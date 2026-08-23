@@ -1,0 +1,71 @@
+import { createClient } from "@/lib/supabase/server";
+import { createManualBackup } from "@/lib/actions/backups";
+import { formatDate } from "@/lib/format";
+
+export default async function BackupsPage() {
+  const supabase = await createClient();
+  const { data: backups } = await supabase.from("backups").select("*").order("created_at", { ascending: false });
+
+  const withLinks = await Promise.all(
+    (backups ?? []).map(async (b) => {
+      const { data } = await supabase.storage.from("backups").createSignedUrl(b.storage_url, 3600);
+      return { ...b, signedUrl: data?.signedUrl ?? null };
+    })
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-slate-900">백업</h1>
+        <form action={createManualBackup}>
+          <button className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
+            지금 백업
+          </button>
+        </form>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[500px] text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-slate-500">
+                <th className="pb-2 pr-4">파일명</th>
+                <th className="pb-2 pr-4">유형</th>
+                <th className="pb-2 pr-4">크기(MB)</th>
+                <th className="pb-2 pr-4">생성일</th>
+                <th className="pb-2 text-right">다운로드</th>
+              </tr>
+            </thead>
+            <tbody>
+              {withLinks.map((b) => (
+                <tr key={b.id} className="border-b border-slate-100 last:border-0">
+                  <td className="py-2 pr-4 text-slate-700">{b.file_name}</td>
+                  <td className="py-2 pr-4 text-slate-700">{b.backup_type === "manual" ? "수동" : "자동"}</td>
+                  <td className="py-2 pr-4 text-slate-700">{b.file_size_mb ?? "-"}</td>
+                  <td className="py-2 pr-4 text-slate-600">{formatDate(b.created_at)}</td>
+                  <td className="py-2 text-right">
+                    {b.signedUrl && (
+                      <a
+                        href={b.signedUrl}
+                        className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-100"
+                      >
+                        다운로드
+                      </a>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {withLinks.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-slate-400">
+                    백업 이력이 없습니다.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}

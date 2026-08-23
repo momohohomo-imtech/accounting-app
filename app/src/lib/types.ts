@@ -1,0 +1,165 @@
+export type Client = {
+  id: string;
+  name: string;
+  type: "vendor" | "customer" | "both";
+  phone: string | null;
+  memo: string | null;
+  created_at: string;
+};
+
+export type Site = {
+  id: string;
+  name: string;
+  location: string | null;
+  manager_name: string | null;
+  created_at: string;
+};
+
+export type Project = {
+  id: string;
+  site_id: string;
+  parent_project_id: string | null;
+  name: string;
+  status: "ongoing" | "done" | "etc";
+  is_service: boolean;
+  start_date: string | null;
+  end_date: string | null;
+  progress_pct: number | null;
+  year: number;
+  created_at: string;
+  sites?: Site;
+};
+
+export type Transaction = {
+  id: string;
+  trans_date: string;
+  type: "매입" | "매출";
+  client_id: string | null;
+  client_name_raw: string | null;
+  project_id: string | null;
+  item_name: string | null;
+  category: string | null;
+  quantity: number | null;
+  unit_price: number | null;
+  card_company: string | null;
+  vat_included: boolean;
+  purchase_amount: number;
+  purchase_vat: number;
+  sales_amount: number;
+  sales_vat: number;
+  payment_type: "immediate" | "credit";
+  is_verified_ai: boolean;
+  receipt_image_url: string | null;
+  ocr_extracted_raw: unknown;
+  note1: string | null;
+  note2: string | null;
+  created_by: string | null;
+  created_at: string;
+  clients?: Client;
+  projects?: Project;
+};
+
+export type CreditPayment = {
+  id: string;
+  transaction_id: string;
+  paid_date: string;
+  paid_amount: number;
+  remaining_amount: number;
+  created_at: string;
+};
+
+export type WorkLog = {
+  id: string;
+  log_date: string;
+  project_id: string;
+  title: string;
+  workers: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  content: string | null;
+  created_at: string;
+  projects?: Project;
+};
+
+export type Employee = {
+  id: string;
+  name: string;
+  role: string | null;
+  employment_type: string | null;
+  hired_date: string | null;
+  phone: string | null;
+  created_at: string;
+};
+
+export type Payroll = {
+  id: string;
+  employee_id: string;
+  pay_month: string;
+  work_days: number | null;
+  amount: number;
+  created_at: string;
+  employees?: Employee;
+};
+
+export type DailyWorkerOffice = {
+  id: string;
+  name: string;
+  manager_name: string | null;
+  phone: string | null;
+  created_at: string;
+};
+
+export type DailyWorker = {
+  id: string;
+  office_id: string;
+  name: string;
+  birth_date: string | null;
+  phone: string | null;
+  nationality: string | null;
+  current_location: string | null;
+  status: "active" | "ended";
+  memo: string | null;
+  registered_at: string;
+  daily_worker_offices?: DailyWorkerOffice;
+};
+
+export type AccessList = {
+  id: string;
+  company_name: string;
+  site_id: string | null;
+  supervisor_name: string | null;
+  access_period: string | null;
+  created_at: string;
+  sites?: Site;
+};
+
+export type BankAccount = {
+  id: string;
+  bank_name: string;
+  nickname: string | null;
+  account_number: string | null;
+  opening_balance: number;
+  created_at: string;
+};
+
+export type BankTransaction = {
+  id: string;
+  bank_account_id: string;
+  trans_date: string;
+  description: string | null;
+  direction: "입금" | "출금";
+  amount: number;
+  matched_client_id: string | null;
+  matched_transaction_id: string | null;
+  created_at: string;
+  clients?: Client;
+};
+
+export type Backup = {
+  id: string;
+  file_name: string;
+  file_size_mb: number | null;
+  backup_type: "auto" | "manual";
+  storage_url: string;
+  created_at: string;
+};
