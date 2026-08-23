@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { Transaction } from "@/lib/types";
+import type { PaymentMethod, Transaction } from "@/lib/types";
 
 const CATEGORY_OPTIONS = ["출장", "물품", "차량", "공구", "회식", "기타"];
 
@@ -12,11 +12,13 @@ type Option = { id: string; name: string };
 export function TransactionForm({
   clients,
   projects,
+  paymentMethods,
   initial,
   action,
 }: {
   clients: Option[];
   projects: Option[];
+  paymentMethods: PaymentMethod[];
   initial?: Transaction;
   action: (formData: FormData) => Promise<void>;
 }) {
@@ -37,7 +39,8 @@ export function TransactionForm({
     category: initial?.category ?? "",
     quantity: initial?.quantity?.toString() ?? "",
     unit_price: initial?.unit_price?.toString() ?? "",
-    card_company: initial?.card_company ?? "",
+    payment_method_id: initial?.payment_method_id ?? "",
+    tax_invoice_issued: initial?.tax_invoice_issued ?? false,
     vat_included: initial?.vat_included ?? true,
     amount: initialAmount ? String(initialAmount) : "",
     payment_type: initial?.payment_type ?? "immediate",
@@ -114,8 +117,8 @@ export function TransactionForm({
     const fd = new FormData();
     if (initial) fd.append("id", initial.id);
     Object.entries(values).forEach(([k, v]) => {
-      if (k === "vat_included") {
-        if (v) fd.append("vat_included", "on");
+      if (k === "vat_included" || k === "tax_invoice_issued") {
+        if (v) fd.append(k, "on");
       } else {
         fd.append(k, String(v));
       }
@@ -226,10 +229,7 @@ export function TransactionForm({
             className={inputClass}
           />
         </Field>
-        <Field label="카드사">
-          <input value={values.card_company} onChange={(e) => set("card_company", e.target.value)} className={inputClass} />
-        </Field>
-        <Field label="결제 방식">
+        <Field label="결제 시점">
           <select
             value={values.payment_type}
             onChange={(e) => set("payment_type", e.target.value as "immediate" | "credit")}
@@ -237,6 +237,21 @@ export function TransactionForm({
           >
             <option value="immediate">즉시결제</option>
             <option value="credit">외상</option>
+          </select>
+        </Field>
+        <Field label="결제수단">
+          <select
+            value={values.payment_method_id}
+            onChange={(e) => set("payment_method_id", e.target.value)}
+            className={inputClass}
+            disabled={values.payment_type === "credit"}
+          >
+            <option value="">{values.payment_type === "credit" ? "정산 시 지정" : "선택 안함"}</option>
+            {paymentMethods.map((pm) => (
+              <option key={pm.id} value={pm.id}>
+                {pm.name}
+              </option>
+            ))}
           </select>
         </Field>
         <Field label="총 금액" required>
@@ -256,6 +271,15 @@ export function TransactionForm({
             className="h-4 w-4"
           />
           VAT 포함 금액
+        </label>
+        <label className="flex items-center gap-2 pt-5 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={values.tax_invoice_issued}
+            onChange={(e) => set("tax_invoice_issued", e.target.checked)}
+            className="h-4 w-4"
+          />
+          세금계산서 발행
         </label>
         <Field label="메모1">
           <input value={values.note1} onChange={(e) => set("note1", e.target.value)} className={inputClass} />

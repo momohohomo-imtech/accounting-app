@@ -1,4 +1,5 @@
 import type { FieldConfig } from "./types";
+import { fieldClass, labelClass } from "@/components/ui/field";
 
 export function EntityForm({
   fields,
@@ -16,7 +17,12 @@ export function EntityForm({
         if (f.type === "checkbox") {
           return (
             <label key={f.name} className="flex items-center gap-2 pt-5 text-sm text-slate-700">
-              <input type="checkbox" name={f.name} defaultChecked={Boolean(raw)} className="h-4 w-4" />
+              <input
+                type="checkbox"
+                name={f.name}
+                defaultChecked={Boolean(raw)}
+                className="h-4 w-4 rounded border-slate-300 accent-slate-900"
+              />
               {f.label}
             </label>
           );
@@ -24,7 +30,7 @@ export function EntityForm({
 
         return (
           <div key={f.name} className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">{f.label}</label>
+            <label className={labelClass}>{f.label}</label>
             {f.type === "textarea" ? (
               <textarea
                 name={f.name}
@@ -32,15 +38,10 @@ export function EntityForm({
                 required={f.required}
                 placeholder={f.placeholder}
                 rows={2}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                className={fieldClass}
               />
             ) : f.type === "select" ? (
-              <select
-                name={f.name}
-                defaultValue={value}
-                required={f.required}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-              >
+              <select name={f.name} defaultValue={value} required={f.required} className={fieldClass}>
                 {f.options?.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
@@ -55,7 +56,7 @@ export function EntityForm({
                 defaultValue={value}
                 required={f.required}
                 placeholder={f.placeholder}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                className={fieldClass}
               />
             )}
           </div>

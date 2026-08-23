@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { remainingBalance } from "@/lib/credit";
+import type { CreditPayment, Transaction } from "@/lib/types";
 
 function computeAmounts(type: string, amount: number, vatIncluded: boolean) {
   const vat = vatIncluded ? Math.round(amount / 11) : Math.round(amount * 0.1);
@@ -36,7 +38,8 @@ export async function createTransactionRecord(formData: FormData) {
     category: String(formData.get("category") ?? "") || null,
     quantity: formData.get("quantity") ? Number(formData.get("quantity")) : null,
     unit_price: formData.get("unit_price") ? Number(formData.get("unit_price")) : null,
-    card_company: String(formData.get("card_company") ?? "") || null,
+    payment_method_id: String(formData.get("payment_method_id") ?? "") || null,
+    tax_invoice_issued: formData.get("tax_invoice_issued") === "on",
     vat_included: vatIncluded,
     ...amounts,
     payment_type: String(formData.get("payment_type") ?? "immediate"),
@@ -73,7 +76,8 @@ export async function updateTransactionRecord(formData: FormData) {
       category: String(formData.get("category") ?? "") || null,
       quantity: formData.get("quantity") ? Number(formData.get("quantity")) : null,
       unit_price: formData.get("unit_price") ? Number(formData.get("unit_price")) : null,
-      card_company: String(formData.get("card_company") ?? "") || null,
+      payment_method_id: String(formData.get("payment_method_id") ?? "") || null,
+      tax_invoice_issued: formData.get("tax_invoice_issued") === "on",
       vat_included: vatIncluded,
       ...amounts,
       payment_type: String(formData.get("payment_type") ?? "immediate"),
@@ -84,7 +88,6 @@ export async function updateTransactionRecord(formData: FormData) {
 
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
-  revalidatePath("/transactions");
 }
 
 export async function deleteTransactionRecord(formData: FormData) {
@@ -93,21 +96,78 @@ export async function deleteTransactionRecord(formData: FormData) {
   await supabase.from("transactions").delete().eq("id", id);
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
-  revalidatePath("/transactions");
 }
 
-export async function addCreditPaymentRecord(formData: FormData) {
+// 외상 여러 건을 같은 날짜로 정산 → 매입매출장에 합계 1건(세금계산서 발행) 자동 생성
+export async function settleCreditTransactions(formData: FormData) {
   const supabase = await createClient();
-  const transactionId = String(formData.get("transaction_id"));
-  const paidAmount = Number(formData.get("paid_amount") ?? 0);
-  const currentRemaining = Number(formData.get("current_remaining") ?? 0);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  await supabase.from("credit_payments").insert({
-    transaction_id: transactionId,
-    paid_date: String(formData.get("paid_date")),
-    paid_amount: paidAmount,
-    remaining_amount: Math.max(currentRemaining - paidAmount, 0),
-  });
+  const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
+  const paidDate = String(formData.get("paid_date") ?? "");
+  const paymentMethodId = String(formData.get("payment_method_id") ?? "") || null;
+  const clientId = String(formData.get("client_id") ?? "") || null;
+  const clientNameRaw = String(formData.get("client_name_raw") ?? "") || null;
+
+  if (ids.length === 0 || !paidDate) {
+    revalidatePath("/transactions");
+    return;
+  }
+
+  const [{ data: txs }, { data: payments }] = await Promise.all([
+    supabase.from("transactions").select("*").in("id", ids),
+    supabase.from("credit_payments").select("*").in("transaction_id", ids),
+  ]);
+
+  const targetTxs = (txs ?? []) as Transaction[];
+  const existingPayments = (payments ?? []) as CreditPayment[];
+  if (targetTxs.length === 0) return;
+
+  const type = targetTxs[0].type;
+  const purchase_amount = targetTxs.reduce((s, t) => s + t.purchase_amount, 0);
+  const purchase_vat = targetTxs.reduce((s, t) => s + t.purchase_vat, 0);
+  const sales_amount = targetTxs.reduce((s, t) => s + t.sales_amount, 0);
+  const sales_vat = targetTxs.reduce((s, t) => s + t.sales_vat, 0);
+
+  const { data: settlementTx, error: settlementError } = await supabase
+    .from("transactions")
+    .insert({
+      trans_date: paidDate,
+      type,
+      client_id: clientId,
+      client_name_raw: clientNameRaw,
+      project_id: null,
+      item_name: `외상 정산 (${targetTxs.length}건)`,
+      payment_method_id: paymentMethodId,
+      tax_invoice_issued: true,
+      vat_included: true,
+      purchase_amount,
+      purchase_vat,
+      sales_amount,
+      sales_vat,
+      payment_type: "immediate",
+      is_verified_ai: false,
+      created_by: user?.id ?? null,
+    })
+    .select()
+    .single();
+
+  if (settlementError || !settlementTx) {
+    revalidatePath("/transactions");
+    return;
+  }
+
+  const creditPaymentRows = targetTxs.map((tx) => ({
+    transaction_id: tx.id,
+    paid_date: paidDate,
+    paid_amount: remainingBalance(tx, existingPayments),
+    remaining_amount: 0,
+    settlement_transaction_id: settlementTx.id,
+  }));
+
+  await supabase.from("credit_payments").insert(creditPaymentRows);
 
   revalidatePath("/transactions");
   revalidatePath("/dashboard");

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cx } from "@/lib/cx";
 
 export function PageTabs({
   basePath,
@@ -15,11 +16,13 @@ export function PageTabs({
         <Link
           key={t.key}
           href={t.key === tabs[0].key ? basePath : `${basePath}?tab=${t.key}`}
-          className={`-mb-px rounded-t-lg border-b-2 px-4 py-2 text-sm font-medium ${
+          aria-current={active === t.key ? "page" : undefined}
+          className={cx(
+            "-mb-px rounded-t-lg border-b-2 px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/20",
             active === t.key
               ? "border-slate-900 text-slate-900"
               : "border-transparent text-slate-500 hover:text-slate-800"
-          }`}
+          )}
         >
           {t.label}
         </Link>

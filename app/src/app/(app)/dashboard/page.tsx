@@ -4,6 +4,10 @@ import { formatWon, formatDate } from "@/lib/format";
 import { remainingBalance } from "@/lib/credit";
 import type { CreditPayment, Transaction } from "@/lib/types";
 import { TaxEstimateSection } from "@/components/sections/TaxEstimateSection";
+import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Table, THead, Th, Tr, Td, EmptyRow } from "@/components/ui/Table";
+import { cx } from "@/lib/cx";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -12,13 +16,14 @@ export default async function DashboardPage() {
 
   const [{ data: monthTx }, { data: creditTx }, { data: creditPayments }, { data: sites }, { data: recentTx }] =
     await Promise.all([
-      supabase.from("transactions").select("*").gte("trans_date", monthStart),
+      supabase.from("transactions").select("*").neq("payment_type", "credit").gte("trans_date", monthStart),
       supabase.from("transactions").select("*").eq("payment_type", "credit"),
       supabase.from("credit_payments").select("*"),
       supabase.from("projects").select("id, status").eq("status", "ongoing"),
       supabase
         .from("transactions")
         .select("*, clients(name), projects(name)")
+        .neq("payment_type", "credit")
         .order("trans_date", { ascending: false })
         .limit(8),
     ]);
@@ -52,9 +57,10 @@ export default async function DashboardPage() {
           <Link
             key={c.label}
             href={c.href}
-            className={`rounded-2xl border p-5 shadow-sm transition hover:border-slate-300 ${
-              c.highlight ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-white"
-            }`}
+            className={cx(
+              "rounded-2xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md",
+              c.highlight ? "border-amber-200 bg-amber-50 hover:border-amber-300" : "border-slate-200 bg-white hover:border-slate-300"
+            )}
           >
             <p className="text-sm text-slate-500">{c.label}</p>
             <p className="mt-2 font-mono text-2xl font-bold text-slate-900">{c.value}</p>
@@ -64,57 +70,43 @@ export default async function DashboardPage() {
 
       <TaxEstimateSection />
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <Card>
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-slate-900">최근 거래</h2>
-          <Link href="/transactions" className="text-sm text-slate-500 hover:text-slate-800">
+          <Link href="/transactions" className="text-sm text-slate-500 transition-colors hover:text-slate-800">
             전체보기
           </Link>
         </div>
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[600px] text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-left text-slate-500">
-                <th className="pb-2 pr-4">날짜</th>
-                <th className="pb-2 pr-4">구분</th>
-                <th className="pb-2 pr-4">거래처</th>
-                <th className="pb-2 pr-4">프로젝트</th>
-                <th className="pb-2 pr-4">품목</th>
-                <th className="pb-2 text-right">금액</th>
-              </tr>
-            </thead>
+        <div className="mt-4">
+          <Table className="min-w-[600px]">
+            <THead>
+              <Th className="pr-4">날짜</Th>
+              <Th className="pr-4">구분</Th>
+              <Th className="pr-4">거래처</Th>
+              <Th className="pr-4">프로젝트</Th>
+              <Th className="pr-4">품목</Th>
+              <Th className="text-right">금액</Th>
+            </THead>
             <tbody>
               {(recentTx ?? []).map((t) => (
-                <tr key={t.id} className="border-b border-slate-100 last:border-0">
-                  <td className="py-2 pr-4 text-slate-600">{formatDate(t.trans_date)}</td>
-                  <td className="py-2 pr-4">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        t.type === "매출" ? "bg-blue-50 text-blue-700" : "bg-orange-50 text-orange-700"
-                      }`}
-                    >
-                      {t.type}
-                    </span>
-                  </td>
-                  <td className="py-2 pr-4 text-slate-700">{t.clients?.name ?? t.client_name_raw ?? "-"}</td>
-                  <td className="py-2 pr-4 text-slate-700">{t.projects?.name ?? "-"}</td>
-                  <td className="py-2 pr-4 text-slate-700">{t.item_name ?? "-"}</td>
-                  <td className="py-2 text-right font-medium text-slate-900">
+                <Tr key={t.id}>
+                  <Td className="pr-4">{formatDate(t.trans_date)}</Td>
+                  <Td className="pr-4">
+                    <Badge variant={t.type === "매출" ? "blue" : "orange"}>{t.type}</Badge>
+                  </Td>
+                  <Td className="pr-4">{t.clients?.name ?? t.client_name_raw ?? "-"}</Td>
+                  <Td className="pr-4">{t.projects?.name ?? "-"}</Td>
+                  <Td className="pr-4">{t.item_name ?? "-"}</Td>
+                  <Td className="text-right font-medium text-slate-900">
                     {formatWon(t.type === "매출" ? t.sales_amount + t.sales_vat : t.purchase_amount + t.purchase_vat)}
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
-              {(recentTx ?? []).length === 0 && (
-                <tr>
-                  <td colSpan={6} className="py-6 text-center text-slate-400">
-                    거래 내역이 없습니다.
-                  </td>
-                </tr>
-              )}
+              {(recentTx ?? []).length === 0 && <EmptyRow colSpan={6}>거래 내역이 없습니다.</EmptyRow>}
             </tbody>
-          </table>
+          </Table>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

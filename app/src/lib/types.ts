@@ -30,6 +30,13 @@ export type Project = {
   sites?: Site;
 };
 
+export type PaymentMethod = {
+  id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+};
+
 export type Transaction = {
   id: string;
   trans_date: string;
@@ -42,6 +49,8 @@ export type Transaction = {
   quantity: number | null;
   unit_price: number | null;
   card_company: string | null;
+  payment_method_id: string | null;
+  tax_invoice_issued: boolean;
   vat_included: boolean;
   purchase_amount: number;
   purchase_vat: number;
@@ -57,6 +66,7 @@ export type Transaction = {
   created_at: string;
   clients?: Client;
   projects?: Project;
+  payment_methods?: PaymentMethod;
 };
 
 export type CreditPayment = {
@@ -65,6 +75,7 @@ export type CreditPayment = {
   paid_date: string;
   paid_amount: number;
   remaining_amount: number;
+  settlement_transaction_id: string | null;
   created_at: string;
 };
 
