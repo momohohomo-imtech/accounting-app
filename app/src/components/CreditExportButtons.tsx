@@ -1,0 +1,61 @@
+"use client";
+
+import { downloadCsv } from "@/lib/csv";
+import { formatDate } from "@/lib/format";
+import { Button } from "@/components/ui/Button";
+import type { OutstandingItem } from "@/components/CreditSettlementGroup";
+import type { SettlementHistoryGroup } from "@/components/CreditHistoryToggle";
+
+export function CreditExportButtons({
+  outstandingGroups,
+  historyGroups,
+}: {
+  outstandingGroups: { label: string; items: OutstandingItem[] }[];
+  historyGroups: SettlementHistoryGroup[];
+}) {
+  function handleExport() {
+    const rows: (string | number)[][] = [
+      ["상태", "거래처", "날짜", "프로젝트", "품목", "금액", "정산일", "결제수단"],
+    ];
+    for (const g of outstandingGroups) {
+      for (const item of g.items) {
+        rows.push([
+          "미정산",
+          g.label,
+          formatDate(item.tx.trans_date),
+          item.tx.projects?.name ?? "일반경비",
+          item.tx.item_name ?? "-",
+          item.remaining,
+          "",
+          "",
+        ]);
+      }
+    }
+    for (const g of historyGroups) {
+      for (const item of g.items) {
+        rows.push([
+          "정산완료",
+          g.clientLabel,
+          formatDate(item.trans_date),
+          item.project_name ?? "일반경비",
+          item.item_name ?? "-",
+          item.amount,
+          formatDate(g.trans_date),
+          g.methodName ?? "",
+        ]);
+      }
+    }
+    downloadCsv(`외상내역_${new Date().toISOString().slice(0, 10)}.csv`, rows);
+  }
+
+  return (
+    <div className="flex gap-2 print:hidden">
+      <Button variant="secondary" size="sm" onClick={() => window.print()}>
+        인쇄
+      </Button>
+      <Button variant="secondary" size="sm" onClick={handleExport}>
+        엑셀 다운로드
+      </Button>
+    </div>
+  );
+}

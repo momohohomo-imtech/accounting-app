@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { formatWon, formatDate } from "@/lib/format";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { fieldClass } from "@/components/ui/field";
 
 export type SettlementHistoryItem = { item_name: string | null; trans_date: string; amount: number; project_name: string | null };
 export type SettlementHistoryGroup = {
@@ -18,6 +19,8 @@ export type SettlementHistoryGroup = {
 export function CreditHistoryToggle({ groups }: { groups: SettlementHistoryGroup[] }) {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [year, setYear] = useState("all");
+  const [month, setMonth] = useState("all");
 
   function toggleExpand(id: string) {
     setExpanded((prev) => {
@@ -28,19 +31,56 @@ export function CreditHistoryToggle({ groups }: { groups: SettlementHistoryGroup
     });
   }
 
+  const years = useMemo(
+    () => Array.from(new Set(groups.map((g) => g.trans_date.slice(0, 4)))).sort((a, b) => b.localeCompare(a)),
+    [groups]
+  );
+
+  const filtered = useMemo(
+    () =>
+      groups.filter((g) => {
+        if (year !== "all" && g.trans_date.slice(0, 4) !== year) return false;
+        if (month !== "all" && g.trans_date.slice(5, 7) !== month) return false;
+        return true;
+      }),
+    [groups, year, month]
+  );
+
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="text-sm font-medium text-slate-600 underline decoration-slate-300 underline-offset-4 transition-colors hover:text-slate-900"
-      >
-        {open ? "정산 이력 숨기기" : `정산 이력 보기 (${groups.length}건)`}
-      </button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="text-sm font-medium text-slate-600 underline decoration-slate-300 underline-offset-4 transition-colors hover:text-slate-900"
+        >
+          {open ? "정산 이력 숨기기" : `정산 이력 보기 (${groups.length}건)`}
+        </button>
+        {open && (
+          <div className="flex gap-2 print:hidden">
+            <select value={year} onChange={(e) => setYear(e.target.value)} className={fieldClass}>
+              <option value="all">전체 연도</option>
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}년
+                </option>
+              ))}
+            </select>
+            <select value={month} onChange={(e) => setMonth(e.target.value)} className={fieldClass}>
+              <option value="all">전체 월</option>
+              {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0")).map((m) => (
+                <option key={m} value={m}>
+                  {Number(m)}월
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
 
       {open && (
         <div className="mt-4 space-y-3">
-          {groups.map((g) => (
+          {filtered.map((g) => (
             <Card key={g.id} padding="md">
               <CardHeader className="mb-2">
                 <div>
@@ -74,7 +114,7 @@ export function CreditHistoryToggle({ groups }: { groups: SettlementHistoryGroup
               )}
             </Card>
           ))}
-          {groups.length === 0 && <p className="py-4 text-center text-sm text-slate-400">정산 이력이 없습니다.</p>}
+          {filtered.length === 0 && <p className="py-4 text-center text-sm text-slate-400">정산 이력이 없습니다.</p>}
         </div>
       )}
     </div>

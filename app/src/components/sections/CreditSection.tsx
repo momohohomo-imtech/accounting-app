@@ -4,6 +4,7 @@ import { remainingBalance, transactionTotal } from "@/lib/credit";
 import type { CreditPayment, PaymentMethod, Transaction } from "@/lib/types";
 import { CreditSettlementGroup } from "@/components/CreditSettlementGroup";
 import { CreditHistoryToggle, type SettlementHistoryGroup } from "@/components/CreditHistoryToggle";
+import { CreditExportButtons } from "@/components/CreditExportButtons";
 import { Card } from "@/components/ui/Card";
 
 export async function CreditSection() {
@@ -87,12 +88,15 @@ export async function CreditSection() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-slate-900">외상 관리</h2>
-        <Card padding="none" className="px-5 py-3">
-          <p className="text-xs text-slate-500">전체 외상 잔액</p>
-          <p className="text-xl font-bold text-slate-900">{formatWon(totalOutstanding)}</p>
-        </Card>
+        <div className="flex items-center gap-3">
+          <CreditExportButtons outstandingGroups={groupList} historyGroups={historyGroups} />
+          <Card padding="none" className="px-5 py-3">
+            <p className="text-xs text-slate-500">전체 외상 잔액</p>
+            <p className="text-xl font-bold text-slate-900">{formatWon(totalOutstanding)}</p>
+          </Card>
+        </div>
       </div>
 
       <div className="space-y-4">

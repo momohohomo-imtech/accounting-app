@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import type { PaymentMethod, Transaction } from "@/lib/types";
 
-type OutstandingItem = { tx: Transaction; remaining: number };
+export type OutstandingItem = { tx: Transaction; remaining: number };
 
 export function CreditSettlementGroup({
   label,

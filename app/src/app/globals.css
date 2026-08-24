@@ -24,3 +24,15 @@ textarea {
   background: #ffffff;
   color: #0f172a;
 }
+
+@media print {
+  aside {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+  body {
+    background: #ffffff;
+  }
+}
