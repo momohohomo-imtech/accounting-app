@@ -2,6 +2,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatWon, formatDate } from "@/lib/format";
 import { ProjectReportActions } from "@/components/ProjectReportActions";
+import { updateProjectMemo } from "@/lib/actions/projects";
+import { fieldClass, labelClass } from "@/components/ui/field";
+import { Button } from "@/components/ui/Button";
 
 export async function ProjectProfitReport({ projectId, closeHref }: { projectId: string; closeHref: string }) {
   const supabase = await createClient();
@@ -131,6 +134,23 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
             {margin === null ? "-" : `${margin.toFixed(2)}%`}
           </p>
         </div>
+      </div>
+
+      <div className="border-t border-slate-100 pt-4">
+        <form action={updateProjectMemo} className="space-y-2">
+          <input type="hidden" name="id" value={project.id} />
+          <label className={labelClass}>메모</label>
+          <textarea
+            name="memo"
+            defaultValue={project.memo ?? ""}
+            rows={8}
+            placeholder="이 프로젝트에 대한 메모를 남겨주세요"
+            className={fieldClass}
+          />
+          <Button type="submit" variant="secondary" size="sm" className="print:hidden">
+            메모 저장
+          </Button>
+        </form>
       </div>
     </div>
   );

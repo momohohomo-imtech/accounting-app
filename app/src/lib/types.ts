@@ -31,6 +31,7 @@ export type Project = {
   quote_amount: number | null;
   contract_amount: number | null;
   order_date: string | null;
+  memo: string | null;
   year: number;
   created_at: string;
   sites?: Site;

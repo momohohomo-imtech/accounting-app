@@ -89,6 +89,7 @@ async function ProjectListSection({ year, report }: { year?: string; report?: st
     { name: "contract_amount", label: "수주액", type: "number" },
     { name: "progress_pct", label: "진행률(%)", type: "number", display: "progress" },
     { name: "year", label: "연도", type: "number", required: true },
+    { name: "memo", label: "메모", type: "textarea" },
   ];
 
   const years = Array.from(

@@ -17,6 +17,7 @@ function parse(formData: FormData) {
     quote_amount: formData.get("quote_amount") ? Number(formData.get("quote_amount")) : null,
     contract_amount: formData.get("contract_amount") ? Number(formData.get("contract_amount")) : null,
     order_date: String(formData.get("order_date") ?? "") || null,
+    memo: String(formData.get("memo") ?? "") || null,
   };
 }
 
@@ -31,6 +32,15 @@ export async function updateProjectRecord(formData: FormData) {
   const id = String(formData.get("id"));
   await supabase.from("projects").update(parse(formData)).eq("id", id);
   revalidatePath("/projects");
+}
+
+export async function updateProjectMemo(formData: FormData) {
+  const supabase = await createClient();
+  const id = String(formData.get("id"));
+  const memo = String(formData.get("memo") ?? "") || null;
+  await supabase.from("projects").update({ memo }).eq("id", id);
+  revalidatePath("/projects");
+  revalidatePath("/reports");
 }
 
 export async function deleteProjectRecord(formData: FormData) {
