@@ -23,7 +23,7 @@ export type Project = {
   parent_project_id: string | null;
   name: string;
   project_code: string | null;
-  status: "ongoing" | "done" | "etc";
+  status: "review" | "ongoing" | "done" | "merged" | "etc";
   is_service: boolean;
   start_date: string | null;
   end_date: string | null;

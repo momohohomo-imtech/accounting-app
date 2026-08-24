@@ -3,6 +3,7 @@ import { CreatePanel } from "@/components/crud/CreatePanel";
 import { EntityTable } from "@/components/crud/EntityTable";
 import { createSiteRecord, updateSiteRecord, deleteSiteRecord } from "@/lib/actions/sites";
 import type { FieldConfig } from "@/components/crud/types";
+import { ClientsSection } from "@/components/sections/ClientsSection";
 
 export async function SitesSection() {
   const supabase = await createClient();
@@ -34,6 +35,10 @@ export async function SitesSection() {
           updateAction={updateSiteRecord}
           deleteAction={deleteSiteRecord}
         />
+      </div>
+
+      <div className="border-t border-slate-200 pt-6">
+        <ClientsSection />
       </div>
     </div>
   );

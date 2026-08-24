@@ -70,8 +70,10 @@ async function ProjectListSection({ year }: { year?: string }) {
       label: "상태",
       type: "select",
       options: [
+        { value: "review", label: "검토중" },
         { value: "ongoing", label: "진행중" },
         { value: "done", label: "완료" },
+        { value: "merged", label: "타 프로젝트 귀속" },
         { value: "etc", label: "기타" },
       ],
     },
