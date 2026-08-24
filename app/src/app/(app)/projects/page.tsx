@@ -109,10 +109,13 @@ async function ProjectListSection({ year, report }: { year?: string; report?: st
           rows={(projects ?? []).map((p) => ({ ...p, site_name: p.sites?.name }))}
           updateAction={updateProjectRecord}
           deleteAction={deleteProjectRecord}
-          renderExtraActions={(row) => (
-            <LinkButton href={`/projects?tab=list&year=${selectedYear}&report=${row.id}`} variant="secondary" size="xs">
-              보고서
-            </LinkButton>
+          extraActions={Object.fromEntries(
+            (projects ?? []).map((p) => [
+              p.id,
+              <LinkButton key={p.id} href={`/projects?tab=list&year=${selectedYear}&report=${p.id}`} variant="secondary" size="xs">
+                보고서
+              </LinkButton>,
+            ])
           )}
         />
       </div>

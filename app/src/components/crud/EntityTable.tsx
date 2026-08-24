@@ -20,13 +20,13 @@ export function EntityTable({
   rows,
   updateAction,
   deleteAction,
-  renderExtraActions,
+  extraActions,
 }: {
   fields: FieldConfig[];
   rows: Row[];
   updateAction: (formData: FormData) => void;
   deleteAction: (formData: FormData) => void;
-  renderExtraActions?: (row: Row) => ReactNode;
+  extraActions?: Record<string, ReactNode>;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -115,7 +115,7 @@ export function EntityTable({
               ))}
               <Td className="text-right">
                 <div className="flex justify-end gap-2">
-                  {renderExtraActions?.(row)}
+                  {extraActions?.[row.id]}
                   <Button variant="secondary" size="xs" onClick={() => setEditingId(row.id)}>
                     수정
                   </Button>
