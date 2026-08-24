@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { FieldConfig } from "./types";
 import { EntityForm } from "./EntityForm";
 import { Table, THead, Tr, Td } from "@/components/ui/Table";
@@ -20,11 +20,13 @@ export function EntityTable({
   rows,
   updateAction,
   deleteAction,
+  renderExtraActions,
 }: {
   fields: FieldConfig[];
   rows: Row[];
   updateAction: (formData: FormData) => void;
   deleteAction: (formData: FormData) => void;
+  renderExtraActions?: (row: Row) => ReactNode;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -113,6 +115,7 @@ export function EntityTable({
               ))}
               <Td className="text-right">
                 <div className="flex justify-end gap-2">
+                  {renderExtraActions?.(row)}
                   <Button variant="secondary" size="xs" onClick={() => setEditingId(row.id)}>
                     수정
                   </Button>

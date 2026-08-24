@@ -6,6 +6,8 @@ import type { FieldConfig } from "@/components/crud/types";
 import { PageTabs } from "@/components/PageTabs";
 import { SitesSection } from "@/components/sections/SitesSection";
 import { YearFilter } from "@/components/YearFilter";
+import { ProjectProfitReport } from "@/components/ProjectProfitReport";
+import { LinkButton } from "@/components/ui/Button";
 
 const TABS = [
   { key: "list", label: "프로젝트" },
@@ -15,9 +17,9 @@ const TABS = [
 export default async function ProjectsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; year?: string }>;
+  searchParams: Promise<{ tab?: string; year?: string; report?: string }>;
 }) {
-  const { tab, year } = await searchParams;
+  const { tab, year, report } = await searchParams;
   const active = tab ?? "list";
 
   return (
@@ -25,12 +27,12 @@ export default async function ProjectsPage({
       <h1 className="text-2xl font-bold text-slate-900">프로젝트·현장</h1>
       <PageTabs basePath="/projects" tabs={TABS} active={active} />
       {active === "sites" && <SitesSection />}
-      {active === "list" && <ProjectListSection year={year} />}
+      {active === "list" && <ProjectListSection year={year} report={report} />}
     </div>
   );
 }
 
-async function ProjectListSection({ year }: { year?: string }) {
+async function ProjectListSection({ year, report }: { year?: string; report?: string }) {
   const supabase = await createClient();
   const currentYear = new Date().getFullYear();
   const selectedYear = year ? Number(year) : currentYear;
@@ -107,8 +109,23 @@ async function ProjectListSection({ year }: { year?: string }) {
           rows={(projects ?? []).map((p) => ({ ...p, site_name: p.sites?.name }))}
           updateAction={updateProjectRecord}
           deleteAction={deleteProjectRecord}
+          renderExtraActions={(row) => (
+            <LinkButton href={`/projects?tab=list&year=${selectedYear}&report=${row.id}`} variant="secondary" size="xs">
+              보고서
+            </LinkButton>
+          )}
         />
       </div>
+
+      {report && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:static print:bg-transparent print:p-0"
+        >
+          <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
+            <ProjectProfitReport projectId={report} closeHref={`/projects?tab=list&year=${selectedYear}`} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

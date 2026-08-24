@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { formatWon, formatDate } from "@/lib/format";
+import { formatWon } from "@/lib/format";
+import { ProjectProfitReport } from "@/components/ProjectProfitReport";
 
 const MONTH_LABELS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
 
@@ -203,7 +204,11 @@ export default async function ReportsPage({
         </div>
       </div>
 
-      {project && <ProjectProfitDetail projectId={project} year={selectedYear} />}
+      {project && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <ProjectProfitReport projectId={project} closeHref={`/reports?year=${selectedYear}`} />
+        </div>
+      )}
 
       <ReportTable
         title="매입처별 집계 — 어느 업체에서 얼마를 매입했는지"
@@ -218,107 +223,6 @@ export default async function ReportsPage({
         headers={["거래처", "건수", "매출 합계"]}
         empty="매출 거래가 없습니다."
       />
-    </div>
-  );
-}
-
-async function ProjectProfitDetail({ projectId, year }: { projectId: string; year: number }) {
-  const supabase = await createClient();
-  const { data: project } = await supabase.from("projects").select("*").eq("id", projectId).single();
-  if (!project) return null;
-
-  const { data: children } = await supabase.from("projects").select("*").eq("parent_project_id", projectId);
-  const group = [project, ...(children ?? [])];
-  const groupIds = group.map((p) => p.id);
-
-  const { data: purchaseRows } = await supabase
-    .from("transactions")
-    .select("*, clients(name), projects(name)")
-    .in("project_id", groupIds)
-    .eq("type", "매입")
-    .order("trans_date", { ascending: true });
-
-  const rows = purchaseRows ?? [];
-  const purchaseTotal = rows.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
-  const quoteTotal = group.reduce((s, p) => s + (p.quote_amount ?? 0), 0);
-  const contractTotal = group.reduce((s, p) => s + (p.contract_amount ?? 0), 0);
-  // 이익 계산은 실제 받는 금액인 수주액 기준. 수주액 미입력 시 발주액으로 대체.
-  const budget = contractTotal || quoteTotal;
-  const profit = budget - purchaseTotal;
-  const margin = budget ? (profit / budget) * 100 : null;
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="font-semibold text-slate-900">
-          {project.name}
-          {children && children.length > 0 && (
-            <span className="ml-2 text-sm font-normal text-slate-500">
-              + {children.map((c) => c.name).join(", ")}
-            </span>
-          )}
-        </h2>
-        <Link href={`/reports?year=${year}`} className="text-sm text-slate-500 hover:text-slate-800">
-          닫기
-        </Link>
-      </div>
-
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[600px] text-sm">
-          <thead>
-            <tr className="border-b border-slate-200 text-left text-slate-500">
-              <th className="pb-2 pr-4">날짜</th>
-              <th className="pb-2 pr-4">거래처</th>
-              <th className="pb-2 pr-4">품목</th>
-              <th className="pb-2 text-right">금액</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((t) => (
-              <tr key={t.id} className="border-b border-slate-100 last:border-0">
-                <td className="py-2 pr-4 text-slate-600">{formatDate(t.trans_date)}</td>
-                <td className="py-2 pr-4 text-slate-700">{t.clients?.name ?? t.client_name_raw ?? "-"}</td>
-                <td className="py-2 pr-4 text-slate-700">{t.item_name ?? "-"}</td>
-                <td className="py-2 text-right font-mono text-slate-900">{formatWon(t.purchase_amount + t.purchase_vat)}</td>
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={4} className="py-6 text-center text-slate-400">
-                  매입 내역이 없습니다.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-5">
-        <div>
-          <p className="text-xs text-slate-500">매입 합계</p>
-          <p className="font-mono text-lg font-bold text-slate-900">{formatWon(purchaseTotal)}</p>
-        </div>
-        <div>
-          <p className="text-xs text-slate-500">발주액 (원청 발주금액)</p>
-          <p className="font-mono text-lg font-bold text-slate-900">{formatWon(quoteTotal)}</p>
-        </div>
-        <div>
-          <p className="text-xs text-slate-500">수주액 (실수령액)</p>
-          <p className="font-mono text-lg font-bold text-slate-900">{formatWon(contractTotal)}</p>
-        </div>
-        <div>
-          <p className="text-xs text-slate-500">이익금 (수주액 기준)</p>
-          <p className={`font-mono text-lg font-bold ${profit >= 0 ? "text-slate-900" : "text-red-600"}`}>
-            {formatWon(profit)}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-slate-500">이익율</p>
-          <p className={`font-mono text-lg font-bold ${profit >= 0 ? "text-slate-900" : "text-red-600"}`}>
-            {margin === null ? "-" : `${margin.toFixed(2)}%`}
-          </p>
-        </div>
-      </div>
     </div>
   );
 }
