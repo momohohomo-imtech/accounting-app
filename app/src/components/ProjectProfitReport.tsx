@@ -26,7 +26,8 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
   // 이익금 = 발주액 - (발주액 - 수주액) - 매입합계 = 수주액 - 매입합계
   const gap = quoteTotal - contractTotal;
   const profit = contractTotal ? contractTotal - purchaseTotal : null;
-  const margin = contractTotal ? ((contractTotal - purchaseTotal) / contractTotal) * 100 : null;
+  // 이익율은 발주액 대비 비율
+  const margin = quoteTotal && profit !== null ? (profit / quoteTotal) * 100 : null;
 
   const exportRows = rows.map((t) => [
     formatDate(t.trans_date),
