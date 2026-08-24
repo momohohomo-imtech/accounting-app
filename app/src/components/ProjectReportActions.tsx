@@ -8,13 +8,20 @@ export function ProjectReportActions({
   filename,
   title,
   exportRows,
+  summaryRows,
 }: {
   filename: string;
   title: string;
   exportRows: (string | number)[][];
+  summaryRows: [string, string | number][];
 }) {
   async function handleExport() {
-    await downloadXlsx(`${filename}.xlsx`, ["날짜", "거래처", "품목", "금액"], exportRows, title.slice(0, 31) || "손익보고서");
+    const rows: (string | number)[][] = [
+      ...exportRows,
+      ["", "", "", ""],
+      ...summaryRows.map(([label, value]) => ["", "", label, value] as (string | number)[]),
+    ];
+    await downloadXlsx(`${filename}.xlsx`, ["날짜", "거래처", "품목", "금액"], rows, title.slice(0, 31) || "손익보고서");
   }
 
   return (

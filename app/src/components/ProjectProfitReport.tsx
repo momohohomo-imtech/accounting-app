@@ -36,6 +36,15 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
     t.purchase_amount + t.purchase_vat,
   ]);
 
+  const summaryRows: [string, string | number][] = [
+    ["발주액 (원청 발주금액)", formatWon(quoteTotal)],
+    ["차액 (발주액-수주액)", `-${formatWon(gap)}`],
+    ["수주액 (실수령액)", formatWon(contractTotal)],
+    ["매입 합계", `-${formatWon(purchaseTotal)}`],
+    ["이익금", profit === null ? "수주액 미입력" : formatWon(profit)],
+    ["이익율", margin === null ? "-" : `${margin.toFixed(2)}%`],
+  ];
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -55,6 +64,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
             filename={`${project.project_code ?? project.name}_손익보고서`}
             title={`${project.project_code ?? ""} ${project.name}`.trim()}
             exportRows={exportRows}
+            summaryRows={summaryRows}
           />
           <Link href={closeHref} className="text-sm text-slate-500 hover:text-slate-800 print:hidden">
             닫기
