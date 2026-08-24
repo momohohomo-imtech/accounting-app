@@ -28,7 +28,7 @@ export async function createTransactionRecord(formData: FormData) {
 
   const ocrRaw = String(formData.get("ocr_extracted_raw") ?? "");
 
-  await supabase.from("transactions").insert({
+  const { error } = await supabase.from("transactions").insert({
     trans_date: String(formData.get("trans_date")),
     type,
     client_id: String(formData.get("client_id") ?? "") || null,
@@ -51,6 +51,8 @@ export async function createTransactionRecord(formData: FormData) {
     created_by: user?.id ?? null,
   });
 
+  if (error) throw new Error(error.message);
+
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
   redirect("/transactions");
@@ -64,7 +66,7 @@ export async function updateTransactionRecord(formData: FormData) {
   const amount = Number(formData.get("amount") ?? 0);
   const amounts = computeAmounts(type, amount, vatIncluded);
 
-  await supabase
+  const { error } = await supabase
     .from("transactions")
     .update({
       trans_date: String(formData.get("trans_date")),
@@ -73,7 +75,7 @@ export async function updateTransactionRecord(formData: FormData) {
       client_name_raw: String(formData.get("client_name_raw") ?? "") || null,
       project_id: String(formData.get("project_id") ?? "") || null,
       item_name: String(formData.get("item_name") ?? "") || null,
-      category: String(formData.get("category") ?? "") || null,
+      category_id: String(formData.get("category_id") ?? "") || null,
       quantity: formData.get("quantity") ? Number(formData.get("quantity")) : null,
       unit_price: formData.get("unit_price") ? Number(formData.get("unit_price")) : null,
       payment_method_id: String(formData.get("payment_method_id") ?? "") || null,
@@ -85,6 +87,8 @@ export async function updateTransactionRecord(formData: FormData) {
       note2: String(formData.get("note2") ?? "") || null,
     })
     .eq("id", id);
+
+  if (error) throw new Error(error.message);
 
   revalidatePath("/transactions");
   revalidatePath("/dashboard");

@@ -130,7 +130,16 @@ export function TransactionForm({
     fd.append("receipt_image_url", path);
     fd.append("ocr_extracted_raw", ocrExtracted ? JSON.stringify(ocrExtracted) : "");
 
-    await action(fd);
+    try {
+      await action(fd);
+    } catch (err) {
+      const digest = (err as { digest?: string } | null)?.digest;
+      if (typeof digest === "string" && digest.startsWith("NEXT_REDIRECT")) {
+        throw err;
+      }
+      setError(err instanceof Error ? err.message : "거래 저장 중 오류가 발생했습니다.");
+      return;
+    }
     if (initial) {
       router.push("/transactions");
       router.refresh();
