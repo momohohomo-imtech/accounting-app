@@ -242,7 +242,8 @@ async function ProjectProfitDetail({ projectId, year }: { projectId: string; yea
   const purchaseTotal = rows.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
   const quoteTotal = group.reduce((s, p) => s + (p.quote_amount ?? 0), 0);
   const contractTotal = group.reduce((s, p) => s + (p.contract_amount ?? 0), 0);
-  const budget = quoteTotal || contractTotal;
+  // 이익 계산은 실제 받는 금액인 수주액 기준. 수주액 미입력 시 발주액으로 대체.
+  const budget = contractTotal || quoteTotal;
   const profit = budget - purchaseTotal;
   const margin = budget ? (profit / budget) * 100 : null;
 
@@ -292,20 +293,21 @@ async function ProjectProfitDetail({ projectId, year }: { projectId: string; yea
         </table>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-5">
         <div>
           <p className="text-xs text-slate-500">매입 합계</p>
           <p className="font-mono text-lg font-bold text-slate-900">{formatWon(purchaseTotal)}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500">발주금{contractTotal ? " / 수주액" : ""}</p>
-          <p className="font-mono text-lg font-bold text-slate-900">
-            {formatWon(quoteTotal)}
-            {contractTotal ? ` / ${formatWon(contractTotal)}` : ""}
-          </p>
+          <p className="text-xs text-slate-500">발주액 (원청 발주금액)</p>
+          <p className="font-mono text-lg font-bold text-slate-900">{formatWon(quoteTotal)}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500">이익금</p>
+          <p className="text-xs text-slate-500">수주액 (실수령액)</p>
+          <p className="font-mono text-lg font-bold text-slate-900">{formatWon(contractTotal)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-500">이익금 (수주액 기준)</p>
           <p className={`font-mono text-lg font-bold ${profit >= 0 ? "text-slate-900" : "text-red-600"}`}>
             {formatWon(profit)}
           </p>
