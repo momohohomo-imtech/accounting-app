@@ -15,6 +15,18 @@ function displayValue(row: Row, f: FieldConfig) {
   return raw === null || raw === undefined || raw === "" ? "-" : String(raw);
 }
 
+function ProgressCell({ value }: { value: number }) {
+  const pct = Math.max(0, Math.min(100, value));
+  return (
+    <div className="flex items-center gap-2">
+      <div className="h-2 w-20 shrink-0 overflow-hidden rounded-full bg-slate-100">
+        <div className="h-full rounded-full bg-blue-500" style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-xs text-slate-600">{pct}%</span>
+    </div>
+  );
+}
+
 export function EntityTable({
   fields,
   rows,
@@ -110,7 +122,7 @@ export function EntityTable({
             <Tr key={row.id}>
               {fields.map((f) => (
                 <Td key={f.name} className="max-w-[220px] truncate pr-4">
-                  {displayValue(row, f)}
+                  {f.display === "progress" ? <ProgressCell value={Number(row[f.name]) || 0} /> : displayValue(row, f)}
                 </Td>
               ))}
               <Td className="text-right">

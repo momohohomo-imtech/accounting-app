@@ -87,7 +87,7 @@ async function ProjectListSection({ year, report }: { year?: string; report?: st
     { name: "order_date", label: "발주서일자", type: "date" },
     { name: "quote_amount", label: "발주액", type: "number" },
     { name: "contract_amount", label: "수주액", type: "number" },
-    { name: "progress_pct", label: "진행률(%)", type: "number" },
+    { name: "progress_pct", label: "진행률(%)", type: "number", display: "progress" },
     { name: "year", label: "연도", type: "number", required: true },
   ];
 

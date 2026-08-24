@@ -7,4 +7,5 @@ export type FieldConfig = {
   step?: string;
   placeholder?: string;
   readOnly?: boolean;
+  display?: "progress";
 };
