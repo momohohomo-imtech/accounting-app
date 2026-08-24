@@ -4,7 +4,7 @@ import { useState } from "react";
 import { settleCreditTransactions } from "@/lib/actions/transactions";
 import { formatWon, formatDate } from "@/lib/format";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
+import { Button, LinkButton } from "@/components/ui/Button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import type { PaymentMethod, Transaction } from "@/lib/types";
 
@@ -59,6 +59,9 @@ export function CreditSettlementGroup({
             <span className="w-28 shrink-0 truncate text-slate-500">{tx.projects?.name ?? "일반경비"}</span>
             <span className="flex-1 truncate text-slate-700">{tx.item_name ?? "-"}</span>
             <span className="shrink-0 font-medium text-slate-900">{formatWon(remaining)}</span>
+            <LinkButton href={`/transactions/${tx.id}/edit`} variant="secondary" size="xs">
+              수정
+            </LinkButton>
           </li>
         ))}
       </ul>
