@@ -3,7 +3,7 @@ import { formatWon } from "@/lib/format";
 import { remainingBalance, transactionTotal } from "@/lib/credit";
 import type { CreditPayment, PaymentMethod, Transaction } from "@/lib/types";
 import { CreditSettlementGroup } from "@/components/CreditSettlementGroup";
-import { CreditHistoryToggle, type SettlementHistoryGroup } from "@/components/CreditHistoryToggle";
+import { CreditHistoryToggle, type VendorHistoryGroup, type VendorHistoryItem } from "@/components/CreditHistoryToggle";
 import { CreditExportButtons } from "@/components/CreditExportButtons";
 import { Card } from "@/components/ui/Card";
 
@@ -18,13 +18,6 @@ export async function CreditSection() {
     supabase.from("credit_payments").select("*"),
     supabase.from("payment_methods").select("*").order("sort_order"),
   ]);
-
-  const settlementIds = Array.from(
-    new Set((payments ?? []).map((p) => p.settlement_transaction_id).filter((id): id is string => Boolean(id)))
-  );
-  const { data: settlements } = settlementIds.length
-    ? await supabase.from("transactions").select("*, clients(name), payment_methods(name)").in("id", settlementIds)
-    : { data: [] as never[] };
 
   const txs = (creditTx ?? []) as Transaction[];
   const pays = (payments ?? []) as CreditPayment[];
@@ -60,38 +53,50 @@ export async function CreditSection() {
   }
   const groupList = Array.from(groups.values()).sort((a, b) => a.label.localeCompare(b.label));
 
-  const originalById = new Map(txs.map((tx) => [tx.id, tx]));
-  const historyMap = new Map<string, SettlementHistoryGroup>();
-  for (const settlement of (settlements ?? []) as Transaction[]) {
-    historyMap.set(settlement.id, {
-      id: settlement.id,
-      clientLabel: `${settlement.clients?.name ?? settlement.client_name_raw ?? "거래처 미지정"}`,
-      trans_date: settlement.trans_date,
-      methodName: settlement.payment_methods?.name ?? null,
-      total: transactionTotal(settlement),
-      items: [],
+  // 외상 거래를 한 번이라도 한 거래처는 전체 거래(즉시결제 포함) 이력을 보여준다.
+  const vendorClientIds = Array.from(
+    new Set(txs.map((t) => t.client_id).filter((id): id is string => Boolean(id)))
+  );
+  const { data: vendorAllTx } = vendorClientIds.length
+    ? await supabase
+        .from("transactions")
+        .select("*, clients(name), projects(name), payment_methods(name)")
+        .in("client_id", vendorClientIds)
+        .order("trans_date", { ascending: false })
+    : { data: [] as Transaction[] };
+
+  const vendorGroupMap = new Map<string, VendorHistoryGroup>();
+  for (const tx of (vendorAllTx ?? []) as Transaction[]) {
+    const key = tx.client_id as string;
+    if (!vendorGroupMap.has(key)) {
+      vendorGroupMap.set(key, { key, label: tx.clients?.name ?? "거래처", items: [] });
+    }
+    let status: VendorHistoryItem["status"];
+    if (tx.payment_type === "credit") {
+      status = remainingBalance(tx, pays) > 0 ? "미정산" : "정산완료";
+    } else if (tx.item_name?.startsWith("외상 정산")) {
+      status = "정산 합계";
+    } else {
+      status = "즉시결제";
+    }
+    vendorGroupMap.get(key)!.items.push({
+      id: tx.id,
+      trans_date: tx.trans_date,
+      item_name: tx.item_name,
+      project_name: tx.projects?.name ?? null,
+      amount: transactionTotal(tx),
+      status,
+      methodName: tx.payment_methods?.name ?? null,
     });
   }
-  for (const p of pays) {
-    if (!p.settlement_transaction_id) continue;
-    const group = historyMap.get(p.settlement_transaction_id);
-    const original = originalById.get(p.transaction_id);
-    if (!group || !original) continue;
-    group.items.push({
-      item_name: original.item_name,
-      trans_date: original.trans_date,
-      amount: transactionTotal(original),
-      project_name: original.projects?.name ?? null,
-    });
-  }
-  const historyGroups = Array.from(historyMap.values()).sort((a, b) => b.trans_date.localeCompare(a.trans_date));
+  const vendorHistoryGroups = Array.from(vendorGroupMap.values()).sort((a, b) => a.label.localeCompare(b.label));
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-slate-900">외상 관리</h2>
         <div className="flex items-center gap-3">
-          <CreditExportButtons outstandingGroups={groupList} historyGroups={historyGroups} />
+          <CreditExportButtons outstandingGroups={groupList} historyGroups={vendorHistoryGroups} />
           <Card padding="none" className="px-5 py-3">
             <p className="text-xs text-slate-500">전체 외상 잔액</p>
             <p className="text-xl font-bold text-slate-900">{formatWon(totalOutstanding)}</p>
@@ -114,7 +119,7 @@ export async function CreditSection() {
       </div>
 
       <div className="border-t border-slate-200 pt-4">
-        <CreditHistoryToggle groups={historyGroups} />
+        <CreditHistoryToggle groups={vendorHistoryGroups} />
       </div>
     </div>
   );

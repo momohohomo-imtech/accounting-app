@@ -4,18 +4,18 @@ import { downloadCsv } from "@/lib/csv";
 import { formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import type { OutstandingItem } from "@/components/CreditSettlementGroup";
-import type { SettlementHistoryGroup } from "@/components/CreditHistoryToggle";
+import type { VendorHistoryGroup } from "@/components/CreditHistoryToggle";
 
 export function CreditExportButtons({
   outstandingGroups,
   historyGroups,
 }: {
   outstandingGroups: { label: string; items: OutstandingItem[] }[];
-  historyGroups: SettlementHistoryGroup[];
+  historyGroups: VendorHistoryGroup[];
 }) {
   function handleExport() {
     const rows: (string | number)[][] = [
-      ["상태", "거래처", "날짜", "프로젝트", "품목", "금액", "정산일", "결제수단"],
+      ["상태", "거래처", "날짜", "프로젝트", "품목", "결제수단", "금액"],
     ];
     for (const g of outstandingGroups) {
       for (const item of g.items) {
@@ -25,23 +25,21 @@ export function CreditExportButtons({
           formatDate(item.tx.trans_date),
           item.tx.projects?.name ?? "일반경비",
           item.tx.item_name ?? "-",
+          "",
           item.remaining,
-          "",
-          "",
         ]);
       }
     }
     for (const g of historyGroups) {
       for (const item of g.items) {
         rows.push([
-          "정산완료",
-          g.clientLabel,
+          item.status,
+          g.label,
           formatDate(item.trans_date),
           item.project_name ?? "일반경비",
           item.item_name ?? "-",
+          item.methodName ?? "",
           item.amount,
-          formatDate(g.trans_date),
-          g.methodName ?? "",
         ]);
       }
     }
