@@ -54,22 +54,38 @@ export async function CreditSection() {
   const groupList = Array.from(groups.values()).sort((a, b) => a.label.localeCompare(b.label));
 
   // 외상 거래를 한 번이라도 한 거래처는 전체 거래(즉시결제 포함) 이력을 보여준다.
+  // client_id가 없는(거래처 미등록) 옛 데이터도 client_name_raw로 잡아준다.
   const vendorClientIds = Array.from(
     new Set(txs.map((t) => t.client_id).filter((id): id is string => Boolean(id)))
   );
-  const { data: vendorAllTx } = vendorClientIds.length
-    ? await supabase
-        .from("transactions")
-        .select("*, clients(name), projects(name), payment_methods(name)")
-        .in("client_id", vendorClientIds)
-        .order("trans_date", { ascending: false })
-    : { data: [] as Transaction[] };
+  const vendorRawNames = Array.from(
+    new Set(txs.filter((t) => !t.client_id).map((t) => t.client_name_raw).filter((n): n is string => Boolean(n)))
+  );
+
+  const [{ data: vendorAllTxById }, { data: vendorAllTxByName }] = await Promise.all([
+    vendorClientIds.length
+      ? supabase
+          .from("transactions")
+          .select("*, clients(name), projects(name), payment_methods(name)")
+          .in("client_id", vendorClientIds)
+          .order("trans_date", { ascending: false })
+      : Promise.resolve({ data: [] as Transaction[] }),
+    vendorRawNames.length
+      ? supabase
+          .from("transactions")
+          .select("*, clients(name), projects(name), payment_methods(name)")
+          .is("client_id", null)
+          .in("client_name_raw", vendorRawNames)
+          .order("trans_date", { ascending: false })
+      : Promise.resolve({ data: [] as Transaction[] }),
+  ]);
+  const vendorAllTx = [...(vendorAllTxById ?? []), ...(vendorAllTxByName ?? [])];
 
   const vendorGroupMap = new Map<string, VendorHistoryGroup>();
-  for (const tx of (vendorAllTx ?? []) as Transaction[]) {
-    const key = tx.client_id as string;
+  for (const tx of vendorAllTx as Transaction[]) {
+    const key = tx.client_id ?? `raw:${tx.client_name_raw}`;
     if (!vendorGroupMap.has(key)) {
-      vendorGroupMap.set(key, { key, label: tx.clients?.name ?? "거래처", items: [] });
+      vendorGroupMap.set(key, { key, label: tx.clients?.name ?? tx.client_name_raw ?? "거래처", items: [] });
     }
     let status: VendorHistoryItem["status"];
     if (tx.payment_type === "credit") {
