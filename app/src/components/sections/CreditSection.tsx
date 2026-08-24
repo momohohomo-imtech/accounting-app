@@ -1,8 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatWon } from "@/lib/format";
-import { remainingBalance } from "@/lib/credit";
+import { remainingBalance, transactionTotal } from "@/lib/credit";
 import type { CreditPayment, PaymentMethod, Transaction } from "@/lib/types";
 import { CreditSettlementGroup } from "@/components/CreditSettlementGroup";
+import { CreditHistoryToggle, type SettlementHistoryGroup } from "@/components/CreditHistoryToggle";
 import { Card } from "@/components/ui/Card";
 
 export async function CreditSection() {
@@ -16,6 +17,13 @@ export async function CreditSection() {
     supabase.from("credit_payments").select("*"),
     supabase.from("payment_methods").select("*").order("sort_order"),
   ]);
+
+  const settlementIds = Array.from(
+    new Set((payments ?? []).map((p) => p.settlement_transaction_id).filter((id): id is string => Boolean(id)))
+  );
+  const { data: settlements } = settlementIds.length
+    ? await supabase.from("transactions").select("*, clients(name), payment_methods(name)").in("id", settlementIds)
+    : { data: [] as never[] };
 
   const txs = (creditTx ?? []) as Transaction[];
   const pays = (payments ?? []) as CreditPayment[];
@@ -51,6 +59,32 @@ export async function CreditSection() {
   }
   const groupList = Array.from(groups.values()).sort((a, b) => a.label.localeCompare(b.label));
 
+  const originalById = new Map(txs.map((tx) => [tx.id, tx]));
+  const historyMap = new Map<string, SettlementHistoryGroup>();
+  for (const settlement of (settlements ?? []) as Transaction[]) {
+    historyMap.set(settlement.id, {
+      id: settlement.id,
+      clientLabel: `${settlement.clients?.name ?? settlement.client_name_raw ?? "거래처 미지정"}`,
+      trans_date: settlement.trans_date,
+      methodName: settlement.payment_methods?.name ?? null,
+      total: transactionTotal(settlement),
+      items: [],
+    });
+  }
+  for (const p of pays) {
+    if (!p.settlement_transaction_id) continue;
+    const group = historyMap.get(p.settlement_transaction_id);
+    const original = originalById.get(p.transaction_id);
+    if (!group || !original) continue;
+    group.items.push({
+      item_name: original.item_name,
+      trans_date: original.trans_date,
+      amount: transactionTotal(original),
+      project_name: original.projects?.name ?? null,
+    });
+  }
+  const historyGroups = Array.from(historyMap.values()).sort((a, b) => b.trans_date.localeCompare(a.trans_date));
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -73,6 +107,10 @@ export async function CreditSection() {
           />
         ))}
         {groupList.length === 0 && <p className="py-8 text-center text-sm text-slate-400">미정산 외상 거래가 없습니다.</p>}
+      </div>
+
+      <div className="border-t border-slate-200 pt-4">
+        <CreditHistoryToggle groups={historyGroups} />
       </div>
     </div>
   );
