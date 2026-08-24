@@ -1,10 +1,12 @@
 "use client";
 
-import { downloadCsv } from "@/lib/csv";
+import { downloadXlsx } from "@/lib/xlsxExport";
 import { formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import type { OutstandingItem } from "@/components/CreditSettlementGroup";
 import type { VendorHistoryGroup } from "@/components/CreditHistoryToggle";
+
+const HEADERS = ["상태", "거래처", "날짜", "프로젝트", "품목", "결제수단", "금액"];
 
 export function CreditExportButtons({
   outstandingGroups,
@@ -13,10 +15,8 @@ export function CreditExportButtons({
   outstandingGroups: { label: string; items: OutstandingItem[] }[];
   historyGroups: VendorHistoryGroup[];
 }) {
-  function handleExport() {
-    const rows: (string | number)[][] = [
-      ["상태", "거래처", "날짜", "프로젝트", "품목", "결제수단", "금액"],
-    ];
+  async function handleExport() {
+    const rows: (string | number)[][] = [];
     for (const g of outstandingGroups) {
       for (const item of g.items) {
         rows.push([
@@ -43,7 +43,7 @@ export function CreditExportButtons({
         ]);
       }
     }
-    downloadCsv(`외상내역_${new Date().toISOString().slice(0, 10)}.csv`, rows);
+    await downloadXlsx(`외상내역_${new Date().toISOString().slice(0, 10)}.xlsx`, HEADERS, rows, "외상내역");
   }
 
   return (
