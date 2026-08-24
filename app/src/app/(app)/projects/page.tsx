@@ -5,6 +5,7 @@ import { createProjectRecord, updateProjectRecord, deleteProjectRecord } from "@
 import type { FieldConfig } from "@/components/crud/types";
 import { PageTabs } from "@/components/PageTabs";
 import { SitesSection } from "@/components/sections/SitesSection";
+import { YearFilter } from "@/components/YearFilter";
 
 const TABS = [
   { key: "list", label: "프로젝트" },
@@ -34,7 +35,7 @@ async function ProjectListSection({ year }: { year?: string }) {
   const currentYear = new Date().getFullYear();
   const selectedYear = year ? Number(year) : currentYear;
 
-  const [{ data: sites }, { data: allProjects }, { data: projects }] = await Promise.all([
+  const [{ data: sites }, { data: allProjects }, { data: projects }, { data: allYears }] = await Promise.all([
     supabase.from("sites").select("id, name, clients(name)").order("name"),
     supabase.from("projects").select("id, name"),
     supabase
@@ -42,6 +43,7 @@ async function ProjectListSection({ year }: { year?: string }) {
       .select("*, sites(name)")
       .eq("year", selectedYear)
       .order("created_at", { ascending: false }),
+    supabase.from("projects").select("year"),
   ]);
 
   const siteOptions = (sites ?? []).map((s) => {
@@ -87,22 +89,14 @@ async function ProjectListSection({ year }: { year?: string }) {
     { name: "year", label: "연도", type: "number", required: true },
   ];
 
-  const years = Array.from({ length: 6 }, (_, i) => currentYear - 3 + i);
+  const years = Array.from(
+    new Set([...(allYears ?? []).map((p) => p.year), currentYear, selectedYear])
+  ).sort((a, b) => b - a);
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end gap-1">
-        {years.map((y) => (
-          <a
-            key={y}
-            href={`/projects?year=${y}`}
-            className={`rounded-lg px-3 py-1.5 text-sm ${
-              y === selectedYear ? "bg-slate-900 text-white" : "border border-slate-300 text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            {y}
-          </a>
-        ))}
+      <div className="flex justify-end">
+        <YearFilter basePath="/projects" years={years} selectedYear={selectedYear} />
       </div>
 
       <CreatePanel title="프로젝트" fields={fields} createAction={createProjectRecord} />
