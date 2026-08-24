@@ -146,7 +146,7 @@ async function TransactionListSection({
       </div>
 
       <Card>
-        <TransactionTable transactions={(transactions ?? []) as Transaction[]} />
+        <TransactionTable transactions={(transactions ?? []) as Transaction[]} projectNodes={projectNodes} />
       </Card>
 
       {projectNodes.length > 0 && (

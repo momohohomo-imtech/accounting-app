@@ -92,6 +92,20 @@ export async function updateTransactionRecord(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+export async function bulkUpdateProjectId(formData: FormData) {
+  const supabase = await createClient();
+  const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
+  const projectId = String(formData.get("project_id") ?? "") || null;
+  if (ids.length === 0) return;
+
+  const { error } = await supabase.from("transactions").update({ project_id: projectId }).in("id", ids);
+  if (error) console.error("bulkUpdateProjectId failed:", error.message);
+
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
+  revalidatePath("/reports");
+}
+
 export async function deleteTransactionRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));

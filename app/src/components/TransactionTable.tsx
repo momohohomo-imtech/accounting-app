@@ -1,14 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { deleteTransactionRecord } from "@/lib/actions/transactions";
+import { deleteTransactionRecord, bulkUpdateProjectId } from "@/lib/actions/transactions";
 import { formatWon, formatDate } from "@/lib/format";
 import { transactionTotal } from "@/lib/credit";
 import { Badge } from "@/components/ui/Badge";
 import { LinkButton, Button } from "@/components/ui/Button";
 import { Table, THead, Tr, Td, EmptyRow } from "@/components/ui/Table";
+import { Card } from "@/components/ui/Card";
+import { fieldClass } from "@/components/ui/field";
 import { cx } from "@/lib/cx";
 import type { Transaction } from "@/lib/types";
+import type { ProjectTreeNode } from "@/components/ProjectTreeFilter";
 
 type SortKey = "trans_date" | "type" | "client" | "project" | "item_name" | "payment_method" | "tax_invoice" | "amount";
 
@@ -44,9 +47,16 @@ function sortValue(t: Transaction, key: SortKey): string | number {
   }
 }
 
-export function TransactionTable({ transactions }: { transactions: Transaction[] }) {
+export function TransactionTable({
+  transactions,
+  projectNodes,
+}: {
+  transactions: Transaction[];
+  projectNodes: ProjectTreeNode[];
+}) {
   const [sortKey, setSortKey] = useState<SortKey>("trans_date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -68,55 +78,130 @@ export function TransactionTable({ transactions }: { transactions: Transaction[]
     return copy;
   }, [transactions, sortKey, sortDir]);
 
+  const siteGroups = useMemo(() => {
+    const map = new Map<string, { label: string; items: ProjectTreeNode[] }>();
+    for (const p of projectNodes) {
+      const key = p.siteId;
+      const label = p.clientName ? `${p.clientName} · ${p.siteName}` : p.siteName;
+      if (!map.has(key)) map.set(key, { label, items: [] });
+      map.get(key)!.items.push(p);
+    }
+    return Array.from(map.values());
+  }, [projectNodes]);
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setSelected((prev) => (prev.size === sorted.length ? new Set() : new Set(sorted.map((t) => t.id))));
+  }
+
   return (
-    <Table className="min-w-[980px]">
-      <THead>
-        {COLUMNS.map((c) => (
-          <th key={c.key} className={cx("whitespace-nowrap pb-2 pr-4 font-medium", c.key === "amount" && "text-right")}>
-            <button
-              type="button"
-              onClick={() => handleSort(c.key)}
-              className="inline-flex items-center gap-1 transition-colors hover:text-slate-800"
-            >
-              {c.label}
-              {sortKey === c.key && <span className="text-[10px]">{sortDir === "asc" ? "▲" : "▼"}</span>}
-            </button>
+    <div className="space-y-3">
+      {selected.size > 0 && (
+        <Card padding="none" className="flex flex-wrap items-center gap-2 border-slate-300 bg-slate-50 p-3 print:hidden">
+          <form
+            action={bulkUpdateProjectId}
+            onSubmit={() => setSelected(new Set())}
+            className="flex flex-wrap items-center gap-2"
+          >
+            {Array.from(selected).map((id) => (
+              <input key={id} type="hidden" name="transaction_ids" value={id} />
+            ))}
+            <span className="text-sm text-slate-600">{selected.size}건 선택됨 · 프로젝트 변경:</span>
+            <select name="project_id" defaultValue="" className={fieldClass}>
+              <option value="">일반경비</option>
+              {siteGroups.map((g) => (
+                <optgroup key={g.label} label={g.label}>
+                  {g.items.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.year})
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <Button type="submit" size="sm">
+              변경
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
+              선택 해제
+            </Button>
+          </form>
+        </Card>
+      )}
+
+      <Table className="min-w-[1020px]">
+        <THead>
+          <th className="w-8 pb-2 pr-2">
+            <input
+              type="checkbox"
+              checked={selected.size > 0 && selected.size === sorted.length}
+              onChange={toggleAll}
+              className="h-4 w-4 accent-slate-900"
+            />
           </th>
-        ))}
-        <th className="pb-2 text-right font-medium">관리</th>
-      </THead>
-      <tbody>
-        {sorted.map((t) => (
-          <Tr key={t.id}>
-            <Td className="pr-4">{formatDate(t.trans_date)}</Td>
-            <Td className="pr-4">
-              <Badge variant={t.type === "매출" ? "blue" : "orange"}>{t.type}</Badge>
-            </Td>
-            <Td className="pr-4">{t.clients?.name ?? t.client_name_raw ?? "-"}</Td>
-            <Td className="pr-4">{t.projects?.name ?? "일반경비"}</Td>
-            <Td className="pr-4">{t.item_name ?? "-"}</Td>
-            <Td className="pr-4">{t.payment_methods?.name ?? "-"}</Td>
-            <Td className="pr-4">
-              {t.tax_invoice_issued ? <Badge variant="emerald">발행</Badge> : <span className="text-slate-300">-</span>}
-            </Td>
-            <Td className="pr-4 text-right font-medium text-slate-900">{formatWon(transactionTotal(t))}</Td>
-            <Td className="text-right">
-              <div className="flex justify-end gap-2">
-                <LinkButton href={`/transactions/${t.id}/edit`} variant="secondary" size="xs">
-                  수정
-                </LinkButton>
-                <form action={deleteTransactionRecord}>
-                  <input type="hidden" name="id" value={t.id} />
-                  <Button variant="danger" size="xs">
-                    삭제
-                  </Button>
-                </form>
-              </div>
-            </Td>
-          </Tr>
-        ))}
-        {sorted.length === 0 && <EmptyRow colSpan={COLUMNS.length + 1}>거래 내역이 없습니다.</EmptyRow>}
-      </tbody>
-    </Table>
+          {COLUMNS.map((c) => (
+            <th key={c.key} className={cx("whitespace-nowrap pb-2 pr-4 font-medium", c.key === "amount" && "text-right")}>
+              <button
+                type="button"
+                onClick={() => handleSort(c.key)}
+                className="inline-flex items-center gap-1 transition-colors hover:text-slate-800"
+              >
+                {c.label}
+                {sortKey === c.key && <span className="text-[10px]">{sortDir === "asc" ? "▲" : "▼"}</span>}
+              </button>
+            </th>
+          ))}
+          <th className="pb-2 text-right font-medium">관리</th>
+        </THead>
+        <tbody>
+          {sorted.map((t) => (
+            <Tr key={t.id} className={selected.has(t.id) ? "bg-blue-50/60" : undefined}>
+              <Td className="pr-2">
+                <input
+                  type="checkbox"
+                  checked={selected.has(t.id)}
+                  onChange={() => toggle(t.id)}
+                  className="h-4 w-4 accent-slate-900"
+                />
+              </Td>
+              <Td className="pr-4">{formatDate(t.trans_date)}</Td>
+              <Td className="pr-4">
+                <Badge variant={t.type === "매출" ? "blue" : "orange"}>{t.type}</Badge>
+              </Td>
+              <Td className="pr-4">{t.clients?.name ?? t.client_name_raw ?? "-"}</Td>
+              <Td className="pr-4">{t.projects?.name ?? "일반경비"}</Td>
+              <Td className="pr-4">{t.item_name ?? "-"}</Td>
+              <Td className="pr-4">{t.payment_methods?.name ?? "-"}</Td>
+              <Td className="pr-4">
+                {t.tax_invoice_issued ? <Badge variant="emerald">발행</Badge> : <span className="text-slate-300">-</span>}
+              </Td>
+              <Td className="pr-4 text-right font-medium text-slate-900">{formatWon(transactionTotal(t))}</Td>
+              <Td className="text-right">
+                <div className="flex justify-end gap-2">
+                  <LinkButton href={`/transactions/${t.id}/edit`} variant="secondary" size="xs">
+                    수정
+                  </LinkButton>
+                  <form action={deleteTransactionRecord}>
+                    <input type="hidden" name="id" value={t.id} />
+                    <Button variant="danger" size="xs">
+                      삭제
+                    </Button>
+                  </form>
+                </div>
+              </Td>
+            </Tr>
+          ))}
+          {sorted.length === 0 && <EmptyRow colSpan={COLUMNS.length + 2}>거래 내역이 없습니다.</EmptyRow>}
+        </tbody>
+      </Table>
+    </div>
   );
 }
