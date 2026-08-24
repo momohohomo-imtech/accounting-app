@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { remainingBalance } from "@/lib/credit";
 import type { CreditPayment, Transaction } from "@/lib/types";
@@ -55,7 +54,6 @@ export async function createTransactionRecord(formData: FormData) {
 
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
-  redirect("/transactions");
 }
 
 export async function updateTransactionRecord(formData: FormData) {
