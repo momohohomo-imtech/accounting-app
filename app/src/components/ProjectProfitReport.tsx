@@ -23,9 +23,9 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
   const purchaseTotal = rows.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
   const quoteTotal = group.reduce((s, p) => s + (p.quote_amount ?? 0), 0);
   const contractTotal = group.reduce((s, p) => s + (p.contract_amount ?? 0), 0);
-  // 이익금/이익율은 실제 받는 금액인 수주액 기준으로만 계산한다 (발주액으로 대체하지 않음).
-  const profit = contractTotal ? contractTotal - purchaseTotal : null;
-  const margin = contractTotal ? ((contractTotal - purchaseTotal) / contractTotal) * 100 : null;
+  // 이익금/이익율은 발주액(원청 발주금액) 기준으로 계산한다.
+  const profit = quoteTotal ? quoteTotal - purchaseTotal : null;
+  const margin = quoteTotal ? ((quoteTotal - purchaseTotal) / quoteTotal) * 100 : null;
 
   const exportRows = rows.map((t) => [
     formatDate(t.trans_date),
@@ -104,13 +104,13 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
           <p className="font-mono text-lg font-bold text-slate-900">{formatWon(contractTotal)}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500">이익금 (수주액 기준)</p>
+          <p className="text-xs text-slate-500">이익금 (발주액 기준)</p>
           <p className={`font-mono text-lg font-bold ${profit === null ? "text-slate-400" : profit >= 0 ? "text-slate-900" : "text-red-600"}`}>
-            {profit === null ? "수주액 미입력" : formatWon(profit)}
+            {profit === null ? "발주액 미입력" : formatWon(profit)}
           </p>
         </div>
         <div>
-          <p className="text-xs text-slate-500">이익율 (수주액 기준)</p>
+          <p className="text-xs text-slate-500">이익율 (발주액 기준)</p>
           <p className={`font-mono text-lg font-bold ${margin === null ? "text-slate-400" : margin >= 0 ? "text-slate-900" : "text-red-600"}`}>
             {margin === null ? "-" : `${margin.toFixed(2)}%`}
           </p>
