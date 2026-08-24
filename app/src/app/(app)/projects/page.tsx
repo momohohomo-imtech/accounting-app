@@ -24,8 +24,10 @@ export default async function ProjectsPage({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-900">프로젝트·현장</h1>
-      <PageTabs basePath="/projects" tabs={TABS} active={active} />
+      <h1 className={`text-2xl font-bold text-slate-900 ${report ? "print:hidden" : ""}`}>프로젝트·현장</h1>
+      <div className={report ? "print:hidden" : ""}>
+        <PageTabs basePath="/projects" tabs={TABS} active={active} />
+      </div>
       {active === "sites" && <SitesSection />}
       {active === "list" && <ProjectListSection year={year} report={report} />}
     </div>
@@ -98,27 +100,29 @@ async function ProjectListSection({ year, report }: { year?: string; report?: st
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <YearFilter basePath="/projects" years={years} selectedYear={selectedYear} />
-      </div>
+      <div className={report ? "space-y-6 print:hidden" : "space-y-6"}>
+        <div className="flex justify-end">
+          <YearFilter basePath="/projects" years={years} selectedYear={selectedYear} />
+        </div>
 
-      <CreatePanel title="프로젝트" fields={fields} createAction={createProjectRecord} />
+        <CreatePanel title="프로젝트" fields={fields} createAction={createProjectRecord} />
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <EntityTable
-          fields={fields}
-          rows={(projects ?? []).map((p) => ({ ...p, site_name: p.sites?.name }))}
-          updateAction={updateProjectRecord}
-          deleteAction={deleteProjectRecord}
-          extraActions={Object.fromEntries(
-            (projects ?? []).map((p) => [
-              p.id,
-              <LinkButton key={p.id} href={`/projects?tab=list&year=${selectedYear}&report=${p.id}`} variant="secondary" size="xs">
-                보고서
-              </LinkButton>,
-            ])
-          )}
-        />
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <EntityTable
+            fields={fields}
+            rows={(projects ?? []).map((p) => ({ ...p, site_name: p.sites?.name }))}
+            updateAction={updateProjectRecord}
+            deleteAction={deleteProjectRecord}
+            extraActions={Object.fromEntries(
+              (projects ?? []).map((p) => [
+                p.id,
+                <LinkButton key={p.id} href={`/projects?tab=list&year=${selectedYear}&report=${p.id}`} variant="secondary" size="xs">
+                  보고서
+                </LinkButton>,
+              ])
+            )}
+          />
+        </div>
       </div>
 
       {report && (
