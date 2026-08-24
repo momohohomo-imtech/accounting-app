@@ -35,7 +35,7 @@ export async function createTransactionRecord(formData: FormData) {
     client_name_raw: String(formData.get("client_name_raw") ?? "") || null,
     project_id: String(formData.get("project_id") ?? "") || null,
     item_name: String(formData.get("item_name") ?? "") || null,
-    category: String(formData.get("category") ?? "") || null,
+    category_id: String(formData.get("category_id") ?? "") || null,
     quantity: formData.get("quantity") ? Number(formData.get("quantity")) : null,
     unit_price: formData.get("unit_price") ? Number(formData.get("unit_price")) : null,
     payment_method_id: String(formData.get("payment_method_id") ?? "") || null,

@@ -3,6 +3,7 @@ import { PageTabs } from "@/components/PageTabs";
 import { CreditSection } from "@/components/sections/CreditSection";
 import { ClientsSection } from "@/components/sections/ClientsSection";
 import { PaymentMethodsSection } from "@/components/sections/PaymentMethodsSection";
+import { ExpenseCategoriesSection } from "@/components/sections/ExpenseCategoriesSection";
 import { YearMonthFilter } from "@/components/YearMonthFilter";
 import { TransactionTable } from "@/components/TransactionTable";
 import { Card } from "@/components/ui/Card";
@@ -15,6 +16,7 @@ const TABS = [
   { key: "credit", label: "외상관리" },
   { key: "clients", label: "거래처" },
   { key: "payment-methods", label: "결제수단" },
+  { key: "expense-categories", label: "지출카테고리" },
 ];
 
 const FLOOR_YEAR = 2026;
@@ -39,6 +41,7 @@ export default async function TransactionsPage({
       {active === "credit" && <CreditSection />}
       {active === "clients" && <ClientsSection />}
       {active === "payment-methods" && <PaymentMethodsSection />}
+      {active === "expense-categories" && <ExpenseCategoriesSection />}
       {active === "list" && <TransactionListSection year={year} month={month} type={type} project_id={project_id} />}
     </div>
   );

@@ -14,6 +14,9 @@ function parse(formData: FormData) {
     end_date: String(formData.get("end_date") ?? "") || null,
     progress_pct: formData.get("progress_pct") ? Number(formData.get("progress_pct")) : 0,
     year: Number(formData.get("year") ?? new Date().getFullYear()),
+    quote_amount: formData.get("quote_amount") ? Number(formData.get("quote_amount")) : null,
+    contract_amount: formData.get("contract_amount") ? Number(formData.get("contract_amount")) : null,
+    order_date: String(formData.get("order_date") ?? "") || null,
   };
 }
 

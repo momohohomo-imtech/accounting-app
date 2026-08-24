@@ -8,6 +8,7 @@ function parse(formData: FormData) {
     name: String(formData.get("name") ?? ""),
     location: String(formData.get("location") ?? "") || null,
     manager_name: String(formData.get("manager_name") ?? "") || null,
+    client_id: String(formData.get("client_id") ?? "") || null,
   };
 }
 

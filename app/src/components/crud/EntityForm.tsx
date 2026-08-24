@@ -11,6 +11,7 @@ export function EntityForm({
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {fields.map((f) => {
+        if (f.readOnly) return null;
         const raw = defaultValues?.[f.name];
         const value = raw === null || raw === undefined ? "" : String(raw);
 

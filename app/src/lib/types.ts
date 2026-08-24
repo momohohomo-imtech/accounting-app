@@ -12,7 +12,9 @@ export type Site = {
   name: string;
   location: string | null;
   manager_name: string | null;
+  client_id: string | null;
   created_at: string;
+  clients?: Client;
 };
 
 export type Project = {
@@ -20,17 +22,28 @@ export type Project = {
   site_id: string;
   parent_project_id: string | null;
   name: string;
+  project_code: string | null;
   status: "ongoing" | "done" | "etc";
   is_service: boolean;
   start_date: string | null;
   end_date: string | null;
   progress_pct: number | null;
+  quote_amount: number | null;
+  contract_amount: number | null;
+  order_date: string | null;
   year: number;
   created_at: string;
   sites?: Site;
 };
 
 export type PaymentMethod = {
+  id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+};
+
+export type ExpenseCategory = {
   id: string;
   name: string;
   sort_order: number;
@@ -46,6 +59,7 @@ export type Transaction = {
   project_id: string | null;
   item_name: string | null;
   category: string | null;
+  category_id: string | null;
   quantity: number | null;
   unit_price: number | null;
   card_company: string | null;
@@ -67,6 +81,7 @@ export type Transaction = {
   clients?: Client;
   projects?: Project;
   payment_methods?: PaymentMethod;
+  expense_categories?: ExpenseCategory;
 };
 
 export type CreditPayment = {

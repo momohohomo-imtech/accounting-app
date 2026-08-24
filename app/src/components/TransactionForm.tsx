@@ -3,22 +3,25 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { PaymentMethod, Transaction } from "@/lib/types";
-
-const CATEGORY_OPTIONS = ["출장", "물품", "차량", "공구", "회식", "기타"];
+import type { ExpenseCategory, PaymentMethod, Transaction } from "@/lib/types";
+import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components/ProjectPicker";
 
 type Option = { id: string; name: string };
 
 export function TransactionForm({
   clients,
+  sites,
   projects,
   paymentMethods,
+  expenseCategories,
   initial,
   action,
 }: {
   clients: Option[];
-  projects: Option[];
+  sites: SiteOption[];
+  projects: ProjectOption[];
   paymentMethods: PaymentMethod[];
+  expenseCategories: ExpenseCategory[];
   initial?: Transaction;
   action: (formData: FormData) => Promise<void>;
 }) {
@@ -36,7 +39,7 @@ export function TransactionForm({
     client_name_raw: initial?.client_name_raw ?? "",
     project_id: initial?.project_id ?? "",
     item_name: initial?.item_name ?? "",
-    category: initial?.category ?? "",
+    category_id: initial?.category_id ?? "",
     quantity: initial?.quantity?.toString() ?? "",
     unit_price: initial?.unit_price?.toString() ?? "",
     payment_method_id: initial?.payment_method_id ?? "",
@@ -85,7 +88,7 @@ export function TransactionForm({
           unit_price: ex.unit_price != null ? String(ex.unit_price) : prev.unit_price,
           amount: ex.amount != null ? String(ex.amount) : prev.amount,
           vat_included: ex.vat_included ?? prev.vat_included,
-          category: ex.category ?? prev.category,
+          category_id: expenseCategories.find((c) => c.name === ex.category)?.id ?? prev.category_id,
           client_name_raw: ex.client_name ?? prev.client_name_raw,
         }));
       }
@@ -187,31 +190,24 @@ export function TransactionForm({
             className={inputClass}
           />
         </Field>
-        <Field label="프로젝트 (일반경비는 비워두기)">
-          <select value={values.project_id} onChange={(e) => set("project_id", e.target.value)} className={inputClass}>
-            <option value="">일반경비</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </Field>
+        <ProjectPicker
+          sites={sites}
+          projects={projects}
+          value={values.project_id}
+          onChange={(v) => set("project_id", v)}
+        />
         <Field label="품목">
           <input value={values.item_name} onChange={(e) => set("item_name", e.target.value)} className={inputClass} />
         </Field>
         <Field label="종류구분">
-          <input
-            value={values.category}
-            onChange={(e) => set("category", e.target.value)}
-            list="category-options"
-            className={inputClass}
-          />
-          <datalist id="category-options">
-            {CATEGORY_OPTIONS.map((c) => (
-              <option key={c} value={c} />
+          <select value={values.category_id} onChange={(e) => set("category_id", e.target.value)} className={inputClass}>
+            <option value="">선택 안함</option>
+            {expenseCategories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
             ))}
-          </datalist>
+          </select>
         </Field>
         <Field label="수량">
           <input

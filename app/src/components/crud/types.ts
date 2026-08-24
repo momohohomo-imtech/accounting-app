@@ -6,4 +6,5 @@ export type FieldConfig = {
   options?: { value: string; label: string }[];
   step?: string;
   placeholder?: string;
+  readOnly?: boolean;
 };

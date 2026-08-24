@@ -35,7 +35,7 @@ async function ProjectListSection({ year }: { year?: string }) {
   const selectedYear = year ? Number(year) : currentYear;
 
   const [{ data: sites }, { data: allProjects }, { data: projects }] = await Promise.all([
-    supabase.from("sites").select("id, name").order("name"),
+    supabase.from("sites").select("id, name, clients(name)").order("name"),
     supabase.from("projects").select("id, name"),
     supabase
       .from("projects")
@@ -44,18 +44,24 @@ async function ProjectListSection({ year }: { year?: string }) {
       .order("created_at", { ascending: false }),
   ]);
 
+  const siteOptions = (sites ?? []).map((s) => {
+    const clientName = s.clients?.[0]?.name as string | undefined;
+    return { value: s.id, label: clientName ? `${clientName} · ${s.name}` : s.name };
+  });
+
   const fields: FieldConfig[] = [
+    { name: "project_code", label: "프로젝트번호", readOnly: true },
     {
       name: "site_id",
       label: "현장",
       type: "select",
       required: true,
-      options: (sites ?? []).map((s) => ({ value: s.id, label: s.name })),
+      options: siteOptions,
     },
     { name: "name", label: "프로젝트명", required: true },
     {
       name: "parent_project_id",
-      label: "상위 프로젝트",
+      label: "귀속 프로젝트 (비용 합산 대상)",
       type: "select",
       options: [{ value: "", label: "없음" }, ...(allProjects ?? []).map((p) => ({ value: p.id, label: p.name }))],
     },
@@ -71,7 +77,10 @@ async function ProjectListSection({ year }: { year?: string }) {
     },
     { name: "is_service", label: "서비스(무상) 작업", type: "checkbox" },
     { name: "start_date", label: "시작일", type: "date" },
-    { name: "end_date", label: "종료일", type: "date" },
+    { name: "end_date", label: "완료일", type: "date" },
+    { name: "order_date", label: "발주서일자", type: "date" },
+    { name: "quote_amount", label: "발주액", type: "number" },
+    { name: "contract_amount", label: "수주액", type: "number" },
     { name: "progress_pct", label: "진행률(%)", type: "number" },
     { name: "year", label: "연도", type: "number", required: true },
   ];
