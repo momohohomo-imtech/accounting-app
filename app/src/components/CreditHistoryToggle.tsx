@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { formatWon, formatDate } from "@/lib/format";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { Button, LinkButton } from "@/components/ui/Button";
 import { fieldClass } from "@/components/ui/field";
 import { downloadXlsx } from "@/lib/xlsxExport";
 
@@ -132,6 +132,9 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
                       <span className="flex-1 truncate text-slate-700">{it.item_name ?? "-"}</span>
                       <span className="w-20 shrink-0 truncate text-right text-slate-400">{it.methodName ?? ""}</span>
                       <span className="w-28 shrink-0 text-right font-medium text-slate-900">{formatWon(it.amount)}</span>
+                      <LinkButton href={`/transactions/${it.id}/edit`} variant="secondary" size="xs" className="print:hidden">
+                        수정
+                      </LinkButton>
                     </li>
                   ))}
                 </ul>
