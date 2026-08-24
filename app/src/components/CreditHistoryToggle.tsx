@@ -4,7 +4,9 @@ import { useMemo, useState } from "react";
 import { formatWon, formatDate } from "@/lib/format";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { fieldClass } from "@/components/ui/field";
+import { downloadXlsx } from "@/lib/xlsxExport";
 
 export type VendorHistoryItem = {
   id: string;
@@ -56,6 +58,22 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
     [groups, year, month]
   );
 
+  async function handleExport() {
+    const rows: (string | number)[][] = [];
+    for (const g of filtered) {
+      for (const it of g.items) {
+        rows.push([it.status, g.label, formatDate(it.trans_date), it.project_name ?? "일반경비", it.item_name ?? "-", it.methodName ?? "", it.amount]);
+      }
+    }
+    const label = year === "all" ? "전체" : month === "all" ? `${year}년` : `${year}-${month}`;
+    await downloadXlsx(
+      `외상이력_${label}.xlsx`,
+      ["상태", "거래처", "날짜", "프로젝트", "품목", "결제수단", "금액"],
+      rows,
+      "외상이력"
+    );
+  }
+
   return (
     <div>
       <div className="flex flex-wrap items-center gap-3">
@@ -67,7 +85,7 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
           {open ? "거래처별 이력 숨기기" : "거래처별 이력 보기"}
         </button>
         {open && (
-          <div className="flex gap-2 print:hidden">
+          <div className="flex flex-wrap items-center gap-2 print:hidden">
             <select value={year} onChange={(e) => setYear(e.target.value)} className={fieldClass}>
               <option value="all">전체 연도</option>
               {years.map((y) => (
@@ -84,6 +102,9 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
                 </option>
               ))}
             </select>
+            <Button variant="secondary" size="sm" onClick={handleExport}>
+              필터 결과 엑셀 다운로드
+            </Button>
           </div>
         )}
       </div>

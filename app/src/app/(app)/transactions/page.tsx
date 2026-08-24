@@ -6,6 +6,8 @@ import { PaymentMethodsSection } from "@/components/sections/PaymentMethodsSecti
 import { ExpenseCategoriesSection } from "@/components/sections/ExpenseCategoriesSection";
 import { YearMonthFilter } from "@/components/YearMonthFilter";
 import { TransactionTable } from "@/components/TransactionTable";
+import { TransactionExportButtons } from "@/components/TransactionExportButtons";
+import { ProjectTreeFilter } from "@/components/ProjectTreeFilter";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { LinkButton } from "@/components/ui/Button";
@@ -88,11 +90,24 @@ async function TransactionListSection({
   if (type) query = query.eq("type", type);
   if (project_id) query = query.eq("project_id", project_id);
 
-  const [{ data: transactions }, { data: projects }, { data: latestTx }] = await Promise.all([
+  const [{ data: transactions }, { data: projectTree }, { data: latestTx }] = await Promise.all([
     query,
-    supabase.from("projects").select("id, name").order("name"),
+    supabase.from("projects").select("id, name, year, site_id, sites(name, clients(name))").order("name"),
     supabase.from("transactions").select("trans_date").order("trans_date", { ascending: false }).limit(1),
   ]);
+
+  const projectNodes = (projectTree ?? []).map((p) => {
+    const site = p.sites?.[0] as { name: string; clients?: { name: string }[] } | undefined;
+    const client = site?.clients?.[0] as { name: string } | undefined;
+    return {
+      id: p.id,
+      name: p.name,
+      year: p.year,
+      siteId: p.site_id,
+      siteName: site?.name ?? "미지정",
+      clientName: client?.name ?? null,
+    };
+  });
 
   const maxDataYear = latestTx?.[0] ? Number(latestTx[0].trans_date.slice(0, 4)) : currentYear;
   const topYear = Math.max(currentYear, maxDataYear, selectedYear);
@@ -114,16 +129,19 @@ async function TransactionListSection({
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <YearMonthFilter years={years} selectedYear={selectedYear} selectedMonth={selectedMonth} />
-        <div className="flex gap-1">
-          {[
-            { v: "", label: "전체" },
-            { v: "매입", label: "매입" },
-            { v: "매출", label: "매출" },
-          ].map((t) => (
-            <Pill key={t.v} href={withParam("type", t.v)} active={(type ?? "") === t.v}>
-              {t.label}
-            </Pill>
-          ))}
+        <div className="flex flex-wrap items-center gap-3 print:hidden">
+          <div className="flex gap-1">
+            {[
+              { v: "", label: "전체" },
+              { v: "매입", label: "매입" },
+              { v: "매출", label: "매출" },
+            ].map((t) => (
+              <Pill key={t.v} href={withParam("type", t.v)} active={(type ?? "") === t.v}>
+                {t.label}
+              </Pill>
+            ))}
+          </div>
+          <TransactionExportButtons transactions={(transactions ?? []) as Transaction[]} />
         </div>
       </div>
 
@@ -131,17 +149,10 @@ async function TransactionListSection({
         <TransactionTable transactions={(transactions ?? []) as Transaction[]} />
       </Card>
 
-      {projects && projects.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          <Pill href={withParam("project_id", "")} active={!project_id} size="xs">
-            전체 프로젝트
-          </Pill>
-          {projects.map((p) => (
-            <Pill key={p.id} href={withParam("project_id", p.id)} active={project_id === p.id} size="xs">
-              {p.name}
-            </Pill>
-          ))}
-        </div>
+      {projectNodes.length > 0 && (
+        <Card className="print:hidden">
+          <ProjectTreeFilter basePath="/transactions" projects={projectNodes} selectedProjectId={project_id ?? ""} />
+        </Card>
       )}
     </div>
   );
