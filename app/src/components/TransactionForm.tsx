@@ -23,7 +23,7 @@ export function TransactionForm({
   paymentMethods: PaymentMethod[];
   expenseCategories: ExpenseCategory[];
   initial?: Transaction;
-  action: (formData: FormData) => Promise<void>;
+  action: (formData: FormData) => Promise<{ error?: string } | void>;
 }) {
   const router = useRouter();
   const initialAmount = initial
@@ -130,10 +130,9 @@ export function TransactionForm({
     fd.append("receipt_image_url", path);
     fd.append("ocr_extracted_raw", ocrExtracted ? JSON.stringify(ocrExtracted) : "");
 
-    try {
-      await action(fd);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "거래 저장 중 오류가 발생했습니다.");
+    const result = await action(fd);
+    if (result?.error) {
+      setError(result.error);
       return;
     }
     router.push("/transactions");

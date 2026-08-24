@@ -50,7 +50,7 @@ export async function createTransactionRecord(formData: FormData) {
     created_by: user?.id ?? null,
   });
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
@@ -86,7 +86,7 @@ export async function updateTransactionRecord(formData: FormData) {
     })
     .eq("id", id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
