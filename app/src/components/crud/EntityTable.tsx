@@ -25,11 +25,11 @@ function displayValue(row: Row, f: FieldConfig) {
 function ProgressCell({ value }: { value: number }) {
   const pct = Math.max(0, Math.min(100, value));
   return (
-    <div className="flex items-center gap-2">
-      <div className="h-2 w-20 shrink-0 overflow-hidden rounded-full bg-slate-100">
-        <div className="h-full rounded-full bg-blue-500" style={{ width: `${pct}%` }} />
-      </div>
-      <span className="text-xs text-slate-600">{pct}%</span>
+    <div className="h-2 w-full shrink-0 overflow-hidden rounded-full bg-slate-100">
+      <div
+        className={`h-full rounded-full ${pct >= 100 ? "bg-red-500" : "bg-blue-500"}`}
+        style={{ width: `${pct}%` }}
+      />
     </div>
   );
 }
