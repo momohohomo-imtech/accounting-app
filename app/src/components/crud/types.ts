@@ -7,7 +7,8 @@ export type FieldConfig = {
   tableLabel?: string;
   type?: "text" | "textarea" | "date" | "tel" | "number" | "select" | "checkbox" | "time" | "project-search";
   required?: boolean;
-  options?: { value: string; label: string }[];
+  /** `color: "red"` on an option renders that option's text in red in the table view. */
+  options?: { value: string; label: string; color?: "red" }[];
   /** Options for type "project-search", grouped/filterable by year + site. */
   projectSearchOptions?: ProjectSearchOption[];
   step?: string;

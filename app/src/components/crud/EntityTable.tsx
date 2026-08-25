@@ -22,6 +22,12 @@ function displayValue(row: Row, f: FieldConfig) {
   return String(raw);
 }
 
+function cellIsRed(row: Row, f: FieldConfig) {
+  if (f.colorField) return Boolean(row[f.colorField]);
+  if (f.type === "select") return f.options?.find((o) => o.value === row[f.name])?.color === "red";
+  return false;
+}
+
 function ProgressCell({ value }: { value: number }) {
   const pct = Math.max(0, Math.min(100, value));
   return (
@@ -142,7 +148,7 @@ export function EntityTable({
                 <Td key={f.name} style={f.width ? { width: f.width } : undefined} className="max-w-[220px] truncate pr-4">
                   {f.display === "progress" ? (
                     <ProgressCell value={Number(row[f.name]) || 0} />
-                  ) : f.colorField && row[f.colorField] ? (
+                  ) : cellIsRed(row, f) ? (
                     <span className="text-red-600">{displayValue(row, f)}</span>
                   ) : (
                     displayValue(row, f)
