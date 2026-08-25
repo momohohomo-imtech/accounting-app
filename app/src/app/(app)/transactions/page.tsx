@@ -154,16 +154,6 @@ async function TransactionListSection({
   }
 
   const listUrl = withParam("type", type ?? "");
-  function editHrefFor(id: string) {
-    const p = new URLSearchParams({
-      year: String(selectedYear),
-      month: selectedMonth,
-      type: type ?? "",
-      project_id: project_id ?? "",
-      editTx: id,
-    });
-    return `/transactions?${p.toString()}`;
-  }
 
   let editTxData: {
     transaction: Transaction;
@@ -234,7 +224,7 @@ async function TransactionListSection({
         <TransactionTable
           transactions={(transactions ?? []) as Transaction[]}
           projectNodes={projectNodes}
-          editHrefFor={editHrefFor}
+          listParams={{ year: selectedYear, month: selectedMonth, type: type ?? "", project_id: project_id ?? "" }}
         />
       </Card>
 

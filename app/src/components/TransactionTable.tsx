@@ -50,12 +50,23 @@ function sortValue(t: Transaction, key: SortKey): string | number {
 export function TransactionTable({
   transactions,
   projectNodes,
-  editHrefFor,
+  listParams,
 }: {
   transactions: Transaction[];
   projectNodes: ProjectTreeNode[];
-  editHrefFor: (id: string) => string;
+  listParams: { year: number; month: string; type: string; project_id: string };
 }) {
+  function editHrefFor(id: string) {
+    const p = new URLSearchParams({
+      year: String(listParams.year),
+      month: listParams.month,
+      type: listParams.type,
+      project_id: listParams.project_id,
+      editTx: id,
+    });
+    return `/transactions?${p.toString()}`;
+  }
+
   const [sortKey, setSortKey] = useState<SortKey>("trans_date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selected, setSelected] = useState<Set<string>>(new Set());
