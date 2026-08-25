@@ -320,17 +320,26 @@ SQL INSERT 스크립트를 생성 → 사용자가 SQL Editor에서 실행하는
   롤 클라이언트(RLS 무시). 필요 환경변수는 `SUPABASE_SERVICE_ROLE_KEY` 하나뿐 —
   Supabase 대시보드 → Project Settings → API → `service_role` 키. **사용자가
   Vercel에 넣고 재배포까지 완료함.**
-- **겪은 문제 2개, 둘 다 해결됨**:
+- **겪은 문제 3개, 전부 해결됨**:
   1. Vercel 환경변수 추가 UI에서 Key 칸에 실수로 값(JWT라 `.`/`-` 포함)을 넣어서
      "invalid characters" 에러 — Key엔 이름만, Value엔 값만 넣도록 안내해서 해결.
   2. `schema.sql`에 `backups` storage 버킷 생성 구문이 있었는데 실제로는 버킷이
      없어서 업로드 시 "Bucket not found" 에러 — `016_backups_storage_bucket.sql`로
-     버킷을 다시 만들어서 해결. (스키마 파일에 있다고 실제로 적용됐다고 가정하면
-     안 된다는 교훈 — 아래 교훈 목록에도 추가.)
-- **2026-08-25 수동 호출로 검증 완료**: `/api/cron/weekly-backup` 직접 호출 →
-  `{"ok":true,"fileName":"backup-2026-08-25T05-25-49-490Z.json","sizeMb":0.79}`
-  정상 응답 확인함. Vercel Cron 스케줄 자체(매주 월요일 새벽 6시 KST)는 다음
-  세션에서 실제로 그 시간에 실행됐는지 `/backups` 목록으로 한 번 더 확인하면 좋음.
+     버킷을 다시 만들어서 해결.
+  3. "지금 백업"(수동, anon key+로그인 세션 경로)이 아무 반응 없이 조용히 실패 —
+     원인은 두 가지 복합: (a) 액션이 에러를 그냥 삼키고 있어서 `BackupNowButton.tsx`로
+     성공/실패 피드백을 보이게 고침, (b) `schema.sql`에 있던 `storage.objects`
+     RLS 정책(`"authenticated backups access"`)도 버킷과 마찬가지로 실제로는
+     적용 안 돼 있어서 "new row violates row-level security policy" 에러 —
+     `017_backups_storage_policy.sql`로 정책을 다시 만들어서 해결. cron 쪽은
+     service_role이 RLS를 통째로 무시해서 이 문제를 안 겪었던 것.
+     (→ **schema.sql에 있다고 실제 적용됐다고 가정하면 안 된다는 교훈, 이번에
+     버킷 생성문과 정책문 둘 다에서 똑같이 발생함 — 아래 교훈 목록 8번 참고.)
+- **2026-08-25 완전히 검증 완료**: cron 엔드포인트 수동 호출 성공
+  (`{"ok":true,"fileName":"backup-2026-08-25T05-25-49-490Z.json","sizeMb":0.79}`)
+  + "지금 백업" 버튼도 성공(`backup-2026-08-25T05-31-31-896Z.json`) 둘 다 확인됨.
+  Vercel Cron 스케줄 자체(매주 월요일 새벽 6시 KST)가 실제로 그 시간에 실행됐는지는
+  다음 세션에서 `/backups` 목록에 auto 타입 항목이 늘어났는지 한 번 더 확인하면 좋음.
 
 ## 겪었던 버그 / 교훈 (중요, 재발 방지용)
 
