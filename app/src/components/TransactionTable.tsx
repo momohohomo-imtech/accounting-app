@@ -70,6 +70,7 @@ export function TransactionTable({
   const [sortKey, setSortKey] = useState<SortKey>("trans_date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [bulkYear, setBulkYear] = useState("");
   const [bulkSiteId, setBulkSiteId] = useState("");
   const [bulkProjectId, setBulkProjectId] = useState("");
@@ -261,12 +262,22 @@ export function TransactionTable({
                   <LinkButton href={editHrefFor(t.id)} variant="secondary" size="xs">
                     수정
                   </LinkButton>
-                  <form action={deleteTransactionRecord}>
-                    <input type="hidden" name="id" value={t.id} />
-                    <Button variant="danger" size="xs">
+                  {confirmDeleteId === t.id ? (
+                    <form action={deleteTransactionRecord} className="flex items-center gap-1">
+                      <input type="hidden" name="id" value={t.id} />
+                      <span className="text-xs font-medium text-red-600">정말 삭제?</span>
+                      <Button variant="danger" size="xs" type="submit">
+                        확인
+                      </Button>
+                      <Button variant="secondary" size="xs" type="button" onClick={() => setConfirmDeleteId(null)}>
+                        취소
+                      </Button>
+                    </form>
+                  ) : (
+                    <Button variant="danger" size="xs" type="button" onClick={() => setConfirmDeleteId(t.id)}>
                       삭제
                     </Button>
-                  </form>
+                  )}
                 </div>
               </Td>
             </Tr>
