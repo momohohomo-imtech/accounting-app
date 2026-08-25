@@ -117,8 +117,8 @@ async function ProjectListSection({ year, siteId, report }: { year?: string; sit
     { name: "contract_amount", label: "수주액", type: "number", format: "currency", hideInTable: true },
     { name: "profit", label: "이익금", readOnly: true, format: "currency", width: "8%" },
     { name: "progress_pct", label: "진행률(%)", type: "number", display: "progress", width: "8%" },
-    { name: "year", label: "연도", type: "number", required: true, width: "5%" },
-    { name: "memo", label: "메모", type: "textarea", width: "10%" },
+    { name: "year", label: "연도", type: "number", required: true, hideInTable: true },
+    { name: "memo", label: "메모", type: "textarea", width: "15%" },
   ];
 
   const years = Array.from(
