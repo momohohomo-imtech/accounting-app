@@ -62,7 +62,32 @@
   `/reports?project=ID`와 `/projects?tab=list&report=ID`(팝업) 양쪽에서 재사용.
   메모란(큰 textarea) 포함, 인쇄 시 팝업 내용만 나오게 배경 요소는 `print:hidden`.
 
-### 4. 대량 과거 데이터 반입
+### 4. 프로젝트·현장 목록 개선 (이어지는 세션에서 추가)
+- `/projects` 목록에 연도 필터 옆 **현장 필터**(`site_id`, "전체 현장" 포함) 추가
+  (`YearFilter.tsx`가 site select도 같이 관리하도록 확장, 왼쪽 정렬로 변경)
+- 손익보고서 팝업의 메모: 수정 후 "닫기"를 누르면 자동 저장(`ProjectMemoProvider.tsx`
+  컨텍스트로 닫기 버튼/메모 textarea 상태 공유, 라벨이 "저장 후 닫기"로 바뀜)
+- `FieldConfig`(`components/crud/types.ts`)에 `tableLabel`(표 헤더만 줄여 표시),
+  `hideInTable`(표에서만 숨김, 폼에는 계속 노출), `width`(비율 컬럼폭, table-fixed),
+  `format: "currency"`(천단위 콤마), `type: "project-search"`(연도/현장으로 좁혀
+  검색하는 귀속 프로젝트 선택, `components/ParentProjectField.tsx`) 추가 —
+  `EntityTable`/`EntityForm`이 공용으로 처리하므로 다른 목록에는 영향 없음
+  (width/hideInTable 미지정 시 기존 동작 그대로)
+- 프로젝트 목록: 귀속 프로젝트 헤더를 "귀속", 무상작업을 "무상"으로 줄이고 체크는
+  있을 때만 O 표기, 시작일/발주서일자/수주액은 표에서 숨기고 대신 **이익금** 컬럼
+  추가(프로젝트별 매입 합계 - 수주액으로 서버에서 계산), 숨긴 필드들은 손익보고서
+  팝업 상단 메타 정보 줄(`ProjectProfitReport.tsx`의 `infoLines`)에서 확인 가능
+- 손익보고서 엑셀 다운로드가 인쇄 레이아웃처럼 상단에 프로젝트명/현장/상태/기간
+  등을 먼저 쓰고 하단에 요약을 넣도록 `lib/xlsxExport.ts`에 `leadingRows` 파라미터
+  추가(기존 호출부는 안 건드려도 되게 옵션으로 처리)
+- **저장/수정 시 확인 팝업** 추가(실수 방지): `EntityTable`의 인라인 수정,
+  `CreatePanel`의 추가하기, `TransactionForm`(매입매출 등록/수정) 세 군데 모두
+  제출 전 `confirm()` — `EntityTable`/`CreatePanel`은 공용 컴포넌트라 프로젝트 외
+  다른 목록(현장/거래처/결제수단 등)에도 자동 적용됨
+- 프로젝트 상태 라벨 맵을 `lib/projectStatus.ts`로 분리(`PROJECT_STATUS_OPTIONS`,
+  `projectStatusLabel`) — 목록 폼과 손익보고서가 같이 참조
+
+### 5. 대량 과거 데이터 반입
 사용자가 준 엑셀(외상 장부, 아이엠테크 3분기 매입매출장, 프로젝트 현황)을 분석해서
 SQL INSERT 스크립트를 생성 → 사용자가 SQL Editor에서 실행하는 방식으로 반입.
 현장·프로젝트 41개, 거래 842건 반입 완료. **주의: 이 과정에서 같은 SQL을 실수로
