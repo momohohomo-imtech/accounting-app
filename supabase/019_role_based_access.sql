@@ -74,6 +74,7 @@ end $$;
 
 -- 백업 파일도 admin/staff만 접근하도록 강화 (영수증은 매입매출 범위라 기존대로 유지).
 drop policy if exists "authenticated backups access" on storage.objects;
+drop policy if exists "admin_staff backups access" on storage.objects;
 create policy "admin_staff backups access" on storage.objects
   for all using (bucket_id = 'backups' and public.current_user_role() in ('admin', 'staff'))
   with check (bucket_id = 'backups' and public.current_user_role() in ('admin', 'staff'));
