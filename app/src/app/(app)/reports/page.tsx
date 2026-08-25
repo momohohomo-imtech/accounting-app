@@ -9,6 +9,7 @@ import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { AutoPrint } from "@/components/AutoPrint";
 import { ReportAIInsights } from "@/components/ReportAIInsights";
 import { VendorAggregateTable } from "@/components/VendorAggregateTable";
+import { ProjectProfitTable } from "@/components/ProjectProfitTable";
 import { TransactionForm } from "@/components/TransactionForm";
 import { updateTransactionRecord } from "@/lib/actions/transactions";
 import type { ExpenseCategory, PaymentMethod, Transaction } from "@/lib/types";
@@ -287,44 +288,7 @@ export default async function ReportsPage({
             {selectedYear}년 총 {projectSummary.count}건 · 매출 {formatWon(projectSummary.sales)} · 매입{" "}
             {formatWon(projectSummary.purchase)} · 이익금 {formatWon(projectSummary.profit)}
           </p>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[600px] text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-slate-500">
-                  <th className="pb-2 pr-4">프로젝트</th>
-                  <th className="pb-2 pr-4 text-right">진행률</th>
-                  <th className="pb-2 pr-4 text-right">매출</th>
-                  <th className="pb-2 pr-4 text-right">매입</th>
-                  <th className="pb-2 text-right">손익</th>
-                </tr>
-              </thead>
-              <tbody>
-                {byProject.map((p) => (
-                  <tr key={p.id} className="border-b border-slate-100 last:border-0">
-                    <td className="py-2 pr-4">
-                      <Link
-                        href={`/reports?year=${selectedYear}${site ? `&site=${site}` : ""}&project=${p.id}`}
-                        className="text-slate-700 underline decoration-slate-300 underline-offset-2 hover:text-slate-900 print:no-underline"
-                      >
-                        {p.name}
-                      </Link>
-                    </td>
-                    <td className="py-2 pr-4 text-right font-mono text-slate-700">{p.progress_pct ?? 0}%</td>
-                    <td className="py-2 pr-4 text-right font-mono text-slate-700">{formatWon(p.sales)}</td>
-                    <td className="py-2 pr-4 text-right font-mono text-slate-700">{formatWon(p.purchase)}</td>
-                    <td className="py-2 text-right font-mono text-slate-700">{formatWon(p.profit)}</td>
-                  </tr>
-                ))}
-                {byProject.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-400">
-                      {selectedYear}년 프로젝트가 없습니다.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <ProjectProfitTable rows={byProject} year={selectedYear} site={site} />
       </CollapsibleSection>
 
       <div className={popupOpen || isolateProjects ? "space-y-6 print:hidden" : "space-y-6"}>
