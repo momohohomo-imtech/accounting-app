@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { formatWon, formatDate } from "@/lib/format";
-import { PrintButton } from "@/components/PrintButton";
+import { VendorReportActions } from "@/components/VendorReportActions";
 
 type VendorRow = { id: string; trans_date: string; item_name: string | null; amount: number };
 
@@ -16,6 +16,7 @@ export function VendorDetailReport({
   closeHref: string;
 }) {
   const total = rows.reduce((s, r) => s + r.amount, 0);
+  const exportRows = rows.map((r) => [formatDate(r.trans_date), r.item_name ?? "-", r.amount]);
 
   return (
     <div className="space-y-4">
@@ -24,7 +25,7 @@ export function VendorDetailReport({
           {vendorName} 매입 내역 <span className="font-mono text-sm font-normal text-slate-400">{year}년</span>
         </h2>
         <div className="flex items-center gap-2">
-          <PrintButton />
+          <VendorReportActions vendorName={vendorName} year={year} rows={exportRows} total={total} />
           <Link href={closeHref} className="text-sm text-slate-500 hover:text-slate-800 print:hidden">
             닫기
           </Link>

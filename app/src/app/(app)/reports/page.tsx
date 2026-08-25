@@ -314,14 +314,18 @@ export default async function ReportsPage({
       </div>
 
       {project && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <ProjectProfitReport projectId={project} closeHref={`/reports?year=${selectedYear}${site ? `&site=${site}` : ""}`} />
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:static print:bg-transparent print:p-0">
+          <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
+            <ProjectProfitReport projectId={project} closeHref={`/reports?year=${selectedYear}${site ? `&site=${site}` : ""}`} />
+          </div>
         </div>
       )}
 
       {vendor && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <VendorDetailReport vendorName={vendor} year={selectedYear} rows={vendorRows} closeHref={`/reports?year=${selectedYear}`} />
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:static print:bg-transparent print:p-0">
+          <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
+            <VendorDetailReport vendorName={vendor} year={selectedYear} rows={vendorRows} closeHref={`/reports?year=${selectedYear}`} />
+          </div>
         </div>
       )}
     </div>
