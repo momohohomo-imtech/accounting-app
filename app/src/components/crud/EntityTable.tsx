@@ -46,12 +46,15 @@ export function EntityTable({
   updateAction,
   deleteAction,
   extraActions,
+  editPopup,
 }: {
   fields: FieldConfig[];
   rows: Row[];
   updateAction: (formData: FormData) => void;
   deleteAction: (formData: FormData) => void;
   extraActions?: Record<string, ReactNode>;
+  /** Show the edit form in a modal instead of expanding the row inline. */
+  editPopup?: boolean;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -91,7 +94,10 @@ export function EntityTable({
     return <p className="py-8 text-center text-sm text-slate-400">등록된 항목이 없습니다.</p>;
   }
 
+  const editingRow = editPopup ? sortedRows.find((r) => r.id === editingId) : undefined;
+
   return (
+    <>
     <Table className={hasWidths ? "min-w-[700px] table-fixed" : "min-w-[700px]"}>
       <THead>
         {visibleFields.map((f) => (
@@ -116,7 +122,7 @@ export function EntityTable({
       </THead>
       <tbody>
         {sortedRows.map((row) =>
-          editingId === row.id ? (
+          editingId === row.id && !editPopup ? (
             <Tr key={row.id} className="bg-slate-50">
               <td colSpan={visibleFields.length + 1} className="py-3 pr-4">
                 <form
@@ -184,5 +190,35 @@ export function EntityTable({
         )}
       </tbody>
     </Table>
+
+    {editingRow && (
+      <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:hidden">
+        <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
+          <h2 className="mb-4 text-lg font-semibold text-slate-900">수정</h2>
+          <form
+            action={(fd) => {
+              updateAction(fd);
+              setEditingId(null);
+            }}
+            onSubmit={(e) => {
+              if (!confirm("수정 내용을 저장하시겠습니까?")) e.preventDefault();
+            }}
+            className="space-y-3"
+          >
+            <input type="hidden" name="id" value={editingRow.id} />
+            <EntityForm fields={fields} defaultValues={editingRow} />
+            <div className="flex gap-2">
+              <Button type="submit" size="sm">
+                저장
+              </Button>
+              <Button type="button" variant="secondary" size="sm" onClick={() => setEditingId(null)}>
+                취소
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

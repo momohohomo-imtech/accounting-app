@@ -182,6 +182,7 @@ async function ProjectListSection({ year, siteId, report }: { year?: string; sit
             rows={tableRows}
             updateAction={updateProjectRecord}
             deleteAction={deleteProjectRecord}
+            editPopup
             extraActions={Object.fromEntries(
               (projects ?? []).map((p) => [
                 p.id,
