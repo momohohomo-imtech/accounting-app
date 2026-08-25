@@ -1,18 +1,18 @@
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { createAccessListRecord, deleteAccessListRecord } from "@/lib/actions/access-lists";
-import { formatDate } from "@/lib/format";
+import { formatDate, sortByEmployeeNo } from "@/lib/format";
 import { AccessListWorkerPicker } from "@/components/AccessListWorkerPicker";
 import { AccessListExportButton } from "@/components/AccessListExportButton";
 
 export async function AccessListsSection() {
   const supabase = await createClient();
-  const [{ data: sites }, { data: offices }, { data: workers }, { data: employees }, { data: lists }, { data: links }] =
+  const [{ data: sites }, { data: offices }, { data: workers }, { data: employeesRaw }, { data: lists }, { data: links }] =
     await Promise.all([
       supabase.from("sites").select("id, name").order("name"),
       supabase.from("daily_worker_offices").select("id, name").order("name"),
       supabase.from("daily_workers").select("id, name, office_id, status").eq("status", "active").order("name"),
-      supabase.from("employees").select("id, name").order("name"),
+      supabase.from("employees").select("id, name, employee_no"),
       supabase.from("access_lists").select("*, sites(name)").order("created_at", { ascending: false }),
       supabase
         .from("access_list_workers")
@@ -20,6 +20,8 @@ export async function AccessListsSection() {
           "access_list_id, daily_worker_id, employee_id, daily_workers(name, phone, nationality, birth_date), employees(name, phone, nationality, birth_date)"
         ),
     ]);
+
+  const employees = sortByEmployeeNo(employeesRaw ?? []);
 
   return (
     <div className="space-y-6">
@@ -61,7 +63,7 @@ export async function AccessListsSection() {
           <AccessListWorkerPicker
             offices={offices ?? []}
             workers={(workers ?? []).map((w) => ({ id: w.id, name: w.name, office_id: w.office_id }))}
-            employees={employees ?? []}
+            employees={employees}
           />
 
           <button className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">

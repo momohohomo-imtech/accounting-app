@@ -17,6 +17,7 @@ import { PayslipView } from "@/components/PayslipView";
 import { YearFilter } from "@/components/YearFilter";
 import { EmployeeCertificate } from "@/components/EmployeeCertificate";
 import { LinkButton } from "@/components/ui/Button";
+import { sortByEmployeeNo } from "@/lib/format";
 
 const employeeFields: FieldConfig[] = [
   { name: "employee_no", label: "사원번호" },
@@ -58,7 +59,7 @@ export default async function EmployeesPage({
   const yearEnd = `${selectedYear}-12-31`;
 
   const supabase = await createClient();
-  const [{ data: employees }, { data: payroll }, { data: firstPayroll }] = await Promise.all([
+  const [{ data: employeesRaw }, { data: payroll }, { data: firstPayroll }] = await Promise.all([
     supabase.from("employees").select("*").order("created_at", { ascending: false }),
     supabase
       .from("payroll")
@@ -77,7 +78,9 @@ export default async function EmployeesPage({
   if (!payrollYears.includes(selectedYear)) payrollYears.unshift(selectedYear);
   payrollYears.sort((a, b) => b - a);
 
-  const employeeOptions = (employees ?? []).map((e) => ({
+  const employees = sortByEmployeeNo(employeesRaw ?? []);
+
+  const employeeOptions = employees.map((e) => ({
     id: e.id,
     name: e.name,
     monthly_salary: e.monthly_salary,
@@ -101,11 +104,11 @@ export default async function EmployeesPage({
           <h2 className="mb-3 font-semibold text-slate-900">직원 목록</h2>
           <EntityTable
             fields={employeeFields}
-            rows={employees ?? []}
+            rows={employees}
             updateAction={updateEmployeeRecord}
             deleteAction={deleteEmployeeRecord}
             extraActions={Object.fromEntries(
-              (employees ?? []).map((e) => [
+              employees.map((e) => [
                 e.id,
                 <LinkButton key={e.id} href={`/employees?certificate=${e.id}`} variant="secondary" size="xs">
                   재직증명서
@@ -118,7 +121,7 @@ export default async function EmployeesPage({
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="mb-3 font-semibold text-slate-900">급여대장/상여대장 업로드 (AI 자동 인식)</h2>
           <PayrollImport
-            employees={(employees ?? []).map((e) => ({ id: e.id, employee_no: e.employee_no, name: e.name }))}
+            employees={employees.map((e) => ({ id: e.id, employee_no: e.employee_no, name: e.name }))}
           />
         </div>
 
@@ -153,7 +156,7 @@ export default async function EmployeesPage({
 
       {certificate &&
         (() => {
-          const employee = (employees ?? []).find((e) => e.id === certificate);
+          const employee = employees.find((e) => e.id === certificate);
           if (!employee) return null;
           return (
             <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 py-10 print:static print:p-0">
