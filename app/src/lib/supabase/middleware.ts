@@ -36,9 +36,23 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  let role: string | null = null;
+  if (user) {
+    const { data } = await supabase.from("users").select("role").eq("id", user.id).maybeSingle();
+    role = data?.role ?? null;
+  }
+  const homePath = role === "tax_agent" ? "/transactions" : "/dashboard";
+
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = homePath;
+    return NextResponse.redirect(url);
+  }
+
+  // tax_agent(세무사 사무실 계정)는 매입매출·외상 화면만 볼 수 있음 — 그 외 경로는 강제 이동.
+  if (user && role === "tax_agent" && !request.nextUrl.pathname.startsWith("/transactions")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/transactions";
     return NextResponse.redirect(url);
   }
 

@@ -9,6 +9,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const { data: profile } = user
+    ? await supabase.from("users").select("role").eq("id", user.id).maybeSingle()
+    : { data: null };
+  const role = profile?.role ?? null;
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -21,7 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <p className="mt-0.5 text-base font-bold text-white">현장관리</p>
           </div>
         </div>
-        <SidebarNav />
+        <SidebarNav role={role} />
         <form action={signOut} className="border-t border-slate-800 p-3">
           <p className="truncate px-3 pb-2 text-xs text-slate-500">{user?.email}</p>
           <button className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-400 transition-colors hover:bg-slate-800 hover:text-white">
@@ -35,7 +39,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Image src="/logo-icon.png" alt="" width={22} height={22} className="rounded-md" />
           <p className="text-sm font-bold text-white">현장관리 시스템</p>
         </header>
-        <MobileNav />
+        <MobileNav role={role} />
         <main className="flex-1 p-4 md:p-8">{children}</main>
       </div>
     </div>

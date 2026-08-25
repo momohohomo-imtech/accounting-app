@@ -20,12 +20,17 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function SidebarNav() {
+function navFor(role: string | null) {
+  return role === "tax_agent" ? NAV.filter((item) => item.href === "/transactions") : NAV;
+}
+
+export function SidebarNav({ role }: { role: string | null }) {
   const pathname = usePathname();
+  const items = navFor(role);
 
   return (
     <nav className="flex flex-1 flex-col gap-0.5 p-3">
-      {NAV.map((item, i) => {
+      {items.map((item, i) => {
         const active = isActive(pathname, item.href);
         return (
           <Link
@@ -53,12 +58,13 @@ export function SidebarNav() {
   );
 }
 
-export function MobileNav() {
+export function MobileNav({ role }: { role: string | null }) {
   const pathname = usePathname();
+  const items = navFor(role);
 
   return (
     <nav className="flex gap-1 overflow-x-auto border-b border-slate-800 bg-slate-900 px-2 py-2 md:hidden print:hidden">
-      {NAV.map((item) => {
+      {items.map((item) => {
         const active = isActive(pathname, item.href);
         return (
           <Link
