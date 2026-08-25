@@ -2,7 +2,13 @@ import Link from "next/link";
 import { formatWon, formatDate } from "@/lib/format";
 import { VendorReportActions } from "@/components/VendorReportActions";
 
-type VendorRow = { id: string; trans_date: string; item_name: string | null; amount: number };
+type VendorRow = {
+  id: string;
+  trans_date: string;
+  item_name: string | null;
+  amount: number;
+  project_name: string | null;
+};
 
 export function VendorDetailReport({
   vendorName,
@@ -39,6 +45,7 @@ export function VendorDetailReport({
           <thead>
             <tr className="border-b border-slate-200 text-left text-slate-500">
               <th className="pb-2 pr-4">날짜</th>
+              <th className="pb-2 pr-4">프로젝트</th>
               <th className="pb-2 pr-4">품목</th>
               <th className="pb-2 text-right">금액</th>
               {editHrefFor && <th className="pb-2 pl-4 text-right print:hidden">관리</th>}
@@ -48,6 +55,9 @@ export function VendorDetailReport({
             {rows.map((r) => (
               <tr key={r.id} className="border-b border-slate-100 last:border-0">
                 <td className="py-2 pr-4 text-slate-600">{formatDate(r.trans_date)}</td>
+                <td className="py-2 pr-4 text-slate-700">
+                  {r.project_name ?? <span className="font-medium text-red-600">일반경비</span>}
+                </td>
                 <td className="py-2 pr-4 text-slate-700">{r.item_name ?? "-"}</td>
                 <td className="py-2 text-right font-mono text-slate-900">{formatWon(r.amount)}</td>
                 {editHrefFor && (
@@ -64,7 +74,7 @@ export function VendorDetailReport({
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={editHrefFor ? 4 : 3} className="py-6 text-center text-slate-400">
+                <td colSpan={editHrefFor ? 5 : 4} className="py-6 text-center text-slate-400">
                   매입 내역이 없습니다.
                 </td>
               </tr>

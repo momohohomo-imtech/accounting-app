@@ -192,7 +192,13 @@ export default async function ReportsPage({
   const vendorRows = vendor
     ? transactions
         .filter((t) => t.type === "매입" && ((one(t.clients) as { name: string } | null)?.name ?? t.client_name_raw ?? "미지정") === vendor)
-        .map((t) => ({ id: t.id, trans_date: t.trans_date, item_name: t.item_name, amount: t.purchase_amount + t.purchase_vat }))
+        .map((t) => ({
+          id: t.id,
+          trans_date: t.trans_date,
+          item_name: t.item_name,
+          amount: t.purchase_amount + t.purchase_vat,
+          project_name: (one(t.projects) as { name: string } | null)?.name ?? null,
+        }))
     : [];
 
   const popupOpen = Boolean(project || vendor);
