@@ -25,8 +25,12 @@
 6. `005_adhoc_fixes_applied.sql` — 세션 중 채팅으로만 보냈던 1회성 수정들을 정리해
    저장소에 기록한 것 (거래처 3곳 등록+연결, `public.users` 누락 계정 채움 + 트리거
    재설치, 프로젝트 귀속 연결). **이미 실행 완료됨.**
+7. `006_worklog_calendar.sql` — `work_logs.project_id`를 nullable로 변경, `color`/
+   `sort_order` 컬럼 추가 (작업일지 달력 기능용). **사용자에게 전달함 — 실행 여부
+   다음 세션에서 확인할 것.** 실행 전까지는 `/worklogs` 페이지가 에러남(컬럼 없음/
+   project_id NOT NULL 위반).
 
-새 스키마 변경이 필요하면 `006_...` 형식으로 이어서 만들 것.
+새 스키마 변경이 필요하면 `007_...` 형식으로 이어서 만들 것.
 
 ## 이번 세션에 한 일 (큰 흐름)
 
@@ -86,8 +90,43 @@
   다른 목록(현장/거래처/결제수단 등)에도 자동 적용됨
 - 프로젝트 상태 라벨 맵을 `lib/projectStatus.ts`로 분리(`PROJECT_STATUS_OPTIONS`,
   `projectStatusLabel`) — 목록 폼과 손익보고서가 같이 참조
+- 후속 미세조정: 진행률 막대에서 숫자 % 텍스트 제거하고 100%일 때 빨간색으로,
+  목록에서 연도 컬럼도 `hideInTable`로 숨김
 
-### 5. 대량 과거 데이터 반입
+### 5. 대시보드 재구성
+- 예상 세금(`TaxEstimateSection.tsx`)을 최상단으로 옮기고, 연환산/세율구간 표 대신
+  **한 줄 요약**으로 단순화 (연환산 없이 현재까지 누적 매출이익 기준으로 바로 계산)
+- 연도별 매출액/매입액/이익금 카드 추가 (기본 현재 연도, `YearFilter` 재사용한
+  드롭다운으로 다른 연도 선택), 기존 이번달 매입/매출/외상잔액/진행 프로젝트
+  카드는 그 아래로 이동
+
+### 6. 작업일지 달력 (work_logs 재설계)
+기존 `/worklogs`는 프로젝트별 flat 목록(CreatePanel+EntityTable)이었는데, 월별
+달력 UI로 완전히 교체함 (사용자가 준 예시 사진 기준).
+- **DB**: `006_worklog_calendar.sql`로 `work_logs.project_id`를 nullable로 바꾸고
+  `color`(text)·`sort_order`(int) 컬럼 추가. 기존 project_id/workers/start_time/
+  end_time/content 컬럼은 스키마상 남아있지만 새 달력 UI에서는 안 씀(날짜당
+  최대 5줄의 `title`+`color`만 사용). **이 마이그레이션은 사용자에게 전달만 했고
+  실행 여부 미확인 — 다음 세션에서 꼭 확인할 것.**
+- `lib/calendar.ts`의 `buildMonthGrid(year, month)`가 6주 그리드(이전/다음달 여백
+  포함)를 순수 함수로 생성 (Date 객체 대신 `dateKey` 문자열만 반환해 서버→클라이언트
+  props로 안전하게 넘길 수 있게 함)
+- `lib/workLogColors.ts`에 색상 팔레트(없음/파랑/빨강/초록/주황/분홍/회색) 정의 —
+  Tailwind 클래스는 파일에 리터럴 문자열로 박아둬야 빌드 시 스캔됨(동적 조합 금지)
+- 날짜 셀 클릭(`Link href="?year&month&day=D"`) → 팝업(`WorkLogDayEditor.tsx`)에서
+  그 날짜의 **고정 5줄**을 편집 (`WorkLogRowInput.tsx`: 줄마다 색상 스와치 버튼 +
+  한 줄 텍스트). 저장(`saveDayWorkLogs` 서버 액션)은 해당 날짜의 기존 행을 전부
+  지우고 비어있지 않은 줄만 다시 insert하는 **"해당 날짜 통째로 교체"** 방식이라
+  단순함. 네이티브 `<form action={fn}>`이라 액션 안에서 `redirect()`로 팝업을
+  자동으로 닫음 (클라이언트에서 수동으로 액션을 호출하는 게 아니라서 안전 — 위
+  교훈 3번 참고)
+- 달력 칸은 좁아서 항목이 `truncate`로 잘리지만, 인쇄(`print:whitespace-normal
+  print:overflow-visible`)와 엑셀 다운로드(`downloadWorkLogCalendarXlsx`, 달력
+  모양 그대로 셀별 배경색 채워서 export)에서는 전체 텍스트가 다 보이게 함
+- 지난달/다음달로 삐져나온 회색 칸은 클릭 불가(Link 아님)로 처리 — 처음엔 클릭
+  가능하게 했다가 "4월 31일"처럼 존재하지 않는 날짜로 이동하는 버그가 있어서 고침
+
+### 7. 대량 과거 데이터 반입
 사용자가 준 엑셀(외상 장부, 아이엠테크 3분기 매입매출장, 프로젝트 현황)을 분석해서
 SQL INSERT 스크립트를 생성 → 사용자가 SQL Editor에서 실행하는 방식으로 반입.
 현장·프로젝트 41개, 거래 842건 반입 완료. **주의: 이 과정에서 같은 SQL을 실수로

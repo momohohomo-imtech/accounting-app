@@ -98,12 +98,14 @@ export type CreditPayment = {
 export type WorkLog = {
   id: string;
   log_date: string;
-  project_id: string;
+  project_id: string | null;
   title: string;
   workers: string | null;
   start_time: string | null;
   end_time: string | null;
   content: string | null;
+  color: string | null;
+  sort_order: number;
   created_at: string;
   projects?: Project;
 };

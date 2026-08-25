@@ -1,36 +1,23 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-function parse(formData: FormData) {
-  return {
-    log_date: String(formData.get("log_date")),
-    project_id: String(formData.get("project_id")),
-    title: String(formData.get("title") ?? ""),
-    workers: String(formData.get("workers") ?? "") || null,
-    start_time: String(formData.get("start_time") ?? "") || null,
-    end_time: String(formData.get("end_time") ?? "") || null,
-    content: String(formData.get("content") ?? "") || null,
-  };
-}
-
-export async function createWorkLogRecord(formData: FormData) {
+export async function saveDayWorkLogs(formData: FormData) {
   const supabase = await createClient();
-  await supabase.from("work_logs").insert(parse(formData));
-  revalidatePath("/worklogs");
-}
+  const logDate = String(formData.get("log_date"));
 
-export async function updateWorkLogRecord(formData: FormData) {
-  const supabase = await createClient();
-  const id = String(formData.get("id"));
-  await supabase.from("work_logs").update(parse(formData)).eq("id", id);
-  revalidatePath("/worklogs");
-}
+  await supabase.from("work_logs").delete().eq("log_date", logDate);
 
-export async function deleteWorkLogRecord(formData: FormData) {
-  const supabase = await createClient();
-  const id = String(formData.get("id"));
-  await supabase.from("work_logs").delete().eq("id", id);
-  revalidatePath("/worklogs");
+  const rows = [];
+  for (let i = 0; i < 5; i++) {
+    const title = String(formData.get(`title_${i}`) ?? "").trim();
+    if (!title) continue;
+    const color = String(formData.get(`color_${i}`) ?? "none");
+    rows.push({ log_date: logDate, title, color, sort_order: i });
+  }
+  if (rows.length) await supabase.from("work_logs").insert(rows);
+
+  const [year, month] = logDate.split("-");
+  redirect(`/worklogs?year=${Number(year)}&month=${Number(month)}`);
 }
