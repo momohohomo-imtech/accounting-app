@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import type { ExpenseCategory, PaymentMethod, Transaction } from "@/lib/types";
 import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components/ProjectPicker";
 
@@ -50,14 +49,11 @@ export function TransactionForm({
     note1: initial?.note1 ?? "",
     note2: initial?.note2 ?? "",
   });
-  const [receiptPath, setReceiptPath] = useState(initial?.receipt_image_url ?? "");
   const [ocrExtracted, setOcrExtracted] = useState<Record<string, unknown> | null>(
     (initial?.ocr_extracted_raw as Record<string, unknown>) ?? null
   );
   const [preview, setPreview] = useState<string | null>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inputClass = "rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none";
 
@@ -66,7 +62,6 @@ export function TransactionForm({
   }
 
   async function handleFile(file: File) {
-    setPendingFile(file);
     setPreview(URL.createObjectURL(file));
     setOcrLoading(true);
     setError(null);
@@ -103,20 +98,6 @@ export function TransactionForm({
     e.preventDefault();
     if (!confirm(initial ? "수정 내용을 저장하시겠습니까?" : "이 거래를 등록하시겠습니까?")) return;
     setError(null);
-    let path = receiptPath;
-
-    if (pendingFile) {
-      setUploading(true);
-      const supabase = createClient();
-      const filePath = `${Date.now()}-${pendingFile.name}`;
-      const { data, error: uploadError } = await supabase.storage.from("receipts").upload(filePath, pendingFile);
-      setUploading(false);
-      if (uploadError) {
-        setError(`영수증 업로드 실패: ${uploadError.message}`);
-        return;
-      }
-      path = data.path;
-    }
 
     const fd = new FormData();
     if (initial) fd.append("id", initial.id);
@@ -128,7 +109,6 @@ export function TransactionForm({
       }
     });
     fd.append("is_verified_ai", "on");
-    fd.append("receipt_image_url", path);
     fd.append("ocr_extracted_raw", ocrExtracted ? JSON.stringify(ocrExtracted) : "");
 
     const result = await action(fd);
@@ -146,6 +126,7 @@ export function TransactionForm({
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="mb-3 font-semibold text-slate-900">영수증 업로드 (선택, AI 자동 인식)</h2>
+        <p className="mb-2 text-xs text-slate-400">사진은 항목 자동 입력에만 쓰이고 저장되지 않아요. 원본은 직접 보관해주세요.</p>
         <input
           type="file"
           accept="image/*"
@@ -291,10 +272,9 @@ export function TransactionForm({
       <div className="flex items-center gap-2">
         <button
           type="submit"
-          disabled={uploading}
           className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
         >
-          {uploading ? "업로드 중..." : initial ? "수정 저장" : "거래 등록"}
+          {initial ? "수정 저장" : "거래 등록"}
         </button>
         <button
           type="button"
