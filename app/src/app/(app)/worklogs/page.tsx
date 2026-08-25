@@ -24,13 +24,16 @@ export default async function WorkLogsPage({
   const lastDay = new Date(selectedYear, selectedMonth, 0).getDate();
   const monthEnd = `${selectedYear}-${pad(selectedMonth)}-${pad(lastDay)}`;
 
-  const { data: logs } = await supabase
-    .from("work_logs")
-    .select("*")
-    .gte("log_date", monthStart)
-    .lte("log_date", monthEnd)
-    .order("log_date", { ascending: true })
-    .order("sort_order", { ascending: true });
+  const [{ data: logs }, { data: allDates }] = await Promise.all([
+    supabase
+      .from("work_logs")
+      .select("*")
+      .gte("log_date", monthStart)
+      .lte("log_date", monthEnd)
+      .order("log_date", { ascending: true })
+      .order("sort_order", { ascending: true }),
+    supabase.from("work_logs").select("log_date"),
+  ]);
 
   const rows = (logs ?? []) as WorkLog[];
   const logsByDate = new Map<string, WorkLog[]>();
@@ -39,6 +42,16 @@ export default async function WorkLogsPage({
     arr.push(l);
     logsByDate.set(l.log_date, arr);
   }
+
+  const monthsByYear = new Map<number, Set<number>>();
+  for (const { log_date } of allDates ?? []) {
+    const y = Number(log_date.slice(0, 4));
+    const m = Number(log_date.slice(5, 7));
+    const set = monthsByYear.get(y) ?? new Set<number>();
+    set.add(m);
+    monthsByYear.set(y, set);
+  }
+  const savedYears = Array.from(monthsByYear.keys()).sort((a, b) => b - a);
 
   const weeks = buildMonthGrid(selectedYear, selectedMonth);
   const basePath = `/worklogs?year=${selectedYear}&month=${selectedMonth}`;
@@ -125,6 +138,33 @@ export default async function WorkLogsPage({
           ))}
         </div>
       </div>
+
+      {savedYears.length > 0 && (
+        <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4 text-sm print:hidden">
+          <p className="text-xs font-semibold text-slate-500">저장된 연/월</p>
+          <div className="space-y-1.5">
+            {savedYears.map((y) => (
+              <div key={y} className="flex flex-wrap items-center gap-1.5">
+                <span className="w-14 shrink-0 font-mono text-xs text-slate-500">{y}년</span>
+                {Array.from(monthsByYear.get(y) ?? []).sort((a, b) => a - b).map((m) => (
+                  <Link
+                    key={m}
+                    href={`/worklogs?year=${y}&month=${m}`}
+                    className={cx(
+                      "rounded-lg px-2.5 py-1 text-xs font-medium transition-colors",
+                      y === selectedYear && m === selectedMonth
+                        ? "bg-slate-900 text-white"
+                        : "border border-slate-300 text-slate-600 hover:bg-slate-100"
+                    )}
+                  >
+                    {m}월
+                  </Link>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {dayKey && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:hidden">
