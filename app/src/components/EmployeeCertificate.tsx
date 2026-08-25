@@ -66,10 +66,10 @@ export function EmployeeCertificate({ employee, closeHref }: { employee: Employe
         </div>
       </div>
 
-      <div className="mx-auto max-w-xl space-y-8 py-4">
+      <div className="mx-auto flex min-h-[700px] max-w-xl flex-col py-4 print:min-h-[250mm]">
         <h1 className="text-center text-3xl font-bold tracking-[0.5em] text-slate-900">재직증명서</h1>
 
-        <table className="w-full border-t-2 border-slate-900 text-sm">
+        <table className="mt-8 w-full border-t-2 border-slate-900 text-sm">
           <tbody>
             <tr className="border-b border-slate-300">
               <td className="w-28 bg-slate-50 py-2.5 pl-3 font-medium text-slate-600">성명</td>
@@ -105,9 +105,11 @@ export function EmployeeCertificate({ employee, closeHref }: { employee: Employe
           </tbody>
         </table>
 
-        <p className="text-center text-sm leading-relaxed text-slate-700">위 사람은 본 사업장에 재직 중임을 증명합니다.</p>
+        <p className="mt-8 text-center text-sm leading-relaxed text-slate-700">
+          위 사람은 본 사업장에 재직 중임을 증명합니다.
+        </p>
 
-        <div className="pt-20 text-center">
+        <div className="mt-auto pb-12 text-center">
           <p className="text-sm text-slate-700">{todayLabel}</p>
           <div className="mt-6 text-sm text-slate-900">
             <p className="font-semibold">{companyName || "-"}</p>
