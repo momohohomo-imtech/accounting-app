@@ -18,9 +18,9 @@ const TABS = [
 export default async function ProjectsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; year?: string; report?: string }>;
+  searchParams: Promise<{ tab?: string; year?: string; site_id?: string; report?: string }>;
 }) {
-  const { tab, year, report } = await searchParams;
+  const { tab, year, site_id, report } = await searchParams;
   const active = tab ?? "list";
 
   return (
@@ -30,24 +30,27 @@ export default async function ProjectsPage({
         <PageTabs basePath="/projects" tabs={TABS} active={active} />
       </div>
       {active === "sites" && <SitesSection />}
-      {active === "list" && <ProjectListSection year={year} report={report} />}
+      {active === "list" && <ProjectListSection year={year} siteId={site_id} report={report} />}
     </div>
   );
 }
 
-async function ProjectListSection({ year, report }: { year?: string; report?: string }) {
+async function ProjectListSection({ year, siteId, report }: { year?: string; siteId?: string; report?: string }) {
   const supabase = await createClient();
   const currentYear = new Date().getFullYear();
   const selectedYear = year ? Number(year) : currentYear;
 
+  let projectsQuery = supabase
+    .from("projects")
+    .select("*, sites(name)")
+    .eq("year", selectedYear)
+    .order("created_at", { ascending: false });
+  if (siteId) projectsQuery = projectsQuery.eq("site_id", siteId);
+
   const [{ data: sites }, { data: allProjects }, { data: projects }, { data: allYears }] = await Promise.all([
     supabase.from("sites").select("id, name, clients(name)").order("name"),
     supabase.from("projects").select("id, name"),
-    supabase
-      .from("projects")
-      .select("*, sites(name)")
-      .eq("year", selectedYear)
-      .order("created_at", { ascending: false }),
+    projectsQuery,
     supabase.from("projects").select("year"),
   ]);
 
@@ -103,7 +106,13 @@ async function ProjectListSection({ year, report }: { year?: string; report?: st
     <div className="space-y-6">
       <div className={report ? "space-y-6 print:hidden" : "space-y-6"}>
         <div className="flex justify-end">
-          <YearFilter basePath="/projects" years={years} selectedYear={selectedYear} />
+          <YearFilter
+            basePath="/projects"
+            years={years}
+            selectedYear={selectedYear}
+            siteOptions={siteOptions}
+            selectedSiteId={siteId}
+          />
         </div>
 
         <CreatePanel title="프로젝트" fields={fields} createAction={createProjectRecord} />
@@ -117,7 +126,12 @@ async function ProjectListSection({ year, report }: { year?: string; report?: st
             extraActions={Object.fromEntries(
               (projects ?? []).map((p) => [
                 p.id,
-                <LinkButton key={p.id} href={`/projects?tab=list&year=${selectedYear}&report=${p.id}`} variant="secondary" size="xs">
+                <LinkButton
+                  key={p.id}
+                  href={`/projects?tab=list&year=${selectedYear}${siteId ? `&site_id=${siteId}` : ""}&report=${p.id}`}
+                  variant="secondary"
+                  size="xs"
+                >
                   보고서
                 </LinkButton>,
               ])
@@ -131,7 +145,10 @@ async function ProjectListSection({ year, report }: { year?: string; report?: st
           className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:static print:bg-transparent print:p-0"
         >
           <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
-            <ProjectProfitReport projectId={report} closeHref={`/projects?tab=list&year=${selectedYear}`} />
+            <ProjectProfitReport
+              projectId={report}
+              closeHref={`/projects?tab=list&year=${selectedYear}${siteId ? `&site_id=${siteId}` : ""}`}
+            />
           </div>
         </div>
       )}
