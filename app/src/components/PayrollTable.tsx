@@ -10,11 +10,13 @@ type PayrollRow = PayrollInitial & { id: string; employees?: { name: string } | 
 export function PayrollTable({
   payroll,
   employees,
+  year,
   updateAction,
   deleteAction,
 }: {
   payroll: PayrollRow[];
   employees: EmployeeOption[];
+  year: number;
   updateAction: (formData: FormData) => void;
   deleteAction: (formData: FormData) => void;
 }) {
@@ -74,7 +76,7 @@ export function PayrollTable({
               <td className="py-2 pr-4 text-right font-medium text-slate-900">{formatWon(net)}</td>
               <td className="py-2 text-right">
                 <div className="flex justify-end gap-2">
-                  <LinkButton href={`/employees?payslip=${p.id}`} variant="secondary" size="xs">
+                  <LinkButton href={`/employees?year=${year}&payslip=${p.id}`} variant="secondary" size="xs">
                     명세서
                   </LinkButton>
                   <Button variant="secondary" size="xs" onClick={() => setEditingId(p.id)}>

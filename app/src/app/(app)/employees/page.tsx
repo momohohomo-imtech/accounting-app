@@ -14,6 +14,7 @@ import { PayrollForm } from "@/components/PayrollForm";
 import { PayrollTable } from "@/components/PayrollTable";
 import { PayrollImport } from "@/components/PayrollImport";
 import { PayslipView } from "@/components/PayslipView";
+import { YearFilter } from "@/components/YearFilter";
 
 const employeeFields: FieldConfig[] = [
   { name: "employee_no", label: "사원번호" },
@@ -44,17 +45,33 @@ const employeeFields: FieldConfig[] = [
 export default async function EmployeesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ payslip?: string }>;
+  searchParams: Promise<{ payslip?: string; year?: string }>;
 }) {
-  const { payslip } = await searchParams;
+  const { payslip, year } = await searchParams;
+  const currentYear = new Date().getFullYear();
+  const selectedYear = year ? Number(year) : currentYear;
+  const yearStart = `${selectedYear}-01-01`;
+  const yearEnd = `${selectedYear}-12-31`;
+
   const supabase = await createClient();
-  const [{ data: employees }, { data: payroll }] = await Promise.all([
+  const [{ data: employees }, { data: payroll }, { data: firstPayroll }] = await Promise.all([
     supabase.from("employees").select("*").order("created_at", { ascending: false }),
     supabase
       .from("payroll")
       .select("*, employees(name)")
+      .gte("pay_month", yearStart)
+      .lte("pay_month", yearEnd)
       .order("pay_month", { ascending: false }),
+    supabase.from("payroll").select("pay_month").order("pay_month", { ascending: true }).limit(1),
   ]);
+
+  const firstYear = Math.min(
+    firstPayroll?.[0]?.pay_month ? Number(firstPayroll[0].pay_month.slice(0, 4)) : currentYear,
+    currentYear
+  );
+  const payrollYears = Array.from({ length: currentYear - firstYear + 1 }, (_, i) => currentYear - i);
+  if (!payrollYears.includes(selectedYear)) payrollYears.unshift(selectedYear);
+  payrollYears.sort((a, b) => b - a);
 
   const employeeOptions = (employees ?? []).map((e) => ({
     id: e.id,
@@ -97,10 +114,16 @@ export default async function EmployeesPage({
           <h2 className="mb-3 font-semibold text-slate-900">급여 지급 등록</h2>
           <PayrollForm employees={employeeOptions} action={createPayrollRecord} />
 
-          <div className="mt-5 overflow-x-auto">
+          <div className="mb-3 mt-6 flex items-center justify-between">
+            <h3 className="font-semibold text-slate-900">급여 지급 이력</h3>
+            <YearFilter basePath="/employees" years={payrollYears} selectedYear={selectedYear} />
+          </div>
+
+          <div className="overflow-x-auto">
             <PayrollTable
               payroll={payroll ?? []}
               employees={employeeOptions}
+              year={selectedYear}
               updateAction={updatePayrollRecord}
               deleteAction={deletePayrollRecord}
             />
@@ -111,7 +134,7 @@ export default async function EmployeesPage({
       {payslip && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 py-10 print:static print:p-0">
           <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl print:max-w-none print:rounded-none print:border-0 print:shadow-none">
-            <PayslipView payrollId={payslip} closeHref="/employees" />
+            <PayslipView payrollId={payslip} closeHref={`/employees?year=${selectedYear}`} />
           </div>
         </div>
       )}
