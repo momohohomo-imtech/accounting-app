@@ -50,9 +50,11 @@ function sortValue(t: Transaction, key: SortKey): string | number {
 export function TransactionTable({
   transactions,
   projectNodes,
+  editHrefFor,
 }: {
   transactions: Transaction[];
   projectNodes: ProjectTreeNode[];
+  editHrefFor: (id: string) => string;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("trans_date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -245,7 +247,7 @@ export function TransactionTable({
               <Td className="pr-4 text-right font-medium text-slate-900">{formatWon(transactionTotal(t))}</Td>
               <Td className="text-right">
                 <div className="flex justify-end gap-2">
-                  <LinkButton href={`/transactions/${t.id}/edit`} variant="secondary" size="xs">
+                  <LinkButton href={editHrefFor(t.id)} variant="secondary" size="xs">
                     수정
                   </LinkButton>
                   <form action={deleteTransactionRecord}>
