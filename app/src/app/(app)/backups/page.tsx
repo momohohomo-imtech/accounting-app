@@ -10,8 +10,13 @@ export default async function BackupsPage() {
 
   const withLinks = await Promise.all(
     (backups ?? []).map(async (b) => {
-      const { data } = await supabase.storage.from("backups").createSignedUrl(b.storage_url, 3600);
-      return { ...b, signedUrl: data?.signedUrl ?? null };
+      if (!b.storage_url) return { ...b, signedUrl: null };
+      try {
+        const { data } = await supabase.storage.from("backups").createSignedUrl(b.storage_url, 3600);
+        return { ...b, signedUrl: data?.signedUrl ?? null };
+      } catch {
+        return { ...b, signedUrl: null };
+      }
     })
   );
 
