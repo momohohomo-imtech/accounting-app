@@ -63,43 +63,73 @@ export async function downloadAccessListXlsx(
 ) {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("출입명단");
+  const FONT = "맑은 고딕";
+
+  ws.pageSetup = {
+    paperSize: 9, // A4
+    orientation: "portrait",
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 1,
+    horizontalCentered: true,
+    margins: { left: 0.35, right: 0.35, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 },
+  };
 
   const titleRow = ws.addRow(["공사자 출입자 명부"]);
-  titleRow.font = { bold: true, size: 14 };
-  titleRow.alignment = { horizontal: "center" };
-  ws.mergeCells(titleRow.number, 1, titleRow.number, 6);
+  titleRow.height = 30.75;
+  titleRow.font = { name: FONT, size: 12 };
+  titleRow.alignment = { horizontal: "center", vertical: "middle" };
+  ws.mergeCells(1, 1, 1, 6);
 
-  ws.addRow(["업체명:", info.companyName, "", "출입일자:", info.accessPeriod]);
+  const row2 = ws.addRow(["업체명:", info.companyName, "", "출입일자:", info.accessPeriod, ""]);
+  row2.height = 30.75;
   ws.mergeCells(2, 5, 2, 6);
+  [1, 2].forEach((c) => {
+    row2.getCell(c).font = { name: FONT, size: 12 };
+    row2.getCell(c).alignment = { horizontal: c === 1 ? "right" : "center", vertical: "middle" };
+  });
+  [4, 5].forEach((c) => {
+    row2.getCell(c).font = { name: FONT, size: 14 };
+    row2.getCell(c).alignment = { horizontal: c === 4 ? "right" : "center", vertical: "middle" };
+  });
 
-  ws.addRow(["감독자:", info.supervisorName, "", "인원수:", members.length]);
+  const row3 = ws.addRow(["감독자:", info.supervisorName, "", "인원수:", members.length, ""]);
+  row3.height = 39.0;
   ws.mergeCells(3, 5, 3, 6);
+  [1, 2].forEach((c) => {
+    row3.getCell(c).font = { name: FONT, size: 12 };
+    row3.getCell(c).alignment = { horizontal: c === 1 ? "right" : "center", vertical: "middle" };
+  });
+  [4, 5].forEach((c) => {
+    row3.getCell(c).font = { name: FONT, size: 14 };
+    row3.getCell(c).alignment = { horizontal: c === 4 ? "right" : "center", vertical: "middle" };
+  });
 
   const headerRow = ws.addRow(["구분", "성 명", "생년월일", "연락처", "국적", "비고"]);
-  headerRow.eachCell((cell) => {
-    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E293B" } };
-    cell.alignment = { horizontal: "center" };
+  headerRow.height = 26.25;
+  headerRow.eachCell((cell, colNumber) => {
+    cell.font = { name: FONT, size: colNumber <= 2 ? 12 : 14 };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+    cell.border = { bottom: { style: "thin" } };
   });
 
-  members.forEach((m, i) => {
-    ws.addRow([i + 1, m.name, m.birthDate, m.phone, m.nationality, m.note]);
-  });
-
-  const thin = { style: "thin" as const, color: { argb: "FFCBD5E1" } };
-  ws.eachRow((row, rowNumber) => {
-    if (rowNumber === 1) return;
+  const totalSlots = Math.max(21, members.length);
+  for (let i = 0; i < totalSlots; i++) {
+    const m: (typeof members)[number] | undefined = members[i];
+    const row = ws.addRow([i + 1, m?.name ?? "", m?.birthDate ?? "", m?.phone ?? "", m?.nationality ?? "", m?.note ?? ""]);
+    row.height = 26.25;
     row.eachCell({ includeEmpty: true }, (cell) => {
-      cell.border = { top: thin, left: thin, bottom: thin, right: thin };
+      cell.font = { name: FONT, size: 12 };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
     });
-  });
+  }
 
-  ws.getColumn(1).width = 8;
-  ws.getColumn(2).width = 14;
-  ws.getColumn(3).width = 14;
-  ws.getColumn(4).width = 18;
-  ws.getColumn(5).width = 14;
-  ws.getColumn(6).width = 24;
+  ws.getColumn(1).width = 9;
+  ws.getColumn(2).width = 14.375;
+  ws.getColumn(3).width = 12;
+  ws.getColumn(4).width = 18.375;
+  ws.getColumn(5).width = 15.75;
+  ws.getColumn(6).width = 20;
 
   triggerDownload(await wb.xlsx.writeBuffer(), filename);
 }
