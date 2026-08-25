@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/format";
 import { BackupNowButton } from "@/components/BackupNowButton";
+import { RestoreBackupButton } from "@/components/RestoreBackupButton";
+import { deleteBackupRecord } from "@/lib/actions/backups";
 
 export default async function BackupsPage() {
   const supabase = await createClient();
@@ -22,14 +24,14 @@ export default async function BackupsPage() {
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[500px] text-sm">
+          <table className="w-full min-w-[600px] text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-slate-500">
                 <th className="pb-2 pr-4">파일명</th>
                 <th className="pb-2 pr-4">유형</th>
                 <th className="pb-2 pr-4">크기(MB)</th>
                 <th className="pb-2 pr-4">생성일</th>
-                <th className="pb-2 text-right">다운로드</th>
+                <th className="pb-2 text-right">관리</th>
               </tr>
             </thead>
             <tbody>
@@ -40,14 +42,31 @@ export default async function BackupsPage() {
                   <td className="py-2 pr-4 text-slate-700">{b.file_size_mb ?? "-"}</td>
                   <td className="py-2 pr-4 text-slate-600">{formatDate(b.created_at)}</td>
                   <td className="py-2 text-right">
-                    {b.signedUrl && (
-                      <a
-                        href={b.signedUrl}
-                        className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-100"
+                    <div className="flex justify-end gap-2">
+                      {b.signedUrl && (
+                        <a
+                          href={b.signedUrl}
+                          className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-100"
+                        >
+                          다운로드
+                        </a>
+                      )}
+                      <RestoreBackupButton fileName={b.file_name} />
+                      <form
+                        action={async (fd) => {
+                          await deleteBackupRecord(fd);
+                        }}
+                        onSubmit={(e) => {
+                          if (!confirm(`이 백업(${b.file_name})을 삭제하시겠습니까?`)) e.preventDefault();
+                        }}
                       >
-                        다운로드
-                      </a>
-                    )}
+                        <input type="hidden" name="id" value={b.id} />
+                        <input type="hidden" name="fileName" value={b.file_name} />
+                        <button className="rounded-lg border border-red-200 px-2.5 py-1 text-xs text-red-600 hover:bg-red-50">
+                          삭제
+                        </button>
+                      </form>
+                    </div>
                   </td>
                 </tr>
               ))}
