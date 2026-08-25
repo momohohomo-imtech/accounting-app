@@ -28,8 +28,8 @@ export default async function ProjectsPage({
 
   return (
     <div className="space-y-6">
-      <h1 className={`text-2xl font-bold text-slate-900 ${report ? "print:hidden" : ""}`}>프로젝트·현장</h1>
-      <div className={report ? "print:hidden" : ""}>
+      <h1 className="text-2xl font-bold text-slate-900 print:hidden">프로젝트·현장</h1>
+      <div className="print:hidden">
         <PageTabs basePath="/projects" tabs={TABS} active={active} />
       </div>
       {active === "sites" && <SitesSection />}
@@ -153,7 +153,7 @@ async function ProjectListSection({ year, siteId, report }: { year?: string; sit
     <div className="space-y-6">
       <div className={report ? "space-y-6 print:hidden" : "space-y-6"}>
         {estimatedProjects.length > 0 && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 print:hidden">
             <p className="text-xs text-red-600">
               공사완료 예상 미수액 (수주액이 예상금액인 {estimatedProjects.length}건의 이익금 합계)
             </p>

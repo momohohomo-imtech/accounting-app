@@ -90,7 +90,7 @@ export default async function EmployeesPage({
 
   return (
     <div className="space-y-6">
-      <h1 className={`text-2xl font-bold text-slate-900 ${payslip ? "print:hidden" : ""}`}>직원 / 급여</h1>
+      <h1 className="text-2xl font-bold text-slate-900 print:hidden">직원 / 급여</h1>
 
       <div className={payslip ? "space-y-6 print:hidden" : "space-y-6"}>
         <CreatePanel title="직원" fields={employeeFields} createAction={createEmployeeRecord} />
