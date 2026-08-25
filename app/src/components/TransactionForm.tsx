@@ -6,13 +6,11 @@ import type { ExpenseCategory, PaymentMethod, Transaction } from "@/lib/types";
 import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components/ProjectPicker";
 import { bulkImportTransactions, type BulkTransactionInput } from "@/lib/actions/transactions";
 import { formatWon } from "@/lib/format";
+import { VAT_EXEMPT_CATEGORIES } from "@/lib/vatExempt";
 
 type Option = { id: string; name: string };
 type ClientOption = Option & { default_item_name?: string | null };
 type LineItem = { item_name: string; quantity: string; unit_price: string; subtotal: string };
-
-// 이 종류구분들은 VAT·세금계산서 대상이 아니라서 등록 시 자동으로 체크 해제하고 못 누르게 막음.
-const VAT_EXEMPT_CATEGORIES = ["인건비", "직원급여/상여/4대보험", "면세"];
 
 function emptyLineItem(): LineItem {
   return { item_name: "", quantity: "", unit_price: "", subtotal: "" };
