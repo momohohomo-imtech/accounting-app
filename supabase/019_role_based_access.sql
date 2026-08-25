@@ -46,6 +46,7 @@ begin
       'payment_methods','expense_categories'
     ])
   loop
+    execute format('drop policy if exists "admin_staff all %1$s" on public.%1$s;', t);
     execute format(
       'create policy "admin_staff all %1$s" on public.%1$s for all using (public.current_user_role() in (''admin'',''staff'')) with check (public.current_user_role() in (''admin'',''staff''));',
       t
@@ -63,6 +64,7 @@ begin
       'transactions','credit_payments','clients','payment_methods','expense_categories'
     ])
   loop
+    execute format('drop policy if exists "tax_agent read %1$s" on public.%1$s;', t);
     execute format(
       'create policy "tax_agent read %1$s" on public.%1$s for select using (public.current_user_role() = ''tax_agent'');',
       t
