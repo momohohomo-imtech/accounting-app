@@ -145,7 +145,12 @@ export function EntityTable({
           ) : (
             <Tr key={row.id}>
               {visibleFields.map((f) => (
-                <Td key={f.name} style={f.width ? { width: f.width } : undefined} className="max-w-[220px] truncate pr-4">
+                <Td
+                  key={f.name}
+                  style={f.width ? { width: f.width } : undefined}
+                  title={f.display === "progress" ? undefined : displayValue(row, f)}
+                  className="max-w-[220px] truncate pr-4"
+                >
                   {f.display === "progress" ? (
                     <ProgressCell value={Number(row[f.name]) || 0} />
                   ) : cellIsRed(row, f) ? (
