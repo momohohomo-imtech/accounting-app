@@ -57,6 +57,9 @@ export function TransactionTable({
   const [sortKey, setSortKey] = useState<SortKey>("trans_date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkYear, setBulkYear] = useState("");
+  const [bulkSiteId, setBulkSiteId] = useState("");
+  const [bulkProjectId, setBulkProjectId] = useState("");
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -78,16 +81,26 @@ export function TransactionTable({
     return copy;
   }, [transactions, sortKey, sortDir]);
 
-  const siteGroups = useMemo(() => {
-    const map = new Map<string, { label: string; items: ProjectTreeNode[] }>();
+  const bulkYears = useMemo(
+    () => Array.from(new Set(projectNodes.map((p) => p.year))).sort((a, b) => b - a),
+    [projectNodes]
+  );
+  const bulkSites = useMemo(() => {
+    if (!bulkYear) return [];
+    const map = new Map<string, string>();
     for (const p of projectNodes) {
-      const key = p.siteId;
-      const label = p.clientName ? `${p.clientName} · ${p.siteName}` : p.siteName;
-      if (!map.has(key)) map.set(key, { label, items: [] });
-      map.get(key)!.items.push(p);
+      if (String(p.year) !== bulkYear) continue;
+      map.set(p.siteId, p.clientName ? `${p.clientName} · ${p.siteName}` : p.siteName);
     }
-    return Array.from(map.values());
-  }, [projectNodes]);
+    return Array.from(map.entries());
+  }, [projectNodes, bulkYear]);
+  const bulkProjects = useMemo(
+    () =>
+      !bulkYear || !bulkSiteId
+        ? []
+        : projectNodes.filter((p) => String(p.year) === bulkYear && p.siteId === bulkSiteId),
+    [projectNodes, bulkYear, bulkSiteId]
+  );
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -108,29 +121,73 @@ export function TransactionTable({
         <Card padding="none" className="flex flex-wrap items-center gap-2 border-slate-300 bg-slate-50 p-3 print:hidden">
           <form
             action={bulkUpdateProjectId}
-            onSubmit={() => setSelected(new Set())}
+            onSubmit={() => {
+              setSelected(new Set());
+              setBulkYear("");
+              setBulkSiteId("");
+              setBulkProjectId("");
+            }}
             className="flex flex-wrap items-center gap-2"
           >
             {Array.from(selected).map((id) => (
               <input key={id} type="hidden" name="transaction_ids" value={id} />
             ))}
+            <input type="hidden" name="project_id" value={bulkProjectId} />
             <span className="text-sm text-slate-600">{selected.size}건 선택됨 · 프로젝트 변경:</span>
-            <select name="project_id" defaultValue="" className={fieldClass}>
+            <select
+              value={bulkYear}
+              onChange={(e) => {
+                setBulkYear(e.target.value);
+                setBulkSiteId("");
+                setBulkProjectId("");
+              }}
+              className={fieldClass}
+            >
+              <option value="">연도 선택</option>
+              {bulkYears.map((y) => (
+                <option key={y} value={y}>
+                  {y}년
+                </option>
+              ))}
+            </select>
+            <select
+              value={bulkSiteId}
+              onChange={(e) => {
+                setBulkSiteId(e.target.value);
+                setBulkProjectId("");
+              }}
+              className={fieldClass}
+              disabled={!bulkYear}
+            >
+              <option value="">현장 선택</option>
+              {bulkSites.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <select value={bulkProjectId} onChange={(e) => setBulkProjectId(e.target.value)} className={fieldClass}>
               <option value="">일반경비</option>
-              {siteGroups.map((g) => (
-                <optgroup key={g.label} label={g.label}>
-                  {g.items.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.year})
-                    </option>
-                  ))}
-                </optgroup>
+              {bulkProjects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
               ))}
             </select>
             <Button type="submit" size="sm">
               변경
             </Button>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelected(new Set());
+                setBulkYear("");
+                setBulkSiteId("");
+                setBulkProjectId("");
+              }}
+            >
               선택 해제
             </Button>
           </form>
