@@ -4,9 +4,26 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ExpenseCategory, PaymentMethod, Transaction } from "@/lib/types";
 import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components/ProjectPicker";
+import { bulkImportTransactions, type BulkTransactionInput } from "@/lib/actions/transactions";
+import { formatWon } from "@/lib/format";
 
 type Option = { id: string; name: string };
 type ClientOption = Option & { default_item_name?: string | null };
+type LineItem = { item_name: string; quantity: string; unit_price: string; subtotal: string };
+
+function emptyLineItem(): LineItem {
+  return { item_name: "", quantity: "", unit_price: "", subtotal: "" };
+}
+
+function lineItemFromInitial(t: Transaction): LineItem {
+  const amount = t.type === "매출" ? t.sales_amount + t.sales_vat : t.purchase_amount + t.purchase_vat;
+  return {
+    item_name: t.item_name ?? "",
+    quantity: t.quantity?.toString() ?? "",
+    unit_price: t.unit_price?.toString() ?? "",
+    subtotal: amount ? String(amount) : "",
+  };
+}
 
 function formatThousands(raw: string) {
   if (!raw) return "";
@@ -42,11 +59,6 @@ export function TransactionForm({
   redirectTo?: string;
 }) {
   const router = useRouter();
-  const initialAmount = initial
-    ? initial.type === "매출"
-      ? initial.sales_amount + initial.sales_vat
-      : initial.purchase_amount + initial.purchase_vat
-    : 0;
 
   const [values, setValues] = useState({
     trans_date: initial?.trans_date ?? new Date().toISOString().slice(0, 10),
@@ -54,18 +66,17 @@ export function TransactionForm({
     client_id: initial?.client_id ?? "",
     client_name_raw: initial?.client_name_raw ?? "",
     project_id: initial?.project_id ?? "",
-    item_name: initial?.item_name ?? "",
     category_id: initial?.category_id ?? "",
-    quantity: initial?.quantity?.toString() ?? "",
-    unit_price: initial?.unit_price?.toString() ?? "",
     payment_method_id: initial?.payment_method_id ?? "",
     tax_invoice_issued: initial?.tax_invoice_issued ?? false,
     vat_included: initial?.vat_included ?? true,
-    amount: initialAmount ? String(initialAmount) : "",
     payment_type: initial?.payment_type ?? "immediate",
     note1: initial?.note1 ?? "",
     note2: initial?.note2 ?? "",
   });
+  const [lineItems, setLineItems] = useState<LineItem[]>(
+    initial ? [lineItemFromInitial(initial)] : [emptyLineItem()]
+  );
   const [ocrExtracted, setOcrExtracted] = useState<Record<string, unknown> | null>(
     (initial?.ocr_extracted_raw as Record<string, unknown>) ?? null
   );
@@ -73,40 +84,60 @@ export function TransactionForm({
   const [ocrLoading, setOcrLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputClass = "rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none";
+  const grandTotal = lineItems.reduce((s, li) => s + (Number(li.subtotal) || 0), 0);
 
   function set<K extends keyof typeof values>(key: K, v: (typeof values)[K]) {
     setValues((prev) => ({ ...prev, [key]: v }));
   }
 
+  function updateLineItem(i: number, patch: Partial<LineItem>) {
+    setLineItems((prev) => prev.map((li, idx) => (idx === i ? { ...li, ...patch } : li)));
+  }
+
+  function handleLineQuantity(i: number, v: string) {
+    setLineItems((prev) =>
+      prev.map((li, idx) => {
+        if (idx !== i) return li;
+        const next = { ...li, quantity: v };
+        if (v && li.unit_price) {
+          const total = Number(v) * Number(li.unit_price);
+          if (!Number.isNaN(total)) next.subtotal = String(total);
+        }
+        return next;
+      })
+    );
+  }
+
+  function handleLineUnitPrice(i: number, v: string) {
+    setLineItems((prev) =>
+      prev.map((li, idx) => {
+        if (idx !== i) return li;
+        const next = { ...li, unit_price: v };
+        if (li.quantity && v) {
+          const total = Number(li.quantity) * Number(v);
+          if (!Number.isNaN(total)) next.subtotal = String(total);
+        }
+        return next;
+      })
+    );
+  }
+
+  function addLineItem() {
+    setLineItems((prev) => [...prev, emptyLineItem()]);
+  }
+
+  function removeLineItem(i: number) {
+    setLineItems((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
   function handleClientSelect(clientId: string) {
     const client = clients.find((c) => c.id === clientId);
-    setValues((prev) => ({
-      ...prev,
-      client_id: clientId,
-      item_name: client?.default_item_name ? client.default_item_name : prev.item_name,
-    }));
-  }
-
-  function handleQuantity(v: string) {
-    setValues((prev) => {
-      const next = { ...prev, quantity: v };
-      if (v && prev.unit_price) {
-        const total = Number(v) * Number(prev.unit_price);
-        if (!Number.isNaN(total)) next.amount = String(total);
-      }
-      return next;
-    });
-  }
-
-  function handleUnitPrice(v: string) {
-    setValues((prev) => {
-      const next = { ...prev, unit_price: v };
-      if (prev.quantity && v) {
-        const total = Number(prev.quantity) * Number(v);
-        if (!Number.isNaN(total)) next.amount = String(total);
-      }
-      return next;
-    });
+    set("client_id", clientId);
+    if (client?.default_item_name) {
+      setLineItems((prev) =>
+        prev.map((li, idx) => (idx === 0 ? { ...li, item_name: client.default_item_name as string } : li))
+      );
+    }
   }
 
   async function handleFile(file: File) {
@@ -123,13 +154,21 @@ export function TransactionForm({
       } else if (json.extracted) {
         setOcrExtracted(json.extracted);
         const ex = json.extracted;
+        setLineItems((prev) =>
+          prev.map((li, idx) =>
+            idx === 0
+              ? {
+                  item_name: ex.item_name ?? li.item_name,
+                  quantity: ex.quantity != null ? String(ex.quantity) : li.quantity,
+                  unit_price: ex.unit_price != null ? String(ex.unit_price) : li.unit_price,
+                  subtotal: ex.amount != null ? String(ex.amount) : li.subtotal,
+                }
+              : li
+          )
+        );
         setValues((prev) => ({
           ...prev,
           trans_date: ex.trans_date ?? prev.trans_date,
-          item_name: ex.item_name ?? prev.item_name,
-          quantity: ex.quantity != null ? String(ex.quantity) : prev.quantity,
-          unit_price: ex.unit_price != null ? String(ex.unit_price) : prev.unit_price,
-          amount: ex.amount != null ? String(ex.amount) : prev.amount,
           vat_included: ex.vat_included ?? prev.vat_included,
           category_id: expenseCategories.find((c) => c.name === ex.category)?.id ?? prev.category_id,
           client_name_raw: ex.client_name ?? prev.client_name_raw,
@@ -144,26 +183,66 @@ export function TransactionForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!confirm(initial ? "수정 내용을 저장하시겠습니까?" : "이 거래를 등록하시겠습니까?")) return;
-    setError(null);
 
-    const fd = new FormData();
-    if (initial) fd.append("id", initial.id);
-    Object.entries(values).forEach(([k, v]) => {
-      if (k === "vat_included" || k === "tax_invoice_issued") {
-        if (v) fd.append(k, "on");
-      } else {
-        fd.append(k, String(v));
-      }
-    });
-    fd.append("is_verified_ai", "on");
-    fd.append("ocr_extracted_raw", ocrExtracted ? JSON.stringify(ocrExtracted) : "");
-
-    const result = await action(fd);
-    if (result?.error) {
-      setError(result.error);
+    const validItems = lineItems.filter((li) => li.subtotal);
+    if (validItems.length === 0) {
+      setError("최소 한 개 항목의 소계(금액)를 입력해주세요.");
       return;
     }
+
+    if (!confirm(initial ? "수정 내용을 저장하시겠습니까?" : `이 거래를 등록하시겠습니까? (${validItems.length}건)`)) return;
+    setError(null);
+
+    if (initial || validItems.length === 1) {
+      const li = validItems[0];
+      const fd = new FormData();
+      if (initial) fd.append("id", initial.id);
+      Object.entries(values).forEach(([k, v]) => {
+        if (k === "vat_included" || k === "tax_invoice_issued") {
+          if (v) fd.append(k, "on");
+        } else {
+          fd.append(k, String(v));
+        }
+      });
+      fd.append("item_name", li.item_name);
+      fd.append("quantity", li.quantity);
+      fd.append("unit_price", li.unit_price);
+      fd.append("amount", li.subtotal);
+      fd.append("is_verified_ai", "on");
+      fd.append("ocr_extracted_raw", ocrExtracted ? JSON.stringify(ocrExtracted) : "");
+
+      const result = await action(fd);
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+    } else {
+      const rows: BulkTransactionInput[] = validItems.map((li) => ({
+        trans_date: values.trans_date,
+        type: values.type,
+        client_id: values.client_id || null,
+        client_name_raw: values.client_name_raw || null,
+        project_id: values.project_id || null,
+        item_name: li.item_name || null,
+        category_id: values.category_id || null,
+        quantity: li.quantity ? Number(li.quantity) : null,
+        unit_price: li.unit_price ? Number(li.unit_price) : null,
+        payment_method_id: values.payment_method_id || null,
+        payment_type: values.payment_type,
+        tax_invoice_issued: values.tax_invoice_issued,
+        vat_included: values.vat_included,
+        amount: Number(li.subtotal) || 0,
+        note1: values.note1 || null,
+        note2: values.note2 || null,
+      }));
+
+      const result = await bulkImportTransactions(rows);
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+    }
+
     router.push(redirectTo);
     router.refresh();
   }
@@ -228,9 +307,6 @@ export function TransactionForm({
           value={values.project_id}
           onChange={(v) => set("project_id", v)}
         />
-        <Field label="품목">
-          <input value={values.item_name} onChange={(e) => set("item_name", e.target.value)} className={inputClass} />
-        </Field>
         <Field label="종류구분">
           <select value={values.category_id} onChange={(e) => set("category_id", e.target.value)} className={inputClass}>
             <option value="">선택 안함</option>
@@ -240,24 +316,6 @@ export function TransactionForm({
               </option>
             ))}
           </select>
-        </Field>
-        <Field label="수량">
-          <input
-            type="text"
-            inputMode="decimal"
-            value={formatThousands(values.quantity)}
-            onChange={(e) => handleQuantity(parseNumericInput(e.target.value))}
-            className={inputClass}
-          />
-        </Field>
-        <Field label="단가">
-          <input
-            type="text"
-            inputMode="decimal"
-            value={formatThousands(values.unit_price)}
-            onChange={(e) => handleUnitPrice(parseNumericInput(e.target.value))}
-            className={inputClass}
-          />
         </Field>
         <Field label="결제 시점">
           <select
@@ -284,16 +342,6 @@ export function TransactionForm({
             ))}
           </select>
         </Field>
-        <Field label="총 금액" required>
-          <input
-            type="text"
-            inputMode="decimal"
-            required
-            value={formatThousands(values.amount)}
-            onChange={(e) => set("amount", parseNumericInput(e.target.value))}
-            className={inputClass}
-          />
-        </Field>
         <label className="flex items-center gap-2 pt-5 text-sm text-slate-700">
           <input
             type="checkbox"
@@ -318,6 +366,76 @@ export function TransactionForm({
         <Field label="메모2">
           <input value={values.note2} onChange={(e) => set("note2", e.target.value)} className={inputClass} />
         </Field>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-semibold text-slate-900">품목</h2>
+          {!initial && (
+            <button
+              type="button"
+              onClick={addLineItem}
+              className="text-xs font-medium text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
+            >
+              + 물품 종류 추가
+            </button>
+          )}
+        </div>
+
+        <div className="space-y-2 overflow-x-auto">
+          <div className="grid min-w-[560px] grid-cols-[1fr_6rem_7rem_7rem_3rem] gap-2 px-1 text-xs font-medium text-slate-500">
+            <span>품목</span>
+            <span>수량</span>
+            <span>단가</span>
+            <span>소계</span>
+            <span />
+          </div>
+          {lineItems.map((li, i) => (
+            <div key={i} className="grid min-w-[560px] grid-cols-[1fr_6rem_7rem_7rem_3rem] items-center gap-2">
+              <input
+                value={li.item_name}
+                onChange={(e) => updateLineItem(i, { item_name: e.target.value })}
+                className={inputClass}
+              />
+              <input
+                type="text"
+                inputMode="decimal"
+                value={formatThousands(li.quantity)}
+                onChange={(e) => handleLineQuantity(i, parseNumericInput(e.target.value))}
+                className={inputClass}
+              />
+              <input
+                type="text"
+                inputMode="decimal"
+                value={formatThousands(li.unit_price)}
+                onChange={(e) => handleLineUnitPrice(i, parseNumericInput(e.target.value))}
+                className={inputClass}
+              />
+              <input
+                type="text"
+                inputMode="decimal"
+                value={formatThousands(li.subtotal)}
+                onChange={(e) => updateLineItem(i, { subtotal: parseNumericInput(e.target.value) })}
+                className={inputClass}
+              />
+              {!initial && lineItems.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => removeLineItem(i)}
+                  className="text-xs text-red-500 hover:text-red-700"
+                >
+                  삭제
+                </button>
+              ) : (
+                <span />
+              )}
+            </div>
+          ))}
+        </div>
+
+        <p className="mt-3 text-right text-sm font-semibold text-slate-900">
+          합계 <span className="ml-1 font-mono text-base">{formatWon(grandTotal)}</span>
+        </p>
       </div>
 
       <div className="flex items-center gap-2">
