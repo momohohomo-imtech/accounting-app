@@ -300,34 +300,29 @@ SQL INSERT 스크립트를 생성 → 사용자가 SQL Editor에서 실행하는
   급여대장 인식처럼 아직 실제로 테스트 못 함** — 다음 세션에서 결제 처리됐는지
   확인하고 실제 생성까지 확인할 것.
 
-### 14. 매주 월요일 자동 백업 이메일 (미검증 — 사용자가 아직 env 설정 안 함)
+### 14. 매주 월요일 자동 백업 (미검증 — 사용자가 아직 env 설정 안 함)
 기존 "지금 백업"(수동, `/backups` 페이지) 로직을 `lib/backup.ts`의 `runBackup()`으로
-분리해서 공용화하고, Vercel Cron으로 매주 자동 실행 + 이메일(첨부파일)로 보내는 기능을
-추가함. **아직 실제로 실행된 적 없음 — 사용자가 아래 환경변수를 Vercel에 넣어야 동작함.**
+분리해서 공용화하고, Vercel Cron으로 매주 자동 실행되게 함. **처음엔 이메일 발송까지
+만들었다가(nodemailer/SMTP, 네이버 메일 등) 사용자가 "너무 어렵다"고 해서 이메일
+부분은 통째로 뺐음** — `lib/email.ts` 삭제, `nodemailer` 의존성 제거. 지금은 그냥
+매주 자동으로 `/backups` 페이지에 백업이 하나 더 쌓이는 것뿐이고, 사용자가 그 화면에서
+수동으로 다운로드하면 됨. **이메일 자동 발송을 나중에 다시 원하면 이 커밋 이전 버전
+참고해서 복구 가능(SMTP 방식으로 설계해뒀었음, Resend 같은 가입 불필요).**
 - `app/vercel.json`: cron 스케줄 `"0 21 * * 0"` (UTC 기준 일요일 21시 = 한국시간
-  월요일 새벽 6시, 사용자가 지정한 시간). Vercel 배포에 이 파일이 인식되려면 Vercel
-  프로젝트의 Root Directory가 `app`으로 잡혀 있어야 함(지금까지 다른 설정 파일들도
-  전부 `app/` 밑에 있었으니 맞을 것으로 추정, 문제 생기면 여기부터 확인).
+  월요일 새벽 6시). Vercel 배포에 이 파일이 인식되려면 Vercel 프로젝트의 Root
+  Directory가 `app`으로 잡혀 있어야 함(지금까지 다른 설정 파일들도 전부 `app/`
+  밑에 있었으니 맞을 것으로 추정, 문제 생기면 여기부터 확인).
 - `app/src/app/api/cron/weekly-backup/route.ts`: cron이 호출하는 엔드포인트.
   `CRON_SECRET` 환경변수가 설정되어 있으면 요청 헤더의 `Authorization: Bearer
   <CRON_SECRET>`를 검사함(Vercel Cron이 자동으로 이 헤더를 붙여줌) — 외부에서
-  아무나 이 URL을 호출해 백업/메일을 남발 못 하게 막는 용도.
+  아무나 이 URL을 호출해 백업을 남발 못 하게 막는 용도(선택 사항).
 - `app/src/lib/supabase/service.ts`: 로그인 세션이 없는 cron 컨텍스트용 서비스
-  롤 클라이언트(RLS 무시). **`SUPABASE_SERVICE_ROLE_KEY` 환경변수 필요** —
-  Supabase 대시보드 → Project Settings → API → `service_role` 키. 이 세션엔 이
-  키가 없어서(anon key만 있음) 사용자가 직접 Vercel 환경변수에 추가해야 함.
-- `app/src/lib/email.ts`: 범용 SMTP 발송(nodemailer). Resend 같은 별도 서비스
-  대신 사용자가 이미 쓰는 이메일 계정(네이버 등)의 SMTP를 쓰기로 함(사용자가
-  "네이버도 가능해?"라고 물어서 범용 SMTP 방식으로 설계 — Resend 가입 안 해도 됨).
-  환경변수: `SMTP_HOST`, `SMTP_PORT`(기본 465), `SMTP_USER`, `SMTP_PASS`,
-  `SMTP_FROM`(생략 시 SMTP_USER 사용). 네이버 메일 기준 `smtp.naver.com` / 465,
-  네이버 계정 2단계 인증을 켜뒀으면 일반 비밀번호 대신 앱 비밀번호를 만들어야
-  할 수 있음(네이버 메일 환경설정 → POP3/IMAP 설정에서 SMTP 사용 허용도 켜야 함).
-- 백업 받을 주소: `BACKUP_EMAIL_TO` 환경변수 (사용자가 지정: momohohomo@gmail.com).
-- **다음 세션 할 일**: 사용자가 Vercel 환경변수(`SUPABASE_SERVICE_ROLE_KEY`,
-  `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS`/`SMTP_FROM`, `BACKUP_EMAIL_TO`,
-  선택적으로 `CRON_SECRET`)를 다 넣었는지 확인하고, `/api/cron/weekly-backup`을
-  브라우저나 curl로 수동 호출해서 실제 이메일이 오는지 검증할 것(Vercel Cron
+  롤 클라이언트(RLS 무시). **딱 이 환경변수 하나만 있으면 동작함: `SUPABASE_SERVICE_ROLE_KEY`**
+  — Supabase 대시보드 → Project Settings → API → `service_role` 키. 이 세션엔
+  이 키가 없어서(anon key만 있음) 사용자가 직접 Vercel 환경변수에 추가해야 함.
+- **다음 세션 할 일**: 사용자가 Vercel에 `SUPABASE_SERVICE_ROLE_KEY`를 넣었는지
+  확인하고, `/api/cron/weekly-backup`을 브라우저로 직접 열어서(`{"ok":true,...}`
+  응답 확인) `/backups` 목록에 새 백업이 실제로 쌓이는지 검증할 것(Vercel Cron
   자체는 배포 후 다음 스케줄까지 기다려야 하므로 수동 호출로 먼저 확인 권장).
 
 ## 겪었던 버그 / 교훈 (중요, 재발 방지용)
