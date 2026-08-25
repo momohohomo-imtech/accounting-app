@@ -29,9 +29,14 @@ export function ProjectPicker({
   value: string;
   onChange: (v: string) => void;
 }) {
-  const [showCompleted, setShowCompleted] = useState(false);
-  const [year, setYear] = useState("");
-  const [siteId, setSiteId] = useState("");
+  // 수정 화면 등에서 이미 선택된 프로젝트가 "진행중"이 아니면(완료/검토중 등) 기본 드롭다운에
+  // 안 나와서 공란처럼 보였음 — 마운트 시 현재 값에 맞춰 완료 프로젝트 검색 상태를 미리 채워둠.
+  const initialProject = useMemo(() => projects.find((p) => p.id === value), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const initialIsCompleted = Boolean(initialProject && initialProject.status !== "ongoing");
+
+  const [showCompleted, setShowCompleted] = useState(initialIsCompleted);
+  const [year, setYear] = useState(initialIsCompleted ? String(initialProject!.year) : "");
+  const [siteId, setSiteId] = useState(initialIsCompleted ? initialProject!.site_id : "");
 
   const siteMap = useMemo(() => new Map(sites.map((s) => [s.id, s])), [sites]);
 
