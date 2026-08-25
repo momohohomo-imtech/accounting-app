@@ -15,6 +15,8 @@ import { PayrollTable } from "@/components/PayrollTable";
 import { PayrollImport } from "@/components/PayrollImport";
 import { PayslipView } from "@/components/PayslipView";
 import { YearFilter } from "@/components/YearFilter";
+import { EmployeeCertificate } from "@/components/EmployeeCertificate";
+import { LinkButton } from "@/components/ui/Button";
 
 const employeeFields: FieldConfig[] = [
   { name: "employee_no", label: "사원번호" },
@@ -47,9 +49,9 @@ const employeeFields: FieldConfig[] = [
 export default async function EmployeesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ payslip?: string; year?: string }>;
+  searchParams: Promise<{ payslip?: string; year?: string; certificate?: string }>;
 }) {
-  const { payslip, year } = await searchParams;
+  const { payslip, year, certificate } = await searchParams;
   const currentYear = new Date().getFullYear();
   const selectedYear = year ? Number(year) : currentYear;
   const yearStart = `${selectedYear}-01-01`;
@@ -92,7 +94,7 @@ export default async function EmployeesPage({
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-slate-900 print:hidden">직원 / 급여</h1>
 
-      <div className={payslip ? "space-y-6 print:hidden" : "space-y-6"}>
+      <div className={payslip || certificate ? "space-y-6 print:hidden" : "space-y-6"}>
         <CreatePanel title="직원" fields={employeeFields} createAction={createEmployeeRecord} />
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -102,6 +104,14 @@ export default async function EmployeesPage({
             rows={employees ?? []}
             updateAction={updateEmployeeRecord}
             deleteAction={deleteEmployeeRecord}
+            extraActions={Object.fromEntries(
+              (employees ?? []).map((e) => [
+                e.id,
+                <LinkButton key={e.id} href={`/employees?certificate=${e.id}`} variant="secondary" size="xs">
+                  재직증명서
+                </LinkButton>,
+              ])
+            )}
           />
         </div>
 
@@ -140,6 +150,19 @@ export default async function EmployeesPage({
           </div>
         </div>
       )}
+
+      {certificate &&
+        (() => {
+          const employee = (employees ?? []).find((e) => e.id === certificate);
+          if (!employee) return null;
+          return (
+            <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 py-10 print:static print:p-0">
+              <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl print:max-w-none print:rounded-none print:border-0 print:shadow-none">
+                <EmployeeCertificate employee={employee} closeHref="/employees" />
+              </div>
+            </div>
+          );
+        })()}
     </div>
   );
 }

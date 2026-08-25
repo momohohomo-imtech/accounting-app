@@ -57,7 +57,7 @@ export function MobileNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex gap-1 overflow-x-auto border-b border-slate-800 bg-slate-900 px-2 py-2 md:hidden">
+    <nav className="flex gap-1 overflow-x-auto border-b border-slate-800 bg-slate-900 px-2 py-2 md:hidden print:hidden">
       {NAV.map((item) => {
         const active = isActive(pathname, item.href);
         return (
