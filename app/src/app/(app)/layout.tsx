@@ -2,6 +2,7 @@ import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/lib/actions/auth";
 import { SidebarNav, MobileNav } from "@/components/AppNav";
+import { IdleLogout } from "@/components/IdleLogout";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -11,6 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen bg-slate-50">
+      <IdleLogout />
       <aside className="hidden w-60 shrink-0 bg-slate-900 md:flex md:flex-col">
         <div className="flex items-center gap-2.5 border-b border-slate-800 px-5 py-5">
           <Image src="/logo-icon.png" alt="" width={30} height={30} className="rounded-md" />
