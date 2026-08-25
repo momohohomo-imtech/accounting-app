@@ -4,6 +4,8 @@ const TABLES = [
   "clients",
   "sites",
   "projects",
+  "payment_methods",
+  "expense_categories",
   "transactions",
   "credit_payments",
   "work_logs",

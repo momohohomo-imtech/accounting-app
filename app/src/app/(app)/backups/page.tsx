@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { createManualBackup } from "@/lib/actions/backups";
 import { formatDate } from "@/lib/format";
+import { BackupNowButton } from "@/components/BackupNowButton";
 
 export default async function BackupsPage() {
   const supabase = await createClient();
@@ -17,11 +17,7 @@ export default async function BackupsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900">백업</h1>
-        <form action={createManualBackup}>
-          <button className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
-            지금 백업
-          </button>
-        </form>
+        <BackupNowButton />
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
