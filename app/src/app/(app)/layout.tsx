@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/lib/actions/auth";
 import { SidebarNav, MobileNav } from "@/components/AppNav";
@@ -11,9 +12,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen bg-slate-50">
       <aside className="hidden w-60 shrink-0 bg-slate-900 md:flex md:flex-col">
-        <div className="border-b border-slate-800 px-5 py-5">
-          <p className="font-mono text-[11px] tracking-widest text-slate-500">FIELD OPS · v0.1</p>
-          <p className="mt-1 text-base font-bold text-white">현장관리</p>
+        <div className="flex items-center gap-2.5 border-b border-slate-800 px-5 py-5">
+          <Image src="/logo-icon.png" alt="" width={30} height={30} className="rounded-md" />
+          <div>
+            <p className="font-mono text-[11px] tracking-widest text-slate-500">FIELD OPS · v0.1</p>
+            <p className="mt-0.5 text-base font-bold text-white">현장관리</p>
+          </div>
         </div>
         <SidebarNav />
         <form action={signOut} className="border-t border-slate-800 p-3">
@@ -25,7 +29,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </aside>
 
       <div className="flex flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-slate-800 bg-slate-900 px-4 py-3 md:hidden print:hidden">
+        <header className="flex items-center gap-2 border-b border-slate-800 bg-slate-900 px-4 py-3 md:hidden print:hidden">
+          <Image src="/logo-icon.png" alt="" width={22} height={22} className="rounded-md" />
           <p className="text-sm font-bold text-white">현장관리 시스템</p>
         </header>
         <MobileNav />

@@ -3,10 +3,10 @@ import type { ComponentProps } from "react";
 import { cx } from "@/lib/cx";
 
 const base =
-  "inline-flex items-center justify-center gap-1.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/30 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex items-center justify-center gap-1.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50";
 
 const variantClass = {
-  primary: "bg-slate-900 font-semibold text-white hover:bg-slate-700",
+  primary: "bg-brand font-semibold text-white hover:bg-brand-dark",
   secondary: "border border-slate-300 text-slate-600 hover:bg-slate-100",
   danger: "border border-red-200 text-red-600 hover:bg-red-50",
   ghost: "text-slate-500 hover:text-slate-800",

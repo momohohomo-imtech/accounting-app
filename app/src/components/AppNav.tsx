@@ -34,13 +34,13 @@ export function SidebarNav() {
             aria-current={active ? "page" : undefined}
             className={cx(
               "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
-              active ? "bg-slate-800 text-white" : "text-slate-400 hover:bg-slate-800/60 hover:text-white"
+              active ? "bg-brand text-white" : "text-slate-400 hover:bg-slate-800/60 hover:text-white"
             )}
           >
             <span
               className={cx(
                 "font-mono text-xs transition-colors",
-                active ? "text-slate-300" : "text-slate-600 group-hover:text-slate-400"
+                active ? "text-white/70" : "text-slate-600 group-hover:text-slate-400"
               )}
             >
               {String(i).padStart(2, "0")}
@@ -67,7 +67,7 @@ export function MobileNav() {
             aria-current={active ? "page" : undefined}
             className={cx(
               "shrink-0 rounded-lg px-3 py-1.5 text-xs transition-colors",
-              active ? "bg-slate-800 text-white" : "text-slate-400 hover:bg-slate-800 hover:text-white"
+              active ? "bg-brand text-white" : "text-slate-400 hover:bg-slate-800 hover:text-white"
             )}
           >
             {item.label}

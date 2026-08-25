@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { formatDate } from "@/lib/format";
@@ -67,36 +68,47 @@ export function EmployeeCertificate({ employee, closeHref }: { employee: Employe
       </div>
 
       <div className="mx-auto flex min-h-[700px] max-w-xl flex-col py-4 print:min-h-[250mm]">
-        <h1 className="text-center text-3xl font-bold tracking-[0.5em] text-slate-900">재직증명서</h1>
+        <div className="flex items-center gap-2.5">
+          <Image src="/logo-lockup.png" alt="" width={30} height={24} className="h-6 w-auto" />
+          <span className="ml-auto font-mono text-[11px] tracking-widest text-slate-400">
+            EMPLOYMENT CERTIFICATE
+          </span>
+        </div>
+        <div className="mt-3 flex flex-col">
+          <div className="h-[3px] bg-brand" />
+          <div className="h-[3px] w-1/3 bg-brand-red" />
+        </div>
+
+        <h1 className="mt-6 text-center text-3xl font-bold tracking-[0.5em] text-brand">재직증명서</h1>
 
         <table className="mt-8 w-full border-t-2 border-slate-900 text-sm">
           <tbody>
             <tr className="border-b border-slate-300">
-              <td className="w-28 bg-slate-50 py-2.5 pl-3 font-medium text-slate-600">성명</td>
+              <td className="w-28 bg-brand-soft py-2.5 pl-3 font-medium text-slate-600">성명</td>
               <td className="py-2.5 pl-3 text-slate-900">{employee.name}</td>
-              <td className="w-28 bg-slate-50 py-2.5 pl-3 font-medium text-slate-600">사원번호</td>
+              <td className="w-28 bg-brand-soft py-2.5 pl-3 font-medium text-slate-600">사원번호</td>
               <td className="py-2.5 pl-3 text-slate-900">{employee.employee_no ?? "-"}</td>
             </tr>
             <tr className="border-b border-slate-300">
-              <td className="bg-slate-50 py-2.5 pl-3 font-medium text-slate-600">생년월일</td>
+              <td className="bg-brand-soft py-2.5 pl-3 font-medium text-slate-600">생년월일</td>
               <td className="py-2.5 pl-3 text-slate-900">{formatDate(employee.birth_date)}</td>
-              <td className="bg-slate-50 py-2.5 pl-3 font-medium text-slate-600">입사일</td>
+              <td className="bg-brand-soft py-2.5 pl-3 font-medium text-slate-600">입사일</td>
               <td className="py-2.5 pl-3 text-slate-900">{formatDate(employee.hired_date)}</td>
             </tr>
             <tr className="border-b border-slate-300">
-              <td className="bg-slate-50 py-2.5 pl-3 font-medium text-slate-600">부서</td>
+              <td className="bg-brand-soft py-2.5 pl-3 font-medium text-slate-600">부서</td>
               <td className="py-2.5 pl-3 text-slate-900">{employee.department ?? "-"}</td>
-              <td className="bg-slate-50 py-2.5 pl-3 font-medium text-slate-600">직위</td>
+              <td className="bg-brand-soft py-2.5 pl-3 font-medium text-slate-600">직위</td>
               <td className="py-2.5 pl-3 text-slate-900">{employee.role ?? "-"}</td>
             </tr>
             <tr className="border-b border-slate-300">
-              <td className="bg-slate-50 py-2.5 pl-3 font-medium text-slate-600">주소</td>
+              <td className="bg-brand-soft py-2.5 pl-3 font-medium text-slate-600">주소</td>
               <td className="py-2.5 pl-3 text-slate-900" colSpan={3}>
                 {employee.address ?? "-"}
               </td>
             </tr>
             <tr className="border-b-2 border-slate-900">
-              <td className="bg-slate-50 py-2.5 pl-3 font-medium text-slate-600">용도</td>
+              <td className="bg-brand-soft py-2.5 pl-3 font-medium text-slate-600">용도</td>
               <td className="py-2.5 pl-3 text-slate-900" colSpan={3}>
                 {purpose}
                 {submitTo ? ` (제출처: ${submitTo})` : ""}
@@ -111,10 +123,11 @@ export function EmployeeCertificate({ employee, closeHref }: { employee: Employe
 
         <div className="mt-auto pb-12 text-center">
           <p className="text-sm text-slate-700">{todayLabel}</p>
-          <div className="mt-6 text-sm text-slate-900">
+          <div className="mt-6 flex items-center justify-center gap-2 text-sm text-slate-900">
+            <Image src="/logo-lockup.png" alt="" width={20} height={16} className="h-4 w-auto" />
             <p className="font-semibold">{companyName || "-"}</p>
-            {representativeName && <p className="mt-1">대표 {representativeName} (인)</p>}
           </div>
+          {representativeName && <p className="mt-1 text-sm text-slate-700">대표 {representativeName} (인)</p>}
         </div>
       </div>
     </div>
