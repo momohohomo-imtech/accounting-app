@@ -11,6 +11,9 @@ type Option = { id: string; name: string };
 type ClientOption = Option & { default_item_name?: string | null };
 type LineItem = { item_name: string; quantity: string; unit_price: string; subtotal: string };
 
+// 이 종류구분들은 VAT·세금계산서 대상이 아니라서 등록 시 자동으로 체크 해제하고 못 누르게 막음.
+const VAT_EXEMPT_CATEGORIES = ["인건비", "직원급여/상여/4대보험", "면세"];
+
 function emptyLineItem(): LineItem {
   return { item_name: "", quantity: "", unit_price: "", subtotal: "" };
 }
@@ -85,9 +88,22 @@ export function TransactionForm({
   const [error, setError] = useState<string | null>(null);
   const inputClass = "rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none";
   const grandTotal = lineItems.reduce((s, li) => s + (Number(li.subtotal) || 0), 0);
+  const selectedCategoryName = expenseCategories.find((c) => c.id === values.category_id)?.name;
+  const vatExempt = selectedCategoryName ? VAT_EXEMPT_CATEGORIES.includes(selectedCategoryName) : false;
 
   function set<K extends keyof typeof values>(key: K, v: (typeof values)[K]) {
     setValues((prev) => ({ ...prev, [key]: v }));
+  }
+
+  function handleCategorySelect(categoryId: string) {
+    const name = expenseCategories.find((c) => c.id === categoryId)?.name;
+    const exempt = name ? VAT_EXEMPT_CATEGORIES.includes(name) : false;
+    setValues((prev) => ({
+      ...prev,
+      category_id: categoryId,
+      vat_included: exempt ? false : prev.vat_included,
+      tax_invoice_issued: exempt ? false : prev.tax_invoice_issued,
+    }));
   }
 
   function updateLineItem(i: number, patch: Partial<LineItem>) {
@@ -166,11 +182,14 @@ export function TransactionForm({
               : li
           )
         );
+        const matchedCategory = expenseCategories.find((c) => c.name === ex.category);
+        const ocrExempt = matchedCategory ? VAT_EXEMPT_CATEGORIES.includes(matchedCategory.name) : false;
         setValues((prev) => ({
           ...prev,
           trans_date: ex.trans_date ?? prev.trans_date,
-          vat_included: ex.vat_included ?? prev.vat_included,
-          category_id: expenseCategories.find((c) => c.name === ex.category)?.id ?? prev.category_id,
+          vat_included: ocrExempt ? false : (ex.vat_included ?? prev.vat_included),
+          category_id: matchedCategory?.id ?? prev.category_id,
+          tax_invoice_issued: ocrExempt ? false : prev.tax_invoice_issued,
           client_name_raw: ex.client_name ?? prev.client_name_raw,
         }));
       }
@@ -308,7 +327,7 @@ export function TransactionForm({
           onChange={(v) => set("project_id", v)}
         />
         <Field label="종류구분">
-          <select value={values.category_id} onChange={(e) => set("category_id", e.target.value)} className={inputClass}>
+          <select value={values.category_id} onChange={(e) => handleCategorySelect(e.target.value)} className={inputClass}>
             <option value="">선택 안함</option>
             {expenseCategories.map((c) => (
               <option key={c.id} value={c.id}>
@@ -346,8 +365,9 @@ export function TransactionForm({
           <input
             type="checkbox"
             checked={values.vat_included}
+            disabled={vatExempt}
             onChange={(e) => set("vat_included", e.target.checked)}
-            className="h-4 w-4"
+            className="h-4 w-4 disabled:cursor-not-allowed disabled:opacity-50"
           />
           VAT 포함 금액
         </label>
@@ -355,10 +375,12 @@ export function TransactionForm({
           <input
             type="checkbox"
             checked={values.tax_invoice_issued}
+            disabled={vatExempt}
             onChange={(e) => set("tax_invoice_issued", e.target.checked)}
-            className="h-4 w-4"
+            className="h-4 w-4 disabled:cursor-not-allowed disabled:opacity-50"
           />
           세금계산서 발행
+          {vatExempt && <span className="text-xs text-slate-400">(비과세 종류구분이라 선택 불가)</span>}
         </label>
         <Field label="메모1">
           <input value={values.note1} onChange={(e) => set("note1", e.target.value)} className={inputClass} />
