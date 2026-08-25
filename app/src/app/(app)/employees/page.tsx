@@ -101,8 +101,8 @@ export default async function EmployeesPage({
       </div>
 
       {payslip && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:static print:bg-transparent print:p-0">
-          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 py-10 print:static print:p-0">
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl print:max-w-none print:rounded-none print:border-0 print:shadow-none">
             <PayslipView payrollId={payslip} closeHref="/employees" />
           </div>
         </div>
