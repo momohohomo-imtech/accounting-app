@@ -13,6 +13,12 @@ function parse(formData: FormData) {
     current_location: String(formData.get("current_location") ?? "") || null,
     status: String(formData.get("status") ?? "active"),
     memo: String(formData.get("memo") ?? "") || null,
+    grade: String(formData.get("grade") ?? "") || null,
+    resident_id_masked: String(formData.get("resident_id_masked") ?? "") || null,
+    language_ability: String(formData.get("language_ability") ?? "") || null,
+    other_ability: String(formData.get("other_ability") ?? "") || null,
+    bank_name: String(formData.get("bank_name") ?? "") || null,
+    account_number: String(formData.get("account_number") ?? "") || null,
   };
 }
 

@@ -55,10 +55,17 @@ async function WorkerListSection() {
       options: (offices ?? []).map((o) => ({ value: o.id, label: o.name })),
     },
     { name: "name", label: "이름", required: true },
-    { name: "birth_date", label: "생년월일", type: "date" },
+    { name: "grade", label: "등급", width: "6%" },
+    { name: "birth_date", label: "생년월일", type: "date", hideInTable: true },
+    {
+      name: "resident_id_masked",
+      label: "주민번호(마스킹)",
+      placeholder: "예: 710429-*******",
+      hideInTable: true,
+    },
     { name: "phone", label: "연락처", type: "tel" },
     { name: "nationality", label: "국적" },
-    { name: "current_location", label: "현재 위치" },
+    { name: "current_location", label: "현재 위치", hideInTable: true },
     {
       name: "status",
       label: "상태",
@@ -68,7 +75,11 @@ async function WorkerListSection() {
         { value: "ended", label: "종료" },
       ],
     },
-    { name: "memo", label: "메모", type: "textarea" },
+    { name: "language_ability", label: "언어능력", hideInTable: true },
+    { name: "other_ability", label: "기타능력", hideInTable: true },
+    { name: "bank_name", label: "은행", hideInTable: true },
+    { name: "account_number", label: "계좌번호", hideInTable: true },
+    { name: "memo", label: "메모", type: "textarea", hideInTable: true },
   ];
 
   return (

@@ -178,6 +178,12 @@ export type DailyWorker = {
   current_location: string | null;
   status: "active" | "ended";
   memo: string | null;
+  grade: string | null;
+  resident_id_masked: string | null;
+  language_ability: string | null;
+  other_ability: string | null;
+  bank_name: string | null;
+  account_number: string | null;
   registered_at: string;
   daily_worker_offices?: DailyWorkerOffice;
 };
