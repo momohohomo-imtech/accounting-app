@@ -105,7 +105,7 @@ async function ProjectListSection({ year, siteId, report }: { year?: string; sit
   return (
     <div className="space-y-6">
       <div className={report ? "space-y-6 print:hidden" : "space-y-6"}>
-        <div className="flex justify-end">
+        <div className="flex justify-start">
           <YearFilter
             basePath="/projects"
             years={years}
