@@ -30,6 +30,7 @@ export type Project = {
   progress_pct: number | null;
   quote_amount: number | null;
   contract_amount: number | null;
+  contract_amount_estimated: boolean;
   order_date: string | null;
   memo: string | null;
   year: number;

@@ -115,6 +115,12 @@ async function ProjectListSection({ year, siteId, report }: { year?: string; sit
     { name: "order_date", label: "발주서일자", type: "date", hideInTable: true },
     { name: "quote_amount", label: "발주액", type: "number", format: "currency", width: "8%" },
     { name: "contract_amount", label: "수주액", type: "number", format: "currency", hideInTable: true },
+    {
+      name: "contract_amount_estimated",
+      label: "수주액 예상금액 (체크 시 빨간색으로 표시)",
+      type: "checkbox",
+      hideInTable: true,
+    },
     { name: "profit", label: "이익금", readOnly: true, format: "currency", width: "8%" },
     { name: "progress_pct", label: "진행률(%)", type: "number", display: "progress", width: "8%" },
     { name: "year", label: "연도", type: "number", required: true, hideInTable: true },

@@ -16,6 +16,7 @@ function parse(formData: FormData) {
     year: Number(formData.get("year") ?? new Date().getFullYear()),
     quote_amount: formData.get("quote_amount") ? Number(formData.get("quote_amount")) : null,
     contract_amount: formData.get("contract_amount") ? Number(formData.get("contract_amount")) : null,
+    contract_amount_estimated: formData.get("contract_amount_estimated") === "on",
     order_date: String(formData.get("order_date") ?? "") || null,
     memo: String(formData.get("memo") ?? "") || null,
   };

@@ -41,8 +41,11 @@
 11. `010_employment_insurance_refund.sql` — `payroll.employment_insurance_refund`
     (고용보험 환급금, 일반 고용보험 차감액과 분리해서 기록) 추가. **사용자에게
     전달함 — 실행 여부 확인할 것.**
+12. `011_contract_amount_estimated.sql` — `projects.contract_amount_estimated`
+    (수주액이 확정이 아니라 예상 금액이면 체크, 손익보고서에서 빨간색으로 표시)
+    추가. **사용자에게 전달함 — 실행 여부 확인할 것.**
 
-새 스키마 변경이 필요하면 `011_...` 형식으로 이어서 만들 것.
+새 스키마 변경이 필요하면 `012_...` 형식으로 이어서 만들 것.
 
 ## 이번 세션에 한 일 (큰 흐름)
 

@@ -48,7 +48,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
   const summaryRows: [string, string | number][] = [
     ["발주액 (원청 발주금액)", formatWon(quoteTotal)],
     ["차액 (발주액-수주액)", `-${formatWon(gap)}`],
-    ["수주액 (실수령액)", formatWon(contractTotal)],
+    [`수주액 (실수령액)${project.contract_amount_estimated ? " - 예상금액" : ""}`, formatWon(contractTotal)],
     ["매입 합계", `-${formatWon(purchaseTotal)}`],
     ["이익금", profit === null ? "수주액 미입력" : formatWon(profit)],
     ["이익율", margin === null ? "-" : `${margin.toFixed(2)}%`],
@@ -136,8 +136,12 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
           <p className="font-mono text-lg font-bold text-slate-500">-{formatWon(gap)}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500">수주액 (실수령액)</p>
-          <p className="font-mono text-lg font-bold text-slate-900">{formatWon(contractTotal)}</p>
+          <p className="text-xs text-slate-500">
+            수주액 (실수령액){project.contract_amount_estimated && <span className="ml-1 text-red-600">예상</span>}
+          </p>
+          <p className={`font-mono text-lg font-bold ${project.contract_amount_estimated ? "text-red-600" : "text-slate-900"}`}>
+            {formatWon(contractTotal)}
+          </p>
         </div>
         <div>
           <p className="text-xs text-slate-500">매입 합계</p>
