@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 export async function createAccessListRecord(formData: FormData) {
   const supabase = await createClient();
   const workerIds = formData.getAll("daily_worker_ids").map(String);
+  const employeeIds = formData.getAll("employee_ids").map(String);
 
   const { data, error } = await supabase
     .from("access_lists")
@@ -18,10 +19,14 @@ export async function createAccessListRecord(formData: FormData) {
     .select("id")
     .single();
 
-  if (!error && data && workerIds.length > 0) {
-    await supabase
-      .from("access_list_workers")
-      .insert(workerIds.map((daily_worker_id) => ({ access_list_id: data.id, daily_worker_id })));
+  if (!error && data) {
+    const members = [
+      ...workerIds.map((daily_worker_id) => ({ access_list_id: data.id, daily_worker_id, employee_id: null })),
+      ...employeeIds.map((employee_id) => ({ access_list_id: data.id, daily_worker_id: null, employee_id })),
+    ];
+    if (members.length > 0) {
+      await supabase.from("access_list_workers").insert(members);
+    }
   }
 
   revalidatePath("/daily-workers");

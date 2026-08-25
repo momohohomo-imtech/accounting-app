@@ -120,6 +120,8 @@ export type Employee = {
   employment_type: string | null;
   hired_date: string | null;
   resigned_date: string | null;
+  birth_date: string | null;
+  nationality: string | null;
   phone: string | null;
   home_phone: string | null;
   address: string | null;

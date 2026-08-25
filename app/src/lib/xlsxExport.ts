@@ -56,6 +56,54 @@ export async function downloadXlsx(
   triggerDownload(await wb.xlsx.writeBuffer(), filename);
 }
 
+export async function downloadAccessListXlsx(
+  filename: string,
+  info: { companyName: string; accessPeriod: string; supervisorName: string },
+  members: { name: string; birthDate: string; phone: string; nationality: string; note: string }[]
+) {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("출입명단");
+
+  const titleRow = ws.addRow(["공사자 출입자 명부"]);
+  titleRow.font = { bold: true, size: 14 };
+  titleRow.alignment = { horizontal: "center" };
+  ws.mergeCells(titleRow.number, 1, titleRow.number, 6);
+
+  ws.addRow(["업체명:", info.companyName, "", "출입일자:", info.accessPeriod]);
+  ws.mergeCells(2, 5, 2, 6);
+
+  ws.addRow(["감독자:", info.supervisorName, "", "인원수:", members.length]);
+  ws.mergeCells(3, 5, 3, 6);
+
+  const headerRow = ws.addRow(["구분", "성 명", "생년월일", "연락처", "국적", "비고"]);
+  headerRow.eachCell((cell) => {
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E293B" } };
+    cell.alignment = { horizontal: "center" };
+  });
+
+  members.forEach((m, i) => {
+    ws.addRow([i + 1, m.name, m.birthDate, m.phone, m.nationality, m.note]);
+  });
+
+  const thin = { style: "thin" as const, color: { argb: "FFCBD5E1" } };
+  ws.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return;
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      cell.border = { top: thin, left: thin, bottom: thin, right: thin };
+    });
+  });
+
+  ws.getColumn(1).width = 8;
+  ws.getColumn(2).width = 14;
+  ws.getColumn(3).width = 14;
+  ws.getColumn(4).width = 18;
+  ws.getColumn(5).width = 14;
+  ws.getColumn(6).width = 24;
+
+  triggerDownload(await wb.xlsx.writeBuffer(), filename);
+}
+
 export async function downloadWorkLogCalendarXlsx(
   filename: string,
   year: number,

@@ -24,6 +24,8 @@ const employeeFields: FieldConfig[] = [
   { name: "employment_type", label: "고용형태" },
   { name: "hired_date", label: "입사일", type: "date" },
   { name: "resigned_date", label: "퇴사일", type: "date", hideInTable: true },
+  { name: "birth_date", label: "생년월일", type: "date", hideInTable: true },
+  { name: "nationality", label: "국적", hideInTable: true },
   { name: "phone", label: "휴대폰번호", type: "tel" },
   { name: "home_phone", label: "집 전화번호", type: "tel", hideInTable: true },
   { name: "address", label: "주소", hideInTable: true },

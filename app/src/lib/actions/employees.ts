@@ -12,6 +12,8 @@ function parse(formData: FormData) {
     employment_type: String(formData.get("employment_type") ?? "") || null,
     hired_date: String(formData.get("hired_date") ?? "") || null,
     resigned_date: String(formData.get("resigned_date") ?? "") || null,
+    birth_date: String(formData.get("birth_date") ?? "") || null,
+    nationality: String(formData.get("nationality") ?? "") || null,
     phone: String(formData.get("phone") ?? "") || null,
     home_phone: String(formData.get("home_phone") ?? "") || null,
     address: String(formData.get("address") ?? "") || null,
