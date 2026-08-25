@@ -7,6 +7,7 @@ import { YearFilter } from "@/components/YearFilter";
 import { ReportProjectSiteFilter } from "@/components/ReportProjectSiteFilter";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { AutoPrint } from "@/components/AutoPrint";
+import { ReportAIInsights } from "@/components/ReportAIInsights";
 
 const MONTH_LABELS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
 
@@ -149,6 +150,17 @@ export default async function ReportsPage({
   const popupOpen = Boolean(project || vendor);
   const isolateProjects = printProjects === "1";
 
+  const aiSummary = {
+    year: selectedYear,
+    yearTotalSales: yearTotal.sales,
+    yearTotalPurchase: yearTotal.purchase,
+    monthly: monthly.map((m) => ({ month: m.label, sales: m.sales, purchase: m.purchase, profit: m.profit })),
+    projectSummary,
+    bySite: bySite.slice(0, 8).map((s) => ({ site: s.name, sales: s.sales, purchase: s.purchase, profit: s.profit })),
+    topVendors: byVendor.slice(0, 5).map((v) => ({ vendor: v.name, count: v.count, amount: v.amount })),
+    topCustomers: byCustomer.slice(0, 5).map((v) => ({ customer: v.name, count: v.count, amount: v.amount })),
+  };
+
   return (
     <div className="space-y-6">
       {isolateProjects && <AutoPrint />}
@@ -158,6 +170,8 @@ export default async function ReportsPage({
           <h1 className="text-2xl font-bold text-slate-900">보고서</h1>
           <YearFilter basePath="/reports" years={years} selectedYear={selectedYear} />
         </div>
+
+        <ReportAIInsights summary={aiSummary} />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
