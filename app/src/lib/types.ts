@@ -128,6 +128,7 @@ export type Employee = {
   emergency2_relation: string | null;
   emergency2_phone: string | null;
   monthly_salary: number | null;
+  national_pension: number;
   health_insurance: number;
   long_term_care_insurance: number;
   employment_insurance: number;
@@ -144,6 +145,7 @@ export type Payroll = {
   work_days: number | null;
   amount: number;
   bonus: number;
+  national_pension: number;
   health_insurance: number;
   long_term_care_insurance: number;
   employment_insurance: number;

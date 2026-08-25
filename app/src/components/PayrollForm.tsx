@@ -9,6 +9,7 @@ type EmployeeOption = {
   id: string;
   name: string;
   monthly_salary: number | null;
+  national_pension: number;
   health_insurance: number;
   long_term_care_insurance: number;
   employment_insurance: number;
@@ -20,6 +21,7 @@ type EmployeeOption = {
 type Values = {
   amount: string;
   bonus: string;
+  national_pension: string;
   health_insurance: string;
   long_term_care_insurance: string;
   employment_insurance: string;
@@ -33,6 +35,7 @@ function defaultsFor(e?: EmployeeOption): Values {
   return {
     amount: e?.monthly_salary != null ? String(e.monthly_salary) : "",
     bonus: "0",
+    national_pension: String(e?.national_pension ?? 0),
     health_insurance: String(e?.health_insurance ?? 0),
     long_term_care_insurance: String(e?.long_term_care_insurance ?? 0),
     employment_insurance: String(e?.employment_insurance ?? 0),
@@ -64,6 +67,7 @@ export function PayrollForm({
 
   const total = (Number(values.amount) || 0) + (Number(values.bonus) || 0);
   const deductionTotal =
+    (Number(values.national_pension) || 0) +
     (Number(values.health_insurance) || 0) +
     (Number(values.long_term_care_insurance) || 0) +
     (Number(values.employment_insurance) || 0) +
@@ -108,6 +112,15 @@ export function PayrollForm({
         </Field>
         <Field label="상여">
           <input type="number" name="bonus" value={values.bonus} onChange={(e) => set("bonus", e.target.value)} className={fieldClass} />
+        </Field>
+        <Field label="국민연금">
+          <input
+            type="number"
+            name="national_pension"
+            value={values.national_pension}
+            onChange={(e) => set("national_pension", e.target.value)}
+            className={fieldClass}
+          />
         </Field>
         <Field label="건강보험">
           <input

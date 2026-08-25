@@ -30,6 +30,7 @@ const employeeFields: FieldConfig[] = [
   { name: "emergency2_relation", label: "비상연락처2 관계", hideInTable: true },
   { name: "emergency2_phone", label: "비상연락처2 전화번호", type: "tel", hideInTable: true },
   { name: "monthly_salary", label: "월급", type: "number", format: "currency" },
+  { name: "national_pension", label: "국민연금(월 차감액)", type: "number", format: "currency", hideInTable: true },
   { name: "health_insurance", label: "건강보험(월 차감액)", type: "number", format: "currency", hideInTable: true },
   { name: "long_term_care_insurance", label: "장기요양보험(월 차감액)", type: "number", format: "currency", hideInTable: true },
   { name: "employment_insurance", label: "고용보험(월 차감액)", type: "number", format: "currency", hideInTable: true },
@@ -78,6 +79,7 @@ export default async function EmployeesPage({
               id: e.id,
               name: e.name,
               monthly_salary: e.monthly_salary,
+              national_pension: e.national_pension,
               health_insurance: e.health_insurance,
               long_term_care_insurance: e.long_term_care_insurance,
               employment_insurance: e.employment_insurance,
@@ -104,6 +106,7 @@ export default async function EmployeesPage({
                 {(payroll ?? []).map((p) => {
                   const total = p.amount + p.bonus;
                   const deductionTotal =
+                    p.national_pension +
                     p.health_insurance +
                     p.long_term_care_insurance +
                     p.employment_insurance +

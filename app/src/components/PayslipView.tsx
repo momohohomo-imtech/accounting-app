@@ -11,10 +11,17 @@ export async function PayslipView({ payrollId, closeHref }: { payrollId: string;
   const e = p.employees;
   const total = p.amount + p.bonus;
   const deductionTotal =
-    p.health_insurance + p.long_term_care_insurance + p.employment_insurance + p.income_tax + p.local_income_tax + p.rural_tax;
+    p.national_pension +
+    p.health_insurance +
+    p.long_term_care_insurance +
+    p.employment_insurance +
+    p.income_tax +
+    p.local_income_tax +
+    p.rural_tax;
   const net = total - deductionTotal + p.non_taxable_unreported;
 
   const deductionRows: [string, number][] = [
+    ["국민연금", p.national_pension],
     ["건강보험", p.health_insurance],
     ["장기요양보험", p.long_term_care_insurance],
     ["고용보험", p.employment_insurance],
