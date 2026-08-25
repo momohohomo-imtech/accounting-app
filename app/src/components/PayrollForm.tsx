@@ -46,6 +46,7 @@ export type PayrollInitial = {
   local_income_tax: number;
   rural_tax: number;
   non_taxable_unreported: number;
+  memo: string | null;
 };
 
 function defaultsFor(e?: EmployeeOption): Values {
@@ -233,6 +234,10 @@ export function PayrollForm({
           />
         </Field>
       </div>
+
+      <Field label="메모 (필요시 사용, 전달사항 등)">
+        <textarea name="memo" defaultValue={initial?.memo ?? ""} rows={2} className={fieldClass} />
+      </Field>
 
       <div className="flex flex-wrap gap-4 rounded-lg bg-slate-50 px-4 py-2.5 text-sm text-slate-600">
         <span>

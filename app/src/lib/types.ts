@@ -153,6 +153,7 @@ export type Payroll = {
   local_income_tax: number;
   rural_tax: number;
   non_taxable_unreported: number;
+  memo: string | null;
   created_at: string;
   employees?: Employee;
 };

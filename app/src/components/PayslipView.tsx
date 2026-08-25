@@ -101,6 +101,13 @@ export async function PayslipView({ payrollId, closeHref }: { payrollId: string;
           <span className="ml-2 font-mono text-xl font-bold text-slate-900">{formatWon(net)}</span>
         </span>
       </div>
+
+      {p.memo && (
+        <div className="rounded-xl border border-slate-200 px-4 py-3">
+          <p className="mb-1 text-xs font-semibold text-slate-500">메모</p>
+          <p className="whitespace-pre-wrap text-sm text-slate-700">{p.memo}</p>
+        </div>
+      )}
     </div>
   );
 }

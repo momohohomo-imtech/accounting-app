@@ -66,6 +66,7 @@ function parsePayroll(formData: FormData) {
     local_income_tax: Number(formData.get("local_income_tax") ?? 0),
     rural_tax: Number(formData.get("rural_tax") ?? 0),
     non_taxable_unreported: Number(formData.get("non_taxable_unreported") ?? 0),
+    memo: String(formData.get("memo") ?? "") || null,
   };
 }
 
