@@ -4,29 +4,50 @@ import { formatWon, formatDate } from "@/lib/format";
 import { remainingBalance } from "@/lib/credit";
 import type { CreditPayment, Transaction } from "@/lib/types";
 import { TaxEstimateSection } from "@/components/sections/TaxEstimateSection";
+import { YearFilter } from "@/components/YearFilter";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Table, THead, Th, Tr, Td, EmptyRow } from "@/components/ui/Table";
 import { cx } from "@/lib/cx";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ year?: string }>;
+}) {
+  const { year } = await searchParams;
   const supabase = await createClient();
   const now = new Date();
-  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  const currentYear = now.getFullYear();
+  const selectedYear = year ? Number(year) : currentYear;
+  const monthStart = `${currentYear}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 
-  const [{ data: monthTx }, { data: creditTx }, { data: creditPayments }, { data: sites }, { data: recentTx }] =
-    await Promise.all([
-      supabase.from("transactions").select("*").neq("payment_type", "credit").gte("trans_date", monthStart),
-      supabase.from("transactions").select("*").eq("payment_type", "credit"),
-      supabase.from("credit_payments").select("*"),
-      supabase.from("projects").select("id, status").eq("status", "ongoing"),
-      supabase
-        .from("transactions")
-        .select("*, clients(name), projects(name)")
-        .neq("payment_type", "credit")
-        .order("trans_date", { ascending: false })
-        .limit(8),
-    ]);
+  const [
+    { data: monthTx },
+    { data: creditTx },
+    { data: creditPayments },
+    { data: sites },
+    { data: recentTx },
+    { data: yearTx },
+    { data: firstTx },
+  ] = await Promise.all([
+    supabase.from("transactions").select("*").neq("payment_type", "credit").gte("trans_date", monthStart),
+    supabase.from("transactions").select("*").eq("payment_type", "credit"),
+    supabase.from("credit_payments").select("*"),
+    supabase.from("projects").select("id, status").eq("status", "ongoing"),
+    supabase
+      .from("transactions")
+      .select("*, clients(name), projects(name)")
+      .neq("payment_type", "credit")
+      .order("trans_date", { ascending: false })
+      .limit(8),
+    supabase
+      .from("transactions")
+      .select("sales_amount, sales_vat, purchase_amount, purchase_vat")
+      .gte("trans_date", `${selectedYear}-01-01`)
+      .lte("trans_date", `${selectedYear}-12-31`),
+    supabase.from("transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
+  ]);
 
   const monthPurchase = (monthTx ?? []).reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
   const monthSales = (monthTx ?? []).reduce((s, t) => s + t.sales_amount + t.sales_vat, 0);
@@ -35,6 +56,24 @@ export default async function DashboardPage() {
     (s, t) => s + remainingBalance(t as Transaction, (creditPayments ?? []) as CreditPayment[]),
     0
   );
+
+  const yearSales = (yearTx ?? []).reduce((s, t) => s + t.sales_amount + t.sales_vat, 0);
+  const yearPurchase = (yearTx ?? []).reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
+  const yearProfit = yearSales - yearPurchase;
+
+  const firstYear = Math.min(
+    firstTx?.[0]?.trans_date ? Number(firstTx[0].trans_date.slice(0, 4)) : currentYear,
+    currentYear
+  );
+  const years = Array.from({ length: currentYear - firstYear + 1 }, (_, i) => currentYear - i);
+  if (!years.includes(selectedYear)) years.unshift(selectedYear);
+  years.sort((a, b) => b - a);
+
+  const yearCards = [
+    { label: `${selectedYear}년 매출액`, value: formatWon(yearSales) },
+    { label: `${selectedYear}년 매입액`, value: formatWon(yearPurchase) },
+    { label: `${selectedYear}년 이익금`, value: formatWon(yearProfit) },
+  ];
 
   const cards = [
     { label: "이번달 매출", value: formatWon(monthSales), href: "/transactions" },
@@ -52,6 +91,23 @@ export default async function DashboardPage() {
         </p>
       </div>
 
+      <TaxEstimateSection />
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-600">연도별 실적</h2>
+          <YearFilter basePath="/dashboard" years={years} selectedYear={selectedYear} />
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {yearCards.map((c) => (
+            <div key={c.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-sm text-slate-500">{c.label}</p>
+              <p className="mt-2 font-mono text-2xl font-bold text-slate-900">{c.value}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((c) => (
           <Link
@@ -67,8 +123,6 @@ export default async function DashboardPage() {
           </Link>
         ))}
       </div>
-
-      <TaxEstimateSection />
 
       <Card>
         <div className="flex items-center justify-between">
