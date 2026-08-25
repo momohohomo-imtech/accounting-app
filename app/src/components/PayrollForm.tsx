@@ -5,7 +5,7 @@ import { fieldClass, labelClass } from "@/components/ui/field";
 import { formatWon } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 
-type EmployeeOption = {
+export type EmployeeOption = {
   id: string;
   name: string;
   monthly_salary: number | null;
@@ -31,6 +31,23 @@ type Values = {
   non_taxable_unreported: string;
 };
 
+export type PayrollInitial = {
+  id: string;
+  employee_id: string;
+  pay_month: string;
+  work_days: number | null;
+  amount: number;
+  bonus: number;
+  national_pension: number;
+  health_insurance: number;
+  long_term_care_insurance: number;
+  employment_insurance: number;
+  income_tax: number;
+  local_income_tax: number;
+  rural_tax: number;
+  non_taxable_unreported: number;
+};
+
 function defaultsFor(e?: EmployeeOption): Values {
   return {
     amount: e?.monthly_salary != null ? String(e.monthly_salary) : "",
@@ -46,19 +63,42 @@ function defaultsFor(e?: EmployeeOption): Values {
   };
 }
 
+function valuesFromInitial(p: PayrollInitial): Values {
+  return {
+    amount: String(p.amount),
+    bonus: String(p.bonus),
+    national_pension: String(p.national_pension),
+    health_insurance: String(p.health_insurance),
+    long_term_care_insurance: String(p.long_term_care_insurance),
+    employment_insurance: String(p.employment_insurance),
+    income_tax: String(p.income_tax),
+    local_income_tax: String(p.local_income_tax),
+    rural_tax: String(p.rural_tax),
+    non_taxable_unreported: String(p.non_taxable_unreported),
+  };
+}
+
 export function PayrollForm({
   employees,
   action,
+  initial,
+  submitLabel = "등록",
+  onCancel,
 }: {
   employees: EmployeeOption[];
   action: (formData: FormData) => void;
+  initial?: PayrollInitial;
+  submitLabel?: string;
+  onCancel?: () => void;
 }) {
-  const [employeeId, setEmployeeId] = useState(employees[0]?.id ?? "");
-  const [values, setValues] = useState<Values>(() => defaultsFor(employees[0]));
+  const [employeeId, setEmployeeId] = useState(initial?.employee_id ?? employees[0]?.id ?? "");
+  const [values, setValues] = useState<Values>(() =>
+    initial ? valuesFromInitial(initial) : defaultsFor(employees[0])
+  );
 
   function handleEmployeeChange(id: string) {
     setEmployeeId(id);
-    setValues(defaultsFor(employees.find((e) => e.id === id)));
+    if (!initial) setValues(defaultsFor(employees.find((e) => e.id === id)));
   }
 
   function set<K extends keyof Values>(key: K, v: string) {
@@ -77,7 +117,14 @@ export function PayrollForm({
   const net = total - deductionTotal + (Number(values.non_taxable_unreported) || 0);
 
   return (
-    <form action={action} className="space-y-3">
+    <form
+      action={action}
+      onSubmit={(e) => {
+        if (!confirm(initial ? "수정 내용을 저장하시겠습니까?" : "이 급여를 등록하시겠습니까?")) e.preventDefault();
+      }}
+      className="space-y-3"
+    >
+      {initial && <input type="hidden" name="id" value={initial.id} />}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="직원">
           <select
@@ -95,10 +142,10 @@ export function PayrollForm({
           </select>
         </Field>
         <Field label="지급월">
-          <input type="date" name="pay_month" required className={fieldClass} />
+          <input type="date" name="pay_month" defaultValue={initial?.pay_month.slice(0, 10)} required className={fieldClass} />
         </Field>
         <Field label="근무일수">
-          <input type="number" name="work_days" className={fieldClass} />
+          <input type="number" name="work_days" defaultValue={initial?.work_days ?? undefined} className={fieldClass} />
         </Field>
         <Field label="기본급(월급)">
           <input
@@ -199,7 +246,14 @@ export function PayrollForm({
         </span>
       </div>
 
-      <Button type="submit">등록</Button>
+      <div className="flex gap-2">
+        <Button type="submit">{submitLabel}</Button>
+        {onCancel && (
+          <Button type="button" variant="secondary" onClick={onCancel}>
+            취소
+          </Button>
+        )}
+      </div>
     </form>
   );
 }

@@ -6,13 +6,13 @@ import {
   updateEmployeeRecord,
   deleteEmployeeRecord,
   createPayrollRecord,
+  updatePayrollRecord,
   deletePayrollRecord,
 } from "@/lib/actions/employees";
 import type { FieldConfig } from "@/components/crud/types";
-import { formatWon, formatDate } from "@/lib/format";
 import { PayrollForm } from "@/components/PayrollForm";
+import { PayrollTable } from "@/components/PayrollTable";
 import { PayslipView } from "@/components/PayslipView";
-import { LinkButton } from "@/components/ui/Button";
 
 const employeeFields: FieldConfig[] = [
   { name: "employee_no", label: "사원번호" },
@@ -55,6 +55,19 @@ export default async function EmployeesPage({
       .order("pay_month", { ascending: false }),
   ]);
 
+  const employeeOptions = (employees ?? []).map((e) => ({
+    id: e.id,
+    name: e.name,
+    monthly_salary: e.monthly_salary,
+    national_pension: e.national_pension,
+    health_insurance: e.health_insurance,
+    long_term_care_insurance: e.long_term_care_insurance,
+    employment_insurance: e.employment_insurance,
+    income_tax: e.income_tax,
+    local_income_tax: e.local_income_tax,
+    rural_tax: e.rural_tax,
+  }));
+
   return (
     <div className="space-y-6">
       <h1 className={`text-2xl font-bold text-slate-900 ${payslip ? "print:hidden" : ""}`}>직원 / 급여</h1>
@@ -74,78 +87,15 @@ export default async function EmployeesPage({
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="mb-3 font-semibold text-slate-900">급여 지급 등록</h2>
-          <PayrollForm
-            employees={(employees ?? []).map((e) => ({
-              id: e.id,
-              name: e.name,
-              monthly_salary: e.monthly_salary,
-              national_pension: e.national_pension,
-              health_insurance: e.health_insurance,
-              long_term_care_insurance: e.long_term_care_insurance,
-              employment_insurance: e.employment_insurance,
-              income_tax: e.income_tax,
-              local_income_tax: e.local_income_tax,
-              rural_tax: e.rural_tax,
-            }))}
-            action={createPayrollRecord}
-          />
+          <PayrollForm employees={employeeOptions} action={createPayrollRecord} />
 
           <div className="mt-5 overflow-x-auto">
-            <table className="w-full min-w-[700px] text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-slate-500">
-                  <th className="pb-2 pr-4">직원</th>
-                  <th className="pb-2 pr-4">지급월</th>
-                  <th className="pb-2 pr-4 text-right">지급합계</th>
-                  <th className="pb-2 pr-4 text-right">공제합계</th>
-                  <th className="pb-2 pr-4 text-right">차인지급액</th>
-                  <th className="pb-2 text-right">관리</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(payroll ?? []).map((p) => {
-                  const total = p.amount + p.bonus;
-                  const deductionTotal =
-                    p.national_pension +
-                    p.health_insurance +
-                    p.long_term_care_insurance +
-                    p.employment_insurance +
-                    p.income_tax +
-                    p.local_income_tax +
-                    p.rural_tax;
-                  const net = total - deductionTotal + p.non_taxable_unreported;
-                  return (
-                    <tr key={p.id} className="border-b border-slate-100 last:border-0">
-                      <td className="py-2 pr-4 text-slate-700">{p.employees?.name}</td>
-                      <td className="py-2 pr-4 text-slate-700">{formatDate(p.pay_month).slice(0, 7)}</td>
-                      <td className="py-2 pr-4 text-right text-slate-700">{formatWon(total)}</td>
-                      <td className="py-2 pr-4 text-right text-slate-500">{formatWon(deductionTotal)}</td>
-                      <td className="py-2 pr-4 text-right font-medium text-slate-900">{formatWon(net)}</td>
-                      <td className="py-2 text-right">
-                        <div className="flex justify-end gap-2">
-                          <LinkButton href={`/employees?payslip=${p.id}`} variant="secondary" size="xs">
-                            명세서
-                          </LinkButton>
-                          <form action={deletePayrollRecord}>
-                            <input type="hidden" name="id" value={p.id} />
-                            <button className="rounded-lg border border-red-200 px-2.5 py-1 text-xs text-red-600 hover:bg-red-50">
-                              삭제
-                            </button>
-                          </form>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {(payroll ?? []).length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="py-6 text-center text-slate-400">
-                      급여 지급 기록이 없습니다.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+            <PayrollTable
+              payroll={payroll ?? []}
+              employees={employeeOptions}
+              updateAction={updatePayrollRecord}
+              deleteAction={deletePayrollRecord}
+            />
           </div>
         </div>
       </div>

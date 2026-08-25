@@ -51,9 +51,8 @@ export async function deleteEmployeeRecord(formData: FormData) {
   revalidatePath("/employees");
 }
 
-export async function createPayrollRecord(formData: FormData) {
-  const supabase = await createClient();
-  await supabase.from("payroll").insert({
+function parsePayroll(formData: FormData) {
+  return {
     employee_id: String(formData.get("employee_id")),
     pay_month: String(formData.get("pay_month")),
     work_days: formData.get("work_days") ? Number(formData.get("work_days")) : null,
@@ -67,7 +66,19 @@ export async function createPayrollRecord(formData: FormData) {
     local_income_tax: Number(formData.get("local_income_tax") ?? 0),
     rural_tax: Number(formData.get("rural_tax") ?? 0),
     non_taxable_unreported: Number(formData.get("non_taxable_unreported") ?? 0),
-  });
+  };
+}
+
+export async function createPayrollRecord(formData: FormData) {
+  const supabase = await createClient();
+  await supabase.from("payroll").insert(parsePayroll(formData));
+  revalidatePath("/employees");
+}
+
+export async function updatePayrollRecord(formData: FormData) {
+  const supabase = await createClient();
+  const id = String(formData.get("id"));
+  await supabase.from("payroll").update(parsePayroll(formData)).eq("id", id);
   revalidatePath("/employees");
 }
 
