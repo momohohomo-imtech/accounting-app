@@ -10,6 +10,7 @@ import { YearFilter } from "@/components/YearFilter";
 import { ProjectProfitReport } from "@/components/ProjectProfitReport";
 import { LinkButton } from "@/components/ui/Button";
 import { PROJECT_STATUS_OPTIONS } from "@/lib/projectStatus";
+import { formatWon } from "@/lib/format";
 
 const TABS = [
   { key: "list", label: "프로젝트" },
@@ -138,9 +139,24 @@ async function ProjectListSection({ year, siteId, report }: { year?: string; sit
     new Set([...(allYears ?? []).map((p) => p.year), currentYear, selectedYear])
   ).sort((a, b) => b - a);
 
+  const estimatedProjects = (projects ?? []).filter((p) => p.contract_amount_estimated);
+  const estimatedProfitSum = estimatedProjects.reduce(
+    (sum, p) => sum + (p.contract_amount ? p.contract_amount - (purchaseByProject.get(p.id) ?? 0) : 0),
+    0
+  );
+
   return (
     <div className="space-y-6">
       <div className={report ? "space-y-6 print:hidden" : "space-y-6"}>
+        {estimatedProjects.length > 0 && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+            <p className="text-xs text-red-600">
+              공사완료 예상 미수액 (수주액이 예상금액인 {estimatedProjects.length}건의 이익금 합계)
+            </p>
+            <p className="mt-1 font-mono text-xl font-bold text-red-600">{formatWon(estimatedProfitSum)}</p>
+          </div>
+        )}
+
         <div className="flex justify-start">
           <YearFilter
             basePath="/projects"
