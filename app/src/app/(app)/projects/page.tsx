@@ -11,6 +11,7 @@ import { ProjectProfitReport } from "@/components/ProjectProfitReport";
 import { LinkButton } from "@/components/ui/Button";
 import { PROJECT_STATUS_OPTIONS } from "@/lib/projectStatus";
 import { formatWon } from "@/lib/format";
+import { ProjectListExportButtons } from "@/components/ProjectListExportButtons";
 
 const TABS = [
   { key: "list", label: "프로젝트" },
@@ -139,11 +140,14 @@ async function ProjectListSection({ year, siteId, report }: { year?: string; sit
     new Set([...(allYears ?? []).map((p) => p.year), currentYear, selectedYear])
   ).sort((a, b) => b - a);
 
-  const estimatedProjects = (projects ?? []).filter((p) => p.contract_amount_estimated);
-  const estimatedProfitSum = estimatedProjects.reduce(
-    (sum, p) => sum + (p.contract_amount ? p.contract_amount - (purchaseByProject.get(p.id) ?? 0) : 0),
-    0
-  );
+  const tableRows = (projects ?? []).map((p) => ({
+    ...p,
+    site_name: (one(p.sites) as { name: string } | undefined)?.name,
+    profit: p.contract_amount ? p.contract_amount - (purchaseByProject.get(p.id) ?? 0) : null,
+  }));
+
+  const estimatedProjects = tableRows.filter((p) => p.contract_amount_estimated);
+  const estimatedProfitSum = estimatedProjects.reduce((sum, p) => sum + (p.profit ?? 0), 0);
 
   return (
     <div className="space-y-6">
@@ -157,7 +161,7 @@ async function ProjectListSection({ year, siteId, report }: { year?: string; sit
           </div>
         )}
 
-        <div className="flex justify-start">
+        <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
           <YearFilter
             basePath="/projects"
             years={years}
@@ -165,18 +169,17 @@ async function ProjectListSection({ year, siteId, report }: { year?: string; sit
             siteOptions={siteOptions}
             selectedSiteId={siteId}
           />
+          <ProjectListExportButtons year={selectedYear} rows={tableRows} />
         </div>
 
-        <CreatePanel title="프로젝트" fields={fields} createAction={createProjectRecord} />
+        <div className="print:hidden">
+          <CreatePanel title="프로젝트" fields={fields} createAction={createProjectRecord} />
+        </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm print:border-0 print:p-0 print:shadow-none">
           <EntityTable
             fields={fields}
-            rows={(projects ?? []).map((p) => ({
-              ...p,
-              site_name: (one(p.sites) as { name: string } | undefined)?.name,
-              profit: p.contract_amount ? p.contract_amount - (purchaseByProject.get(p.id) ?? 0) : null,
-            }))}
+            rows={tableRows}
             updateAction={updateProjectRecord}
             deleteAction={deleteProjectRecord}
             extraActions={Object.fromEntries(

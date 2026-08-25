@@ -110,7 +110,7 @@ export function EntityTable({
             </button>
           </th>
         ))}
-        <th className="pb-2 text-right font-medium" style={hasWidths ? { width: "8%" } : undefined}>
+        <th className="pb-2 text-right font-medium print:hidden" style={hasWidths ? { width: "8%" } : undefined}>
           관리
         </th>
       </THead>
@@ -149,7 +149,7 @@ export function EntityTable({
                   key={f.name}
                   style={f.width ? { width: f.width } : undefined}
                   title={f.display === "progress" ? undefined : displayValue(row, f)}
-                  className="max-w-[220px] truncate pr-4"
+                  className="max-w-[220px] truncate pr-4 print:whitespace-normal print:overflow-visible"
                 >
                   {f.display === "progress" ? (
                     <ProgressCell value={Number(row[f.name]) || 0} />
@@ -160,7 +160,7 @@ export function EntityTable({
                   )}
                 </Td>
               ))}
-              <Td className="text-right">
+              <Td className="text-right print:hidden">
                 <div className="flex justify-end gap-2">
                   {extraActions?.[row.id]}
                   <Button variant="secondary" size="xs" onClick={() => setEditingId(row.id)}>
