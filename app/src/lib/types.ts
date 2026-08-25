@@ -149,6 +149,7 @@ export type Payroll = {
   health_insurance: number;
   long_term_care_insurance: number;
   employment_insurance: number;
+  employment_insurance_refund: number;
   income_tax: number;
   local_income_tax: number;
   rural_tax: number;

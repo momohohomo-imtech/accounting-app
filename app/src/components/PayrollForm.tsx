@@ -25,6 +25,7 @@ type Values = {
   health_insurance: string;
   long_term_care_insurance: string;
   employment_insurance: string;
+  employment_insurance_refund: string;
   income_tax: string;
   local_income_tax: string;
   rural_tax: string;
@@ -42,6 +43,7 @@ export type PayrollInitial = {
   health_insurance: number;
   long_term_care_insurance: number;
   employment_insurance: number;
+  employment_insurance_refund: number;
   income_tax: number;
   local_income_tax: number;
   rural_tax: number;
@@ -57,6 +59,7 @@ function defaultsFor(e?: EmployeeOption): Values {
     health_insurance: String(e?.health_insurance ?? 0),
     long_term_care_insurance: String(e?.long_term_care_insurance ?? 0),
     employment_insurance: String(e?.employment_insurance ?? 0),
+    employment_insurance_refund: "0",
     income_tax: String(e?.income_tax ?? 0),
     local_income_tax: String(e?.local_income_tax ?? 0),
     rural_tax: String(e?.rural_tax ?? 0),
@@ -72,6 +75,7 @@ function valuesFromInitial(p: PayrollInitial): Values {
     health_insurance: String(p.health_insurance),
     long_term_care_insurance: String(p.long_term_care_insurance),
     employment_insurance: String(p.employment_insurance),
+    employment_insurance_refund: String(p.employment_insurance_refund),
     income_tax: String(p.income_tax),
     local_income_tax: String(p.local_income_tax),
     rural_tax: String(p.rural_tax),
@@ -114,7 +118,8 @@ export function PayrollForm({
     (Number(values.employment_insurance) || 0) +
     (Number(values.income_tax) || 0) +
     (Number(values.local_income_tax) || 0) +
-    (Number(values.rural_tax) || 0);
+    (Number(values.rural_tax) || 0) -
+    (Number(values.employment_insurance_refund) || 0);
   const net = total - deductionTotal + (Number(values.non_taxable_unreported) || 0);
 
   return (
@@ -194,6 +199,15 @@ export function PayrollForm({
             name="employment_insurance"
             value={values.employment_insurance}
             onChange={(e) => set("employment_insurance", e.target.value)}
+            className={fieldClass}
+          />
+        </Field>
+        <Field label="고용보험 환급금">
+          <input
+            type="number"
+            name="employment_insurance_refund"
+            value={values.employment_insurance_refund}
+            onChange={(e) => set("employment_insurance_refund", e.target.value)}
             className={fieldClass}
           />
         </Field>

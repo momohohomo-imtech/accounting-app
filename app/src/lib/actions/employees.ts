@@ -62,6 +62,7 @@ function parsePayroll(formData: FormData) {
     health_insurance: Number(formData.get("health_insurance") ?? 0),
     long_term_care_insurance: Number(formData.get("long_term_care_insurance") ?? 0),
     employment_insurance: Number(formData.get("employment_insurance") ?? 0),
+    employment_insurance_refund: Number(formData.get("employment_insurance_refund") ?? 0),
     income_tax: Number(formData.get("income_tax") ?? 0),
     local_income_tax: Number(formData.get("local_income_tax") ?? 0),
     rural_tax: Number(formData.get("rural_tax") ?? 0),
@@ -87,5 +88,29 @@ export async function deletePayrollRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
   await supabase.from("payroll").delete().eq("id", id);
+  revalidatePath("/employees");
+}
+
+export type PayrollImportRow = {
+  employee_id: string;
+  pay_month: string;
+  amount: number;
+  bonus: number;
+  national_pension: number;
+  health_insurance: number;
+  long_term_care_insurance: number;
+  employment_insurance: number;
+  employment_insurance_refund: number;
+  income_tax: number;
+  local_income_tax: number;
+  rural_tax: number;
+};
+
+export async function bulkImportPayroll(rows: PayrollImportRow[]) {
+  const supabase = await createClient();
+  const valid = rows.filter((r) => r.employee_id && r.pay_month);
+  if (valid.length) {
+    await supabase.from("payroll").insert(valid.map((r) => ({ ...r, non_taxable_unreported: 0 })));
+  }
   revalidatePath("/employees");
 }

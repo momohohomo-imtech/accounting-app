@@ -12,6 +12,7 @@ import {
 import type { FieldConfig } from "@/components/crud/types";
 import { PayrollForm } from "@/components/PayrollForm";
 import { PayrollTable } from "@/components/PayrollTable";
+import { PayrollImport } from "@/components/PayrollImport";
 import { PayslipView } from "@/components/PayslipView";
 
 const employeeFields: FieldConfig[] = [
@@ -82,6 +83,13 @@ export default async function EmployeesPage({
             rows={employees ?? []}
             updateAction={updateEmployeeRecord}
             deleteAction={deleteEmployeeRecord}
+          />
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-3 font-semibold text-slate-900">급여대장/상여대장 업로드 (AI 자동 인식)</h2>
+          <PayrollImport
+            employees={(employees ?? []).map((e) => ({ id: e.id, employee_no: e.employee_no, name: e.name }))}
           />
         </div>
 

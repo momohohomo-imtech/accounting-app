@@ -61,7 +61,8 @@ export function PayrollTable({
             p.employment_insurance +
             p.income_tax +
             p.local_income_tax +
-            p.rural_tax;
+            p.rural_tax -
+            p.employment_insurance_refund;
           const net = total - deductionTotal + p.non_taxable_unreported;
 
           return (

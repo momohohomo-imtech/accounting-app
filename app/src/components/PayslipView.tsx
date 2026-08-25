@@ -17,7 +17,8 @@ export async function PayslipView({ payrollId, closeHref }: { payrollId: string;
     p.employment_insurance +
     p.income_tax +
     p.local_income_tax +
-    p.rural_tax;
+    p.rural_tax -
+    p.employment_insurance_refund;
   const net = total - deductionTotal + p.non_taxable_unreported;
 
   const deductionRows: [string, number][] = [
@@ -25,6 +26,7 @@ export async function PayslipView({ payrollId, closeHref }: { payrollId: string;
     ["건강보험", p.health_insurance],
     ["장기요양보험", p.long_term_care_insurance],
     ["고용보험", p.employment_insurance],
+    ...(p.employment_insurance_refund ? ([["고용보험 환급", -p.employment_insurance_refund]] as [string, number][]) : []),
     ["소득세", p.income_tax],
     ["지방소득세", p.local_income_tax],
     ["농특세", p.rural_tax],
