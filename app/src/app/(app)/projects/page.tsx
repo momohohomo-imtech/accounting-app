@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { one } from "@/lib/relations";
 import { CreatePanel } from "@/components/crud/CreatePanel";
 import { EntityTable } from "@/components/crud/EntityTable";
 import { createProjectRecord, updateProjectRecord, deleteProjectRecord } from "@/lib/actions/projects";
@@ -51,7 +52,7 @@ async function ProjectListSection({ year, report }: { year?: string; report?: st
   ]);
 
   const siteOptions = (sites ?? []).map((s) => {
-    const clientName = s.clients?.[0]?.name as string | undefined;
+    const clientName = (one(s.clients) as { name: string } | undefined)?.name;
     return { value: s.id, label: clientName ? `${clientName} · ${s.name}` : s.name };
   });
 
@@ -110,7 +111,7 @@ async function ProjectListSection({ year, report }: { year?: string; report?: st
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <EntityTable
             fields={fields}
-            rows={(projects ?? []).map((p) => ({ ...p, site_name: p.sites?.name }))}
+            rows={(projects ?? []).map((p) => ({ ...p, site_name: (one(p.sites) as { name: string } | undefined)?.name }))}
             updateAction={updateProjectRecord}
             deleteAction={deleteProjectRecord}
             extraActions={Object.fromEntries(

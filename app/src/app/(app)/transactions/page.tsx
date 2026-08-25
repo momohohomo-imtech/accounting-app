@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { one } from "@/lib/relations";
 import { PageTabs } from "@/components/PageTabs";
 import { CreditSection } from "@/components/sections/CreditSection";
 import { ClientsSection } from "@/components/sections/ClientsSection";
@@ -97,8 +98,8 @@ async function TransactionListSection({
   ]);
 
   const projectNodes = (projectTree ?? []).map((p) => {
-    const site = p.sites?.[0] as { name: string; clients?: { name: string }[] } | undefined;
-    const client = site?.clients?.[0] as { name: string } | undefined;
+    const site = one(p.sites) as { name: string; clients?: unknown } | undefined;
+    const client = one(site?.clients) as { name: string } | undefined;
     return {
       id: p.id,
       name: p.name,

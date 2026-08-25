@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { one } from "@/lib/relations";
 import { TransactionForm } from "@/components/TransactionForm";
 import { createTransactionRecord } from "@/lib/actions/transactions";
 
@@ -16,7 +17,7 @@ export default async function NewTransactionPage() {
   const siteOptions = (sites ?? []).map((s) => ({
     id: s.id,
     name: s.name,
-    client_name: (s.clients?.[0]?.name as string | undefined) ?? null,
+    client_name: (one(s.clients) as { name: string } | undefined)?.name ?? null,
   }));
 
   return (
