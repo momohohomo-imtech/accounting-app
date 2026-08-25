@@ -101,6 +101,7 @@ export function TransactionForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!confirm(initial ? "수정 내용을 저장하시겠습니까?" : "이 거래를 등록하시겠습니까?")) return;
     setError(null);
     let path = receiptPath;
 

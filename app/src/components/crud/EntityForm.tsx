@@ -1,5 +1,6 @@
 import type { FieldConfig } from "./types";
 import { fieldClass, labelClass } from "@/components/ui/field";
+import { ParentProjectField } from "@/components/ParentProjectField";
 
 export function EntityForm({
   fields,
@@ -40,6 +41,13 @@ export function EntityForm({
                 placeholder={f.placeholder}
                 rows={2}
                 className={fieldClass}
+              />
+            ) : f.type === "project-search" ? (
+              <ParentProjectField
+                name={f.name}
+                options={f.projectSearchOptions ?? []}
+                defaultValue={value}
+                required={f.required}
               />
             ) : f.type === "select" ? (
               <select name={f.name} defaultValue={value} required={f.required} className={fieldClass}>

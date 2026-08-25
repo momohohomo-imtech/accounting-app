@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import { one } from "@/lib/relations";
 import { formatWon, formatDate } from "@/lib/format";
+import { projectStatusLabel } from "@/lib/projectStatus";
 import { ProjectReportActions } from "@/components/ProjectReportActions";
 import { ProjectMemoProvider } from "@/components/ProjectMemoProvider";
 import { ReportCloseButton } from "@/components/ReportCloseButton";
@@ -7,8 +9,13 @@ import { ReportMemoField } from "@/components/ReportMemoField";
 
 export async function ProjectProfitReport({ projectId, closeHref }: { projectId: string; closeHref: string }) {
   const supabase = await createClient();
-  const { data: project } = await supabase.from("projects").select("*").eq("id", projectId).single();
+  const { data: project } = await supabase.from("projects").select("*, sites(name)").eq("id", projectId).single();
   if (!project) return null;
+
+  const siteName = (one(project.sites) as { name: string } | undefined)?.name;
+  const { data: parentProject } = project.parent_project_id
+    ? await supabase.from("projects").select("name, project_code").eq("id", project.parent_project_id).single()
+    : { data: null };
 
   const { data: children } = await supabase.from("projects").select("*").eq("parent_project_id", projectId);
   const group = [project, ...(children ?? [])];
@@ -47,6 +54,16 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
     ["이익율", margin === null ? "-" : `${margin.toFixed(2)}%`],
   ];
 
+  const parentLabel = parentProject
+    ? `${parentProject.project_code ? `${parentProject.project_code} ` : ""}${parentProject.name}`
+    : null;
+
+  const infoLines = [
+    `현장: ${siteName ?? "-"}    상태: ${projectStatusLabel(project.status)}`,
+    `기간: ${formatDate(project.start_date)} ~ ${formatDate(project.end_date)}    발주서일자: ${formatDate(project.order_date)}`,
+    ...(parentLabel ? [`귀속 프로젝트: ${parentLabel}`] : []),
+  ];
+
   return (
     <ProjectMemoProvider projectId={project.id} initialMemo={project.memo ?? ""} closeHref={closeHref}>
     <div className="space-y-4">
@@ -61,11 +78,17 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
               </span>
             )}
           </h2>
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
+            {infoLines.map((line) => (
+              <span key={line}>{line}</span>
+            ))}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <ProjectReportActions
             filename={`${project.project_code ?? project.name}_손익보고서`}
             title={`${project.project_code ?? ""} ${project.name}`.trim()}
+            infoLines={infoLines}
             exportRows={exportRows}
             summaryRows={summaryRows}
           />

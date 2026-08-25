@@ -9,6 +9,7 @@ import { SitesSection } from "@/components/sections/SitesSection";
 import { YearFilter } from "@/components/YearFilter";
 import { ProjectProfitReport } from "@/components/ProjectProfitReport";
 import { LinkButton } from "@/components/ui/Button";
+import { PROJECT_STATUS_OPTIONS } from "@/lib/projectStatus";
 
 const TABS = [
   { key: "list", label: "프로젝트" },
@@ -49,7 +50,7 @@ async function ProjectListSection({ year, siteId, report }: { year?: string; sit
 
   const [{ data: sites }, { data: allProjects }, { data: projects }, { data: allYears }] = await Promise.all([
     supabase.from("sites").select("id, name, clients(name)").order("name"),
-    supabase.from("projects").select("id, name"),
+    supabase.from("projects").select("id, name, year, site_id"),
     projectsQuery,
     supabase.from("projects").select("year"),
   ]);
@@ -58,44 +59,66 @@ async function ProjectListSection({ year, siteId, report }: { year?: string; sit
     const clientName = (one(s.clients) as { name: string } | undefined)?.name;
     return { value: s.id, label: clientName ? `${clientName} · ${s.name}` : s.name };
   });
+  const siteLabelMap = new Map(siteOptions.map((s) => [s.value, s.label]));
+
+  const parentProjectOptions = (allProjects ?? []).map((p) => ({
+    value: p.id,
+    label: p.name,
+    year: p.year,
+    siteLabel: siteLabelMap.get(p.site_id) ?? "미지정 현장",
+  }));
+
+  const projectIds = (projects ?? []).map((p) => p.id);
+  const { data: purchaseRows } = projectIds.length
+    ? await supabase
+        .from("transactions")
+        .select("project_id, purchase_amount, purchase_vat")
+        .eq("type", "매입")
+        .in("project_id", projectIds)
+    : { data: [] as { project_id: string | null; purchase_amount: number; purchase_vat: number }[] };
+
+  const purchaseByProject = new Map<string, number>();
+  for (const t of purchaseRows ?? []) {
+    if (!t.project_id) continue;
+    purchaseByProject.set(t.project_id, (purchaseByProject.get(t.project_id) ?? 0) + t.purchase_amount + t.purchase_vat);
+  }
 
   const fields: FieldConfig[] = [
-    { name: "project_code", label: "프로젝트번호", readOnly: true },
+    { name: "project_code", label: "프로젝트번호", readOnly: true, width: "7%" },
     {
       name: "site_id",
       label: "현장",
       type: "select",
       required: true,
       options: siteOptions,
+      width: "10%",
     },
-    { name: "name", label: "프로젝트명", required: true },
+    { name: "name", label: "프로젝트명", required: true, width: "13%" },
     {
       name: "parent_project_id",
       label: "귀속 프로젝트 (비용 합산 대상)",
-      type: "select",
-      options: [{ value: "", label: "없음" }, ...(allProjects ?? []).map((p) => ({ value: p.id, label: p.name }))],
+      tableLabel: "귀속",
+      type: "project-search",
+      projectSearchOptions: parentProjectOptions,
+      width: "5%",
     },
     {
       name: "status",
       label: "상태",
       type: "select",
-      options: [
-        { value: "review", label: "검토중" },
-        { value: "ongoing", label: "진행중" },
-        { value: "done", label: "완료" },
-        { value: "merged", label: "타 프로젝트 귀속" },
-        { value: "etc", label: "기타" },
-      ],
+      options: PROJECT_STATUS_OPTIONS,
+      width: "6%",
     },
-    { name: "is_service", label: "서비스(무상) 작업", type: "checkbox" },
-    { name: "start_date", label: "시작일", type: "date" },
-    { name: "end_date", label: "완료일", type: "date" },
-    { name: "order_date", label: "발주서일자", type: "date" },
-    { name: "quote_amount", label: "발주액", type: "number" },
-    { name: "contract_amount", label: "수주액", type: "number" },
-    { name: "progress_pct", label: "진행률(%)", type: "number", display: "progress" },
-    { name: "year", label: "연도", type: "number", required: true },
-    { name: "memo", label: "메모", type: "textarea" },
+    { name: "is_service", label: "서비스(무상) 작업", tableLabel: "무상", type: "checkbox", width: "5%" },
+    { name: "start_date", label: "시작일", type: "date", hideInTable: true },
+    { name: "end_date", label: "완료일", type: "date", width: "7%" },
+    { name: "order_date", label: "발주서일자", type: "date", hideInTable: true },
+    { name: "quote_amount", label: "발주액", type: "number", format: "currency", width: "8%" },
+    { name: "contract_amount", label: "수주액", type: "number", format: "currency", hideInTable: true },
+    { name: "profit", label: "이익금", readOnly: true, format: "currency", width: "8%" },
+    { name: "progress_pct", label: "진행률(%)", type: "number", display: "progress", width: "8%" },
+    { name: "year", label: "연도", type: "number", required: true, width: "5%" },
+    { name: "memo", label: "메모", type: "textarea", width: "10%" },
   ];
 
   const years = Array.from(
@@ -120,7 +143,11 @@ async function ProjectListSection({ year, siteId, report }: { year?: string; sit
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <EntityTable
             fields={fields}
-            rows={(projects ?? []).map((p) => ({ ...p, site_name: (one(p.sites) as { name: string } | undefined)?.name }))}
+            rows={(projects ?? []).map((p) => ({
+              ...p,
+              site_name: (one(p.sites) as { name: string } | undefined)?.name,
+              profit: p.contract_amount ? p.contract_amount - (purchaseByProject.get(p.id) ?? 0) : null,
+            }))}
             updateAction={updateProjectRecord}
             deleteAction={deleteProjectRecord}
             extraActions={Object.fromEntries(

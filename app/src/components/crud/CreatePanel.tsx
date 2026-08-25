@@ -36,6 +36,9 @@ export function CreatePanel({
           createAction(fd);
           setOpen(false);
         }}
+        onSubmit={(e) => {
+          if (!confirm(`${title}을(를) 추가하시겠습니까?`)) e.preventDefault();
+        }}
         className="space-y-3"
       >
         <EntityForm fields={fields} />
