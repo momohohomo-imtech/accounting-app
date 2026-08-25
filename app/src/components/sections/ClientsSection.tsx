@@ -17,6 +17,7 @@ const fields: FieldConfig[] = [
     ],
   },
   { name: "phone", label: "연락처", type: "tel" },
+  { name: "default_item_name", label: "기본 품목", placeholder: "예: A제품 (거래 등록 시 자동 입력)" },
   { name: "memo", label: "메모", type: "textarea" },
 ];
 

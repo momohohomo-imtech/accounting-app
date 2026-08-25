@@ -6,6 +6,21 @@ import type { ExpenseCategory, PaymentMethod, Transaction } from "@/lib/types";
 import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components/ProjectPicker";
 
 type Option = { id: string; name: string };
+type ClientOption = Option & { default_item_name?: string | null };
+
+function formatThousands(raw: string) {
+  if (!raw) return "";
+  const [intPart, decPart] = raw.split(".");
+  const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return decPart !== undefined ? `${withCommas}.${decPart}` : withCommas;
+}
+
+function parseNumericInput(display: string) {
+  const cleaned = display.replace(/[^\d.]/g, "");
+  const firstDot = cleaned.indexOf(".");
+  if (firstDot === -1) return cleaned;
+  return cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, "");
+}
 
 export function TransactionForm({
   clients,
@@ -15,14 +30,16 @@ export function TransactionForm({
   expenseCategories,
   initial,
   action,
+  redirectTo = "/transactions",
 }: {
-  clients: Option[];
+  clients: ClientOption[];
   sites: SiteOption[];
   projects: ProjectOption[];
   paymentMethods: PaymentMethod[];
   expenseCategories: ExpenseCategory[];
   initial?: Transaction;
   action: (formData: FormData) => Promise<{ error?: string } | void>;
+  redirectTo?: string;
 }) {
   const router = useRouter();
   const initialAmount = initial
@@ -59,6 +76,37 @@ export function TransactionForm({
 
   function set<K extends keyof typeof values>(key: K, v: (typeof values)[K]) {
     setValues((prev) => ({ ...prev, [key]: v }));
+  }
+
+  function handleClientSelect(clientId: string) {
+    const client = clients.find((c) => c.id === clientId);
+    setValues((prev) => ({
+      ...prev,
+      client_id: clientId,
+      item_name: client?.default_item_name ? client.default_item_name : prev.item_name,
+    }));
+  }
+
+  function handleQuantity(v: string) {
+    setValues((prev) => {
+      const next = { ...prev, quantity: v };
+      if (v && prev.unit_price) {
+        const total = Number(v) * Number(prev.unit_price);
+        if (!Number.isNaN(total)) next.amount = String(total);
+      }
+      return next;
+    });
+  }
+
+  function handleUnitPrice(v: string) {
+    setValues((prev) => {
+      const next = { ...prev, unit_price: v };
+      if (prev.quantity && v) {
+        const total = Number(prev.quantity) * Number(v);
+        if (!Number.isNaN(total)) next.amount = String(total);
+      }
+      return next;
+    });
   }
 
   async function handleFile(file: File) {
@@ -116,7 +164,7 @@ export function TransactionForm({
       setError(result.error);
       return;
     }
-    router.push("/transactions");
+    router.push(redirectTo);
     router.refresh();
   }
 
@@ -157,7 +205,7 @@ export function TransactionForm({
           </select>
         </Field>
         <Field label="거래처 (등록됨)">
-          <select value={values.client_id} onChange={(e) => set("client_id", e.target.value)} className={inputClass}>
+          <select value={values.client_id} onChange={(e) => handleClientSelect(e.target.value)} className={inputClass}>
             <option value="">선택 안함</option>
             {clients.map((c) => (
               <option key={c.id} value={c.id}>
@@ -195,17 +243,19 @@ export function TransactionForm({
         </Field>
         <Field label="수량">
           <input
-            type="number"
-            value={values.quantity}
-            onChange={(e) => set("quantity", e.target.value)}
+            type="text"
+            inputMode="decimal"
+            value={formatThousands(values.quantity)}
+            onChange={(e) => handleQuantity(parseNumericInput(e.target.value))}
             className={inputClass}
           />
         </Field>
         <Field label="단가">
           <input
-            type="number"
-            value={values.unit_price}
-            onChange={(e) => set("unit_price", e.target.value)}
+            type="text"
+            inputMode="decimal"
+            value={formatThousands(values.unit_price)}
+            onChange={(e) => handleUnitPrice(parseNumericInput(e.target.value))}
             className={inputClass}
           />
         </Field>
@@ -236,10 +286,11 @@ export function TransactionForm({
         </Field>
         <Field label="총 금액" required>
           <input
-            type="number"
+            type="text"
+            inputMode="decimal"
             required
-            value={values.amount}
-            onChange={(e) => set("amount", e.target.value)}
+            value={formatThousands(values.amount)}
+            onChange={(e) => set("amount", parseNumericInput(e.target.value))}
             className={inputClass}
           />
         </Field>
@@ -278,7 +329,7 @@ export function TransactionForm({
         </button>
         <button
           type="button"
-          onClick={() => router.push("/transactions")}
+          onClick={() => router.push(redirectTo)}
           className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
         >
           {initial ? "수정 취소" : "취소"}

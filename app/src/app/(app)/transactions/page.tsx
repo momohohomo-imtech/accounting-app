@@ -9,6 +9,7 @@ import { YearMonthFilter } from "@/components/YearMonthFilter";
 import { TransactionTable } from "@/components/TransactionTable";
 import { TransactionExportButtons } from "@/components/TransactionExportButtons";
 import { ProjectTreeFilter } from "@/components/ProjectTreeFilter";
+import { TransactionBulkImport } from "@/components/TransactionBulkImport";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { LinkButton } from "@/components/ui/Button";
@@ -91,10 +92,22 @@ async function TransactionListSection({
   if (type) query = query.eq("type", type);
   if (project_id) query = query.eq("project_id", project_id);
 
-  const [{ data: transactions }, { data: projectTree }, { data: latestTx }] = await Promise.all([
+  const [
+    { data: transactions },
+    { data: projectTree },
+    { data: latestTx },
+    { data: importClients },
+    { data: importProjects },
+    { data: importPaymentMethods },
+    { data: importExpenseCategories },
+  ] = await Promise.all([
     query,
     supabase.from("projects").select("id, name, year, site_id, sites(name, clients(name))").order("name"),
     supabase.from("transactions").select("trans_date").order("trans_date", { ascending: false }).limit(1),
+    supabase.from("clients").select("id, name").order("name"),
+    supabase.from("projects").select("id, name").order("name"),
+    supabase.from("payment_methods").select("id, name").order("sort_order"),
+    supabase.from("expense_categories").select("id, name").order("sort_order"),
   ]);
 
   const projectNodes = (projectTree ?? []).map((p) => {
@@ -128,6 +141,16 @@ async function TransactionListSection({
 
   return (
     <div className="space-y-4">
+      <Card className="print:hidden">
+        <h2 className="mb-3 font-semibold text-slate-900">엑셀로 여러 거래 한 번에 등록 (AI 자동 인식)</h2>
+        <TransactionBulkImport
+          clients={importClients ?? []}
+          projects={importProjects ?? []}
+          paymentMethods={importPaymentMethods ?? []}
+          expenseCategories={importExpenseCategories ?? []}
+        />
+      </Card>
+
       <div className="flex flex-wrap items-end justify-between gap-3">
         <YearMonthFilter years={years} selectedYear={selectedYear} selectedMonth={selectedMonth} />
         <div className="flex flex-wrap items-center gap-3 print:hidden">

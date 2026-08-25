@@ -8,6 +8,7 @@ function parse(formData: FormData) {
     name: String(formData.get("name") ?? ""),
     type: String(formData.get("type") ?? "both"),
     phone: String(formData.get("phone") ?? "") || null,
+    default_item_name: String(formData.get("default_item_name") ?? "") || null,
     memo: String(formData.get("memo") ?? "") || null,
   };
 }

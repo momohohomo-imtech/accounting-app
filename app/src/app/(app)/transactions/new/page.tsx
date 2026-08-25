@@ -7,7 +7,7 @@ export default async function NewTransactionPage() {
   const supabase = await createClient();
   const [{ data: clients }, { data: sites }, { data: projects }, { data: paymentMethods }, { data: expenseCategories }] =
     await Promise.all([
-      supabase.from("clients").select("id, name").order("name"),
+      supabase.from("clients").select("id, name, default_item_name").order("name"),
       supabase.from("sites").select("id, name, clients(name)").order("name"),
       supabase.from("projects").select("id, name, site_id, status, year, project_code").order("name"),
       supabase.from("payment_methods").select("*").order("sort_order"),

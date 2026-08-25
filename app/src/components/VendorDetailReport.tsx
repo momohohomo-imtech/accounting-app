@@ -9,11 +9,13 @@ export function VendorDetailReport({
   year,
   rows,
   closeHref,
+  editHrefFor,
 }: {
   vendorName: string;
   year: number;
   rows: VendorRow[];
   closeHref: string;
+  editHrefFor?: (id: string) => string;
 }) {
   const total = rows.reduce((s, r) => s + r.amount, 0);
   const exportRows = rows.map((r) => [formatDate(r.trans_date), r.item_name ?? "-", r.amount]);
@@ -39,6 +41,7 @@ export function VendorDetailReport({
               <th className="pb-2 pr-4">날짜</th>
               <th className="pb-2 pr-4">품목</th>
               <th className="pb-2 text-right">금액</th>
+              {editHrefFor && <th className="pb-2 pl-4 text-right print:hidden">관리</th>}
             </tr>
           </thead>
           <tbody>
@@ -47,11 +50,21 @@ export function VendorDetailReport({
                 <td className="py-2 pr-4 text-slate-600">{formatDate(r.trans_date)}</td>
                 <td className="py-2 pr-4 text-slate-700">{r.item_name ?? "-"}</td>
                 <td className="py-2 text-right font-mono text-slate-900">{formatWon(r.amount)}</td>
+                {editHrefFor && (
+                  <td className="py-2 pl-4 text-right print:hidden">
+                    <Link
+                      href={editHrefFor(r.id)}
+                      className="text-xs text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
+                    >
+                      수정
+                    </Link>
+                  </td>
+                )}
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={3} className="py-6 text-center text-slate-400">
+                <td colSpan={editHrefFor ? 4 : 3} className="py-6 text-center text-slate-400">
                   매입 내역이 없습니다.
                 </td>
               </tr>

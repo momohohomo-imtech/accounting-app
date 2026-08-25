@@ -92,6 +92,61 @@ export async function updateTransactionRecord(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+export type BulkTransactionInput = {
+  trans_date: string;
+  type: string;
+  client_id: string | null;
+  client_name_raw: string | null;
+  project_id: string | null;
+  item_name: string | null;
+  category_id: string | null;
+  quantity: number | null;
+  unit_price: number | null;
+  payment_method_id: string | null;
+  payment_type: string;
+  tax_invoice_issued: boolean;
+  vat_included: boolean;
+  amount: number;
+  note1: string | null;
+  note2: string | null;
+};
+
+export async function bulkImportTransactions(rows: BulkTransactionInput[]) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (rows.length === 0) return { error: "등록할 행이 없습니다." };
+
+  const inserts = rows.map((r) => ({
+    trans_date: r.trans_date,
+    type: r.type,
+    client_id: r.client_id,
+    client_name_raw: r.client_name_raw,
+    project_id: r.project_id,
+    item_name: r.item_name,
+    category_id: r.category_id,
+    quantity: r.quantity,
+    unit_price: r.unit_price,
+    payment_method_id: r.payment_method_id,
+    tax_invoice_issued: r.tax_invoice_issued,
+    vat_included: r.vat_included,
+    ...computeAmounts(r.type, r.amount, r.vat_included),
+    payment_type: r.payment_type,
+    is_verified_ai: true,
+    note1: r.note1,
+    note2: r.note2,
+    created_by: user?.id ?? null,
+  }));
+
+  const { error } = await supabase.from("transactions").insert(inserts);
+  if (error) return { error: error.message };
+
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
+}
+
 export async function bulkUpdateProjectId(formData: FormData) {
   const supabase = await createClient();
   const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);

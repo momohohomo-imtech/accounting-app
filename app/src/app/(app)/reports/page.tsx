@@ -9,6 +9,10 @@ import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { AutoPrint } from "@/components/AutoPrint";
 import { ReportAIInsights } from "@/components/ReportAIInsights";
 import { VendorAggregateTable } from "@/components/VendorAggregateTable";
+import { TransactionForm } from "@/components/TransactionForm";
+import { updateTransactionRecord } from "@/lib/actions/transactions";
+import type { ExpenseCategory, PaymentMethod, Transaction } from "@/lib/types";
+import type { ProjectOption } from "@/components/ProjectPicker";
 
 const MONTH_LABELS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
 
@@ -35,9 +39,16 @@ function one<T>(v: T | T[] | null): T | null {
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string; project?: string; vendor?: string; site?: string; printProjects?: string }>;
+  searchParams: Promise<{
+    year?: string;
+    project?: string;
+    vendor?: string;
+    site?: string;
+    printProjects?: string;
+    editTx?: string;
+  }>;
 }) {
-  const { year, project, vendor, site, printProjects } = await searchParams;
+  const { year, project, vendor, site, printProjects, editTx } = await searchParams;
   const currentYear = new Date().getFullYear();
   const selectedYear = year ? Number(year) : currentYear;
 
@@ -53,6 +64,41 @@ export default async function ReportsPage({
   ]);
 
   const transactions = (rawTx ?? []) as unknown as Row[];
+
+  let editTxData: {
+    transaction: Transaction;
+    clients: { id: string; name: string; default_item_name: string | null }[];
+    sites: { id: string; name: string; client_name: string | null }[];
+    projects: ProjectOption[];
+    paymentMethods: PaymentMethod[];
+    expenseCategories: ExpenseCategory[];
+  } | null = null;
+
+  if (editTx) {
+    const [{ data: editClients }, { data: editSites }, { data: editProjects }, { data: paymentMethods }, { data: expenseCategories }, { data: tx }] =
+      await Promise.all([
+        supabase.from("clients").select("id, name, default_item_name").order("name"),
+        supabase.from("sites").select("id, name, clients(name)").order("name"),
+        supabase.from("projects").select("id, name, site_id, status, year, project_code").order("name"),
+        supabase.from("payment_methods").select("*").order("sort_order"),
+        supabase.from("expense_categories").select("*").order("sort_order"),
+        supabase.from("transactions").select("*").eq("id", editTx).single(),
+      ]);
+    if (tx) {
+      editTxData = {
+        transaction: tx,
+        clients: editClients ?? [],
+        sites: (editSites ?? []).map((s) => ({
+          id: s.id,
+          name: s.name,
+          client_name: (one(s.clients) as { name: string } | undefined)?.name ?? null,
+        })),
+        projects: editProjects ?? [],
+        paymentMethods: paymentMethods ?? [],
+        expenseCategories: expenseCategories ?? [],
+      };
+    }
+  }
 
   const firstYear = Math.min(
     firstTx?.[0]?.trans_date ? Number(firstTx[0].trans_date.slice(0, 4)) : currentYear,
@@ -306,7 +352,31 @@ export default async function ReportsPage({
       {vendor && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:static print:bg-transparent print:p-0">
           <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
-            <VendorDetailReport vendorName={vendor} year={selectedYear} rows={vendorRows} closeHref={`/reports?year=${selectedYear}`} />
+            <VendorDetailReport
+              vendorName={vendor}
+              year={selectedYear}
+              rows={vendorRows}
+              closeHref={`/reports?year=${selectedYear}`}
+              editHrefFor={(id) => `/reports?year=${selectedYear}&vendor=${encodeURIComponent(vendor)}&editTx=${id}`}
+            />
+          </div>
+        </div>
+      )}
+
+      {editTxData && (
+        <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 py-10 print:static print:bg-transparent print:p-0">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl print:max-w-none print:rounded-none print:shadow-none">
+            <h2 className="mb-4 text-lg font-semibold text-slate-900">거래 수정</h2>
+            <TransactionForm
+              clients={editTxData.clients}
+              sites={editTxData.sites}
+              projects={editTxData.projects}
+              paymentMethods={editTxData.paymentMethods}
+              expenseCategories={editTxData.expenseCategories}
+              initial={editTxData.transaction}
+              action={updateTransactionRecord}
+              redirectTo={`/reports?year=${selectedYear}&vendor=${encodeURIComponent(vendor ?? "")}`}
+            />
           </div>
         </div>
       )}
