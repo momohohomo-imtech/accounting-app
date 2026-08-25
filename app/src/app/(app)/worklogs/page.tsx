@@ -24,16 +24,13 @@ export default async function WorkLogsPage({
   const lastDay = new Date(selectedYear, selectedMonth, 0).getDate();
   const monthEnd = `${selectedYear}-${pad(selectedMonth)}-${pad(lastDay)}`;
 
-  const [{ data: logs }, { data: firstLog }] = await Promise.all([
-    supabase
-      .from("work_logs")
-      .select("*")
-      .gte("log_date", monthStart)
-      .lte("log_date", monthEnd)
-      .order("log_date", { ascending: true })
-      .order("sort_order", { ascending: true }),
-    supabase.from("work_logs").select("log_date").order("log_date", { ascending: true }).limit(1),
-  ]);
+  const { data: logs } = await supabase
+    .from("work_logs")
+    .select("*")
+    .gte("log_date", monthStart)
+    .lte("log_date", monthEnd)
+    .order("log_date", { ascending: true })
+    .order("sort_order", { ascending: true });
 
   const rows = (logs ?? []) as WorkLog[];
   const logsByDate = new Map<string, WorkLog[]>();
@@ -42,14 +39,6 @@ export default async function WorkLogsPage({
     arr.push(l);
     logsByDate.set(l.log_date, arr);
   }
-
-  const firstYear = Math.min(
-    firstLog?.[0]?.log_date ? Number(firstLog[0].log_date.slice(0, 4)) : now.getFullYear(),
-    now.getFullYear()
-  );
-  const years = Array.from({ length: now.getFullYear() - firstYear + 2 }, (_, i) => now.getFullYear() + 1 - i);
-  if (!years.includes(selectedYear)) years.unshift(selectedYear);
-  years.sort((a, b) => b - a);
 
   const weeks = buildMonthGrid(selectedYear, selectedMonth);
   const basePath = `/worklogs?year=${selectedYear}&month=${selectedMonth}`;
@@ -68,7 +57,7 @@ export default async function WorkLogsPage({
       </div>
 
       <div className="print:hidden">
-        <WorkLogMonthFilter year={selectedYear} month={selectedMonth} years={years} />
+        <WorkLogMonthFilter year={selectedYear} month={selectedMonth} />
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm print:rounded-none print:border-0 print:shadow-none">
