@@ -128,7 +128,9 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
                       <Badge variant={STATUS_VARIANT[it.status]} className="w-16 shrink-0 justify-center">
                         {it.status}
                       </Badge>
-                      <span className="w-28 shrink-0 truncate text-slate-500">{it.project_name ?? "일반경비"}</span>
+                      <span className="w-28 shrink-0 truncate text-slate-500">
+                        {it.project_name ?? <span className="font-medium text-red-600">일반경비</span>}
+                      </span>
                       <span className="flex-1 truncate text-slate-700">{it.item_name ?? "-"}</span>
                       <span className="w-20 shrink-0 truncate text-right text-slate-400">{it.methodName ?? ""}</span>
                       <span className="w-28 shrink-0 text-right font-medium text-slate-900">{formatWon(it.amount)}</span>

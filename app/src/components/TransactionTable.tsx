@@ -234,7 +234,9 @@ export function TransactionTable({
                 <Badge variant={t.type === "매출" ? "blue" : "orange"}>{t.type}</Badge>
               </Td>
               <Td className="pr-4">{t.clients?.name ?? t.client_name_raw ?? "-"}</Td>
-              <Td className="pr-4">{t.projects?.name ?? "일반경비"}</Td>
+              <Td className="pr-4">
+                {t.projects?.name ?? <span className="font-medium text-red-600">일반경비</span>}
+              </Td>
               <Td className="pr-4">{t.item_name ?? "-"}</Td>
               <Td className="pr-4">{t.payment_methods?.name ?? "-"}</Td>
               <Td className="pr-4">

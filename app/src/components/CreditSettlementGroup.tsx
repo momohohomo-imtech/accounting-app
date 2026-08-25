@@ -56,7 +56,9 @@ export function CreditSettlementGroup({
               className="h-4 w-4 accent-slate-900"
             />
             <span className="w-24 shrink-0 text-slate-500">{formatDate(tx.trans_date)}</span>
-            <span className="w-28 shrink-0 truncate text-slate-500">{tx.projects?.name ?? "일반경비"}</span>
+            <span className="w-28 shrink-0 truncate text-slate-500">
+              {tx.projects?.name ?? <span className="font-medium text-red-600">일반경비</span>}
+            </span>
             <span className="flex-1 truncate text-slate-700">{tx.item_name ?? "-"}</span>
             <span className="shrink-0 font-medium text-slate-900">{formatWon(remaining)}</span>
             <LinkButton href={`/transactions/${tx.id}/edit`} variant="secondary" size="xs">
