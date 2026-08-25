@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/format";
 import { BackupNowButton } from "@/components/BackupNowButton";
 import { RestoreBackupButton } from "@/components/RestoreBackupButton";
-import { deleteBackupRecord } from "@/lib/actions/backups";
+import { DeleteBackupButton } from "@/components/DeleteBackupButton";
 
 export default async function BackupsPage() {
   const supabase = await createClient();
@@ -57,20 +57,7 @@ export default async function BackupsPage() {
                         </a>
                       )}
                       <RestoreBackupButton fileName={b.file_name} />
-                      <form
-                        action={async (fd) => {
-                          await deleteBackupRecord(fd);
-                        }}
-                        onSubmit={(e) => {
-                          if (!confirm(`이 백업(${b.file_name})을 삭제하시겠습니까?`)) e.preventDefault();
-                        }}
-                      >
-                        <input type="hidden" name="id" value={b.id} />
-                        <input type="hidden" name="fileName" value={b.file_name} />
-                        <button className="rounded-lg border border-red-200 px-2.5 py-1 text-xs text-red-600 hover:bg-red-50">
-                          삭제
-                        </button>
-                      </form>
+                      <DeleteBackupButton id={b.id} fileName={b.file_name} />
                     </div>
                   </td>
                 </tr>
