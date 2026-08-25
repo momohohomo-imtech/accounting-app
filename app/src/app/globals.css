@@ -25,6 +25,10 @@ textarea {
   color: #0f172a;
 }
 
+@page {
+  size: A4;
+}
+
 @media print {
   aside {
     display: none !important;

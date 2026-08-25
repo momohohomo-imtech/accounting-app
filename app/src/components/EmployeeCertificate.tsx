@@ -107,11 +107,12 @@ export function EmployeeCertificate({ employee, closeHref }: { employee: Employe
 
         <p className="text-center text-sm leading-relaxed text-slate-700">위 사람은 본 사업장에 재직 중임을 증명합니다.</p>
 
-        <p className="text-center text-sm text-slate-700">{todayLabel}</p>
-
-        <div className="pt-8 text-center text-sm text-slate-900">
-          <p className="font-semibold">{companyName || "-"}</p>
-          {representativeName && <p className="mt-1">대표 {representativeName} (인)</p>}
+        <div className="pt-20 text-center">
+          <p className="text-sm text-slate-700">{todayLabel}</p>
+          <div className="mt-6 text-sm text-slate-900">
+            <p className="font-semibold">{companyName || "-"}</p>
+            {representativeName && <p className="mt-1">대표 {representativeName} (인)</p>}
+          </div>
         </div>
       </div>
     </div>
