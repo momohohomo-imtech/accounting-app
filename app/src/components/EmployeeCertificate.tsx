@@ -12,6 +12,8 @@ type EmployeeInfo = {
   department: string | null;
   role: string | null;
   hired_date: string | null;
+  birth_date: string | null;
+  address: string | null;
 };
 
 export function EmployeeCertificate({ employee, closeHref }: { employee: EmployeeInfo; closeHref: string }) {
@@ -76,15 +78,21 @@ export function EmployeeCertificate({ employee, closeHref }: { employee: Employe
               <td className="py-2.5 pl-3 text-slate-900">{employee.employee_no ?? "-"}</td>
             </tr>
             <tr className="border-b border-slate-300">
+              <td className="bg-slate-50 py-2.5 pl-3 font-medium text-slate-600">생년월일</td>
+              <td className="py-2.5 pl-3 text-slate-900">{formatDate(employee.birth_date)}</td>
+              <td className="bg-slate-50 py-2.5 pl-3 font-medium text-slate-600">입사일</td>
+              <td className="py-2.5 pl-3 text-slate-900">{formatDate(employee.hired_date)}</td>
+            </tr>
+            <tr className="border-b border-slate-300">
               <td className="bg-slate-50 py-2.5 pl-3 font-medium text-slate-600">부서</td>
               <td className="py-2.5 pl-3 text-slate-900">{employee.department ?? "-"}</td>
               <td className="bg-slate-50 py-2.5 pl-3 font-medium text-slate-600">직위</td>
               <td className="py-2.5 pl-3 text-slate-900">{employee.role ?? "-"}</td>
             </tr>
             <tr className="border-b border-slate-300">
-              <td className="bg-slate-50 py-2.5 pl-3 font-medium text-slate-600">입사일</td>
+              <td className="bg-slate-50 py-2.5 pl-3 font-medium text-slate-600">주소</td>
               <td className="py-2.5 pl-3 text-slate-900" colSpan={3}>
-                {formatDate(employee.hired_date)}
+                {employee.address ?? "-"}
               </td>
             </tr>
             <tr className="border-b-2 border-slate-900">
