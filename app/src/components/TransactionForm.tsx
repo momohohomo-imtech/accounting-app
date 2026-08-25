@@ -288,13 +288,22 @@ export function TransactionForm({
         </Field>
       </div>
 
-      <button
-        type="submit"
-        disabled={uploading}
-        className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
-      >
-        {uploading ? "업로드 중..." : initial ? "수정 저장" : "거래 등록"}
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="submit"
+          disabled={uploading}
+          className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
+        >
+          {uploading ? "업로드 중..." : initial ? "수정 저장" : "거래 등록"}
+        </button>
+        <button
+          type="button"
+          onClick={() => router.push("/transactions")}
+          className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
+        >
+          {initial ? "수정 취소" : "취소"}
+        </button>
+      </div>
     </form>
   );
 }
