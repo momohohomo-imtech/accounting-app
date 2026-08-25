@@ -112,11 +112,28 @@ export type WorkLog = {
 
 export type Employee = {
   id: string;
+  employee_no: string | null;
   name: string;
   role: string | null;
+  department: string | null;
   employment_type: string | null;
   hired_date: string | null;
+  resigned_date: string | null;
   phone: string | null;
+  home_phone: string | null;
+  address: string | null;
+  memo: string | null;
+  emergency1_relation: string | null;
+  emergency1_phone: string | null;
+  emergency2_relation: string | null;
+  emergency2_phone: string | null;
+  monthly_salary: number | null;
+  health_insurance: number;
+  long_term_care_insurance: number;
+  employment_insurance: number;
+  income_tax: number;
+  local_income_tax: number;
+  rural_tax: number;
   created_at: string;
 };
 
@@ -126,6 +143,14 @@ export type Payroll = {
   pay_month: string;
   work_days: number | null;
   amount: number;
+  bonus: number;
+  health_insurance: number;
+  long_term_care_insurance: number;
+  employment_insurance: number;
+  income_tax: number;
+  local_income_tax: number;
+  rural_tax: number;
+  non_taxable_unreported: number;
   created_at: string;
   employees?: Employee;
 };

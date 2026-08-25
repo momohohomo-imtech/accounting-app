@@ -5,11 +5,28 @@ import { createClient } from "@/lib/supabase/server";
 
 function parse(formData: FormData) {
   return {
+    employee_no: String(formData.get("employee_no") ?? "") || null,
     name: String(formData.get("name") ?? ""),
     role: String(formData.get("role") ?? "") || null,
+    department: String(formData.get("department") ?? "") || null,
     employment_type: String(formData.get("employment_type") ?? "") || null,
     hired_date: String(formData.get("hired_date") ?? "") || null,
+    resigned_date: String(formData.get("resigned_date") ?? "") || null,
     phone: String(formData.get("phone") ?? "") || null,
+    home_phone: String(formData.get("home_phone") ?? "") || null,
+    address: String(formData.get("address") ?? "") || null,
+    memo: String(formData.get("memo") ?? "") || null,
+    emergency1_relation: String(formData.get("emergency1_relation") ?? "") || null,
+    emergency1_phone: String(formData.get("emergency1_phone") ?? "") || null,
+    emergency2_relation: String(formData.get("emergency2_relation") ?? "") || null,
+    emergency2_phone: String(formData.get("emergency2_phone") ?? "") || null,
+    monthly_salary: formData.get("monthly_salary") ? Number(formData.get("monthly_salary")) : null,
+    health_insurance: Number(formData.get("health_insurance") ?? 0),
+    long_term_care_insurance: Number(formData.get("long_term_care_insurance") ?? 0),
+    employment_insurance: Number(formData.get("employment_insurance") ?? 0),
+    income_tax: Number(formData.get("income_tax") ?? 0),
+    local_income_tax: Number(formData.get("local_income_tax") ?? 0),
+    rural_tax: Number(formData.get("rural_tax") ?? 0),
   };
 }
 
@@ -40,6 +57,14 @@ export async function createPayrollRecord(formData: FormData) {
     pay_month: String(formData.get("pay_month")),
     work_days: formData.get("work_days") ? Number(formData.get("work_days")) : null,
     amount: Number(formData.get("amount") ?? 0),
+    bonus: Number(formData.get("bonus") ?? 0),
+    health_insurance: Number(formData.get("health_insurance") ?? 0),
+    long_term_care_insurance: Number(formData.get("long_term_care_insurance") ?? 0),
+    employment_insurance: Number(formData.get("employment_insurance") ?? 0),
+    income_tax: Number(formData.get("income_tax") ?? 0),
+    local_income_tax: Number(formData.get("local_income_tax") ?? 0),
+    rural_tax: Number(formData.get("rural_tax") ?? 0),
+    non_taxable_unreported: Number(formData.get("non_taxable_unreported") ?? 0),
   });
   revalidatePath("/employees");
 }
