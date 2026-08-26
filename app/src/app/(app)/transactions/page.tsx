@@ -14,6 +14,7 @@ import { TransactionEditPopup } from "@/components/TransactionEditPopup";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { LinkButton } from "@/components/ui/Button";
+import { formatWon } from "@/lib/format";
 import type { Transaction } from "@/lib/types";
 
 const TABS = [
@@ -52,10 +53,27 @@ export default async function TransactionsPage({
     return qs ? `/transactions?${qs}` : "/transactions";
   })();
 
+  const totals =
+    active === "list" ? await fetchTransactionTotals({ year, month, type, project_id }) : null;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-slate-900">매입매출·외상</h1>
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <h1 className="text-2xl font-bold text-slate-900">매입매출·외상</h1>
+          {totals && (
+            <div className="flex flex-wrap items-baseline gap-x-3 text-sm text-slate-500">
+              <span>
+                총 매입액{" "}
+                <span className="font-mono font-semibold text-slate-900">{formatWon(totals.purchase)}</span>
+              </span>
+              <span>
+                총 매출액{" "}
+                <span className="font-mono font-semibold text-slate-900">{formatWon(totals.sales)}</span>
+              </span>
+            </div>
+          )}
+        </div>
         {active === "list" && <LinkButton href="/transactions/new">+ 거래 등록</LinkButton>}
       </div>
 
@@ -72,6 +90,41 @@ export default async function TransactionsPage({
       <TransactionEditPopup editTx={editTx} redirectTo={redirectTo} />
     </div>
   );
+}
+
+async function fetchTransactionTotals({
+  year,
+  month,
+  type,
+  project_id,
+}: {
+  year?: string;
+  month?: string;
+  type?: string;
+  project_id?: string;
+}) {
+  const supabase = await createClient();
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const selectedYear = year ? Number(year) : currentYear;
+  const selectedMonth = month ?? "current";
+  const { start, end } = monthRange(selectedYear, selectedMonth, currentMonth);
+
+  let query = supabase
+    .from("transactions")
+    .select("purchase_amount, purchase_vat, sales_amount, sales_vat")
+    .neq("payment_type", "credit")
+    .gte("trans_date", start)
+    .lte("trans_date", end);
+  if (type) query = query.eq("type", type);
+  if (project_id) query = query.eq("project_id", project_id);
+
+  const { data } = await query;
+  return {
+    purchase: (data ?? []).reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0),
+    sales: (data ?? []).reduce((s, t) => s + t.sales_amount + t.sales_vat, 0),
+  };
 }
 
 function monthRange(selectedYear: number, monthParam: string, currentMonth: number) {
