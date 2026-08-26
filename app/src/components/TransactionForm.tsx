@@ -47,6 +47,7 @@ function parseNumericInput(display: string) {
 
 export function TransactionForm({
   clients,
+  rawClientNames = [],
   sites,
   projects,
   paymentMethods,
@@ -56,6 +57,7 @@ export function TransactionForm({
   redirectTo = "/transactions",
 }: {
   clients: ClientOption[];
+  rawClientNames?: string[];
   sites: SiteOption[];
   projects: ProjectOption[];
   paymentMethods: PaymentMethod[];
@@ -65,6 +67,9 @@ export function TransactionForm({
   redirectTo?: string;
 }) {
   const router = useRouter();
+  const clientNameSuggestions = Array.from(new Set([...clients.map((c) => c.name), ...rawClientNames])).sort((a, b) =>
+    a.localeCompare(b, "ko")
+  );
 
   const [values, setValues] = useState({
     trans_date: initial?.trans_date ?? new Date().toISOString().slice(0, 10),
@@ -357,8 +362,8 @@ export function TransactionForm({
             className={inputClass}
           />
           <datalist id="client-name-suggestions">
-            {clients.map((c) => (
-              <option key={c.id} value={c.name} />
+            {clientNameSuggestions.map((name) => (
+              <option key={name} value={name} />
             ))}
           </datalist>
         </Field>
