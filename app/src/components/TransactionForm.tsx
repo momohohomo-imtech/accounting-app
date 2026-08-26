@@ -96,9 +96,15 @@ export function TransactionForm({
   const [error, setError] = useState<string | null>(null);
   const [projectPopupIndex, setProjectPopupIndex] = useState<number | null>(null);
   const inputClass = "rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none";
-  const grandTotal = lineItems.reduce((s, li) => s + (Number(li.subtotal) || 0), 0);
   const selectedCategoryName = expenseCategories.find((c) => c.id === values.category_id)?.name;
   const vatExempt = selectedCategoryName ? VAT_EXEMPT_CATEGORIES.includes(selectedCategoryName) : false;
+  const vatAppliesNow = !vatExempt && values.vat_included;
+  // 실제 저장 시 각 줄마다 VAT를 반올림해서 더하는 computeAmounts와 동일한 방식으로 미리보기 합계를 계산.
+  const grandTotal = lineItems.reduce((s, li) => {
+    const base = Number(li.subtotal) || 0;
+    const vat = vatAppliesNow ? Math.round(base * 0.1) : 0;
+    return s + base + vat;
+  }, 0);
 
   function set<K extends keyof typeof values>(key: K, v: (typeof values)[K]) {
     setValues((prev) => ({ ...prev, [key]: v }));
@@ -532,7 +538,8 @@ export function TransactionForm({
         </div>
 
         <p className="mt-3 text-right text-sm font-semibold text-slate-900">
-          합계 <span className="ml-1 font-mono text-base">{formatWon(grandTotal)}</span>
+          합계{vatAppliesNow && <span className="ml-1 text-xs font-normal text-slate-400">(VAT 포함)</span>}
+          <span className="ml-1 font-mono text-base">{formatWon(grandTotal)}</span>
         </p>
       </div>
 
