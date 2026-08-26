@@ -17,7 +17,10 @@ function emptyLineItem(): LineItem {
 }
 
 function lineItemFromInitial(t: Transaction): LineItem {
-  const amount = t.type === "매출" ? t.sales_amount + t.sales_vat : t.purchase_amount + t.purchase_vat;
+  // 소계는 "VAT 얹기 전 원래 입력 금액"을 나타내는 값이라, 여기서도 purchase_vat/sales_vat를
+  // 더한 최종 합계가 아니라 base 금액만 보여줘야 함 — 안 그러면 체크된 채로 다시 저장할 때마다
+  // 10%가 중복으로 더 붙어버림(저장할 때마다 금액이 계속 불어나는 버그의 원인이었음).
+  const amount = t.type === "매출" ? t.sales_amount : t.purchase_amount;
   return {
     item_name: t.item_name ?? "",
     quantity: t.quantity?.toString() ?? "",
