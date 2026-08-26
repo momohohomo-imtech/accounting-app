@@ -59,7 +59,7 @@ async function WorkerListSection({ officeId }: { officeId?: string }) {
     },
     { name: "name", label: "이름", required: true },
     { name: "grade", label: "등급", width: "6%", redValue: "불량" },
-    { name: "birth_date", label: "생년월일", type: "date", hideInTable: true },
+    { name: "birth_date", label: "생년월일", type: "date" },
     {
       name: "resident_id_masked",
       label: "주민번호(마스킹)",
