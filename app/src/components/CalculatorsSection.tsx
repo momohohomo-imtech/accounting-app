@@ -227,6 +227,62 @@ function PercentDifferenceCalculator() {
   );
 }
 
+function UnitPriceCalculator() {
+  const [totalAmount, setTotalAmount] = useState("1000");
+  const [totalQty, setTotalQty] = useState("10");
+  const [unit, setUnit] = useState("개");
+  const [targetQty, setTargetQty] = useState("1");
+
+  const amount = Number(totalAmount) || 0;
+  const qty = Number(totalQty) || 0;
+  const target = Number(targetQty) || 0;
+  const unitPrice = qty !== 0 ? amount / qty : NaN;
+  const targetAmount = unitPrice * target;
+  const unitLabel = unit || "단위";
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>단가 계산기</CardTitle>
+      </CardHeader>
+      <p className="mb-3 text-xs text-slate-400">
+        총액과 총수량을 입력하면 1단위당 단가를 계산하고, 원하는 수량의 금액을 알려줍니다. (예: 1,000원이 10개
+        또는 350ml일 때, 1개나 20ml은 얼마인지)
+      </p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <CalcField
+          label="총액"
+          value={formatThousands(totalAmount)}
+          onChange={(v) => setTotalAmount(parseNumericInput(v))}
+          suffix="원"
+        />
+        <CalcField label="총수량" value={totalQty} onChange={(v) => setTotalQty(parseNumericInput(v))} suffix={unit || undefined} />
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-slate-500">단위</span>
+          <input
+            value={unit}
+            onChange={(e) => setUnit(e.target.value)}
+            placeholder="예: 개, ml, kg"
+            className={inputClass}
+          />
+        </label>
+      </div>
+      <div className="mt-3">
+        <CalcField
+          label={`확인할 수량`}
+          value={targetQty}
+          onChange={(v) => setTargetQty(parseNumericInput(v))}
+          suffix={unit || undefined}
+        />
+      </div>
+      <div className="mt-3 space-y-1.5">
+        <ResultRow label={`단가 (1${unitLabel}당)`} value={unitPrice} />
+        <ResultRow label={`${targetQty || 0}${unitLabel}의 금액`} value={targetAmount} />
+      </div>
+    </Card>
+  );
+}
+
 export function CalculatorsSection() {
   return (
     <div className="space-y-3">
@@ -237,6 +293,7 @@ export function CalculatorsSection() {
         <VatExtractCalculator />
         <PercentSubtractCalculator />
         <PercentDifferenceCalculator />
+        <UnitPriceCalculator />
       </div>
     </div>
   );
