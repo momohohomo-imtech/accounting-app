@@ -137,12 +137,12 @@ export function PayrollImport({ employees }: { employees: EmployeeRef[] }) {
   return (
     <div className="space-y-3">
       <p className="text-xs text-slate-500">
-        급여대장/상여대장 PDF나 이미지를 올리면 AI가 표를 읽어서 아래에 미리보기로 보여줘요. 값을 확인·수정한 뒤
-        일괄 등록하세요.
+        급여대장/상여대장 PDF·이미지·엑셀을 올리면 AI가 표를 읽어서 아래에 미리보기로 보여줘요. 한 파일에 여러
+        직원이 들어있어도 전부 인식해요. 값을 확인·수정한 뒤 일괄 등록하세요.
       </p>
       <input
         type="file"
-        accept="application/pdf,image/*"
+        accept="application/pdf,image/*,.xlsx,.xls"
         onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
         className="text-sm"
       />

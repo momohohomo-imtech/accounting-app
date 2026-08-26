@@ -171,49 +171,141 @@ export function TransactionForm({
     }
   }
 
-  async function handleFile(file: File) {
-    setPreview(URL.createObjectURL(file));
+  async function ocrOneFile(file: File): Promise<Record<string, unknown> | null> {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/ocr", { method: "POST", body: fd });
+    const json = await res.json();
+    return json.extracted ?? null;
+  }
+
+  async function handleImageOrPdfFiles(files: File[]) {
+    const firstImage = files.find((f) => f.type.startsWith("image/"));
+    setPreview(firstImage ? URL.createObjectURL(firstImage) : null);
+    setOcrLoading(true);
+    setError(null);
+    try {
+      const results = await Promise.all(files.map((f) => ocrOneFile(f)));
+      const valid = results.filter((r): r is NonNullable<typeof r> => r !== null);
+      if (valid.length === 0) {
+        setError("인식된 항목이 없습니다.");
+        return;
+      }
+      setOcrExtracted(valid[0]);
+      setLineItems((prev) => {
+        const updated = [...prev];
+        valid.forEach((ex, idx) => {
+          const patch = {
+            item_name: (ex.item_name as string) ?? "",
+            quantity: ex.quantity != null ? String(ex.quantity) : "",
+            unit_price: ex.unit_price != null ? String(ex.unit_price) : "",
+            subtotal: ex.amount != null ? String(ex.amount) : "",
+          };
+          if (idx < updated.length) updated[idx] = { ...updated[idx], ...patch };
+          else updated.push({ ...emptyLineItem(), ...patch });
+        });
+        return updated;
+      });
+      const ex = valid[0];
+      const matchedCategory = expenseCategories.find((c) => c.name === ex.category);
+      const ocrExempt = matchedCategory ? VAT_EXEMPT_CATEGORIES.includes(matchedCategory.name) : false;
+      setValues((prev) => ({
+        ...prev,
+        trans_date: (ex.trans_date as string) ?? prev.trans_date,
+        // AI가 영수증에서 추정한 VAT 여부는 신뢰하지 않고, 항상 사용자가 직접 체크하게 둠.
+        vat_included: ocrExempt ? false : prev.vat_included,
+        category_id: matchedCategory?.id ?? prev.category_id,
+        tax_invoice_issued: ocrExempt ? false : prev.tax_invoice_issued,
+        client_name_raw: (ex.client_name as string) ?? prev.client_name_raw,
+      }));
+    } catch {
+      setError("OCR 인식 중 오류가 발생했습니다.");
+    } finally {
+      setOcrLoading(false);
+    }
+  }
+
+  async function handleExcelFile(file: File) {
+    setPreview(null);
     setOcrLoading(true);
     setError(null);
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/api/ocr", { method: "POST", body: fd });
+      const res = await fetch("/api/transactions-excel", { method: "POST", body: fd });
       const json = await res.json();
       if (json.error) {
         setError(json.error);
-      } else if (json.extracted) {
-        setOcrExtracted(json.extracted);
-        const ex = json.extracted;
-        setLineItems((prev) =>
-          prev.map((li, idx) =>
-            idx === 0
-              ? {
-                  ...li,
-                  item_name: ex.item_name ?? li.item_name,
-                  quantity: ex.quantity != null ? String(ex.quantity) : li.quantity,
-                  unit_price: ex.unit_price != null ? String(ex.unit_price) : li.unit_price,
-                  subtotal: ex.amount != null ? String(ex.amount) : li.subtotal,
-                }
-              : li
-          )
-        );
-        const matchedCategory = expenseCategories.find((c) => c.name === ex.category);
-        const ocrExempt = matchedCategory ? VAT_EXEMPT_CATEGORIES.includes(matchedCategory.name) : false;
-        setValues((prev) => ({
-          ...prev,
-          trans_date: ex.trans_date ?? prev.trans_date,
-          // AI가 영수증에서 추정한 VAT 여부는 신뢰하지 않고, 항상 사용자가 직접 체크하게 둠.
-          vat_included: ocrExempt ? false : prev.vat_included,
-          category_id: matchedCategory?.id ?? prev.category_id,
-          tax_invoice_issued: ocrExempt ? false : prev.tax_invoice_issued,
-          client_name_raw: ex.client_name ?? prev.client_name_raw,
-        }));
+        return;
       }
+      type ExcelRow = {
+        trans_date?: string;
+        type?: string;
+        client_name?: string;
+        project_name?: string;
+        item_name?: string;
+        category_name?: string;
+        quantity?: number | null;
+        unit_price?: number | null;
+        amount?: number;
+        payment_method_name?: string;
+        payment_type?: string;
+        tax_invoice_issued?: boolean;
+        note1?: string;
+        note2?: string;
+      };
+      const rows = (json.rows ?? []) as ExcelRow[];
+      if (rows.length === 0) {
+        setError("엑셀에서 항목을 인식하지 못했습니다.");
+        return;
+      }
+
+      setLineItems(
+        rows.map((r) => ({
+          item_name: r.item_name ?? "",
+          quantity: r.quantity != null ? String(r.quantity) : "",
+          unit_price: r.unit_price != null ? String(r.unit_price) : "",
+          subtotal: r.amount != null ? String(r.amount) : "",
+          project_id: (r.project_name && projects.find((p) => p.name === r.project_name)?.id) || "",
+        }))
+      );
+
+      const first = rows[0];
+      const matchedClient = first.client_name ? clients.find((c) => c.name === first.client_name) : undefined;
+      const matchedCategory = first.category_name
+        ? expenseCategories.find((c) => c.name === first.category_name)
+        : undefined;
+      const matchedPaymentMethod = first.payment_method_name
+        ? paymentMethods.find((pm) => pm.name === first.payment_method_name)
+        : undefined;
+      const catExempt = matchedCategory ? VAT_EXEMPT_CATEGORIES.includes(matchedCategory.name) : false;
+      setValues((prev) => ({
+        ...prev,
+        trans_date: first.trans_date ?? prev.trans_date,
+        type: first.type === "매출" || first.type === "매입" ? first.type : prev.type,
+        client_id: matchedClient?.id ?? "",
+        client_name_raw: matchedClient ? "" : (first.client_name ?? prev.client_name_raw),
+        category_id: matchedCategory?.id ?? prev.category_id,
+        payment_method_id: matchedPaymentMethod?.id ?? prev.payment_method_id,
+        payment_type: first.payment_type === "credit" ? "credit" : "immediate",
+        tax_invoice_issued: catExempt ? false : Boolean(first.tax_invoice_issued),
+        note1: first.note1 ?? prev.note1,
+        note2: first.note2 ?? prev.note2,
+      }));
     } catch {
-      setError("OCR 인식 중 오류가 발생했습니다.");
+      setError("엑셀 인식 중 오류가 발생했습니다.");
     } finally {
       setOcrLoading(false);
+    }
+  }
+
+  async function handleFiles(fileList: FileList) {
+    const files = Array.from(fileList);
+    if (files.length === 0) return;
+    if (files.length === 1 && /\.(xlsx|xls)$/i.test(files[0].name)) {
+      await handleExcelFile(files[0]);
+    } else {
+      await handleImageOrPdfFiles(files);
     }
   }
 
@@ -319,11 +411,15 @@ export function TransactionForm({
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="mb-3 font-semibold text-slate-900">영수증 업로드 (선택, AI 자동 인식)</h2>
-        <p className="mb-2 text-xs text-slate-400">사진은 항목 자동 입력에만 쓰이고 저장되지 않아요. 원본은 직접 보관해주세요.</p>
+        <p className="mb-2 text-xs text-slate-400">
+          사진(여러 장 선택 시 장당 한 줄씩 등록), PDF, 엑셀(여러 품목 정리본)을 올리면 AI가 자동으로 항목을
+          채워줘요. 사진/PDF 원본은 저장되지 않으니 직접 보관해주세요.
+        </p>
         <input
           type="file"
-          accept="image/*"
-          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+          accept="image/*,application/pdf,.xlsx,.xls"
+          multiple
+          onChange={(e) => e.target.files && handleFiles(e.target.files)}
           className="text-sm"
         />
         {ocrLoading && <p className="mt-2 text-sm text-slate-500">AI가 영수증을 인식하는 중입니다...</p>}
