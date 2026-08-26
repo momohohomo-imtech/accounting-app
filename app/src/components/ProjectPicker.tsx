@@ -23,11 +23,13 @@ export function ProjectPicker({
   projects,
   value,
   onChange,
+  label = "프로젝트 (일반경비는 비워두기)",
 }: {
   sites: SiteOption[];
   projects: ProjectOption[];
   value: string;
   onChange: (v: string) => void;
+  label?: string;
 }) {
   // 수정 화면 등에서 이미 선택된 프로젝트가 "진행중"이 아니면(완료/검토중 등) 기본 드롭다운에
   // 안 나와서 공란처럼 보였음 — 마운트 시 현재 값에 맞춰 완료 프로젝트 검색 상태를 미리 채워둠.
@@ -72,7 +74,7 @@ export function ProjectPicker({
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between">
-        <label className={labelClass}>프로젝트 (일반경비는 비워두기)</label>
+        <label className={labelClass}>{label}</label>
         <label className="flex items-center gap-1 text-xs text-slate-500">
           <input
             type="checkbox"

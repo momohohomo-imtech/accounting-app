@@ -89,6 +89,7 @@ export function TransactionForm({
   const [preview, setPreview] = useState<string | null>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [projectPopupIndex, setProjectPopupIndex] = useState<number | null>(null);
   const inputClass = "rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none";
   const grandTotal = lineItems.reduce((s, li) => s + (Number(li.subtotal) || 0), 0);
   const selectedCategoryName = expenseCategories.find((c) => c.id === values.category_id)?.name;
@@ -446,75 +447,113 @@ export function TransactionForm({
           </p>
         )}
 
-        <div className="space-y-2 overflow-x-auto">
-          <div className="grid min-w-[700px] grid-cols-[1fr_9rem_5rem_6rem_7rem_3rem] gap-2 px-1 text-xs font-medium text-slate-500">
-            <span>품목</span>
-            <span>프로젝트</span>
-            <span>수량</span>
-            <span>단가</span>
-            <span>소계</span>
-            <span />
-          </div>
-          {lineItems.map((li, i) => (
-            <div key={i} className="grid min-w-[700px] grid-cols-[1fr_9rem_5rem_6rem_7rem_3rem] items-center gap-2">
-              <input
-                value={li.item_name}
-                onChange={(e) => updateLineItem(i, { item_name: e.target.value })}
-                className={inputClass}
-              />
-              <select
-                value={li.project_id}
-                onChange={(e) => updateLineItem(i, { project_id: e.target.value })}
-                className={inputClass}
-              >
-                <option value="">공통 프로젝트 사용</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                    {p.project_code ? ` (${p.project_code})` : ""}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={formatThousands(li.quantity)}
-                onChange={(e) => handleLineQuantity(i, parseNumericInput(e.target.value))}
-                className={inputClass}
-              />
-              <input
-                type="text"
-                inputMode="decimal"
-                value={formatThousands(li.unit_price)}
-                onChange={(e) => handleLineUnitPrice(i, parseNumericInput(e.target.value))}
-                className={inputClass}
-              />
-              <input
-                type="text"
-                inputMode="decimal"
-                value={formatThousands(li.subtotal)}
-                onChange={(e) => updateLineItem(i, { subtotal: parseNumericInput(e.target.value) })}
-                className={inputClass}
-              />
-              {lineItems.length > 1 ? (
-                <button
-                  type="button"
-                  onClick={() => removeLineItem(i)}
-                  className="text-xs text-red-500 hover:text-red-700"
-                >
-                  삭제
-                </button>
-              ) : (
-                <span />
-              )}
-            </div>
-          ))}
+        <div className="space-y-3">
+          {lineItems.map((li, i) => {
+            const resolvedProjectId = li.project_id || values.project_id;
+            const resolvedProject = projects.find((p) => p.id === resolvedProjectId);
+            const isOverride = Boolean(li.project_id);
+            return (
+              <div key={i} className="rounded-xl border border-slate-200 p-3">
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="shrink-0 text-xs font-medium text-slate-400">#{i + 1}</span>
+                  <input
+                    value={li.item_name}
+                    onChange={(e) => updateLineItem(i, { item_name: e.target.value })}
+                    placeholder="품목명"
+                    className={`${inputClass} flex-1`}
+                  />
+                  {lineItems.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeLineItem(i)}
+                      className="shrink-0 text-xs text-red-500 hover:text-red-700"
+                    >
+                      삭제
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-slate-500">프로젝트</span>
+                    <button
+                      type="button"
+                      onClick={() => setProjectPopupIndex(i)}
+                      className={`${inputClass} truncate text-left`}
+                    >
+                      {resolvedProject ? resolvedProject.name : "일반경비"}
+                      {!isOverride && <span className="text-slate-400"> (공통)</span>}
+                    </button>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-slate-500">수량</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={formatThousands(li.quantity)}
+                      onChange={(e) => handleLineQuantity(i, parseNumericInput(e.target.value))}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-slate-500">단가</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={formatThousands(li.unit_price)}
+                      onChange={(e) => handleLineUnitPrice(i, parseNumericInput(e.target.value))}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-slate-500">소계</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={formatThousands(li.subtotal)}
+                      onChange={(e) => updateLineItem(i, { subtotal: parseNumericInput(e.target.value) })}
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <p className="mt-3 text-right text-sm font-semibold text-slate-900">
           합계 <span className="ml-1 font-mono text-base">{formatWon(grandTotal)}</span>
         </p>
       </div>
+
+      {projectPopupIndex !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setProjectPopupIndex(null)}
+        >
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-semibold text-slate-900">품목 #{projectPopupIndex + 1} 프로젝트 선택</h3>
+              <button
+                type="button"
+                onClick={() => setProjectPopupIndex(null)}
+                className="text-sm text-slate-400 hover:text-slate-600"
+              >
+                닫기
+              </button>
+            </div>
+            <ProjectPicker
+              sites={sites}
+              projects={projects}
+              value={lineItems[projectPopupIndex].project_id}
+              onChange={(v) => {
+                updateLineItem(projectPopupIndex, { project_id: v });
+                setProjectPopupIndex(null);
+              }}
+              label="프로젝트 (비워두면 상단 공통값 사용)"
+            />
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         <button
