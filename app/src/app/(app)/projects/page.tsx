@@ -21,9 +21,9 @@ const TABS = [
 export default async function ProjectsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; year?: string; site_id?: string; report?: string }>;
+  searchParams: Promise<{ tab?: string; year?: string; site_id?: string; status?: string; report?: string }>;
 }) {
-  const { tab, year, site_id, report } = await searchParams;
+  const { tab, year, site_id, status, report } = await searchParams;
   const active = tab ?? "list";
 
   return (
@@ -33,12 +33,22 @@ export default async function ProjectsPage({
         <PageTabs basePath="/projects" tabs={TABS} active={active} />
       </div>
       {active === "sites" && <SitesSection />}
-      {active === "list" && <ProjectListSection year={year} siteId={site_id} report={report} />}
+      {active === "list" && <ProjectListSection year={year} siteId={site_id} status={status} report={report} />}
     </div>
   );
 }
 
-async function ProjectListSection({ year, siteId, report }: { year?: string; siteId?: string; report?: string }) {
+async function ProjectListSection({
+  year,
+  siteId,
+  status,
+  report,
+}: {
+  year?: string;
+  siteId?: string;
+  status?: string;
+  report?: string;
+}) {
   const supabase = await createClient();
   const currentYear = new Date().getFullYear();
   const selectedYear = year ? Number(year) : currentYear;
@@ -49,6 +59,7 @@ async function ProjectListSection({ year, siteId, report }: { year?: string; sit
     .eq("year", selectedYear)
     .order("created_at", { ascending: false });
   if (siteId) projectsQuery = projectsQuery.eq("site_id", siteId);
+  if (status) projectsQuery = projectsQuery.eq("status", status);
 
   const [{ data: sites }, { data: allProjects }, { data: projects }, { data: allYears }] = await Promise.all([
     supabase.from("sites").select("id, name, clients(name)").order("name"),
@@ -168,6 +179,8 @@ async function ProjectListSection({ year, siteId, report }: { year?: string; sit
             selectedYear={selectedYear}
             siteOptions={siteOptions}
             selectedSiteId={siteId}
+            statusOptions={PROJECT_STATUS_OPTIONS}
+            selectedStatus={status}
           />
           <ProjectListExportButtons year={selectedYear} rows={tableRows} />
         </div>
@@ -188,7 +201,7 @@ async function ProjectListSection({ year, siteId, report }: { year?: string; sit
                 p.id,
                 <LinkButton
                   key={p.id}
-                  href={`/projects?tab=list&year=${selectedYear}${siteId ? `&site_id=${siteId}` : ""}&report=${p.id}`}
+                  href={`/projects?tab=list&year=${selectedYear}${siteId ? `&site_id=${siteId}` : ""}${status ? `&status=${status}` : ""}&report=${p.id}`}
                   variant="secondary"
                   size="xs"
                 >
@@ -207,7 +220,7 @@ async function ProjectListSection({ year, siteId, report }: { year?: string; sit
           <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
             <ProjectProfitReport
               projectId={report}
-              closeHref={`/projects?tab=list&year=${selectedYear}${siteId ? `&site_id=${siteId}` : ""}`}
+              closeHref={`/projects?tab=list&year=${selectedYear}${siteId ? `&site_id=${siteId}` : ""}${status ? `&status=${status}` : ""}`}
             />
           </div>
         </div>
