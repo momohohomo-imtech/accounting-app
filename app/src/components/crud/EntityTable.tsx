@@ -22,11 +22,15 @@ function displayValue(row: Row, f: FieldConfig) {
   return String(raw);
 }
 
-function cellIsRed(row: Row, f: FieldConfig) {
-  if (f.colorField) return Boolean(row[f.colorField]);
-  if (f.redValue !== undefined) return row[f.name] === f.redValue;
-  if (f.type === "select") return f.options?.find((o) => o.value === row[f.name])?.color === "red";
-  return false;
+function cellColorClass(row: Row, f: FieldConfig): string | undefined {
+  if (f.colorField) return row[f.colorField] ? "text-red-600" : undefined;
+  if (f.redValue !== undefined) return row[f.name] === f.redValue ? "text-red-600" : undefined;
+  if (f.type === "select") {
+    const color = f.options?.find((o) => o.value === row[f.name])?.color;
+    if (color === "red") return "text-red-600";
+    if (color === "blue") return "text-blue-600";
+  }
+  return undefined;
 }
 
 function ProgressCell({ value }: { value: number }) {
@@ -161,8 +165,8 @@ export function EntityTable({
                 >
                   {f.display === "progress" ? (
                     <ProgressCell value={Number(row[f.name]) || 0} />
-                  ) : cellIsRed(row, f) ? (
-                    <span className="text-red-600">{displayValue(row, f)}</span>
+                  ) : cellColorClass(row, f) ? (
+                    <span className={cellColorClass(row, f)}>{displayValue(row, f)}</span>
                   ) : (
                     displayValue(row, f)
                   )}
