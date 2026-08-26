@@ -19,7 +19,6 @@ type ParsedRow = {
   quantity: number | null;
   unit_price: number | null;
   amount: number;
-  vat_included: boolean;
   payment_method_name?: string;
   payment_type: string;
   tax_invoice_issued: boolean;

@@ -60,9 +60,9 @@ export async function POST(req: NextRequest) {
 
   const prompt = `다음은 매입매출 거래를 여러 건 등록하기 위한 엑셀 표를 CSV로 변환한 거야. 각 행을 아래 JSON 형식으로 변환해서 배열로만 답해줘, 다른 설명 없이 JSON 배열만 출력해.
 
-컬럼은 보통 이 순서: 날짜, 구분(매입/매출), 거래처명, 프로젝트명, 품목, 종류구분, 수량, 단가, 총금액(VAT포함), VAT포함여부(Y/N), 결제수단, 결제시점(즉시/외상), 세금계산서발행(Y/N), 메모1, 메모2.
+컬럼은 보통 이 순서: 날짜, 구분(매입/매출), 거래처명, 프로젝트명, 품목, 종류구분, 수량, 단가, 총금액, 결제수단, 결제시점(즉시/외상), 세금계산서발행(Y/N), 메모1, 메모2.
 헤더 이름이 정확히 안 맞거나 순서가 달라도 의미로 알아서 매칭해줘. 헤더 행, 안내/예시 행, 완전히 빈 행은 결과에서 제외해.
-날짜는 YYYY-MM-DD로 변환. 금액에 쉼표나 "원"이 붙어있으면 숫자만 추출.
+날짜는 YYYY-MM-DD로 변환. 금액에 쉼표나 "원"이 붙어있으면 숫자만 추출. 총금액은 최종 합계로 그대로 쓰고 별도로 세금을 더하거나 빼지 마.
 
 [
   {
@@ -74,8 +74,7 @@ export async function POST(req: NextRequest) {
     "category_name": "종류구분 (없으면 빈 문자열)",
     "quantity": 숫자 또는 null,
     "unit_price": 숫자 또는 null,
-    "amount": 숫자 (필수),
-    "vat_included": true 또는 false (기본 true),
+    "amount": 숫자 (필수, 최종 합계),
     "payment_method_name": "결제수단 (없으면 빈 문자열)",
     "payment_type": "immediate 또는 credit",
     "tax_invoice_issued": true 또는 false,
