@@ -214,11 +214,19 @@ export function TransactionForm({
     if (!confirm(initial ? "수정 내용을 저장하시겠습니까?" : `이 거래를 등록하시겠습니까? (${validItems.length}건)`)) return;
     setError(null);
 
+    // 종류구분이 비과세면 체크박스 state가(예전 데이터 등으로) true로 남아있어도 무조건 무시 —
+    // 화면에서 비활성화만 하고 state는 안 건드렸던 게 "체크 안 보이는데 10%가 붙는" 원인이었음.
+    const effectiveValues = {
+      ...values,
+      vat_included: vatExempt ? false : values.vat_included,
+      tax_invoice_issued: vatExempt ? false : values.tax_invoice_issued,
+    };
+
     if (initial || validItems.length === 1) {
       const li = validItems[0];
       const fd = new FormData();
       if (initial) fd.append("id", initial.id);
-      Object.entries(values).forEach(([k, v]) => {
+      Object.entries(effectiveValues).forEach(([k, v]) => {
         if (k === "vat_included" || k === "tax_invoice_issued") {
           if (v) fd.append(k, "on");
         } else {
@@ -239,22 +247,22 @@ export function TransactionForm({
       }
     } else {
       const rows: BulkTransactionInput[] = validItems.map((li) => ({
-        trans_date: values.trans_date,
-        type: values.type,
-        client_id: values.client_id || null,
-        client_name_raw: values.client_name_raw || null,
-        project_id: values.project_id || null,
+        trans_date: effectiveValues.trans_date,
+        type: effectiveValues.type,
+        client_id: effectiveValues.client_id || null,
+        client_name_raw: effectiveValues.client_name_raw || null,
+        project_id: effectiveValues.project_id || null,
         item_name: li.item_name || null,
-        category_id: values.category_id || null,
+        category_id: effectiveValues.category_id || null,
         quantity: li.quantity ? Number(li.quantity) : null,
         unit_price: li.unit_price ? Number(li.unit_price) : null,
-        payment_method_id: values.payment_method_id || null,
-        payment_type: values.payment_type,
-        tax_invoice_issued: values.tax_invoice_issued,
-        vat_included: values.vat_included,
+        payment_method_id: effectiveValues.payment_method_id || null,
+        payment_type: effectiveValues.payment_type,
+        tax_invoice_issued: effectiveValues.tax_invoice_issued,
+        vat_included: effectiveValues.vat_included,
         amount: Number(li.subtotal) || 0,
-        note1: values.note1 || null,
-        note2: values.note2 || null,
+        note1: effectiveValues.note1 || null,
+        note2: effectiveValues.note2 || null,
       }));
 
       const result = await bulkImportTransactions(rows);
@@ -366,7 +374,7 @@ export function TransactionForm({
         <label className="flex items-start gap-2 pt-5 text-sm text-slate-700">
           <input
             type="checkbox"
-            checked={values.vat_included}
+            checked={vatExempt ? false : values.vat_included}
             disabled={vatExempt}
             onChange={(e) => set("vat_included", e.target.checked)}
             className="mt-0.5 h-4 w-4 disabled:cursor-not-allowed disabled:opacity-50"
@@ -379,7 +387,7 @@ export function TransactionForm({
         <label className="flex items-center gap-2 pt-5 text-sm text-slate-700">
           <input
             type="checkbox"
-            checked={values.tax_invoice_issued}
+            checked={vatExempt ? false : values.tax_invoice_issued}
             disabled={vatExempt}
             onChange={(e) => set("tax_invoice_issued", e.target.checked)}
             className="h-4 w-4 disabled:cursor-not-allowed disabled:opacity-50"
