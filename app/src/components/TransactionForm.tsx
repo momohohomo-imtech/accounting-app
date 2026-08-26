@@ -10,10 +10,10 @@ import { VAT_EXEMPT_CATEGORIES } from "@/lib/vatExempt";
 
 type Option = { id: string; name: string };
 type ClientOption = Option & { default_item_name?: string | null };
-type LineItem = { item_name: string; quantity: string; unit_price: string; subtotal: string };
+type LineItem = { item_name: string; quantity: string; unit_price: string; subtotal: string; project_id: string };
 
 function emptyLineItem(): LineItem {
-  return { item_name: "", quantity: "", unit_price: "", subtotal: "" };
+  return { item_name: "", quantity: "", unit_price: "", subtotal: "", project_id: "" };
 }
 
 function lineItemFromInitial(t: Transaction): LineItem {
@@ -26,6 +26,8 @@ function lineItemFromInitial(t: Transaction): LineItem {
     quantity: t.quantity?.toString() ?? "",
     unit_price: t.unit_price?.toString() ?? "",
     subtotal: amount ? String(amount) : "",
+    // 비워두면 위쪽 공통 "프로젝트" 선택값을 그대로 씀 — 계산서 1건이 여러 프로젝트에 걸칠 때만 줄별로 덮어씀.
+    project_id: "",
   };
 }
 
@@ -175,6 +177,7 @@ export function TransactionForm({
           prev.map((li, idx) =>
             idx === 0
               ? {
+                  ...li,
                   item_name: ex.item_name ?? li.item_name,
                   quantity: ex.quantity != null ? String(ex.quantity) : li.quantity,
                   unit_price: ex.unit_price != null ? String(ex.unit_price) : li.unit_price,
@@ -222,36 +225,13 @@ export function TransactionForm({
       tax_invoice_issued: vatExempt ? false : values.tax_invoice_issued,
     };
 
-    if (initial || validItems.length === 1) {
-      const li = validItems[0];
-      const fd = new FormData();
-      if (initial) fd.append("id", initial.id);
-      Object.entries(effectiveValues).forEach(([k, v]) => {
-        if (k === "vat_included" || k === "tax_invoice_issued") {
-          if (v) fd.append(k, "on");
-        } else {
-          fd.append(k, String(v));
-        }
-      });
-      fd.append("item_name", li.item_name);
-      fd.append("quantity", li.quantity);
-      fd.append("unit_price", li.unit_price);
-      fd.append("amount", li.subtotal);
-      fd.append("is_verified_ai", "on");
-      fd.append("ocr_extracted_raw", ocrExtracted ? JSON.stringify(ocrExtracted) : "");
-
-      const result = await action(fd);
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
-    } else {
-      const rows: BulkTransactionInput[] = validItems.map((li) => ({
+    function buildRow(li: LineItem): BulkTransactionInput {
+      return {
         trans_date: effectiveValues.trans_date,
         type: effectiveValues.type,
         client_id: effectiveValues.client_id || null,
         client_name_raw: effectiveValues.client_name_raw || null,
-        project_id: effectiveValues.project_id || null,
+        project_id: li.project_id || effectiveValues.project_id || null,
         item_name: li.item_name || null,
         category_id: effectiveValues.category_id || null,
         quantity: li.quantity ? Number(li.quantity) : null,
@@ -263,12 +243,57 @@ export function TransactionForm({
         amount: Number(li.subtotal) || 0,
         note1: effectiveValues.note1 || null,
         note2: effectiveValues.note2 || null,
-      }));
+      };
+    }
 
-      const result = await bulkImportTransactions(rows);
+    async function saveSingle(li: LineItem, id?: string) {
+      const fd = new FormData();
+      if (id) fd.append("id", id);
+      Object.entries(effectiveValues).forEach(([k, v]) => {
+        if (k === "vat_included" || k === "tax_invoice_issued") {
+          if (v) fd.append(k, "on");
+        } else {
+          fd.append(k, String(v));
+        }
+      });
+      fd.set("project_id", li.project_id || effectiveValues.project_id);
+      fd.append("item_name", li.item_name);
+      fd.append("quantity", li.quantity);
+      fd.append("unit_price", li.unit_price);
+      fd.append("amount", li.subtotal);
+      fd.append("is_verified_ai", "on");
+      fd.append("ocr_extracted_raw", ocrExtracted ? JSON.stringify(ocrExtracted) : "");
+      return action(fd);
+    }
+
+    if (validItems.length === 1) {
+      const result = await saveSingle(validItems[0], initial?.id);
       if (result?.error) {
         setError(result.error);
         return;
+      }
+    } else if (!initial) {
+      // 신규 등록, 여러 줄 → 전부 새 거래로 일괄 등록.
+      const result = await bulkImportTransactions(validItems.map(buildRow));
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+    } else {
+      // 기존 거래 수정 중 줄을 추가한 경우 → 첫 줄은 원래 거래를 그대로 업데이트하고,
+      // 나머지 줄은 새 거래로 추가해서 "하나였던 거래를 여러 건으로 분할".
+      const [first, ...rest] = validItems;
+      const firstResult = await saveSingle(first, initial.id);
+      if (firstResult?.error) {
+        setError(firstResult.error);
+        return;
+      }
+      if (rest.length > 0) {
+        const bulkResult = await bulkImportTransactions(rest.map(buildRow));
+        if (bulkResult?.error) {
+          setError(bulkResult.error);
+          return;
+        }
       }
     }
 
@@ -406,32 +431,50 @@ export function TransactionForm({
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-semibold text-slate-900">품목</h2>
-          {!initial && (
-            <button
-              type="button"
-              onClick={addLineItem}
-              className="text-xs font-medium text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
-            >
-              + 물품 종류 추가
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={addLineItem}
+            className="text-xs font-medium text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
+          >
+            + 물품 종류 추가
+          </button>
         </div>
+        {initial && (
+          <p className="mb-2 text-xs text-slate-400">
+            줄을 추가하면 저장 시 첫 줄은 이 거래를 수정하고, 나머지 줄은 새 거래로 분리돼요 (계산서 1건이 여러
+            프로젝트에 걸칠 때).
+          </p>
+        )}
 
         <div className="space-y-2 overflow-x-auto">
-          <div className="grid min-w-[560px] grid-cols-[1fr_6rem_7rem_7rem_3rem] gap-2 px-1 text-xs font-medium text-slate-500">
+          <div className="grid min-w-[700px] grid-cols-[1fr_9rem_5rem_6rem_7rem_3rem] gap-2 px-1 text-xs font-medium text-slate-500">
             <span>품목</span>
+            <span>프로젝트</span>
             <span>수량</span>
             <span>단가</span>
             <span>소계</span>
             <span />
           </div>
           {lineItems.map((li, i) => (
-            <div key={i} className="grid min-w-[560px] grid-cols-[1fr_6rem_7rem_7rem_3rem] items-center gap-2">
+            <div key={i} className="grid min-w-[700px] grid-cols-[1fr_9rem_5rem_6rem_7rem_3rem] items-center gap-2">
               <input
                 value={li.item_name}
                 onChange={(e) => updateLineItem(i, { item_name: e.target.value })}
                 className={inputClass}
               />
+              <select
+                value={li.project_id}
+                onChange={(e) => updateLineItem(i, { project_id: e.target.value })}
+                className={inputClass}
+              >
+                <option value="">공통 프로젝트 사용</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                    {p.project_code ? ` (${p.project_code})` : ""}
+                  </option>
+                ))}
+              </select>
               <input
                 type="text"
                 inputMode="decimal"
@@ -453,7 +496,7 @@ export function TransactionForm({
                 onChange={(e) => updateLineItem(i, { subtotal: parseNumericInput(e.target.value) })}
                 className={inputClass}
               />
-              {!initial && lineItems.length > 1 ? (
+              {lineItems.length > 1 ? (
                 <button
                   type="button"
                   onClick={() => removeLineItem(i)}
