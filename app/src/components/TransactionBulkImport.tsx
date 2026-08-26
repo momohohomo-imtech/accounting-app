@@ -87,7 +87,8 @@ export function TransactionBulkImport({
             payment_method_id: matchId(paymentMethods, r.payment_method_name),
             payment_type: r.payment_type === "credit" ? "credit" : "immediate",
             tax_invoice_issued: Boolean(r.tax_invoice_issued),
-            vat_included: r.vat_included !== false,
+            // 엑셀 금액은 이미 최종 합계로 보고, 자동으로 10% 얹지 않음(항상 미체크로 저장).
+            vat_included: false,
             amount: Number(r.amount) || 0,
             note1: r.note1?.trim() || null,
             note2: r.note2?.trim() || null,

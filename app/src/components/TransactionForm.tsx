@@ -70,7 +70,7 @@ export function TransactionForm({
     category_id: initial?.category_id ?? "",
     payment_method_id: initial?.payment_method_id ?? "",
     tax_invoice_issued: initial?.tax_invoice_issued ?? false,
-    vat_included: initial?.vat_included ?? true,
+    vat_included: initial?.vat_included ?? false,
     payment_type: initial?.payment_type ?? "immediate",
     note1: initial?.note1 ?? "",
     note2: initial?.note2 ?? "",
@@ -185,7 +185,8 @@ export function TransactionForm({
         setValues((prev) => ({
           ...prev,
           trans_date: ex.trans_date ?? prev.trans_date,
-          vat_included: ocrExempt ? false : (ex.vat_included ?? prev.vat_included),
+          // AI가 영수증에서 추정한 VAT 여부는 신뢰하지 않고, 항상 사용자가 직접 체크하게 둠.
+          vat_included: ocrExempt ? false : prev.vat_included,
           category_id: matchedCategory?.id ?? prev.category_id,
           tax_invoice_issued: ocrExempt ? false : prev.tax_invoice_issued,
           client_name_raw: ex.client_name ?? prev.client_name_raw,
@@ -359,15 +360,18 @@ export function TransactionForm({
             ))}
           </select>
         </Field>
-        <label className="flex items-center gap-2 pt-5 text-sm text-slate-700">
+        <label className="flex items-start gap-2 pt-5 text-sm text-slate-700">
           <input
             type="checkbox"
             checked={values.vat_included}
             disabled={vatExempt}
             onChange={(e) => set("vat_included", e.target.checked)}
-            className="h-4 w-4 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-0.5 h-4 w-4 disabled:cursor-not-allowed disabled:opacity-50"
           />
-          VAT 포함 금액
+          <span>
+            10% VAT 추가
+            <span className="block text-xs text-slate-400">(총 합계에 10% 합산 / 체크 해제 시 합산 안함)</span>
+          </span>
         </label>
         <label className="flex items-center gap-2 pt-5 text-sm text-slate-700">
           <input

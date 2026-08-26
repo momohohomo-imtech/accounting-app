@@ -3,29 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { remainingBalance } from "@/lib/credit";
-import { VAT_EXEMPT_CATEGORIES } from "@/lib/vatExempt";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CreditPayment, Transaction } from "@/lib/types";
 
-// noVat(비과세 종류구분)이면 부가세를 아예 0으로 — vat_included=false를 "10% 얹기"로 오해하면
-// 이미 세율이 안 붙어야 할 인건비 등에서 금액이 부풀려짐(이중과세처럼 보이는 버그의 원인이었음).
-function computeAmounts(type: string, amount: number, vatIncluded: boolean, noVat: boolean) {
-  if (noVat) {
-    if (type === "매출") return { sales_amount: amount, sales_vat: 0, purchase_amount: 0, purchase_vat: 0 };
-    return { purchase_amount: amount, purchase_vat: 0, sales_amount: 0, sales_vat: 0 };
-  }
-  const vat = vatIncluded ? Math.round(amount / 11) : Math.round(amount * 0.1);
-  const base = vatIncluded ? amount - vat : amount;
+// addVat 체크 시에만 입력 금액의 10%를 얹어서 합계에 더함. 체크 안 하면(기본값) 입력한 금액이
+// 곧 최종 합계이고 부가세는 0 — "얼마인지 모르니 자동으로 계산해준다"는 동작은 없음, 항상 사용자가
+// 명시적으로 체크해야만 10%가 붙음.
+function computeAmounts(type: string, amount: number, addVat: boolean) {
+  const vat = addVat ? Math.round(amount * 0.1) : 0;
   if (type === "매출") {
-    return { sales_amount: base, sales_vat: vat, purchase_amount: 0, purchase_vat: 0 };
+    return { sales_amount: amount, sales_vat: vat, purchase_amount: 0, purchase_vat: 0 };
   }
-  return { purchase_amount: base, purchase_vat: vat, sales_amount: 0, sales_vat: 0 };
-}
-
-async function isExemptCategory(supabase: SupabaseClient, categoryId: string | null) {
-  if (!categoryId) return false;
-  const { data } = await supabase.from("expense_categories").select("name").eq("id", categoryId).maybeSingle();
-  return data ? VAT_EXEMPT_CATEGORIES.includes(data.name) : false;
+  return { purchase_amount: amount, purchase_vat: vat, sales_amount: 0, sales_vat: 0 };
 }
 
 export async function createTransactionRecord(formData: FormData) {
@@ -38,8 +26,7 @@ export async function createTransactionRecord(formData: FormData) {
   const vatIncluded = formData.get("vat_included") === "on";
   const amount = Number(formData.get("amount") ?? 0);
   const categoryId = String(formData.get("category_id") ?? "") || null;
-  const noVat = await isExemptCategory(supabase, categoryId);
-  const amounts = computeAmounts(type, amount, vatIncluded, noVat);
+  const amounts = computeAmounts(type, amount, vatIncluded);
 
   const ocrRaw = String(formData.get("ocr_extracted_raw") ?? "");
 
@@ -79,8 +66,7 @@ export async function updateTransactionRecord(formData: FormData) {
   const vatIncluded = formData.get("vat_included") === "on";
   const amount = Number(formData.get("amount") ?? 0);
   const categoryId = String(formData.get("category_id") ?? "") || null;
-  const noVat = await isExemptCategory(supabase, categoryId);
-  const amounts = computeAmounts(type, amount, vatIncluded, noVat);
+  const amounts = computeAmounts(type, amount, vatIncluded);
 
   const { error } = await supabase
     .from("transactions")
@@ -137,9 +123,6 @@ export async function bulkImportTransactions(rows: BulkTransactionInput[]) {
 
   if (rows.length === 0) return { error: "등록할 행이 없습니다." };
 
-  const { data: categories } = await supabase.from("expense_categories").select("id, name");
-  const exemptIds = new Set((categories ?? []).filter((c) => VAT_EXEMPT_CATEGORIES.includes(c.name)).map((c) => c.id));
-
   const inserts = rows.map((r) => ({
     trans_date: r.trans_date,
     type: r.type,
@@ -153,7 +136,7 @@ export async function bulkImportTransactions(rows: BulkTransactionInput[]) {
     payment_method_id: r.payment_method_id,
     tax_invoice_issued: r.tax_invoice_issued,
     vat_included: r.vat_included,
-    ...computeAmounts(r.type, r.amount, r.vat_included, r.category_id ? exemptIds.has(r.category_id) : false),
+    ...computeAmounts(r.type, r.amount, r.vat_included),
     payment_type: r.payment_type,
     is_verified_ai: true,
     note1: r.note1,
