@@ -4,7 +4,13 @@ import { useState } from "react";
 import { formatDate } from "@/lib/format";
 import { AccessListExportButton } from "@/components/AccessListExportButton";
 
-type Member = { name: string; phone: string | null; nationality: string | null; birthDate: string | null };
+type Member = {
+  name: string;
+  phone: string | null;
+  nationality: string | null;
+  birthDate: string | null;
+  grade?: string | null;
+};
 
 export function AccessListCard({
   id,
@@ -37,7 +43,15 @@ export function AccessListCard({
             {formatDate(createdAt)}
           </p>
           <p className="mt-2 text-sm text-slate-700">
-            인원 {members.length}명: {members.map((m) => m.name).join(", ") || "-"}
+            인원 {members.length}명:{" "}
+            {members.length === 0
+              ? "-"
+              : members.map((m, i) => (
+                  <span key={i}>
+                    <span className={m.grade === "불량" ? "font-medium text-red-600" : undefined}>{m.name}</span>
+                    {i < members.length - 1 && ", "}
+                  </span>
+                ))}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">

@@ -11,13 +11,13 @@ export async function AccessListsSection() {
     await Promise.all([
       supabase.from("sites").select("id, name").order("name"),
       supabase.from("daily_worker_offices").select("id, name").order("name"),
-      supabase.from("daily_workers").select("id, name, office_id, status").eq("status", "active").order("name"),
+      supabase.from("daily_workers").select("id, name, office_id, status, grade").eq("status", "active").order("name"),
       supabase.from("employees").select("id, name, employee_no"),
       supabase.from("access_lists").select("*, sites(name)").order("created_at", { ascending: false }),
       supabase
         .from("access_list_workers")
         .select(
-          "access_list_id, daily_worker_id, employee_id, daily_workers(name, phone, nationality, birth_date), employees(name, phone, nationality, birth_date)"
+          "access_list_id, daily_worker_id, employee_id, daily_workers(name, phone, nationality, birth_date, grade), employees(name, phone, nationality, birth_date)"
         ),
     ]);
 
@@ -62,7 +62,7 @@ export async function AccessListsSection() {
 
           <AccessListWorkerPicker
             offices={offices ?? []}
-            workers={(workers ?? []).map((w) => ({ id: w.id, name: w.name, office_id: w.office_id }))}
+            workers={(workers ?? []).map((w) => ({ id: w.id, name: w.name, office_id: w.office_id, grade: w.grade }))}
             employees={employees}
           />
 
@@ -84,6 +84,7 @@ export async function AccessListsSection() {
                     phone: (source.phone as string | null) ?? null,
                     nationality: (source.nationality as string | null) ?? null,
                     birthDate: (source.birth_date as string | null) ?? null,
+                    grade: (source as { grade?: string | null }).grade ?? null,
                   }
                 : null;
             })
