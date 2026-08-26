@@ -48,7 +48,10 @@ export function AccessListCard({
               ? "-"
               : members.map((m, i) => (
                   <span key={i}>
-                    <span className={m.grade === "불량" ? "font-medium text-red-600" : undefined}>{m.name}</span>
+                    <span className={m.grade === "불량" ? "font-medium text-red-600" : undefined}>
+                      {m.name}
+                      {m.birthDate && <span className="text-slate-400">({formatDate(m.birthDate)})</span>}
+                    </span>
                     {i < members.length - 1 && ", "}
                   </span>
                 ))}
