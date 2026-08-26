@@ -23,9 +23,12 @@ export async function CreditSection() {
   const pays = (payments ?? []) as CreditPayment[];
   const methods = (paymentMethods ?? []) as PaymentMethod[];
 
+  // remaining > 0이면 당연히 미정산. remaining이 0이어도 정산 이력이 아예 없으면
+  // (금액을 0원으로 입력한 외상 건 등) 계속 목록에 보여줘야 수정/삭제할 수 있음 —
+  // 실제로 정산돼서 0원이 된 건만(결제 이력 있음) 목록에서 빠져야 함.
   const outstanding = txs
     .map((tx) => ({ tx, remaining: remainingBalance(tx, pays) }))
-    .filter((item) => item.remaining > 0);
+    .filter((item) => item.remaining > 0 || !pays.some((p) => p.transaction_id === item.tx.id));
 
   const totalOutstanding = outstanding.reduce((s, item) => s + item.remaining, 0);
 
