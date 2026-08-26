@@ -73,8 +73,8 @@ export default async function WorkLogsPage({
         <WorkLogMonthFilter year={selectedYear} month={selectedMonth} />
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm print:rounded-none print:border-0 print:shadow-none">
-        <div className="min-w-[900px]">
+      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm print:rounded-none print:border-0 print:shadow-none print:overflow-visible">
+        <div className="min-w-[900px] print:min-w-0 print:w-full">
           <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-center text-xs font-semibold text-slate-500">
             {WEEKDAY_LABELS.map((w, i) => (
               <div
