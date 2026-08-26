@@ -48,13 +48,16 @@ function CalcField({
   );
 }
 
-function ResultRow({ label, value }: { label: string; value: number }) {
+function ResultRow({ label, value, unit = "won" }: { label: string; value: number; unit?: "won" | "percent" }) {
+  const display = !Number.isFinite(value)
+    ? "-"
+    : unit === "percent"
+      ? `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`
+      : formatWon(Math.round(value));
   return (
     <p className="flex items-baseline justify-between rounded-lg bg-slate-50 px-3 py-2">
       <span className="text-sm text-slate-500">{label}</span>
-      <span className="font-mono text-base font-bold text-slate-900">
-        {Number.isFinite(value) ? formatWon(Math.round(value)) : "-"}
-      </span>
+      <span className="font-mono text-base font-bold text-slate-900">{display}</span>
     </p>
   );
 }
@@ -186,6 +189,44 @@ function PercentSubtractCalculator() {
   );
 }
 
+function PercentDifferenceCalculator() {
+  const [amountA, setAmountA] = useState("");
+  const [amountB, setAmountB] = useState("");
+  const a = Number(amountA) || 0;
+  const b = Number(amountB) || 0;
+  const diff = b - a;
+  const diffRate = a !== 0 ? (diff / a) * 100 : NaN;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>두 금액 차이(%) 계산기</CardTitle>
+      </CardHeader>
+      <p className="mb-3 text-xs text-slate-400">
+        A금액 대비 B금액이 몇 % 많거나 적은지 계산합니다. (차이율 = (B − A) ÷ A × 100, 양수면 B가 더 큼)
+      </p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <CalcField
+          label="A금액"
+          value={formatThousands(amountA)}
+          onChange={(v) => setAmountA(parseNumericInput(v))}
+          suffix="원"
+        />
+        <CalcField
+          label="B금액"
+          value={formatThousands(amountB)}
+          onChange={(v) => setAmountB(parseNumericInput(v))}
+          suffix="원"
+        />
+      </div>
+      <div className="mt-3 space-y-1.5">
+        <ResultRow label="차액 (B − A)" value={diff} />
+        <ResultRow label="차이율" value={diffRate} unit="percent" />
+      </div>
+    </Card>
+  );
+}
+
 export function CalculatorsSection() {
   return (
     <div className="space-y-3">
@@ -195,6 +236,7 @@ export function CalculatorsSection() {
         <VatAddCalculator />
         <VatExtractCalculator />
         <PercentSubtractCalculator />
+        <PercentDifferenceCalculator />
       </div>
     </div>
   );
