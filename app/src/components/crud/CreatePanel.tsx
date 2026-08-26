@@ -42,7 +42,12 @@ export function CreatePanel({
         className="space-y-3"
       >
         <EntityForm fields={fields} />
-        <Button type="submit">추가하기</Button>
+        <div className="flex items-center gap-2">
+          <Button type="submit">추가하기</Button>
+          <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+            취소
+          </Button>
+        </div>
       </form>
     </Card>
   );
