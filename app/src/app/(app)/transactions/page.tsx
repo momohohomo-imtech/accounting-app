@@ -10,13 +10,11 @@ import { TransactionTable } from "@/components/TransactionTable";
 import { TransactionExportButtons } from "@/components/TransactionExportButtons";
 import { ProjectTreeFilter } from "@/components/ProjectTreeFilter";
 import { TransactionBulkImport } from "@/components/TransactionBulkImport";
-import { TransactionForm } from "@/components/TransactionForm";
-import { updateTransactionRecord } from "@/lib/actions/transactions";
+import { TransactionEditPopup } from "@/components/TransactionEditPopup";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { LinkButton } from "@/components/ui/Button";
-import type { ExpenseCategory, PaymentMethod, Transaction } from "@/lib/types";
-import type { ProjectOption } from "@/components/ProjectPicker";
+import type { Transaction } from "@/lib/types";
 
 const TABS = [
   { key: "list", label: "매입매출" },
@@ -43,6 +41,17 @@ export default async function TransactionsPage({
   const { tab, year, month, type, project_id, editTx } = await searchParams;
   const active = tab ?? "list";
 
+  const redirectTo = (() => {
+    if (active !== "list") return `/transactions?tab=${active}`;
+    const p = new URLSearchParams();
+    if (year) p.set("year", year);
+    if (month) p.set("month", month);
+    if (type) p.set("type", type);
+    if (project_id) p.set("project_id", project_id);
+    const qs = p.toString();
+    return qs ? `/transactions?${qs}` : "/transactions";
+  })();
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -57,8 +66,10 @@ export default async function TransactionsPage({
       {active === "payment-methods" && <PaymentMethodsSection />}
       {active === "expense-categories" && <ExpenseCategoriesSection />}
       {active === "list" && (
-        <TransactionListSection year={year} month={month} type={type} project_id={project_id} editTx={editTx} />
+        <TransactionListSection year={year} month={month} type={type} project_id={project_id} />
       )}
+
+      <TransactionEditPopup editTx={editTx} redirectTo={redirectTo} />
     </div>
   );
 }
@@ -78,13 +89,11 @@ async function TransactionListSection({
   month,
   type,
   project_id,
-  editTx,
 }: {
   year?: string;
   month?: string;
   type?: string;
   project_id?: string;
-  editTx?: string;
 }) {
   const supabase = await createClient();
   const now = new Date();
@@ -153,43 +162,6 @@ async function TransactionListSection({
     return `/transactions?${p.toString()}`;
   }
 
-  const listUrl = withParam("type", type ?? "");
-
-  let editTxData: {
-    transaction: Transaction;
-    clients: { id: string; name: string; default_item_name: string | null }[];
-    sites: { id: string; name: string; client_name: string | null }[];
-    projects: ProjectOption[];
-    paymentMethods: PaymentMethod[];
-    expenseCategories: ExpenseCategory[];
-  } | null = null;
-
-  if (editTx) {
-    const [{ data: editClients }, { data: editSites }, { data: editProjects }, { data: editPaymentMethods }, { data: editExpenseCategories }, { data: tx }] =
-      await Promise.all([
-        supabase.from("clients").select("id, name, default_item_name").order("name"),
-        supabase.from("sites").select("id, name, clients(name)").order("name"),
-        supabase.from("projects").select("id, name, site_id, status, year, project_code").order("name"),
-        supabase.from("payment_methods").select("*").order("sort_order"),
-        supabase.from("expense_categories").select("*").order("sort_order"),
-        supabase.from("transactions").select("*").eq("id", editTx).single(),
-      ]);
-    if (tx) {
-      editTxData = {
-        transaction: tx,
-        clients: editClients ?? [],
-        sites: (editSites ?? []).map((s) => ({
-          id: s.id,
-          name: s.name,
-          client_name: (one(s.clients) as { name: string } | undefined)?.name ?? null,
-        })),
-        projects: editProjects ?? [],
-        paymentMethods: editPaymentMethods ?? [],
-        expenseCategories: editExpenseCategories ?? [],
-      };
-    }
-  }
-
   return (
     <div className="space-y-4">
       <Card className="print:hidden">
@@ -232,24 +204,6 @@ async function TransactionListSection({
         <Card className="print:hidden">
           <ProjectTreeFilter basePath="/transactions" projects={projectNodes} selectedProjectId={project_id ?? ""} />
         </Card>
-      )}
-
-      {editTxData && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:static print:bg-transparent print:p-0">
-          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
-            <h2 className="mb-4 text-lg font-semibold text-slate-900">거래 수정</h2>
-            <TransactionForm
-              clients={editTxData.clients}
-              sites={editTxData.sites}
-              projects={editTxData.projects}
-              paymentMethods={editTxData.paymentMethods}
-              expenseCategories={editTxData.expenseCategories}
-              initial={editTxData.transaction}
-              action={updateTransactionRecord}
-              redirectTo={listUrl}
-            />
-          </div>
-        </div>
       )}
     </div>
   );

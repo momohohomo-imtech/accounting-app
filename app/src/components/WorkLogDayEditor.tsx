@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { saveDayWorkLogs } from "@/lib/actions/worklogs";
-import { WorkLogRowInput } from "@/components/WorkLogRowInput";
-import { Button } from "@/components/ui/Button";
+import { WorkLogForm } from "@/components/WorkLogForm";
 
 export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string; closeHref: string }) {
   const supabase = await createClient();
@@ -23,15 +21,7 @@ export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string
         </Link>
       </div>
 
-      <form action={saveDayWorkLogs} className="space-y-2">
-        <input type="hidden" name="log_date" value={dateKey} />
-        {rows.map((row, i) => (
-          <WorkLogRowInput key={i} index={i} defaultTitle={row?.title ?? ""} defaultColor={row?.color ?? "none"} />
-        ))}
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="submit">저장</Button>
-        </div>
-      </form>
+      <WorkLogForm dateKey={dateKey} rows={rows} />
     </div>
   );
 }

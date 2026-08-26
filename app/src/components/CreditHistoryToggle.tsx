@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button, LinkButton } from "@/components/ui/Button";
 import { fieldClass } from "@/components/ui/field";
 import { downloadXlsx } from "@/lib/xlsxExport";
+import { deleteTransactionRecord } from "@/lib/actions/transactions";
 
 export type VendorHistoryItem = {
   id: string;
@@ -32,6 +33,7 @@ const STATUS_VARIANT = {
 
 export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }) {
   const [open, setOpen] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [year, setYear] = useState("all");
   const [month, setMonth] = useState("all");
 
@@ -134,9 +136,36 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
                       <span className="flex-1 truncate text-slate-700">{it.item_name ?? "-"}</span>
                       <span className="w-20 shrink-0 truncate text-right text-slate-400">{it.methodName ?? ""}</span>
                       <span className="w-28 shrink-0 text-right font-medium text-slate-900">{formatWon(it.amount)}</span>
-                      <LinkButton href={`/transactions/${it.id}/edit`} variant="secondary" size="xs" className="print:hidden">
+                      <LinkButton
+                        href={`/transactions?tab=credit&editTx=${it.id}`}
+                        variant="secondary"
+                        size="xs"
+                        className="print:hidden"
+                      >
                         수정
                       </LinkButton>
+                      {confirmDeleteId === it.id ? (
+                        <form action={deleteTransactionRecord} className="flex shrink-0 items-center gap-1 print:hidden">
+                          <input type="hidden" name="id" value={it.id} />
+                          <span className="text-xs font-medium text-red-600">정말 삭제?</span>
+                          <Button variant="danger" size="xs" type="submit">
+                            확인
+                          </Button>
+                          <Button variant="secondary" size="xs" type="button" onClick={() => setConfirmDeleteId(null)}>
+                            취소
+                          </Button>
+                        </form>
+                      ) : (
+                        <Button
+                          variant="danger"
+                          size="xs"
+                          type="button"
+                          className="print:hidden"
+                          onClick={() => setConfirmDeleteId(it.id)}
+                        >
+                          삭제
+                        </Button>
+                      )}
                     </li>
                   ))}
                 </ul>

@@ -57,6 +57,7 @@ export function EntityTable({
   editPopup?: boolean;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
@@ -172,17 +173,22 @@ export function EntityTable({
                   <Button variant="secondary" size="xs" onClick={() => setEditingId(row.id)}>
                     수정
                   </Button>
-                  <form
-                    action={deleteAction}
-                    onSubmit={(e) => {
-                      if (!confirm("삭제하시겠습니까?")) e.preventDefault();
-                    }}
-                  >
-                    <input type="hidden" name="id" value={row.id} />
-                    <Button variant="danger" size="xs">
+                  {confirmDeleteId === row.id ? (
+                    <form action={deleteAction} className="flex items-center gap-1">
+                      <input type="hidden" name="id" value={row.id} />
+                      <span className="text-xs font-medium text-red-600">정말 삭제?</span>
+                      <Button variant="danger" size="xs" type="submit">
+                        확인
+                      </Button>
+                      <Button variant="secondary" size="xs" type="button" onClick={() => setConfirmDeleteId(null)}>
+                        취소
+                      </Button>
+                    </form>
+                  ) : (
+                    <Button variant="danger" size="xs" type="button" onClick={() => setConfirmDeleteId(row.id)}>
                       삭제
                     </Button>
-                  </form>
+                  )}
                 </div>
               </Td>
             </Tr>

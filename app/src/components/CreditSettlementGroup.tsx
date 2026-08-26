@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { settleCreditTransactions } from "@/lib/actions/transactions";
+import { settleCreditTransactions, deleteTransactionRecord } from "@/lib/actions/transactions";
 import { formatWon, formatDate } from "@/lib/format";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button, LinkButton } from "@/components/ui/Button";
@@ -24,6 +24,7 @@ export function CreditSettlementGroup({
   paymentMethods: PaymentMethod[];
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -61,9 +62,25 @@ export function CreditSettlementGroup({
             </span>
             <span className="flex-1 truncate text-slate-700">{tx.item_name ?? "-"}</span>
             <span className="shrink-0 font-medium text-slate-900">{formatWon(remaining)}</span>
-            <LinkButton href={`/transactions/${tx.id}/edit`} variant="secondary" size="xs">
+            <LinkButton href={`/transactions?tab=credit&editTx=${tx.id}`} variant="secondary" size="xs">
               수정
             </LinkButton>
+            {confirmDeleteId === tx.id ? (
+              <form action={deleteTransactionRecord} className="flex shrink-0 items-center gap-1">
+                <input type="hidden" name="id" value={tx.id} />
+                <span className="text-xs font-medium text-red-600">정말 삭제?</span>
+                <Button variant="danger" size="xs" type="submit">
+                  확인
+                </Button>
+                <Button variant="secondary" size="xs" type="button" onClick={() => setConfirmDeleteId(null)}>
+                  취소
+                </Button>
+              </form>
+            ) : (
+              <Button variant="danger" size="xs" type="button" onClick={() => setConfirmDeleteId(tx.id)}>
+                삭제
+              </Button>
+            )}
           </li>
         ))}
       </ul>

@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { createAccessListRecord, deleteAccessListRecord } from "@/lib/actions/access-lists";
-import { formatDate, sortByEmployeeNo } from "@/lib/format";
+import { sortByEmployeeNo } from "@/lib/format";
 import { AccessListWorkerPicker } from "@/components/AccessListWorkerPicker";
-import { AccessListExportButton } from "@/components/AccessListExportButton";
+import { AccessListCard } from "@/components/AccessListCard";
 
 export async function AccessListsSection() {
   const supabase = await createClient();
@@ -90,34 +90,17 @@ export async function AccessListsSection() {
             .filter((m): m is NonNullable<typeof m> => m !== null);
 
           return (
-            <div key={l.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="font-semibold text-slate-900">{l.company_name}</p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {l.sites?.name ?? "현장 미지정"} · {l.supervisor_name ?? "감독관 미지정"} ·{" "}
-                    {l.access_period ?? "기간 미지정"} · 생성일 {formatDate(l.created_at)}
-                  </p>
-                  <p className="mt-2 text-sm text-slate-700">
-                    인원 {members.length}명: {members.map((m) => m.name).join(", ") || "-"}
-                  </p>
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  <AccessListExportButton
-                    companyName={l.company_name}
-                    accessPeriod={l.access_period ?? ""}
-                    supervisorName={l.supervisor_name ?? ""}
-                    members={members}
-                  />
-                  <form action={deleteAccessListRecord}>
-                    <input type="hidden" name="id" value={l.id} />
-                    <button className="rounded-lg border border-red-200 px-2.5 py-1 text-xs text-red-600 hover:bg-red-50">
-                      삭제
-                    </button>
-                  </form>
-                </div>
-              </div>
-            </div>
+            <AccessListCard
+              key={l.id}
+              id={l.id}
+              companyName={l.company_name}
+              siteName={l.sites?.name ?? null}
+              supervisorName={l.supervisor_name}
+              accessPeriod={l.access_period}
+              createdAt={l.created_at}
+              members={members}
+              deleteAction={deleteAccessListRecord}
+            />
           );
         })}
         {(lists ?? []).length === 0 && (

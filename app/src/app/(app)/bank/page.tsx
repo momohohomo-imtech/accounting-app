@@ -6,10 +6,10 @@ import {
   updateBankAccountRecord,
   deleteBankAccountRecord,
   createBankTransactionRecord,
-  deleteBankTransactionRecord,
 } from "@/lib/actions/bank";
 import type { FieldConfig } from "@/components/crud/types";
-import { formatWon, formatDate } from "@/lib/format";
+import { formatWon } from "@/lib/format";
+import { BankTransactionTable } from "@/components/BankTransactionTable";
 
 const accountFields: FieldConfig[] = [
   { name: "bank_name", label: "은행명", required: true },
@@ -116,54 +116,7 @@ export default async function BankPage() {
         </form>
 
         <div className="mt-5 overflow-x-auto">
-          <table className="w-full min-w-[700px] text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-left text-slate-500">
-                <th className="pb-2 pr-4">날짜</th>
-                <th className="pb-2 pr-4">계좌</th>
-                <th className="pb-2 pr-4">구분</th>
-                <th className="pb-2 pr-4">적요</th>
-                <th className="pb-2 pr-4">매칭 거래처</th>
-                <th className="pb-2 pr-4 text-right">금액</th>
-                <th className="pb-2 text-right">관리</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(transactions ?? []).map((t) => (
-                <tr key={t.id} className="border-b border-slate-100 last:border-0">
-                  <td className="py-2 pr-4 text-slate-600">{formatDate(t.trans_date)}</td>
-                  <td className="py-2 pr-4 text-slate-700">{t.bank_accounts?.nickname ?? t.bank_accounts?.bank_name}</td>
-                  <td className="py-2 pr-4">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        t.direction === "입금" ? "bg-blue-50 text-blue-700" : "bg-orange-50 text-orange-700"
-                      }`}
-                    >
-                      {t.direction}
-                    </span>
-                  </td>
-                  <td className="py-2 pr-4 text-slate-700">{t.description ?? "-"}</td>
-                  <td className="py-2 pr-4 text-slate-700">{t.clients?.name ?? "-"}</td>
-                  <td className="py-2 pr-4 text-right font-medium text-slate-900">{formatWon(t.amount)}</td>
-                  <td className="py-2 text-right">
-                    <form action={deleteBankTransactionRecord}>
-                      <input type="hidden" name="id" value={t.id} />
-                      <button className="rounded-lg border border-red-200 px-2.5 py-1 text-xs text-red-600 hover:bg-red-50">
-                        삭제
-                      </button>
-                    </form>
-                  </td>
-                </tr>
-              ))}
-              {(transactions ?? []).length === 0 && (
-                <tr>
-                  <td colSpan={7} className="py-6 text-center text-slate-400">
-                    거래내역이 없습니다.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <BankTransactionTable transactions={transactions ?? []} />
         </div>
       </div>
     </div>
