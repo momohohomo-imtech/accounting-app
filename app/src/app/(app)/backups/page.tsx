@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { BackupNowButton } from "@/components/BackupNowButton";
 import { BackupsTable } from "@/components/BackupsTable";
+import { CalculatorsSection } from "@/components/CalculatorsSection";
 
 export default async function BackupsPage() {
   const supabase = await createClient();
@@ -30,6 +31,8 @@ export default async function BackupsPage() {
           <BackupsTable backups={withLinks} />
         </div>
       </div>
+
+      <CalculatorsSection />
     </div>
   );
 }
