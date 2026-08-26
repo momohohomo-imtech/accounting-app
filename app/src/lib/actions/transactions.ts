@@ -206,6 +206,8 @@ export async function settleCreditTransactions(formData: FormData) {
   const sales_amount = targetTxs.reduce((s, t) => s + t.sales_amount, 0);
   const sales_vat = targetTxs.reduce((s, t) => s + t.sales_vat, 0);
 
+  const originalDates = Array.from(new Set(targetTxs.map((t) => t.trans_date))).sort();
+
   const { data: settlementTx, error: settlementError } = await supabase
     .from("transactions")
     .insert({
@@ -224,6 +226,7 @@ export async function settleCreditTransactions(formData: FormData) {
       sales_vat,
       payment_type: "immediate",
       is_verified_ai: false,
+      note2: `실 ${type}일자: ${originalDates.join(", ")}`,
       created_by: user?.id ?? null,
     })
     .select()
