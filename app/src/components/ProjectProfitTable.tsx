@@ -8,12 +8,13 @@ type ProjectRow = {
   id: string;
   name: string;
   progress_pct: number | null;
+  quoteAmount: number;
   sales: number;
   purchase: number;
   profit: number;
 };
 
-type SortKey = "name" | "progress_pct" | "profitRate" | "sales" | "purchase";
+type SortKey = "name" | "progress_pct" | "quoteAmount" | "profitRate" | "sales" | "purchase";
 
 function sortValue(p: ProjectRow & { profitRate: number }, key: SortKey): string | number {
   switch (key) {
@@ -21,6 +22,8 @@ function sortValue(p: ProjectRow & { profitRate: number }, key: SortKey): string
       return p.name;
     case "progress_pct":
       return p.progress_pct ?? 0;
+    case "quoteAmount":
+      return p.quoteAmount;
     case "profitRate":
       return p.profitRate;
     case "sales":
@@ -43,7 +46,7 @@ export function ProjectProfitTable({
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const withRate = useMemo(
-    () => rows.map((p) => ({ ...p, profitRate: p.sales > 0 ? (p.profit / p.sales) * 100 : 0 })),
+    () => rows.map((p) => ({ ...p, profitRate: p.quoteAmount > 0 ? (p.profit / p.quoteAmount) * 100 : 0 })),
     [rows]
   );
 
@@ -79,11 +82,12 @@ export function ProjectProfitTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[650px] text-sm">
+      <table className="w-full min-w-[750px] text-sm">
         <thead>
           <tr className="border-b border-slate-200 text-left text-slate-500">
             <th className="pb-2 pr-4">{headerButton("name", "프로젝트")}</th>
             <th className="pb-2 pr-4 text-right">{headerButton("progress_pct", "진행률")}</th>
+            <th className="pb-2 pr-4 text-right">{headerButton("quoteAmount", "발주액")}</th>
             <th className="pb-2 pr-4 text-right">{headerButton("profitRate", "이익율")}</th>
             <th className="pb-2 pr-4 text-right">{headerButton("sales", "매출")}</th>
             <th className="pb-2 pr-4 text-right">{headerButton("purchase", "매입")}</th>
@@ -102,6 +106,7 @@ export function ProjectProfitTable({
                 </Link>
               </td>
               <td className="py-2 pr-4 text-right font-mono text-slate-700">{p.progress_pct ?? 0}%</td>
+              <td className="py-2 pr-4 text-right font-mono text-slate-700">{formatWon(p.quoteAmount)}</td>
               <td className="py-2 pr-4 text-right font-mono text-slate-700">{p.profitRate.toFixed(1)}%</td>
               <td className="py-2 pr-4 text-right font-mono text-slate-700">{formatWon(p.sales)}</td>
               <td className="py-2 pr-4 text-right font-mono text-slate-700">{formatWon(p.purchase)}</td>
@@ -110,7 +115,7 @@ export function ProjectProfitTable({
           ))}
           {sorted.length === 0 && (
             <tr>
-              <td colSpan={6} className="py-8 text-center text-slate-400">
+              <td colSpan={7} className="py-8 text-center text-slate-400">
                 {year}년 프로젝트가 없습니다.
               </td>
             </tr>

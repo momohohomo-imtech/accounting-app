@@ -57,7 +57,10 @@ export default async function ReportsPage({
       .select("*, clients(name), projects(name, sites(name))")
       .gte("trans_date", `${selectedYear}-01-01`)
       .lte("trans_date", `${selectedYear}-12-31`),
-    supabase.from("projects").select("id, name, status, progress_pct, site_id, sites(name)").eq("year", selectedYear),
+    supabase
+      .from("projects")
+      .select("id, name, status, progress_pct, site_id, quote_amount, sites(name)")
+      .eq("year", selectedYear),
     supabase.from("transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
   ]);
 
@@ -97,7 +100,7 @@ export default async function ReportsPage({
     const rows = transactions.filter((t) => t.project_id === p.id);
     const sales = rows.reduce((s, t) => s + t.sales_amount + t.sales_vat, 0);
     const purchase = rows.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
-    return { ...p, sales, purchase, profit: sales - purchase };
+    return { ...p, quoteAmount: p.quote_amount ?? 0, sales, purchase, profit: sales - purchase };
   });
 
   const projectSummary = {
