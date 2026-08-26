@@ -350,11 +350,17 @@ export function TransactionForm({
         </Field>
         <Field label="거래처 (자유 입력)">
           <input
+            list="client-name-suggestions"
             value={values.client_name_raw}
             onChange={(e) => set("client_name_raw", e.target.value)}
             placeholder="예: 온라인, 화성"
             className={inputClass}
           />
+          <datalist id="client-name-suggestions">
+            {clients.map((c) => (
+              <option key={c.id} value={c.name} />
+            ))}
+          </datalist>
         </Field>
         <ProjectPicker
           sites={sites}
