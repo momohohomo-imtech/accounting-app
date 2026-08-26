@@ -13,7 +13,7 @@ const NAV = [
   { href: "/daily-workers", label: "일용직 관리" },
   { href: "/bank", label: "은행 거래내역" },
   { href: "/reports", label: "보고서" },
-  { href: "/backups", label: "시스템·백업" },
+  { href: "/backups", label: "계산기·백업" },
 ];
 
 function isActive(pathname: string, href: string) {
