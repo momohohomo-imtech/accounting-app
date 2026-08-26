@@ -13,6 +13,7 @@ const NAV = [
   { href: "/daily-workers", label: "일용직 관리" },
   { href: "/bank", label: "은행 거래내역" },
   { href: "/reports", label: "보고서" },
+  { href: "/memos", label: "메모장" },
   { href: "/backups", label: "계산기·백업" },
 ];
 
