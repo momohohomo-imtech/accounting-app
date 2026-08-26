@@ -327,7 +327,6 @@ export default async function ReportsPage({
               year={selectedYear}
               rows={vendorRows}
               closeHref={`/reports?year=${selectedYear}`}
-              editHrefFor={(id) => `/reports?year=${selectedYear}&vendor=${encodeURIComponent(vendor)}&editTx=${id}`}
             />
           </div>
         </div>

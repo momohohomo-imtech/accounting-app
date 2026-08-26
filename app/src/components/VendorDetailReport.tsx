@@ -1,3 +1,6 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatWon, formatDate } from "@/lib/format";
 import { VendorReportActions } from "@/components/VendorReportActions";
@@ -10,21 +13,71 @@ type VendorRow = {
   project_name: string | null;
 };
 
+type SortKey = "trans_date" | "project_name" | "item_name" | "amount";
+
+function sortValue(r: VendorRow, key: SortKey): string | number {
+  switch (key) {
+    case "trans_date":
+      return r.trans_date;
+    case "project_name":
+      return r.project_name ?? "";
+    case "item_name":
+      return r.item_name ?? "";
+    case "amount":
+      return r.amount;
+  }
+}
+
 export function VendorDetailReport({
   vendorName,
   year,
   rows,
   closeHref,
-  editHrefFor,
 }: {
   vendorName: string;
   year: number;
   rows: VendorRow[];
   closeHref: string;
-  editHrefFor?: (id: string) => string;
 }) {
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
   const total = rows.reduce((s, r) => s + r.amount, 0);
   const exportRows = rows.map((r) => [formatDate(r.trans_date), r.item_name ?? "-", r.amount]);
+
+  function editHrefFor(id: string) {
+    return `/reports?year=${year}&vendor=${encodeURIComponent(vendorName)}&editTx=${id}`;
+  }
+
+  function handleSort(key: SortKey) {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  const sortedRows = useMemo(() => {
+    if (!sortKey) return rows;
+    const copy = [...rows];
+    copy.sort((a, b) => {
+      const va = sortValue(a, sortKey);
+      const vb = sortValue(b, sortKey);
+      const cmp = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb));
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return copy;
+  }, [rows, sortKey, sortDir]);
+
+  function headerButton(key: SortKey, label: string) {
+    return (
+      <button type="button" onClick={() => handleSort(key)} className="inline-flex items-center gap-1 hover:text-slate-800">
+        {label}
+        {sortKey === key && <span className="text-[10px]">{sortDir === "asc" ? "▲" : "▼"}</span>}
+      </button>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -44,15 +97,15 @@ export function VendorDetailReport({
         <table className="w-full min-w-[500px] text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-left text-slate-500">
-              <th className="pb-2 pr-4">날짜</th>
-              <th className="pb-2 pr-4">프로젝트</th>
-              <th className="pb-2 pr-4">품목</th>
-              <th className="pb-2 text-right">금액</th>
-              {editHrefFor && <th className="pb-2 pl-4 text-right print:hidden">관리</th>}
+              <th className="pb-2 pr-4">{headerButton("trans_date", "날짜")}</th>
+              <th className="pb-2 pr-4">{headerButton("project_name", "프로젝트")}</th>
+              <th className="pb-2 pr-4">{headerButton("item_name", "품목")}</th>
+              <th className="pb-2 text-right">{headerButton("amount", "금액")}</th>
+              <th className="pb-2 pl-4 text-right print:hidden">관리</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {sortedRows.map((r) => (
               <tr key={r.id} className="border-b border-slate-100 last:border-0">
                 <td className="py-2 pr-4 text-slate-600">{formatDate(r.trans_date)}</td>
                 <td className="py-2 pr-4 text-slate-700">
@@ -60,21 +113,19 @@ export function VendorDetailReport({
                 </td>
                 <td className="py-2 pr-4 text-slate-700">{r.item_name ?? "-"}</td>
                 <td className="py-2 text-right font-mono text-slate-900">{formatWon(r.amount)}</td>
-                {editHrefFor && (
-                  <td className="py-2 pl-4 text-right print:hidden">
-                    <Link
-                      href={editHrefFor(r.id)}
-                      className="text-xs text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
-                    >
-                      수정
-                    </Link>
-                  </td>
-                )}
+                <td className="py-2 pl-4 text-right print:hidden">
+                  <Link
+                    href={editHrefFor(r.id)}
+                    className="text-xs text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
+                  >
+                    수정
+                  </Link>
+                </td>
               </tr>
             ))}
-            {rows.length === 0 && (
+            {sortedRows.length === 0 && (
               <tr>
-                <td colSpan={editHrefFor ? 5 : 4} className="py-6 text-center text-slate-400">
+                <td colSpan={5} className="py-6 text-center text-slate-400">
                   매입 내역이 없습니다.
                 </td>
               </tr>
