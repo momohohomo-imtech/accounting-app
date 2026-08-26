@@ -23,4 +23,6 @@ export type FieldConfig = {
   width?: string;
   /** When the row's value at this field name is truthy, render this cell's text in red (table view only). */
   colorField?: string;
+  /** When this field's own raw value equals this string, render its cell's text in red (table view only). */
+  redValue?: string;
 };

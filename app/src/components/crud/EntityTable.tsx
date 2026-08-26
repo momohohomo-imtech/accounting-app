@@ -24,6 +24,7 @@ function displayValue(row: Row, f: FieldConfig) {
 
 function cellIsRed(row: Row, f: FieldConfig) {
   if (f.colorField) return Boolean(row[f.colorField]);
+  if (f.redValue !== undefined) return row[f.name] === f.redValue;
   if (f.type === "select") return f.options?.find((o) => o.value === row[f.name])?.color === "red";
   return false;
 }

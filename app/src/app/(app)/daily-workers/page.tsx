@@ -10,6 +10,7 @@ import type { FieldConfig } from "@/components/crud/types";
 import { PageTabs } from "@/components/PageTabs";
 import { DailyWorkerOfficesSection } from "@/components/sections/DailyWorkerOfficesSection";
 import { AccessListsSection } from "@/components/sections/AccessListsSection";
+import { Pill } from "@/components/ui/Pill";
 
 const TABS = [
   { key: "list", label: "일용직 근로자" },
@@ -20,9 +21,9 @@ const TABS = [
 export default async function DailyWorkersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; office_id?: string }>;
 }) {
-  const { tab } = await searchParams;
+  const { tab, office_id } = await searchParams;
   const active = tab ?? "list";
 
   return (
@@ -31,12 +32,12 @@ export default async function DailyWorkersPage({
       <PageTabs basePath="/daily-workers" tabs={TABS} active={active} />
       {active === "offices" && <DailyWorkerOfficesSection />}
       {active === "access" && <AccessListsSection />}
-      {active === "list" && <WorkerListSection />}
+      {active === "list" && <WorkerListSection officeId={office_id} />}
     </div>
   );
 }
 
-async function WorkerListSection() {
+async function WorkerListSection({ officeId }: { officeId?: string }) {
   const supabase = await createClient();
   const [{ data: offices }, { data: workers }] = await Promise.all([
     supabase.from("daily_worker_offices").select("id, name").order("name"),
@@ -45,6 +46,8 @@ async function WorkerListSection() {
       .select("*, daily_worker_offices(name)")
       .order("registered_at", { ascending: false }),
   ]);
+
+  const filteredWorkers = officeId ? (workers ?? []).filter((w) => w.office_id === officeId) : workers ?? [];
 
   const fields: FieldConfig[] = [
     {
@@ -55,7 +58,7 @@ async function WorkerListSection() {
       options: (offices ?? []).map((o) => ({ value: o.id, label: o.name })),
     },
     { name: "name", label: "이름", required: true },
-    { name: "grade", label: "등급", width: "6%" },
+    { name: "grade", label: "등급", width: "6%", redValue: "불량" },
     { name: "birth_date", label: "생년월일", type: "date", hideInTable: true },
     {
       name: "resident_id_masked",
@@ -85,10 +88,22 @@ async function WorkerListSection() {
   return (
     <div className="space-y-6">
       <CreatePanel title="일용직 근로자" fields={fields} createAction={createDailyWorkerRecord} />
+
+      <div className="flex flex-wrap gap-1">
+        <Pill href="/daily-workers?tab=list" active={!officeId}>
+          전체
+        </Pill>
+        {(offices ?? []).map((o) => (
+          <Pill key={o.id} href={`/daily-workers?tab=list&office_id=${o.id}`} active={officeId === o.id}>
+            {o.name}
+          </Pill>
+        ))}
+      </div>
+
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <EntityTable
           fields={fields}
-          rows={workers ?? []}
+          rows={filteredWorkers}
           updateAction={updateDailyWorkerRecord}
           deleteAction={deleteDailyWorkerRecord}
         />
