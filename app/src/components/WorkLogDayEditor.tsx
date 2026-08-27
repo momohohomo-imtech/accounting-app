@@ -12,7 +12,7 @@ export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string
 
   const [{ data: logs }, { data: sites }, { data: monthLogs }] = await Promise.all([
     supabase.from("work_logs").select("*").eq("log_date", dateKey).order("sort_order", { ascending: true }),
-    supabase.from("sites").select("id, name").order("name"),
+    supabase.from("sites").select("id, name, color").order("name"),
     supabase.from("work_logs").select("title").gte("log_date", monthStart).lte("log_date", monthEnd),
   ]);
 

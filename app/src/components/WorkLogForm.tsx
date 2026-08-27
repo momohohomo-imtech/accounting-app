@@ -5,7 +5,7 @@ import { WorkLogRowInput } from "@/components/WorkLogRowInput";
 import { Button } from "@/components/ui/Button";
 
 type Row = { title: string | null; site_id: string | null } | null;
-type SiteOption = { id: string; name: string };
+type SiteOption = { id: string; name: string; color: string | null };
 
 export function WorkLogForm({
   dateKey,

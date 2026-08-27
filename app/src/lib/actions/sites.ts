@@ -31,3 +31,13 @@ export async function deleteSiteRecord(formData: FormData) {
   await supabase.from("sites").delete().eq("id", id);
   revalidatePath("/projects");
 }
+
+// 작업일지 하단의 현장 색상 범례에서 개별 현장 고유색만 수정/초기화할 때 쓰는 전용 액션.
+export async function updateSiteColor(formData: FormData) {
+  const supabase = await createClient();
+  const id = String(formData.get("id"));
+  const color = String(formData.get("color") ?? "") || null;
+  await supabase.from("sites").update({ color }).eq("id", id);
+  revalidatePath("/worklogs");
+  revalidatePath("/reports");
+}

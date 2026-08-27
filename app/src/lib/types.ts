@@ -13,6 +13,7 @@ export type Site = {
   location: string | null;
   manager_name: string | null;
   client_id: string | null;
+  color: string | null;
   created_at: string;
   clients?: Client;
 };

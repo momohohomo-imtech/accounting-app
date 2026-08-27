@@ -8,6 +8,7 @@ import { WorkLogMonthFilter } from "@/components/WorkLogMonthFilter";
 import { WorkLogExportButtons } from "@/components/WorkLogExportButtons";
 import { WorkLogDayEditor } from "@/components/WorkLogDayEditor";
 import { WorkLogSummaryTable } from "@/components/WorkLogSummaryTable";
+import { SiteColorLegend } from "@/components/SiteColorLegend";
 import { cx } from "@/lib/cx";
 import type { WorkLog } from "@/lib/types";
 
@@ -38,7 +39,7 @@ export default async function WorkLogsPage({
       .order("log_date", { ascending: true })
       .order("sort_order", { ascending: true }),
     supabase.from("work_logs").select("log_date"),
-    supabase.from("sites").select("id, name").order("name"),
+    supabase.from("sites").select("id, name, color").order("name"),
   ]);
 
   const rows = (logs ?? []) as WorkLog[];
@@ -52,7 +53,8 @@ export default async function WorkLogsPage({
   }
 
   const siteNameById = new Map((sites ?? []).map((s) => [s.id, s.name]));
-  const monthlySummary = buildWorkLogSummary(rows, siteNameById);
+  const siteColorById = new Map((sites ?? []).map((s) => [s.id, s.color]));
+  const monthlySummary = buildWorkLogSummary(rows, sites ?? []);
 
   const monthsByYear = new Map<number, Set<number>>();
   for (const { log_date } of allDates ?? []) {
@@ -147,7 +149,7 @@ export default async function WorkLogsPage({
                         return (
                           <span
                             key={log.id}
-                            style={log.site_id ? siteColorStyle(log.site_id) : undefined}
+                            style={log.site_id ? siteColorStyle(log.site_id, siteColorById.get(log.site_id)) : undefined}
                             className={cx(
                               "truncate rounded px-1 py-0.5 leading-tight print:whitespace-normal print:overflow-visible",
                               !log.site_id && workLogColorCellClass(log.color)
@@ -199,6 +201,8 @@ export default async function WorkLogsPage({
           </div>
         </div>
       )}
+
+      <SiteColorLegend sites={sites ?? []} />
 
       {dayKey && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:hidden">

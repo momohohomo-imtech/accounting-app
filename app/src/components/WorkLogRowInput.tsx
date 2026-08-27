@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { siteColorHex } from "@/lib/siteColor";
+import { resolveSiteColor } from "@/lib/siteColor";
 import { fieldClass } from "@/components/ui/field";
 
-type SiteOption = { id: string; name: string };
+type SiteOption = { id: string; name: string; color: string | null };
 
 export function WorkLogRowInput({
   index,
@@ -20,13 +20,14 @@ export function WorkLogRowInput({
   contentListId: string;
 }) {
   const [siteId, setSiteId] = useState(defaultSiteId || "");
+  const selectedSite = sites.find((s) => s.id === siteId);
 
   return (
     <div className="flex items-center gap-2">
       <span
         className="h-6 w-6 shrink-0 rounded-full border border-slate-200"
-        style={siteId ? { backgroundColor: siteColorHex(siteId) } : { backgroundColor: "#fff" }}
-        title={siteId ? sites.find((s) => s.id === siteId)?.name : "현장 없음"}
+        style={siteId ? { backgroundColor: resolveSiteColor(siteId, selectedSite?.color) } : { backgroundColor: "#fff" }}
+        title={selectedSite?.name ?? "현장 없음"}
       />
       <div className="w-32 shrink-0">
         <select

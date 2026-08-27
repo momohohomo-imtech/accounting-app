@@ -1,5 +1,4 @@
 import type { WorkLogSummaryRow } from "@/lib/workLogSummary";
-import { siteColorHex } from "@/lib/siteColor";
 
 export function WorkLogSummaryTable({ rows, emptyMessage }: { rows: WorkLogSummaryRow[]; emptyMessage: string }) {
   return (
@@ -19,7 +18,7 @@ export function WorkLogSummaryTable({ rows, emptyMessage }: { rows: WorkLogSumma
                 <span className="inline-flex items-center gap-1.5">
                   <span
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: siteColorHex(r.siteId) }}
+                    style={{ backgroundColor: r.siteColor }}
                   />
                   {r.siteName}
                 </span>

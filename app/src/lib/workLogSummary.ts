@@ -1,6 +1,8 @@
 import type { WorkLog } from "@/lib/types";
+import { resolveSiteColor } from "@/lib/siteColor";
 
-export type WorkLogSummaryRow = { siteId: string; siteName: string; title: string; days: number };
+export type WorkLogSummaryRow = { siteId: string; siteName: string; siteColor: string; title: string; days: number };
+export type SiteInfo = { id: string; name: string; color: string | null };
 
 /**
  * 현장별로 "몇 일 같은 작업을 했는지" 집계.
@@ -8,7 +10,8 @@ export type WorkLogSummaryRow = { siteId: string; siteName: string; title: strin
  * 내용을 그대로 이어받는다 — 매일 내용을 재입력하지 않고 현장만 골라도(연속 작업)
  * 하나의 작업으로 합산되게 하기 위함. 현장이 지정되지 않은 줄은 집계 대상에서 제외.
  */
-export function buildWorkLogSummary(rows: WorkLog[], siteNameById: Map<string, string>): WorkLogSummaryRow[] {
+export function buildWorkLogSummary(rows: WorkLog[], sites: SiteInfo[]): WorkLogSummaryRow[] {
+  const siteById = new Map(sites.map((s) => [s.id, s]));
   const sorted = [...rows].sort((a, b) => a.log_date.localeCompare(b.log_date));
   const lastTitleBySite = new Map<string, string>();
   const groups = new Map<string, { siteId: string; siteName: string; title: string; dates: Set<string> }>();
@@ -20,7 +23,7 @@ export function buildWorkLogSummary(rows: WorkLog[], siteNameById: Map<string, s
     if (explicitTitle) lastTitleBySite.set(l.site_id, explicitTitle);
     if (!title) continue;
 
-    const siteName = siteNameById.get(l.site_id) ?? "미지정";
+    const siteName = siteById.get(l.site_id)?.name ?? "미지정";
     const key = `${l.site_id}::${title}`;
     const g = groups.get(key) ?? { siteId: l.site_id, siteName, title, dates: new Set<string>() };
     g.dates.add(l.log_date);
@@ -28,6 +31,12 @@ export function buildWorkLogSummary(rows: WorkLog[], siteNameById: Map<string, s
   }
 
   return Array.from(groups.values())
-    .map((g) => ({ siteId: g.siteId, siteName: g.siteName, title: g.title, days: g.dates.size }))
+    .map((g) => ({
+      siteId: g.siteId,
+      siteName: g.siteName,
+      siteColor: resolveSiteColor(g.siteId, siteById.get(g.siteId)?.color),
+      title: g.title,
+      days: g.dates.size,
+    }))
     .sort((a, b) => b.days - a.days);
 }

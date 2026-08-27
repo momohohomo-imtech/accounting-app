@@ -18,7 +18,7 @@ export function WorkLogExportButtons({
   month: number;
   weeks: MonthCell[][];
   logs: LogEntry[];
-  sites?: { id: string; name: string }[];
+  sites?: { id: string; name: string; color: string | null }[];
 }) {
   async function handleExport() {
     const byDate = new Map<string, LogEntry[]>();
@@ -27,8 +27,7 @@ export function WorkLogExportButtons({
       arr.push(l);
       byDate.set(l.log_date, arr);
     }
-    const siteNameById = new Map(sites.map((s) => [s.id, s.name]));
-    await downloadWorkLogCalendarXlsx(`${year}년_${month}월_작업일지.xlsx`, year, month, weeks, byDate, siteNameById);
+    await downloadWorkLogCalendarXlsx(`${year}년_${month}월_작업일지.xlsx`, year, month, weeks, byDate, sites);
   }
 
   return (

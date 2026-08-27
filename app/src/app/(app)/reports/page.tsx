@@ -185,10 +185,9 @@ export default async function ReportsPage({
 
   const [{ data: wlRows }, { data: wlSites }] = await Promise.all([
     supabase.from("work_logs").select("*").gte("log_date", wlStart).lte("log_date", wlEnd),
-    supabase.from("sites").select("id, name"),
+    supabase.from("sites").select("id, name, color"),
   ]);
-  const wlSiteNameById = new Map((wlSites ?? []).map((s) => [s.id, s.name]));
-  const workLogSummary = buildWorkLogSummary((wlRows ?? []) as WorkLog[], wlSiteNameById);
+  const workLogSummary = buildWorkLogSummary((wlRows ?? []) as WorkLog[], wlSites ?? []);
 
   const vendorRows = vendor
     ? transactions

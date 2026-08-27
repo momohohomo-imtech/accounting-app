@@ -30,18 +30,23 @@ function toHex2(n: number): string {
   return n.toString(16).padStart(2, "0").toUpperCase();
 }
 
-export function siteColorHex(siteId: string, saturation = 65, lightness = 55): string {
+/** 순수 해시 기반 자동 색 — 수동 지정 색이 없을 때의 기본값, 또는 "기본값으로" 재설정 시 미리보기용. */
+export function autoSiteColorHex(siteId: string, saturation = 65, lightness = 55): string {
   const [r, g, b] = hslToRgb(siteHue(siteId), saturation, lightness);
   return `#${toHex2(r)}${toHex2(g)}${toHex2(b)}`;
 }
 
-/** 엑셀 내보내기용 ARGB (알파 FF + RRGGBB). */
-export function siteColorExcelArgb(siteId: string): string {
-  return `FF${siteColorHex(siteId).slice(1)}`;
+/** 실제로 화면에 쓸 최종 색 — sites.color에 수동 지정 값이 있으면 그걸, 없으면 자동 색. */
+export function resolveSiteColor(siteId: string, overrideColor?: string | null): string {
+  return overrideColor || autoSiteColorHex(siteId);
 }
 
-/** 달력 칸 등에 바로 쓸 수 있는 인라인 스타일. site가 없으면 빈 객체(기본 배경 유지). */
-export function siteColorStyle(siteId: string | null | undefined): { backgroundColor: string; color: string } | Record<string, never> {
-  if (!siteId) return {};
-  return { backgroundColor: siteColorHex(siteId), color: "#ffffff" };
+/** 엑셀 내보내기용 ARGB (알파 FF + RRGGBB). */
+export function siteColorExcelArgb(siteId: string, overrideColor?: string | null): string {
+  return `FF${resolveSiteColor(siteId, overrideColor).slice(1).toUpperCase()}`;
+}
+
+/** 달력 칸 등에 바로 쓸 수 있는 인라인 스타일. */
+export function siteColorStyle(siteId: string, overrideColor?: string | null): { backgroundColor: string; color: string } {
+  return { backgroundColor: resolveSiteColor(siteId, overrideColor), color: "#ffffff" };
 }
