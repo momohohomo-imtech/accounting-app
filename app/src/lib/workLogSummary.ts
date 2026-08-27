@@ -1,0 +1,33 @@
+import type { WorkLog } from "@/lib/types";
+
+export type WorkLogSummaryRow = { siteId: string; siteName: string; title: string; days: number };
+
+/**
+ * 현장별로 "몇 일 같은 작업을 했는지" 집계.
+ * 날짜순으로 훑으면서 같은 현장에 내용이 빈 줄이 나오면 그 현장에서 마지막으로 입력됐던
+ * 내용을 그대로 이어받는다 — 매일 내용을 재입력하지 않고 현장만 골라도(연속 작업)
+ * 하나의 작업으로 합산되게 하기 위함. 현장이 지정되지 않은 줄은 집계 대상에서 제외.
+ */
+export function buildWorkLogSummary(rows: WorkLog[], siteNameById: Map<string, string>): WorkLogSummaryRow[] {
+  const sorted = [...rows].sort((a, b) => a.log_date.localeCompare(b.log_date));
+  const lastTitleBySite = new Map<string, string>();
+  const groups = new Map<string, { siteId: string; siteName: string; title: string; dates: Set<string> }>();
+
+  for (const l of sorted) {
+    if (!l.site_id) continue;
+    const explicitTitle = (l.title ?? "").trim();
+    const title = explicitTitle || lastTitleBySite.get(l.site_id) || "";
+    if (explicitTitle) lastTitleBySite.set(l.site_id, explicitTitle);
+    if (!title) continue;
+
+    const siteName = siteNameById.get(l.site_id) ?? "미지정";
+    const key = `${l.site_id}::${title}`;
+    const g = groups.get(key) ?? { siteId: l.site_id, siteName, title, dates: new Set<string>() };
+    g.dates.add(l.log_date);
+    groups.set(key, g);
+  }
+
+  return Array.from(groups.values())
+    .map((g) => ({ siteId: g.siteId, siteName: g.siteName, title: g.title, days: g.dates.size }))
+    .sort((a, b) => b.days - a.days);
+}

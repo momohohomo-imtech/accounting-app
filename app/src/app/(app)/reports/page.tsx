@@ -11,6 +11,10 @@ import { ReportAIInsights } from "@/components/ReportAIInsights";
 import { VendorAggregateTable } from "@/components/VendorAggregateTable";
 import { ProjectProfitTable } from "@/components/ProjectProfitTable";
 import { TransactionEditPopup } from "@/components/TransactionEditPopup";
+import { WorkLogSummaryTable } from "@/components/WorkLogSummaryTable";
+import { WorkLogMonthRangeFilter } from "@/components/WorkLogMonthRangeFilter";
+import { buildWorkLogSummary } from "@/lib/workLogSummary";
+import type { WorkLog } from "@/lib/types";
 
 const MONTH_LABELS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
 
@@ -34,6 +38,24 @@ function one<T>(v: T | T[] | null): T | null {
   return Array.isArray(v) ? v[0] ?? null : v;
 }
 
+function parseMonthRange(input: string | undefined): { start: number; end: number; label: string } {
+  const raw = (input ?? "1-12").trim();
+  const rangeMatch = raw.match(/^(\d{1,2})-(\d{1,2})$/);
+  if (rangeMatch) {
+    const a = Math.min(12, Math.max(1, Number(rangeMatch[1])));
+    const b = Math.min(12, Math.max(1, Number(rangeMatch[2])));
+    const start = Math.min(a, b);
+    const end = Math.max(a, b);
+    return { start, end, label: start === end ? `${start}월` : `${start}월~${end}월` };
+  }
+  const single = raw.match(/^(\d{1,2})$/);
+  if (single) {
+    const m = Math.min(12, Math.max(1, Number(single[1])));
+    return { start: m, end: m, label: `${m}월` };
+  }
+  return { start: 1, end: 12, label: "1월~12월" };
+}
+
 export default async function ReportsPage({
   searchParams,
 }: {
@@ -44,9 +66,10 @@ export default async function ReportsPage({
     site?: string;
     printProjects?: string;
     editTx?: string;
+    wlMonths?: string;
   }>;
 }) {
-  const { year, project, vendor, site, printProjects, editTx } = await searchParams;
+  const { year, project, vendor, site, printProjects, editTx, wlMonths } = await searchParams;
   const currentYear = new Date().getFullYear();
   const selectedYear = year ? Number(year) : currentYear;
 
@@ -154,6 +177,19 @@ export default async function ReportsPage({
   const byVendor = clientBreakdown("매입");
   const byCustomer = clientBreakdown("매출");
 
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const wlMonthRange = parseMonthRange(wlMonths);
+  const wlStart = `${selectedYear}-${pad(wlMonthRange.start)}-01`;
+  const wlEndLastDay = new Date(selectedYear, wlMonthRange.end, 0).getDate();
+  const wlEnd = `${selectedYear}-${pad(wlMonthRange.end)}-${pad(wlEndLastDay)}`;
+
+  const [{ data: wlRows }, { data: wlSites }] = await Promise.all([
+    supabase.from("work_logs").select("*").gte("log_date", wlStart).lte("log_date", wlEnd),
+    supabase.from("sites").select("id, name"),
+  ]);
+  const wlSiteNameById = new Map((wlSites ?? []).map((s) => [s.id, s.name]));
+  const workLogSummary = buildWorkLogSummary((wlRows ?? []) as WorkLog[], wlSiteNameById);
+
   const vendorRows = vendor
     ? transactions
         .filter((t) => t.type === "매입" && ((one(t.clients) as { name: string } | null)?.name ?? t.client_name_raw ?? "미지정") === vendor)
@@ -229,6 +265,20 @@ export default async function ReportsPage({
             rows={bySite.map((s) => [s.name, formatWon(s.sales), formatWon(s.purchase), formatWon(s.profit)])}
             headers={["현장", "매출", "매입", "손익"]}
             empty="현장 데이터가 없습니다."
+          />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title={`작업일지 집계 — ${selectedYear}년 ${wlMonthRange.label} 동안 같은 작업을 몇 일 했는지`}
+          headerExtra={
+            <div className="print:hidden">
+              <WorkLogMonthRangeFilter year={selectedYear} value={wlMonths ?? "1-12"} />
+            </div>
+          }
+        >
+          <WorkLogSummaryTable
+            rows={workLogSummary}
+            emptyMessage="이 기간에 현장이 지정된 작업일지가 없습니다."
           />
         </CollapsibleSection>
       </div>

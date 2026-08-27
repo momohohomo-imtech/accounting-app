@@ -100,6 +100,7 @@ export type WorkLog = {
   id: string;
   log_date: string;
   project_id: string | null;
+  site_id: string | null;
   title: string;
   workers: string | null;
   start_time: string | null;
@@ -109,6 +110,7 @@ export type WorkLog = {
   sort_order: number;
   created_at: string;
   projects?: Project;
+  sites?: Site;
 };
 
 export type Employee = {

@@ -2,11 +2,16 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { buildMonthGrid, WEEKDAY_LABELS } from "@/lib/calendar";
 import { workLogColorCellClass } from "@/lib/workLogColors";
+import { siteColorStyle } from "@/lib/siteColor";
+import { buildWorkLogSummary } from "@/lib/workLogSummary";
 import { WorkLogMonthFilter } from "@/components/WorkLogMonthFilter";
 import { WorkLogExportButtons } from "@/components/WorkLogExportButtons";
 import { WorkLogDayEditor } from "@/components/WorkLogDayEditor";
+import { WorkLogSummaryTable } from "@/components/WorkLogSummaryTable";
 import { cx } from "@/lib/cx";
 import type { WorkLog } from "@/lib/types";
+
+const HOLIDAY_TITLE = "휴무";
 
 export default async function WorkLogsPage({
   searchParams,
@@ -24,7 +29,7 @@ export default async function WorkLogsPage({
   const lastDay = new Date(selectedYear, selectedMonth, 0).getDate();
   const monthEnd = `${selectedYear}-${pad(selectedMonth)}-${pad(lastDay)}`;
 
-  const [{ data: logs }, { data: allDates }] = await Promise.all([
+  const [{ data: logs }, { data: allDates }, { data: sites }] = await Promise.all([
     supabase
       .from("work_logs")
       .select("*")
@@ -33,15 +38,21 @@ export default async function WorkLogsPage({
       .order("log_date", { ascending: true })
       .order("sort_order", { ascending: true }),
     supabase.from("work_logs").select("log_date"),
+    supabase.from("sites").select("id, name").order("name"),
   ]);
 
   const rows = (logs ?? []) as WorkLog[];
   const logsByDate = new Map<string, WorkLog[]>();
+  const holidayDates = new Set<string>();
   for (const l of rows) {
     const arr = logsByDate.get(l.log_date) ?? [];
     arr.push(l);
     logsByDate.set(l.log_date, arr);
+    if ((l.title ?? "").trim() === HOLIDAY_TITLE) holidayDates.add(l.log_date);
   }
+
+  const siteNameById = new Map((sites ?? []).map((s) => [s.id, s.name]));
+  const monthlySummary = buildWorkLogSummary(rows, siteNameById);
 
   const monthsByYear = new Map<number, Set<number>>();
   for (const { log_date } of allDates ?? []) {
@@ -65,7 +76,8 @@ export default async function WorkLogsPage({
           year={selectedYear}
           month={selectedMonth}
           weeks={weeks}
-          logs={rows.map((l) => ({ log_date: l.log_date, title: l.title, color: l.color }))}
+          logs={rows.map((l) => ({ log_date: l.log_date, title: l.title, color: l.color, site_id: l.site_id }))}
+          sites={sites ?? []}
         />
       </div>
 
@@ -92,15 +104,25 @@ export default async function WorkLogsPage({
           {weeks.map((week) => (
             <div key={week[0].dateKey} className="grid grid-cols-7">
               {week.map((cell) => {
+                const isHoliday = holidayDates.has(cell.dateKey);
                 const cellClass = cx(
                   "flex min-h-[110px] flex-col gap-0.5 border-b border-r border-slate-200 p-1.5 text-xs last:border-r-0",
-                  !cell.inMonth && "bg-slate-50"
+                  !cell.inMonth && "bg-slate-50",
+                  isHoliday && "bg-red-50"
                 );
                 const dayLabel = (
                   <span
                     className={cx(
                       "text-right font-mono text-[11px]",
-                      !cell.inMonth ? "text-slate-300" : cell.weekday === 0 ? "text-red-500" : cell.weekday === 6 ? "text-blue-500" : "text-slate-500"
+                      !cell.inMonth
+                        ? "text-slate-300"
+                        : isHoliday
+                          ? "font-bold text-red-600"
+                          : cell.weekday === 0
+                            ? "text-red-500"
+                            : cell.weekday === 6
+                              ? "text-blue-500"
+                              : "text-slate-500"
                     )}
                   >
                     {cell.day}
@@ -119,17 +141,22 @@ export default async function WorkLogsPage({
                   <Link key={cell.dateKey} href={`${basePath}&day=${cell.day}`} className={cx(cellClass, "hover:bg-slate-50")}>
                     {dayLabel}
                     <div className="flex flex-1 flex-col gap-0.5">
-                      {(logsByDate.get(cell.dateKey) ?? []).map((log) => (
-                        <span
-                          key={log.id}
-                          className={cx(
-                            "truncate rounded px-1 py-0.5 leading-tight print:whitespace-normal print:overflow-visible",
-                            workLogColorCellClass(log.color)
-                          )}
-                        >
-                          {log.title}
-                        </span>
-                      ))}
+                      {(logsByDate.get(cell.dateKey) ?? []).map((log) => {
+                        const label = log.title?.trim() || (log.site_id ? siteNameById.get(log.site_id) : "") || "";
+                        if (!label) return null;
+                        return (
+                          <span
+                            key={log.id}
+                            style={log.site_id ? siteColorStyle(log.site_id) : undefined}
+                            className={cx(
+                              "truncate rounded px-1 py-0.5 leading-tight print:whitespace-normal print:overflow-visible",
+                              !log.site_id && workLogColorCellClass(log.color)
+                            )}
+                          >
+                            {label}
+                          </span>
+                        );
+                      })}
                     </div>
                   </Link>
                 );
@@ -137,6 +164,13 @@ export default async function WorkLogsPage({
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-3 font-semibold text-slate-900">
+          {selectedYear}년 {selectedMonth}월 작업 집계 (현장·내용별 일수)
+        </h2>
+        <WorkLogSummaryTable rows={monthlySummary} emptyMessage="이 달에 현장이 지정된 작업일지가 없습니다." />
       </div>
 
       {savedYears.length > 0 && (

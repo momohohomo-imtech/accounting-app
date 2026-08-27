@@ -5,18 +5,20 @@ import { downloadWorkLogCalendarXlsx } from "@/lib/xlsxExport";
 import { PrintButton } from "@/components/PrintButton";
 import { Button } from "@/components/ui/Button";
 
-type LogEntry = { log_date: string; title: string; color: string | null };
+type LogEntry = { log_date: string; title: string; color: string | null; site_id: string | null };
 
 export function WorkLogExportButtons({
   year,
   month,
   weeks,
   logs,
+  sites = [],
 }: {
   year: number;
   month: number;
   weeks: MonthCell[][];
   logs: LogEntry[];
+  sites?: { id: string; name: string }[];
 }) {
   async function handleExport() {
     const byDate = new Map<string, LogEntry[]>();
@@ -25,7 +27,8 @@ export function WorkLogExportButtons({
       arr.push(l);
       byDate.set(l.log_date, arr);
     }
-    await downloadWorkLogCalendarXlsx(`${year}년_${month}월_작업일지.xlsx`, year, month, weeks, byDate);
+    const siteNameById = new Map(sites.map((s) => [s.id, s.name]));
+    await downloadWorkLogCalendarXlsx(`${year}년_${month}월_작업일지.xlsx`, year, month, weeks, byDate, siteNameById);
   }
 
   return (

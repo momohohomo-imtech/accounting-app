@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import type { MonthCell } from "@/lib/calendar";
 import { WEEKDAY_LABELS } from "@/lib/calendar";
 import { workLogColorExcelArgb } from "@/lib/workLogColors";
+import { siteColorExcelArgb } from "@/lib/siteColor";
 
 function triggerDownload(buffer: ExcelJS.Buffer, filename: string) {
   const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -139,7 +140,8 @@ export async function downloadWorkLogCalendarXlsx(
   year: number,
   month: number,
   weeks: MonthCell[][],
-  logsByDate: Map<string, { title: string; color: string | null }[]>
+  logsByDate: Map<string, { title: string; color: string | null; site_id: string | null }[]>,
+  siteNameById: Map<string, string> = new Map()
 ) {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet(`${year}-${String(month).padStart(2, "0")}`);
@@ -165,10 +167,16 @@ export async function downloadWorkLogCalendarXlsx(
     });
 
     for (let i = 0; i < 5; i++) {
-      const entryRow = ws.addRow(week.map((c) => logsByDate.get(c.dateKey)?.[i]?.title ?? ""));
+      const entryRow = ws.addRow(
+        week.map((c) => {
+          const entry = logsByDate.get(c.dateKey)?.[i];
+          if (!entry) return "";
+          return entry.title?.trim() || (entry.site_id ? siteNameById.get(entry.site_id) : "") || "";
+        })
+      );
       entryRow.eachCell((cell, colNumber) => {
         const entry = logsByDate.get(week[colNumber - 1].dateKey)?.[i];
-        const argb = entry ? workLogColorExcelArgb(entry.color) : null;
+        const argb = entry ? (entry.site_id ? siteColorExcelArgb(entry.site_id) : workLogColorExcelArgb(entry.color)) : null;
         if (argb) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } };
       });
     }
