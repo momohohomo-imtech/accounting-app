@@ -2,10 +2,23 @@ import { createClient } from "@/lib/supabase/server";
 import { BackupNowButton } from "@/components/BackupNowButton";
 import { BackupsTable } from "@/components/BackupsTable";
 import { CalculatorsSection } from "@/components/CalculatorsSection";
+import { TaxAgentAccountPanel } from "@/components/TaxAgentAccountPanel";
+import { getTaxAgentAccounts } from "@/lib/actions/tax-agent";
 
 export default async function BackupsPage() {
   const supabase = await createClient();
-  const { data: backups } = await supabase.from("backups").select("*").order("created_at", { ascending: false });
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: profile } = user
+    ? await supabase.from("users").select("role").eq("id", user.id).maybeSingle()
+    : { data: null };
+  const isAdmin = profile?.role === "admin";
+
+  const [{ data: backups }, taxAgentAccounts] = await Promise.all([
+    supabase.from("backups").select("*").order("created_at", { ascending: false }),
+    isAdmin ? getTaxAgentAccounts() : Promise.resolve([]),
+  ]);
 
   const withLinks = await Promise.all(
     (backups ?? []).map(async (b) => {
@@ -33,6 +46,10 @@ export default async function BackupsPage() {
           <BackupsTable backups={withLinks} />
         </div>
       </div>
+
+      {isAdmin && (
+        <TaxAgentAccountPanel accounts={taxAgentAccounts} adminApiConfigured={Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)} />
+      )}
     </div>
   );
 }
