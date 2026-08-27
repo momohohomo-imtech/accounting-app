@@ -28,19 +28,21 @@ export function WorkLogRowInput({
         style={siteId ? { backgroundColor: siteColorHex(siteId) } : { backgroundColor: "#fff" }}
         title={siteId ? sites.find((s) => s.id === siteId)?.name : "현장 없음"}
       />
-      <select
-        name={`site_id_${index}`}
-        value={siteId}
-        onChange={(e) => setSiteId(e.target.value)}
-        className={`${fieldClass} w-32 shrink-0`}
-      >
-        <option value="">현장 없음</option>
-        {sites.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name}
-          </option>
-        ))}
-      </select>
+      <div className="w-32 shrink-0">
+        <select
+          name={`site_id_${index}`}
+          value={siteId}
+          onChange={(e) => setSiteId(e.target.value)}
+          className={fieldClass}
+        >
+          <option value="">현장 없음</option>
+          {sites.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </div>
       <input
         name={`title_${index}`}
         defaultValue={defaultTitle}
