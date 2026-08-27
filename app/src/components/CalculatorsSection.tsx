@@ -286,7 +286,6 @@ function UnitPriceCalculator() {
 export function CalculatorsSection() {
   return (
     <div className="space-y-3">
-      <h2 className="text-lg font-semibold text-slate-900">계산기</h2>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <BillDiscountCalculator />
         <VatAddCalculator />

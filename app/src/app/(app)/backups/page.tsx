@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { BackupNowButton } from "@/components/BackupNowButton";
 import { BackupsTable } from "@/components/BackupsTable";
-import { CalculatorsSection } from "@/components/CalculatorsSection";
 import { TaxAgentAccountPanel } from "@/components/TaxAgentAccountPanel";
 import { getTaxAgentAccounts } from "@/lib/actions/tax-agent";
 
@@ -34,8 +33,6 @@ export default async function BackupsPage() {
 
   return (
     <div className="space-y-6">
-      <CalculatorsSection />
-
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900">백업</h1>
         <BackupNowButton />

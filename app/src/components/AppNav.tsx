@@ -14,7 +14,8 @@ const NAV = [
   { href: "/bank", label: "은행 거래내역" },
   { href: "/reports", label: "보고서" },
   { href: "/memos", label: "메모장" },
-  { href: "/backups", label: "계산기·백업" },
+  { href: "/calculators", label: "계산기" },
+  { href: "/backups", label: "백업" },
 ];
 
 function isActive(pathname: string, href: string) {
