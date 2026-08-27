@@ -266,7 +266,14 @@ export function TransactionTable({
                     <form action={deleteTransactionRecord} className="flex items-center gap-1">
                       <input type="hidden" name="id" value={t.id} />
                       <span className="text-xs font-medium text-red-600">정말 삭제?</span>
-                      <Button variant="danger" size="xs" type="submit">
+                      <Button
+                        variant="danger"
+                        size="xs"
+                        type="submit"
+                        onClick={(e) => {
+                          if (!confirm("정말로 이 내역을 삭제하시겠습니까? 삭제하면 복구할 수 없습니다.")) e.preventDefault();
+                        }}
+                      >
                         확인
                       </Button>
                       <Button variant="secondary" size="xs" type="button" onClick={() => setConfirmDeleteId(null)}>

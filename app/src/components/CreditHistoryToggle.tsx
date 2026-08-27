@@ -60,6 +60,11 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
     [groups, year, month]
   );
 
+  const grandTotal = useMemo(
+    () => filtered.reduce((sum, g) => sum + g.items.reduce((s, it) => s + it.amount, 0), 0),
+    [filtered]
+  );
+
   async function handleExport() {
     const rows: (string | number)[][] = [];
     for (const g of filtered) {
@@ -86,6 +91,12 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
         >
           {open ? "거래처별 이력 숨기기" : "거래처별 이력 보기"}
         </button>
+        {open && (
+          <span className="text-sm text-slate-500">
+            전체 {filtered.reduce((n, g) => n + g.items.length, 0)}건 · 합계{" "}
+            <span className="font-semibold text-slate-900">{formatWon(grandTotal)}</span>
+          </span>
+        )}
         {open && (
           <div className="flex flex-wrap items-center gap-2 print:hidden">
             <select value={year} onChange={(e) => setYear(e.target.value)} className={fieldClass}>
@@ -148,7 +159,14 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
                         <form action={deleteTransactionRecord} className="flex shrink-0 items-center gap-1 print:hidden">
                           <input type="hidden" name="id" value={it.id} />
                           <span className="text-xs font-medium text-red-600">정말 삭제?</span>
-                          <Button variant="danger" size="xs" type="submit">
+                          <Button
+                            variant="danger"
+                            size="xs"
+                            type="submit"
+                            onClick={(e) => {
+                              if (!confirm("정말로 이 내역을 삭제하시겠습니까? 삭제하면 복구할 수 없습니다.")) e.preventDefault();
+                            }}
+                          >
                             확인
                           </Button>
                           <Button variant="secondary" size="xs" type="button" onClick={() => setConfirmDeleteId(null)}>
