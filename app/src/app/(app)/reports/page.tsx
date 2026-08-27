@@ -267,20 +267,6 @@ export default async function ReportsPage({
             empty="현장 데이터가 없습니다."
           />
         </CollapsibleSection>
-
-        <CollapsibleSection
-          title={`작업일지 집계 — ${selectedYear}년 ${wlMonthRange.label} 동안 같은 작업을 몇 일 했는지`}
-          headerExtra={
-            <div className="print:hidden">
-              <WorkLogMonthRangeFilter year={selectedYear} value={wlMonths ?? "1-12"} />
-            </div>
-          }
-        >
-          <WorkLogSummaryTable
-            rows={workLogSummary}
-            emptyMessage="이 기간에 현장이 지정된 작업일지가 없습니다."
-          />
-        </CollapsibleSection>
       </div>
 
       <CollapsibleSection
@@ -322,6 +308,20 @@ export default async function ReportsPage({
             rows={byCustomer.map((v) => [v.name, `${v.count}건`, formatWon(v.amount)])}
             headers={["거래처", "건수", "매출 합계"]}
             empty="매출 거래가 없습니다."
+          />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title={`작업일지 집계 — ${selectedYear}년 ${wlMonthRange.label} 동안 같은 작업을 몇 일 했는지`}
+          headerExtra={
+            <div className="print:hidden">
+              <WorkLogMonthRangeFilter year={selectedYear} value={wlMonths ?? "1-12"} />
+            </div>
+          }
+        >
+          <WorkLogSummaryTable
+            rows={workLogSummary}
+            emptyMessage="이 기간에 현장이 지정된 작업일지가 없습니다."
           />
         </CollapsibleSection>
       </div>

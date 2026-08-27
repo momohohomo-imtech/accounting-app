@@ -46,7 +46,7 @@ export function WorkLogRowInput({
         defaultValue={defaultTitle}
         placeholder={`${index + 1}번째 내용 (예: 파이프공사, 휴무)`}
         list={contentListId}
-        className={fieldClass}
+        className={`${fieldClass} min-w-0 flex-1`}
       />
     </div>
   );
