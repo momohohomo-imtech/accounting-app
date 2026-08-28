@@ -22,8 +22,9 @@ function emptyEquipment(): BusinessTripEquipment {
 function emptyExpense(): BusinessTripExpense {
   return { vendor: "", amount: "", note: "" };
 }
-function emptyProject(): BusinessTripProject {
+function emptyProject(workDate: string): BusinessTripProject {
   return {
+    work_date: workDate,
     project_name: "",
     workers: [emptyWorker(), emptyWorker(), emptyWorker()],
     personnel_note: "",
@@ -36,7 +37,6 @@ function emptyProject(): BusinessTripProject {
 function ProjectBlockEditor({
   project,
   index,
-  workDate,
   onChange,
   onRemove,
   canRemove,
@@ -44,7 +44,6 @@ function ProjectBlockEditor({
 }: {
   project: BusinessTripProject;
   index: number;
-  workDate: string;
   onChange: (p: BusinessTripProject) => void;
   onRemove: () => void;
   canRemove: boolean;
@@ -63,7 +62,7 @@ function ProjectBlockEditor({
     setPickerOpen(next);
     if (next) {
       setLoadingEntries(true);
-      const entries = await getWorkLogsForDate(workDate);
+      const entries = await getWorkLogsForDate(project.work_date);
       setDateEntries(entries);
       setLoadingEntries(false);
     }
@@ -91,6 +90,12 @@ function ProjectBlockEditor({
         <div className="relative flex flex-1 items-center gap-2">
           <span className="shrink-0 text-xs font-medium text-slate-400">프로젝트 #{index + 1}</span>
           <input
+            type="date"
+            value={project.work_date}
+            onChange={(e) => onChange({ ...project, work_date: e.target.value })}
+            className={`${fieldClass} w-40 shrink-0`}
+          />
+          <input
             value={project.project_name}
             onChange={(e) => onChange({ ...project, project_name: e.target.value })}
             placeholder="프로젝트명 (직접 입력 또는 달력에서 선택)"
@@ -105,7 +110,7 @@ function ProjectBlockEditor({
           </button>
           {pickerOpen && (
             <div className="absolute left-0 top-full z-10 mt-1 w-full max-w-sm rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
-              <p className="mb-1 px-1 text-xs text-slate-400">{workDate} 작업일지 내역</p>
+              <p className="mb-1 px-1 text-xs text-slate-400">{project.work_date} 작업일지 내역</p>
               {loadingEntries ? (
                 <p className="px-1 py-2 text-xs text-slate-400">불러오는 중...</p>
               ) : dateEntries && dateEntries.length > 0 ? (
@@ -146,7 +151,7 @@ function ProjectBlockEditor({
             + 인원 추가
           </button>
         </div>
-        <p className="mb-1.5 text-xs text-slate-400">근무일은 상단 공사일과 동일하게 적용됩니다.</p>
+        <p className="mb-1.5 text-xs text-slate-400">근무일은 이 프로젝트의 공사일과 동일하게 적용됩니다.</p>
         <div className="space-y-1.5">
           <div className="grid grid-cols-[1fr_5rem_1fr_3rem] gap-2 px-1 text-xs font-medium text-slate-500">
             <span>작업자명</span>
@@ -305,12 +310,13 @@ export function BusinessTripLogForm({
 
   const [clientName, setClientName] = useState(initial?.client_name ?? "");
   const [siteName, setSiteName] = useState(initial?.site_name ?? "");
-  const [workDateValue, setWorkDateValue] = useState(workDate);
   const [createdDate, setCreatedDate] = useState(initial?.created_date ?? today);
   const [workTypes, setWorkTypes] = useState<Set<string>>(new Set(initial?.work_types ?? []));
   const [note, setNote] = useState(initial?.note ?? "");
   const [projects, setProjects] = useState<BusinessTripProject[]>(
-    initial?.projects?.length ? initial.projects.map((p) => ({ ...p, personnel_note: p.personnel_note ?? "" })) : [emptyProject()]
+    initial?.projects?.length
+      ? initial.projects.map((p) => ({ ...p, work_date: p.work_date ?? workDate, personnel_note: p.personnel_note ?? "" }))
+      : [emptyProject(workDate)]
   );
   const [saving, setSaving] = useState(false);
 
@@ -334,7 +340,6 @@ export function BusinessTripLogForm({
     if (initial) fd.append("id", initial.id);
     fd.append("client_name", clientName);
     fd.append("site_name", siteName);
-    fd.append("work_date", workDateValue);
     fd.append("created_date", createdDate);
     workTypes.forEach((t) => fd.append("work_types", t));
     fd.append("note", note);
@@ -362,10 +367,6 @@ export function BusinessTripLogForm({
           <input value={siteName} onChange={(e) => setSiteName(e.target.value)} className={fieldClass} />
         </div>
         <div className="flex flex-col gap-1">
-          <label className={labelClass}>공사일</label>
-          <input type="date" value={workDateValue} onChange={(e) => setWorkDateValue(e.target.value)} className={fieldClass} />
-        </div>
-        <div className="flex flex-col gap-1">
           <label className={labelClass}>작성일</label>
           <input type="date" value={createdDate} onChange={(e) => setCreatedDate(e.target.value)} className={fieldClass} />
         </div>
@@ -391,7 +392,9 @@ export function BusinessTripLogForm({
           <h2 className="font-semibold text-slate-900">프로젝트별 내역 (하루에 여러 프로젝트 가능)</h2>
           <button
             type="button"
-            onClick={() => setProjects((prev) => [...prev, emptyProject()])}
+            onClick={() =>
+              setProjects((prev) => [...prev, emptyProject(prev[prev.length - 1]?.work_date ?? today)])
+            }
             className="text-xs font-medium text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
           >
             + 프로젝트 추가
@@ -402,7 +405,6 @@ export function BusinessTripLogForm({
             key={i}
             project={p}
             index={i}
-            workDate={workDateValue}
             onChange={(updated) => updateProject(i, updated)}
             onRemove={() => setProjects((prev) => prev.filter((_, idx) => idx !== i))}
             canRemove={projects.length > 1}

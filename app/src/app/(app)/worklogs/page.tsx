@@ -91,7 +91,7 @@ async function WorkLogCalendarSection({
       .order("sort_order", { ascending: true }),
     supabase.from("work_logs").select("log_date"),
     supabase.from("sites").select("id, name, color").order("name"),
-    supabase.from("business_trip_logs").select("work_date").gte("work_date", monthStart).lte("work_date", monthEnd),
+    supabase.from("business_trip_logs").select("projects"),
   ]);
 
   const rows = (logs ?? []) as WorkLog[];
@@ -104,7 +104,9 @@ async function WorkLogCalendarSection({
     if ((l.title ?? "").trim() === HOLIDAY_TITLE) holidayDates.add(l.log_date);
   }
 
-  const tripDates = new Set((tripLogs ?? []).map((t) => t.work_date));
+  const tripDates = new Set(
+    (tripLogs ?? []).flatMap((t) => (t.projects as { work_date?: string }[] | null ?? []).map((p) => p.work_date))
+  );
 
   const siteNameById = new Map((sites ?? []).map((s) => [s.id, s.name]));
   const siteColorById = new Map((sites ?? []).map((s) => [s.id, s.color]));

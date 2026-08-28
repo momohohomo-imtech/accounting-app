@@ -235,12 +235,15 @@ export type Backup = {
   created_at: string;
 };
 
-// 근무일은 항상 출장일지 상단의 공사일과 동일하므로 인원별로 따로 갖지 않는다.
+// 근무일은 항상 그 프로젝트 줄의 공사일과 동일하므로 인원별로 따로 갖지 않는다.
 export type BusinessTripWorker = { name: string; overtime: boolean; note: string };
 export type BusinessTripEquipment = { name: string; location: string; hours: string; note: string };
 export type BusinessTripExpense = { vendor: string; amount: string; note: string };
 
+// 공사일은 프로젝트마다 따로 가진다 — 한 출장일지 안에 서로 다른 날짜의
+// 같거나 다른 프로젝트를 여러 줄로 기록할 수 있게 하기 위함.
 export type BusinessTripProject = {
+  work_date: string;
   project_name: string;
   workers: BusinessTripWorker[];
   personnel_note: string;
@@ -251,6 +254,7 @@ export type BusinessTripProject = {
 
 export type BusinessTripLog = {
   id: string;
+  // 프로젝트들 중 가장 이른 공사일 — 목록 정렬/기본 표시용으로 서버에서 자동 계산.
   work_date: string;
   created_date: string;
   client_name: string | null;

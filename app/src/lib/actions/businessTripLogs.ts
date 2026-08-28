@@ -13,14 +13,19 @@ function parseJsonField(formData: FormData, key: string) {
 }
 
 function parse(formData: FormData) {
+  const projects = parseJsonField(formData, "projects_json") as { work_date?: string }[];
+  // 목록 정렬/기본 표시용 대표 날짜 — 프로젝트별 공사일 중 가장 이른 날짜.
+  const dates = projects.map((p) => p.work_date).filter((d): d is string => Boolean(d)).sort();
+  const workDate = dates[0] ?? new Date().toISOString().slice(0, 10);
+
   return {
-    work_date: String(formData.get("work_date") ?? ""),
+    work_date: workDate,
     created_date: String(formData.get("created_date") ?? ""),
     client_name: String(formData.get("client_name") ?? "") || null,
     site_name: String(formData.get("site_name") ?? "") || null,
     work_types: formData.getAll("work_types").map(String),
     note: String(formData.get("note") ?? "") || null,
-    projects: parseJsonField(formData, "projects_json"),
+    projects,
   };
 }
 

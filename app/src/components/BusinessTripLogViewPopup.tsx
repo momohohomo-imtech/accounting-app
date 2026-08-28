@@ -82,7 +82,6 @@ export function BusinessTripLogViewPopup({ log, onClose }: { log: BusinessTripLo
               <div className="grid grid-cols-1 gap-3 border-b border-slate-100 pb-4 sm:grid-cols-3">
                 <Field label="원청사" value={log.client_name ?? ""} />
                 <Field label="현장명" value={log.site_name ?? ""} />
-                <Field label="공사일" value={log.work_date} />
                 <Field label="작성일" value={log.created_date} />
                 <Field label="작업구분" value={log.work_types.join(", ")} />
                 <div className="sm:col-span-3">
@@ -92,8 +91,9 @@ export function BusinessTripLogViewPopup({ log, onClose }: { log: BusinessTripLo
 
               {log.projects.map((p, pi) => (
                 <div key={pi} className="mt-4 border-t border-slate-100 pt-4 first:mt-0 first:border-0 first:pt-0">
-                  <h3 className="mb-3 font-semibold text-slate-900">
-                    {p.project_name || `프로젝트 ${pi + 1}`}
+                  <h3 className="mb-3 flex items-baseline gap-2 font-semibold text-slate-900">
+                    <span>{p.project_name || `프로젝트 ${pi + 1}`}</span>
+                    <span className="text-xs font-normal text-slate-400">{p.work_date}</span>
                   </h3>
 
                   <p className="mb-1 text-sm font-medium text-slate-700">작업 인원 내역</p>

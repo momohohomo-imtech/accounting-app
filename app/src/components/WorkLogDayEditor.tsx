@@ -16,8 +16,12 @@ export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string
     supabase.from("work_logs").select("*").eq("log_date", dateKey).order("sort_order", { ascending: true }),
     supabase.from("sites").select("id, name, color").order("name"),
     supabase.from("work_logs").select("title").gte("log_date", monthStart).lte("log_date", monthEnd),
-    supabase.from("business_trip_logs").select("*").eq("work_date", dateKey),
+    supabase.from("business_trip_logs").select("*"),
   ]);
+
+  const dayTripLogs = ((tripLogs ?? []) as BusinessTripLog[]).filter((t) =>
+    t.projects.some((p) => p.work_date === dateKey)
+  );
 
   const rows = Array.from({ length: 5 }, (_, i) => logs?.[i] ?? null);
   const contentSuggestions = Array.from(
@@ -33,7 +37,7 @@ export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string
         </Link>
       </div>
 
-      <WorkLogDayTripLinks logs={(tripLogs ?? []) as BusinessTripLog[]} />
+      <WorkLogDayTripLinks logs={dayTripLogs} />
 
       <WorkLogForm dateKey={dateKey} rows={rows} sites={sites ?? []} contentSuggestions={contentSuggestions} />
     </div>

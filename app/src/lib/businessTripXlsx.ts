@@ -20,13 +20,13 @@ export async function downloadBusinessTripLogXlsx(log: BusinessTripLog) {
   ws.addRow([]);
 
   ws.addRow(["원청사", log.client_name ?? "", "현장명", log.site_name ?? ""]);
-  ws.addRow(["작성일", log.created_date, "공사일", log.work_date]);
+  ws.addRow(["작성일", log.created_date]);
   ws.addRow(["작업구분", log.work_types.join(", ")]);
   ws.addRow(["비고", log.note ?? ""]);
 
   for (const p of log.projects) {
     ws.addRow([]);
-    ws.addRow([`프로젝트: ${p.project_name || "-"}`]).font = { bold: true };
+    ws.addRow([`프로젝트: ${p.project_name || "-"}`, "공사일", p.work_date]).font = { bold: true };
 
     ws.addRow(["작업 인원 내역"]).font = { bold: true };
     const workerHeader = ws.addRow(["작업자명", "추가근무", "비고"]);
