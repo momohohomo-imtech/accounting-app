@@ -4,6 +4,7 @@ import { formatWon, formatDate } from "@/lib/format";
 import { remainingBalance } from "@/lib/credit";
 import type { CreditPayment, Transaction } from "@/lib/types";
 import { TaxEstimateSection } from "@/components/sections/TaxEstimateSection";
+import { PendingPaymentProfitSection } from "@/components/sections/PendingPaymentProfitSection";
 import { YearFilter } from "@/components/YearFilter";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -92,6 +93,7 @@ export default async function DashboardPage({
       </div>
 
       <TaxEstimateSection />
+      <PendingPaymentProfitSection />
 
       <div className="space-y-3">
         <div className="flex items-center justify-between">
