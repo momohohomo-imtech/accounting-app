@@ -97,7 +97,9 @@ export function WorkLogGroupDetailPopup({
               {siteName}
             </p>
             <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-            <p className="mt-0.5 text-xs text-slate-400">{year}년 전체 내역</p>
+            <p className="mt-0.5 text-xs text-slate-400">
+              {year}년 전체 내역{entries !== null && ` · 총 ${entries.length}일`}
+            </p>
           </div>
           <button type="button" onClick={onClose} className="text-sm text-slate-500 hover:text-slate-800">
             닫기
