@@ -201,7 +201,9 @@ export default async function ReportsPage({
 
   return (
     <div className="space-y-6">
-      {isolateProjects && <AutoPrint />}
+      {isolateProjects && (
+        <AutoPrint cleanupHref={`/reports?year=${selectedYear}${site ? `&site=${site}` : ""}`} />
+      )}
 
       <div className={popupOpen || isolateProjects ? "space-y-6 print:hidden" : "space-y-6"}>
         <div className="flex flex-wrap items-center justify-between gap-3">
