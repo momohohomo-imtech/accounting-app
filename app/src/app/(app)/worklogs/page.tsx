@@ -80,7 +80,12 @@ export default async function WorkLogsPage({
 
       <div className={isolateSummary ? "space-y-4 print:hidden" : "space-y-4"}>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h1 className="text-2xl font-bold text-slate-900">작업일지</h1>
+          <h1 className="text-2xl font-bold text-slate-900">
+            작업일지{" "}
+            <span className="hidden text-lg font-normal text-slate-500 print:inline">
+              {selectedYear}년 {selectedMonth}월
+            </span>
+          </h1>
           <WorkLogExportButtons
             year={selectedYear}
             month={selectedMonth}
