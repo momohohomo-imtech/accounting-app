@@ -11,6 +11,7 @@ type VendorRow = {
   item_name: string | null;
   amount: number;
   project_name: string | null;
+  needs_classification: boolean;
 };
 
 type SortKey = "trans_date" | "project_name" | "item_name" | "amount";
@@ -109,7 +110,13 @@ export function VendorDetailReport({
               <tr key={r.id} className="border-b border-slate-100 last:border-0">
                 <td className="py-2 pr-4 text-slate-600">{formatDate(r.trans_date)}</td>
                 <td className="py-2 pr-4 text-slate-700">
-                  {r.project_name ?? <span className="font-medium text-red-600">일반경비</span>}
+                  {r.needs_classification ? (
+                    <span className="inline-flex rounded-full bg-green-600 px-2 py-0.5 text-xs font-medium text-white">
+                      분류 대기 중
+                    </span>
+                  ) : (
+                    (r.project_name ?? <span className="font-medium text-red-600">일반경비</span>)
+                  )}
                 </td>
                 <td className="py-2 pr-4 text-slate-700">{r.item_name ?? "-"}</td>
                 <td className="py-2 text-right font-mono text-slate-900">{formatWon(r.amount)}</td>

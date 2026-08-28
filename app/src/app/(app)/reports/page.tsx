@@ -31,6 +31,7 @@ type Row = {
   sales_vat: number;
   purchase_amount: number;
   purchase_vat: number;
+  needs_classification: boolean;
   clients: { name: string } | { name: string }[] | null;
   projects: { name: string; sites: { name: string } | { name: string }[] | null } | { name: string; sites: { name: string } | { name: string }[] | null }[] | null;
 };
@@ -182,6 +183,7 @@ export default async function ReportsPage({
           item_name: t.item_name,
           amount: t.purchase_amount + t.purchase_vat,
           project_name: (one(t.projects) as { name: string } | null)?.name ?? null,
+          needs_classification: t.needs_classification,
         }))
     : [];
 

@@ -14,6 +14,7 @@ export type VendorHistoryItem = {
   trans_date: string;
   item_name: string | null;
   project_name: string | null;
+  needs_classification: boolean;
   amount: number;
   status: "미정산" | "즉시결제" | "정산완료" | "정산 합계";
   methodName: string | null;
@@ -142,7 +143,13 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
                         {it.status}
                       </Badge>
                       <span className="w-28 shrink-0 truncate text-slate-500">
-                        {it.project_name ?? <span className="font-medium text-red-600">일반경비</span>}
+                        {it.needs_classification ? (
+                          <span className="inline-flex rounded-full bg-green-600 px-2 py-0.5 text-xs font-medium text-white">
+                            분류 대기 중
+                          </span>
+                        ) : (
+                          (it.project_name ?? <span className="font-medium text-red-600">일반경비</span>)
+                        )}
                       </span>
                       <span className="flex-1 truncate text-slate-700">{it.item_name ?? "-"}</span>
                       <span className="w-20 shrink-0 truncate text-right text-slate-400">{it.methodName ?? ""}</span>

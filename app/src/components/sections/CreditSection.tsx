@@ -103,6 +103,7 @@ export async function CreditSection() {
       trans_date: tx.trans_date,
       item_name: tx.item_name,
       project_name: tx.projects?.name ?? null,
+      needs_classification: tx.needs_classification,
       amount: transactionTotal(tx),
       status,
       methodName: tx.payment_methods?.name ?? null,
