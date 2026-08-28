@@ -29,10 +29,10 @@ export async function downloadBusinessTripLogXlsx(log: BusinessTripLog) {
     ws.addRow([`프로젝트: ${p.project_name || "-"}`, "공사일", p.work_date]).font = { bold: true };
 
     ws.addRow(["작업 인원 내역"]).font = { bold: true };
-    const workerHeader = ws.addRow(["작업자명", "추가근무", "비고"]);
+    const workerHeader = ws.addRow(["공사일", "작업자명", "추가근무", "비고"]);
     workerHeader.font = { bold: true };
     for (const w of p.workers) {
-      ws.addRow([w.name, w.overtime ? "O" : "", w.note]);
+      ws.addRow([w.work_date, w.name, w.overtime ? "O" : "", w.note]);
     }
     if (p.personnel_note) ws.addRow(["비고", p.personnel_note]);
     ws.addRow(["총 공수", `${p.total_manpower || ""}명`]);

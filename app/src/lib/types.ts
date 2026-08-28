@@ -235,8 +235,8 @@ export type Backup = {
   created_at: string;
 };
 
-// 근무일은 항상 그 프로젝트 줄의 공사일과 동일하므로 인원별로 따로 갖지 않는다.
-export type BusinessTripWorker = { name: string; overtime: boolean; note: string };
+// 근무일은 기본으로 그 프로젝트의 공사일을 따라가지만, 인원별로 다른 날짜로 수정할 수 있다.
+export type BusinessTripWorker = { work_date: string; name: string; overtime: boolean; note: string };
 export type BusinessTripEquipment = { name: string; location: string; hours: string; note: string };
 export type BusinessTripExpense = { vendor: string; amount: string; note: string };
 

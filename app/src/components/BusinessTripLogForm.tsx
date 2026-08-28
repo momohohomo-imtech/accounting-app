@@ -13,8 +13,8 @@ import { getWorkLogsForDate, type WorkLogDateEntry } from "@/lib/actions/worklog
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { Button } from "@/components/ui/Button";
 
-function emptyWorker(): BusinessTripWorker {
-  return { name: "", overtime: false, note: "" };
+function emptyWorker(workDate: string): BusinessTripWorker {
+  return { work_date: workDate, name: "", overtime: false, note: "" };
 }
 function emptyEquipment(): BusinessTripEquipment {
   return { name: "", location: "", hours: "", note: "" };
@@ -26,7 +26,7 @@ function emptyProject(workDate: string): BusinessTripProject {
   return {
     work_date: workDate,
     project_name: "",
-    workers: [emptyWorker(), emptyWorker(), emptyWorker()],
+    workers: [emptyWorker(workDate), emptyWorker(workDate), emptyWorker(workDate)],
     personnel_note: "",
     total_manpower: "",
     equipment: [emptyEquipment()],
@@ -87,27 +87,32 @@ function ProjectBlockEditor({
   return (
     <div className="space-y-4 rounded-xl border border-slate-200 p-4">
       <div className="flex items-center justify-between gap-2">
-        <div className="relative flex flex-1 items-center gap-2">
-          <span className="shrink-0 text-xs font-medium text-slate-400">프로젝트 #{index + 1}</span>
+        <span className="text-xs font-medium text-slate-400">프로젝트 #{index + 1}</span>
+        {canRemove && (
+          <button type="button" onClick={onRemove} className="shrink-0 text-xs text-red-500 hover:text-red-700">
+            프로젝트 삭제
+          </button>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[9rem_1fr_auto] sm:items-end">
+        <div className="flex flex-col gap-1">
+          <label className={labelClass}>공사일</label>
           <input
             type="date"
             value={project.work_date}
             onChange={(e) => onChange({ ...project, work_date: e.target.value })}
-            className={`${fieldClass} w-40 shrink-0`}
+            className={fieldClass}
           />
+        </div>
+        <div className="relative flex flex-col gap-1">
+          <label className={labelClass}>프로젝트명</label>
           <input
             value={project.project_name}
             onChange={(e) => onChange({ ...project, project_name: e.target.value })}
-            placeholder="프로젝트명 (직접 입력 또는 달력에서 선택)"
-            className={`${fieldClass} flex-1`}
+            placeholder="직접 입력 또는 달력에서 선택"
+            className={fieldClass}
           />
-          <button
-            type="button"
-            onClick={togglePicker}
-            className="shrink-0 rounded-lg border border-slate-300 px-2.5 py-2 text-xs text-slate-600 hover:bg-slate-100"
-          >
-            달력에서 선택
-          </button>
           {pickerOpen && (
             <div className="absolute left-0 top-full z-10 mt-1 w-full max-w-sm rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
               <p className="mb-1 px-1 text-xs text-slate-400">{project.work_date} 작업일지 내역</p>
@@ -133,11 +138,13 @@ function ProjectBlockEditor({
             </div>
           )}
         </div>
-        {canRemove && (
-          <button type="button" onClick={onRemove} className="shrink-0 text-xs text-red-500 hover:text-red-700">
-            프로젝트 삭제
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={togglePicker}
+          className="shrink-0 rounded-lg border border-slate-300 px-2.5 py-2 text-xs text-slate-600 hover:bg-slate-100"
+        >
+          달력에서 선택
+        </button>
       </div>
 
       <div>
@@ -145,22 +152,29 @@ function ProjectBlockEditor({
           <h3 className="text-sm font-semibold text-slate-900">작업 인원 내역</h3>
           <button
             type="button"
-            onClick={() => onChange({ ...project, workers: [...project.workers, emptyWorker()] })}
+            onClick={() => onChange({ ...project, workers: [...project.workers, emptyWorker(project.work_date)] })}
             className="text-xs font-medium text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
           >
             + 인원 추가
           </button>
         </div>
-        <p className="mb-1.5 text-xs text-slate-400">근무일은 이 프로젝트의 공사일과 동일하게 적용됩니다.</p>
+        <p className="mb-1.5 text-xs text-slate-400">근무일은 기본으로 공사일을 따라가며, 필요하면 인원별로 수정할 수 있습니다.</p>
         <div className="space-y-1.5">
-          <div className="grid grid-cols-[1fr_5rem_1fr_3rem] gap-2 px-1 text-xs font-medium text-slate-500">
+          <div className="grid grid-cols-[8rem_1fr_5rem_1fr_3rem] gap-2 px-1 text-xs font-medium text-slate-500">
+            <span>공사일</span>
             <span>작업자명</span>
             <span>추가근무</span>
             <span>비고</span>
             <span />
           </div>
           {project.workers.map((w, i) => (
-            <div key={i} className="grid grid-cols-[1fr_5rem_1fr_3rem] items-center gap-2">
+            <div key={i} className="grid grid-cols-[8rem_1fr_5rem_1fr_3rem] items-center gap-2">
+              <input
+                type="date"
+                value={w.work_date}
+                onChange={(e) => updateWorker(i, { work_date: e.target.value })}
+                className={fieldClass}
+              />
               <input value={w.name} onChange={(e) => updateWorker(i, { name: e.target.value })} className={fieldClass} />
               <input
                 type="checkbox"
@@ -315,7 +329,15 @@ export function BusinessTripLogForm({
   const [note, setNote] = useState(initial?.note ?? "");
   const [projects, setProjects] = useState<BusinessTripProject[]>(
     initial?.projects?.length
-      ? initial.projects.map((p) => ({ ...p, work_date: p.work_date ?? workDate, personnel_note: p.personnel_note ?? "" }))
+      ? initial.projects.map((p) => {
+          const pWorkDate = p.work_date ?? workDate;
+          return {
+            ...p,
+            work_date: pWorkDate,
+            personnel_note: p.personnel_note ?? "",
+            workers: p.workers.map((w) => ({ ...w, work_date: w.work_date ?? pWorkDate })),
+          };
+        })
       : [emptyProject(workDate)]
   );
   const [saving, setSaving] = useState(false);
