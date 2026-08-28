@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { WorkLogForm } from "@/components/WorkLogForm";
+import { WorkLogDayTripLinks } from "@/components/WorkLogDayTripLinks";
+import type { BusinessTripLog } from "@/lib/types";
 
 export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string; closeHref: string }) {
   const supabase = await createClient();
@@ -10,10 +12,11 @@ export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string
   const lastDay = new Date(year, month, 0).getDate();
   const monthEnd = `${year}-${pad(month)}-${pad(lastDay)}`;
 
-  const [{ data: logs }, { data: sites }, { data: monthLogs }] = await Promise.all([
+  const [{ data: logs }, { data: sites }, { data: monthLogs }, { data: tripLogs }] = await Promise.all([
     supabase.from("work_logs").select("*").eq("log_date", dateKey).order("sort_order", { ascending: true }),
     supabase.from("sites").select("id, name, color").order("name"),
     supabase.from("work_logs").select("title").gte("log_date", monthStart).lte("log_date", monthEnd),
+    supabase.from("business_trip_logs").select("*").eq("work_date", dateKey),
   ]);
 
   const rows = Array.from({ length: 5 }, (_, i) => logs?.[i] ?? null);
@@ -29,6 +32,8 @@ export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string
           닫기
         </Link>
       </div>
+
+      <WorkLogDayTripLinks logs={(tripLogs ?? []) as BusinessTripLog[]} />
 
       <WorkLogForm dateKey={dateKey} rows={rows} sites={sites ?? []} contentSuggestions={contentSuggestions} />
     </div>

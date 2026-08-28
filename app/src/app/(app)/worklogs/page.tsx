@@ -11,17 +11,65 @@ import { WorkLogSummaryTable } from "@/components/WorkLogSummaryTable";
 import { SiteAggregateTable } from "@/components/SiteAggregateTable";
 import { SiteColorLegend } from "@/components/SiteColorLegend";
 import { AutoPrint } from "@/components/AutoPrint";
+import { PageTabs } from "@/components/PageTabs";
+import { BusinessTripListClient } from "@/components/BusinessTripListClient";
 import { cx } from "@/lib/cx";
-import type { WorkLog } from "@/lib/types";
+import type { BusinessTripLog, WorkLog } from "@/lib/types";
 
 const HOLIDAY_TITLE = "휴무";
+const TABS = [
+  { key: "calendar", label: "작업일지" },
+  { key: "trip", label: "출장일지" },
+];
 
 export default async function WorkLogsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string; month?: string; day?: string; printSummary?: string }>;
+  searchParams: Promise<{ tab?: string; year?: string; month?: string; day?: string; printSummary?: string }>;
 }) {
-  const { year, month, day, printSummary } = await searchParams;
+  const { tab, year, month, day, printSummary } = await searchParams;
+  const activeTab = tab === "trip" ? "trip" : "calendar";
+
+  return (
+    <div className="space-y-4">
+      <div className="print:hidden">
+        <PageTabs basePath="/worklogs" tabs={TABS} active={activeTab} />
+      </div>
+      {activeTab === "trip" ? (
+        <BusinessTripSection />
+      ) : (
+        <WorkLogCalendarSection year={year} month={month} day={day} printSummary={printSummary} />
+      )}
+    </div>
+  );
+}
+
+async function BusinessTripSection() {
+  const supabase = await createClient();
+  const { data: logs } = await supabase
+    .from("business_trip_logs")
+    .select("*")
+    .order("work_date", { ascending: false });
+
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-bold text-slate-900">출장일지</h1>
+      <BusinessTripListClient logs={(logs ?? []) as BusinessTripLog[]} />
+    </div>
+  );
+}
+
+async function WorkLogCalendarSection({
+  year,
+  month,
+  day,
+  printSummary,
+}: {
+  year?: string;
+  month?: string;
+  day?: string;
+  printSummary?: string;
+}) {
   const isolateSummary = printSummary === "1";
   const now = new Date();
   const selectedYear = year ? Number(year) : now.getFullYear();
@@ -33,7 +81,7 @@ export default async function WorkLogsPage({
   const lastDay = new Date(selectedYear, selectedMonth, 0).getDate();
   const monthEnd = `${selectedYear}-${pad(selectedMonth)}-${pad(lastDay)}`;
 
-  const [{ data: logs }, { data: allDates }, { data: sites }] = await Promise.all([
+  const [{ data: logs }, { data: allDates }, { data: sites }, { data: tripLogs }] = await Promise.all([
     supabase
       .from("work_logs")
       .select("*")
@@ -43,6 +91,7 @@ export default async function WorkLogsPage({
       .order("sort_order", { ascending: true }),
     supabase.from("work_logs").select("log_date"),
     supabase.from("sites").select("id, name, color").order("name"),
+    supabase.from("business_trip_logs").select("work_date").gte("work_date", monthStart).lte("work_date", monthEnd),
   ]);
 
   const rows = (logs ?? []) as WorkLog[];
@@ -54,6 +103,8 @@ export default async function WorkLogsPage({
     logsByDate.set(l.log_date, arr);
     if ((l.title ?? "").trim() === HOLIDAY_TITLE) holidayDates.add(l.log_date);
   }
+
+  const tripDates = new Set((tripLogs ?? []).map((t) => t.work_date));
 
   const siteNameById = new Map((sites ?? []).map((s) => [s.id, s.name]));
   const siteColorById = new Map((sites ?? []).map((s) => [s.id, s.color]));
@@ -119,6 +170,7 @@ export default async function WorkLogsPage({
               <div key={week[0].dateKey} className="grid grid-cols-7">
                 {week.map((cell) => {
                   const isHoliday = holidayDates.has(cell.dateKey);
+                  const hasTrip = tripDates.has(cell.dateKey);
                   const cellClass = cx(
                     "flex min-h-[110px] flex-col gap-0.5 border-b border-r border-slate-200 p-1.5 text-xs last:border-r-0",
                     !cell.inMonth && "bg-slate-50",
@@ -155,6 +207,11 @@ export default async function WorkLogsPage({
                     <Link key={cell.dateKey} href={`${basePath}&day=${cell.day}`} className={cx(cellClass, "hover:bg-slate-50")}>
                       {dayLabel}
                       <div className="flex flex-1 flex-col gap-0.5">
+                        {hasTrip && (
+                          <span className="truncate rounded bg-indigo-600 px-1 py-0.5 leading-tight font-medium text-white">
+                            *출장일지*
+                          </span>
+                        )}
                         {(logsByDate.get(cell.dateKey) ?? []).map((log) => {
                           const label = log.title?.trim() || (log.site_id ? siteNameById.get(log.site_id) : "") || "";
                           if (!label) return null;

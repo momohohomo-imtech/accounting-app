@@ -233,3 +233,23 @@ export type Backup = {
   storage_url: string;
   created_at: string;
 };
+
+export type BusinessTripWorker = { name: string; work_date: string; overtime: boolean; note: string };
+export type BusinessTripEquipment = { name: string; location: string; hours: string; note: string };
+export type BusinessTripExpense = { vendor: string; amount: string; note: string };
+
+export type BusinessTripLog = {
+  id: string;
+  work_date: string;
+  created_date: string;
+  client_name: string | null;
+  site_name: string | null;
+  project_name: string | null;
+  work_types: string[];
+  note: string | null;
+  workers: BusinessTripWorker[];
+  total_manpower: string | null;
+  equipment: BusinessTripEquipment[];
+  expenses: BusinessTripExpense[];
+  created_at: string;
+};
