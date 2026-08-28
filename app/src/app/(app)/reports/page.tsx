@@ -106,7 +106,8 @@ export default async function ReportsPage({
 
   const byProjectAll = (projects ?? []).map((p) => {
     const rows = transactions.filter((t) => t.project_id === p.id);
-    const sales = rows.reduce((s, t) => s + t.sales_amount + t.sales_vat, 0);
+    // 손익 계산 시 매출은 VAT를 제외한 금액을 사용 (VAT는 실제 이익이 아닌 세무서 납부분).
+    const sales = rows.reduce((s, t) => s + t.sales_amount, 0);
     const purchase = rows.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
     return { ...p, quoteAmount: p.quote_amount ?? 0, sales, purchase, profit: sales - purchase };
   });
