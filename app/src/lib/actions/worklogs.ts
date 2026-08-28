@@ -77,6 +77,40 @@ export async function updateWorkLogMemo(formData: FormData) {
   revalidatePath("/reports");
 }
 
+/**
+ * 작업 집계 팝업에서 내용을 고치면, 그 해에 같은 현장·같은 내용으로 명시 입력된 모든
+ * 행을 한 번에 새 이름으로 바꾼다. 내용을 비워두고 현장만 골라 이어받은(carry-forward)
+ * 행들은 손댈 필요가 없다 — 다음에 집계할 때 마지막 명시 내용을 새로 바뀐 값으로 다시
+ * 이어받으므로 달력에도 자동으로 일관되게 반영된다.
+ */
+export async function renameWorkLogTitle(formData: FormData) {
+  const supabase = await createClient();
+  const siteId = String(formData.get("site_id") ?? "") || null;
+  const oldTitle = String(formData.get("old_title") ?? "").trim();
+  const newTitle = String(formData.get("new_title") ?? "").trim();
+  const year = Number(formData.get("year"));
+  if (!oldTitle || !newTitle || !year) return;
+
+  const start = `${year}-01-01`;
+  const end = `${year}-12-31`;
+
+  const base = supabase
+    .from("work_logs")
+    .update({ title: newTitle })
+    .eq("title", oldTitle)
+    .gte("log_date", start)
+    .lte("log_date", end);
+
+  if (siteId) {
+    await base.eq("site_id", siteId);
+  } else {
+    await base.is("site_id", null);
+  }
+
+  revalidatePath("/worklogs");
+  revalidatePath("/reports");
+}
+
 export type SiteWorkLogEntry = { log_date: string; title: string };
 export type SiteWorkLogDetail = { jobTypeCount: number; dayCount: number; entries: SiteWorkLogEntry[] };
 

@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getWorkLogGroupDetail, updateWorkLogMemo, type WorkLogDetailEntry } from "@/lib/actions/worklogs";
+import { useRouter } from "next/navigation";
+import {
+  getWorkLogGroupDetail,
+  updateWorkLogMemo,
+  renameWorkLogTitle,
+  type WorkLogDetailEntry,
+} from "@/lib/actions/worklogs";
 import { Button } from "@/components/ui/Button";
 import { fieldClass } from "@/components/ui/field";
 
@@ -75,7 +81,11 @@ export function WorkLogGroupDetailPopup({
   title: string;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const [entries, setEntries] = useState<WorkLogDetailEntry[] | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(title);
+  const [renaming, setRenaming] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -87,6 +97,31 @@ export function WorkLogGroupDetailPopup({
     };
   }, [year, siteId, title]);
 
+  async function saveTitle() {
+    const newTitle = titleDraft.trim();
+    if (!newTitle || newTitle === title) {
+      setEditingTitle(false);
+      setTitleDraft(title);
+      return;
+    }
+    if (
+      !confirm(
+        `"${title}"을(를) "${newTitle}"(으)로 바꾸면 ${year}년 달력에 있는 이 내용의 모든 날짜에 반영됩니다. 계속할까요?`
+      )
+    )
+      return;
+    setRenaming(true);
+    const fd = new FormData();
+    fd.append("site_id", siteId);
+    fd.append("old_title", title);
+    fd.append("new_title", newTitle);
+    fd.append("year", String(year));
+    await renameWorkLogTitle(fd);
+    setRenaming(false);
+    router.refresh();
+    onClose();
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10">
       <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
@@ -96,7 +131,44 @@ export function WorkLogGroupDetailPopup({
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: siteColor }} />
               {siteName}
             </p>
-            <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+            {editingTitle ? (
+              <div className="mt-1 flex items-center gap-1.5">
+                <input
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  className={`${fieldClass} h-8 w-44 text-sm`}
+                  autoFocus
+                />
+                <Button type="button" size="xs" disabled={renaming} onClick={saveTitle}>
+                  저장
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="xs"
+                  disabled={renaming}
+                  onClick={() => {
+                    setEditingTitle(false);
+                    setTitleDraft(title);
+                  }}
+                >
+                  취소
+                </Button>
+              </div>
+            ) : (
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+                {title}
+                {siteId && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingTitle(true)}
+                    className="text-xs font-normal text-slate-400 underline decoration-slate-300 underline-offset-2 hover:text-slate-700"
+                  >
+                    수정
+                  </button>
+                )}
+              </h2>
+            )}
             <p className="mt-0.5 text-xs text-slate-400">
               {year}년 전체 내역{entries !== null && ` · 총 ${entries.length}일`}
             </p>
