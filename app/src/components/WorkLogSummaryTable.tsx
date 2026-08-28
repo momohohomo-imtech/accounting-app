@@ -30,15 +30,18 @@ export function WorkLogSummaryTable({ rows, emptyMessage }: { rows: WorkLogSumma
   }
 
   const sorted = useMemo(() => {
-    if (!sortKey) return rows;
-    const copy = [...rows];
-    copy.sort((a, b) => {
-      const va = sortValue(a, sortKey);
-      const vb = sortValue(b, sortKey);
-      const cmp = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb), "ko");
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-    return copy;
+    // 휴무/사내/기타는 어떤 열로 정렬하든 항상 맨 아래 고정.
+    const normal = rows.filter((r) => !r.isSpecial);
+    const special = rows.filter((r) => r.isSpecial);
+    if (sortKey) {
+      normal.sort((a, b) => {
+        const va = sortValue(a, sortKey);
+        const vb = sortValue(b, sortKey);
+        const cmp = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb), "ko");
+        return sortDir === "asc" ? cmp : -cmp;
+      });
+    }
+    return [...normal, ...special];
   }, [rows, sortKey, sortDir]);
 
   function headerButton(key: SortKey, label: string) {

@@ -1,7 +1,14 @@
 import type { WorkLog } from "@/lib/types";
 import { resolveSiteColor } from "@/lib/siteColor";
 
-export type WorkLogSummaryRow = { siteId: string; siteName: string; siteColor: string; title: string; days: number };
+export type WorkLogSummaryRow = {
+  siteId: string;
+  siteName: string;
+  siteColor: string;
+  title: string;
+  days: number;
+  isSpecial: boolean;
+};
 export type SiteInfo = { id: string; name: string; color: string | null };
 
 // 현장에 속하지 않는 고정 카테고리 — 실제로 쓰였는지와 상관없이 항상 한 줄씩 보여주고,
@@ -43,21 +50,26 @@ export function buildWorkLogSummary(rows: WorkLog[], sites: SiteInfo[]): WorkLog
     groups.set(key, g);
   }
 
-  const siteRows: WorkLogSummaryRow[] = Array.from(groups.values()).map((g) => ({
-    siteId: g.siteId,
-    siteName: g.siteName,
-    siteColor: resolveSiteColor(g.siteId, siteById.get(g.siteId)?.color),
-    title: g.title,
-    days: g.dates.size,
-  }));
+  const siteRows: WorkLogSummaryRow[] = Array.from(groups.values())
+    .map((g) => ({
+      siteId: g.siteId,
+      siteName: g.siteName,
+      siteColor: resolveSiteColor(g.siteId, siteById.get(g.siteId)?.color),
+      title: g.title,
+      days: g.dates.size,
+      isSpecial: false,
+    }))
+    .sort((a, b) => b.days - a.days);
 
+  // 휴무/사내/기타는 정렬과 무관하게 항상 맨 아래 고정.
   const specialRows: WorkLogSummaryRow[] = SPECIAL_TITLES.map((t) => ({
     siteId: "",
     siteName: "-",
     siteColor: SPECIAL_COLOR,
     title: t,
     days: specialDates.get(t)?.size ?? 0,
+    isSpecial: true,
   }));
 
-  return [...siteRows, ...specialRows].sort((a, b) => b.days - a.days);
+  return [...siteRows, ...specialRows];
 }
