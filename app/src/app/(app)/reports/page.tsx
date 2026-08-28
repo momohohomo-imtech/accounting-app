@@ -106,8 +106,10 @@ export default async function ReportsPage({
 
   const byProjectAll = (projects ?? []).map((p) => {
     const rows = transactions.filter((t) => t.project_id === p.id);
-    // 손익 계산 시 매출은 실제 부가세(sales_vat)만큼만 뺀 금액을 사용 (VAT는 실제 이익이 아닌 세무서 납부분).
-    const sales = rows.reduce((s, t) => s + t.sales_amount, 0);
+    // 손익 계산 시 매출은 부가세를 뺀 금액을 사용 (VAT는 실제 이익이 아닌 세무서 납부분).
+    // 매출 총액(부가세 포함분)을 1.1로 나눠서 부가세만큼만 정확히 제외한다.
+    const salesGross = rows.reduce((s, t) => s + t.sales_amount + t.sales_vat, 0);
+    const sales = Math.round(salesGross / 1.1);
     const purchase = rows.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
     return { ...p, quoteAmount: p.quote_amount ?? 0, sales, purchase, profit: sales - purchase };
   });
