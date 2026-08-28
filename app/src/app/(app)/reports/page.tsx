@@ -114,13 +114,6 @@ export default async function ReportsPage({
     return { ...p, quoteAmount: p.quote_amount ?? 0, sales, purchase, profit: sales - purchase };
   });
 
-  const projectSummary = {
-    count: byProjectAll.length,
-    sales: byProjectAll.reduce((s, p) => s + p.sales, 0),
-    purchase: byProjectAll.reduce((s, p) => s + p.purchase, 0),
-    profit: byProjectAll.reduce((s, p) => s + p.profit, 0),
-  };
-
   const projectSiteOptions = Array.from(
     new Map(
       (projects ?? [])
@@ -132,6 +125,16 @@ export default async function ReportsPage({
     .sort((a, b) => a.label.localeCompare(b.label));
 
   const byProject = site ? byProjectAll.filter((p) => p.site_id === site) : byProjectAll;
+
+  const projectSummaryQuoteAmount = byProject.reduce((s, p) => s + p.quoteAmount, 0);
+  const projectSummaryProfit = byProject.reduce((s, p) => s + p.profit, 0);
+  const projectSummary = {
+    count: byProject.length,
+    sales: byProject.reduce((s, p) => s + p.sales, 0),
+    purchase: byProject.reduce((s, p) => s + p.purchase, 0),
+    profit: projectSummaryProfit,
+    profitRate: projectSummaryQuoteAmount > 0 ? (projectSummaryProfit / projectSummaryQuoteAmount) * 100 : null,
+  };
 
   // 현장별 손익 (프로젝트 없는 일반경비는 별도 묶음)
   const siteMap = new Map<string, { name: string; sales: number; purchase: number }>();
@@ -267,7 +270,8 @@ export default async function ReportsPage({
             <div className="flex items-center gap-2 print:hidden">
               <span className="text-xs text-slate-500">
                 {selectedYear}년 총 {projectSummary.count}건 · 매출 {formatWon(projectSummary.sales)} · 매입{" "}
-                {formatWon(projectSummary.purchase)} · 이익금 {formatWon(projectSummary.profit)}
+                {formatWon(projectSummary.purchase)} · 이익금 {formatWon(projectSummary.profit)} · 이익율{" "}
+                {projectSummary.profitRate === null ? "-" : `${projectSummary.profitRate.toFixed(2)}%`}
               </span>
               {projectSiteOptions.length > 0 && (
                 <ReportProjectSiteFilter year={selectedYear} siteOptions={projectSiteOptions} selectedSite={site} />
@@ -283,7 +287,8 @@ export default async function ReportsPage({
         >
           <p className="mb-3 hidden text-xs text-slate-500 print:block">
             {selectedYear}년 총 {projectSummary.count}건 · 매출 {formatWon(projectSummary.sales)} · 매입{" "}
-            {formatWon(projectSummary.purchase)} · 이익금 {formatWon(projectSummary.profit)}
+            {formatWon(projectSummary.purchase)} · 이익금 {formatWon(projectSummary.profit)} · 이익율{" "}
+            {projectSummary.profitRate === null ? "-" : `${projectSummary.profitRate.toFixed(2)}%`}
           </p>
           <ProjectProfitTable rows={byProject} year={selectedYear} site={site} />
       </CollapsibleSection>
