@@ -50,19 +50,30 @@ textarea {
 }
 
 /* 팝업(모달) 안에서 "인쇄"를 누르면 나머지 페이지는 숨기고 모달 내용만 인쇄되게.
-   ModalPrintButton이 인쇄 직전 html에 이 클래스를 붙였다가 인쇄 후 제거한다. */
+   ModalPrintButton이 인쇄 직전 html에 이 클래스를 붙였다가 인쇄 후 제거한다.
+   모달 오버레이는 원래 position:fixed인데, 인쇄 시에는 그대로 두면 브라우저마다
+   fixed 요소를 인쇄 레이아웃에 반영하는 방식이 달라 안 나오는 경우가 있어서
+   static으로 풀어 그냥 문서 맨 위에 자연스럽게 흐르는 내용으로 만든다. */
 @media print {
   html.modal-print body > * {
     visibility: hidden;
   }
-  html.modal-print .modal-print-target,
-  html.modal-print .modal-print-target * {
+  html.modal-print .modal-print-overlay,
+  html.modal-print .modal-print-overlay * {
     visibility: visible;
   }
+  html.modal-print .modal-print-overlay {
+    position: static !important;
+    inset: auto !important;
+    overflow: visible !important;
+    background: none !important;
+    padding: 0 !important;
+  }
   html.modal-print .modal-print-target {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
+    position: static !important;
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    box-shadow: none !important;
   }
 }
