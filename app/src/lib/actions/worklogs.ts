@@ -111,6 +111,50 @@ export async function renameWorkLogTitle(formData: FormData) {
   revalidatePath("/reports");
 }
 
+export type WorkLogDateEntry = { site_id: string; site_name: string | null; title: string };
+
+/**
+ * 출장일지 작성 화면에서 "달력에서 선택"을 누르면, 그 공사일에 실제로 활성화된
+ * (빈 내용은 그 현장의 마지막 내용을 이어받은) 현장·내용 조합을 뽑아준다.
+ */
+export async function getWorkLogsForDate(dateKey: string): Promise<WorkLogDateEntry[]> {
+  const supabase = await createClient();
+  const [year, month] = dateKey.split("-").map(Number);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const monthStart = `${year}-${pad(month)}-01`;
+
+  const { data } = await supabase
+    .from("work_logs")
+    .select("log_date, site_id, title, sites(name)")
+    .gte("log_date", monthStart)
+    .lte("log_date", dateKey)
+    .order("log_date", { ascending: true })
+    .order("sort_order", { ascending: true });
+
+  const lastTitleBySite = new Map<string, string>();
+  const result: WorkLogDateEntry[] = [];
+
+  for (const r of data ?? []) {
+    if (!r.site_id) continue;
+    const siteRel = r.sites as { name: string } | { name: string }[] | null;
+    const siteName = Array.isArray(siteRel) ? (siteRel[0]?.name ?? null) : (siteRel?.name ?? null);
+    const explicit = (r.title ?? "").trim();
+    const title = explicit || lastTitleBySite.get(r.site_id) || "";
+    if (explicit) lastTitleBySite.set(r.site_id, explicit);
+    if (r.log_date === dateKey && title) {
+      result.push({ site_id: r.site_id, site_name: siteName, title });
+    }
+  }
+
+  const seen = new Set<string>();
+  return result.filter((e) => {
+    const key = `${e.site_id}::${e.title}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export type SiteWorkLogEntry = { log_date: string; title: string };
 export type SiteWorkLogDetail = { jobTypeCount: number; dayCount: number; entries: SiteWorkLogEntry[] };
 

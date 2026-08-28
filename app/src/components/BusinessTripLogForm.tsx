@@ -9,6 +9,7 @@ import type {
   BusinessTripWorker,
 } from "@/lib/types";
 import { WORK_TYPE_OPTIONS } from "@/lib/businessTrip";
+import { getWorkLogsForDate, type WorkLogDateEntry } from "@/lib/actions/worklogs";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { Button } from "@/components/ui/Button";
 
@@ -38,6 +39,7 @@ function ProjectBlockEditor({
   onChange,
   onRemove,
   canRemove,
+  onSiteNameFill,
 }: {
   project: BusinessTripProject;
   index: number;
@@ -45,10 +47,32 @@ function ProjectBlockEditor({
   onChange: (p: BusinessTripProject) => void;
   onRemove: () => void;
   canRemove: boolean;
+  onSiteNameFill: (name: string) => void;
 }) {
   const [manpowerTouched, setManpowerTouched] = useState(Boolean(project.total_manpower));
   const autoManpower = useMemo(() => project.workers.filter((w) => w.name.trim()).length, [project.workers]);
   const manpowerDisplay = manpowerTouched ? project.total_manpower : String(autoManpower);
+
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [loadingEntries, setLoadingEntries] = useState(false);
+  const [dateEntries, setDateEntries] = useState<WorkLogDateEntry[] | null>(null);
+
+  async function togglePicker() {
+    const next = !pickerOpen;
+    setPickerOpen(next);
+    if (next) {
+      setLoadingEntries(true);
+      const entries = await getWorkLogsForDate(workDate);
+      setDateEntries(entries);
+      setLoadingEntries(false);
+    }
+  }
+
+  function pickEntry(entry: WorkLogDateEntry) {
+    onChange({ ...project, project_name: entry.title });
+    if (entry.site_name) onSiteNameFill(entry.site_name);
+    setPickerOpen(false);
+  }
 
   function updateWorker(i: number, patch: Partial<BusinessTripWorker>) {
     onChange({ ...project, workers: project.workers.map((w, idx) => (idx === i ? { ...w, ...patch } : w)) });
@@ -63,14 +87,45 @@ function ProjectBlockEditor({
   return (
     <div className="space-y-4 rounded-xl border border-slate-200 p-4">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex flex-1 items-center gap-2">
+        <div className="relative flex flex-1 items-center gap-2">
           <span className="shrink-0 text-xs font-medium text-slate-400">프로젝트 #{index + 1}</span>
           <input
             value={project.project_name}
             onChange={(e) => onChange({ ...project, project_name: e.target.value })}
-            placeholder="프로젝트명"
+            placeholder="프로젝트명 (직접 입력 또는 달력에서 선택)"
             className={`${fieldClass} flex-1`}
           />
+          <button
+            type="button"
+            onClick={togglePicker}
+            className="shrink-0 rounded-lg border border-slate-300 px-2.5 py-2 text-xs text-slate-600 hover:bg-slate-100"
+          >
+            달력에서 선택
+          </button>
+          {pickerOpen && (
+            <div className="absolute left-0 top-full z-10 mt-1 w-full max-w-sm rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
+              <p className="mb-1 px-1 text-xs text-slate-400">{workDate} 작업일지 내역</p>
+              {loadingEntries ? (
+                <p className="px-1 py-2 text-xs text-slate-400">불러오는 중...</p>
+              ) : dateEntries && dateEntries.length > 0 ? (
+                <div className="max-h-48 space-y-0.5 overflow-y-auto">
+                  {dateEntries.map((entry, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => pickEntry(entry)}
+                      className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-slate-100"
+                    >
+                      <span className="font-medium text-slate-900">{entry.site_name ?? "현장 없음"}</span>
+                      <span className="ml-1 text-slate-500">{entry.title}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="px-1 py-2 text-xs text-slate-400">이 날짜에 작업일지 내역이 없습니다.</p>
+              )}
+            </div>
+          )}
         </div>
         {canRemove && (
           <button type="button" onClick={onRemove} className="shrink-0 text-xs text-red-500 hover:text-red-700">
@@ -348,6 +403,7 @@ export function BusinessTripLogForm({
             onChange={(updated) => updateProject(i, updated)}
             onRemove={() => setProjects((prev) => prev.filter((_, idx) => idx !== i))}
             canRemove={projects.length > 1}
+            onSiteNameFill={setSiteName}
           />
         ))}
       </div>
