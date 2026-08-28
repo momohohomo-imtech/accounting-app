@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatWon } from "@/lib/format";
+import { estimateIncomeTax, currentBracketIndex, INCOME_TAX_BRACKETS } from "@/lib/tax";
 
 export async function PendingPaymentProfitSection() {
   const supabase = await createClient();
@@ -36,16 +37,23 @@ export async function PendingPaymentProfitSection() {
     totalReceivable += p.contract_amount ?? p.quote_amount ?? 0;
   }
 
+  // 미수금까지 실현됐다고 가정했을 때의 예상 세금 (실제 이익금 + 미수 합계금 기준).
+  const taxBase = Math.max(totalProfit + totalReceivable, 0);
+  const incomeTax = estimateIncomeTax(taxBase);
+  const localTax = Math.round(incomeTax * 0.1);
+  const totalTax = incomeTax + localTax;
+  const bracket = INCOME_TAX_BRACKETS[currentBracketIndex(taxBase)];
+
   return (
-    <div className="space-y-1 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-900">
-      <p>
-        <span className="font-semibold">미수금 포함 내역</span>
-        {" — "}실제 이익금 기준 {projectRows.length}건 예상 이익금 약{" "}
-        <span className="font-mono font-semibold">{formatWon(totalProfit)}</span>
-      </p>
-      <p>
-        미수 합계금 약 <span className="font-mono font-semibold">{formatWon(totalReceivable)}</span>
-      </p>
-    </div>
+    <p className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-900">
+      <span className="font-semibold">미수금 포함 내역</span>
+      {" — "}실제 이익금 {projectRows.length}건 약{" "}
+      <span className="font-mono font-semibold">{formatWon(totalProfit)}</span>
+      {" + "}미수 합계금 약 <span className="font-mono font-semibold">{formatWon(totalReceivable)}</span>
+      {" → "}예상세금 약 <span className="font-mono font-semibold">{formatWon(totalTax)}</span>
+      {" (세율 "}
+      <span className="font-mono font-semibold">{Math.round(bracket.rate * 100)}%</span>
+      {" 구간)"}
+    </p>
   );
 }
