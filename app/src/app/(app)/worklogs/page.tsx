@@ -9,6 +9,7 @@ import { WorkLogExportButtons } from "@/components/WorkLogExportButtons";
 import { WorkLogDayEditor } from "@/components/WorkLogDayEditor";
 import { WorkLogSummaryTable } from "@/components/WorkLogSummaryTable";
 import { SiteColorLegend } from "@/components/SiteColorLegend";
+import { AutoPrint } from "@/components/AutoPrint";
 import { cx } from "@/lib/cx";
 import type { WorkLog } from "@/lib/types";
 
@@ -17,9 +18,10 @@ const HOLIDAY_TITLE = "휴무";
 export default async function WorkLogsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string; month?: string; day?: string }>;
+  searchParams: Promise<{ year?: string; month?: string; day?: string; printSummary?: string }>;
 }) {
-  const { year, month, day } = await searchParams;
+  const { year, month, day, printSummary } = await searchParams;
+  const isolateSummary = printSummary === "1";
   const now = new Date();
   const selectedYear = year ? Number(year) : now.getFullYear();
   const selectedMonth = month ? Number(month) : now.getMonth() + 1;
@@ -72,106 +74,118 @@ export default async function WorkLogsPage({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold text-slate-900">작업일지</h1>
-        <WorkLogExportButtons
-          year={selectedYear}
-          month={selectedMonth}
-          weeks={weeks}
-          logs={rows.map((l) => ({ log_date: l.log_date, title: l.title, color: l.color, site_id: l.site_id }))}
-          sites={sites ?? []}
-        />
-      </div>
+      {isolateSummary && <AutoPrint />}
 
-      <div className="print:hidden">
-        <WorkLogMonthFilter year={selectedYear} month={selectedMonth} />
-      </div>
+      <div className={isolateSummary ? "space-y-4 print:hidden" : "space-y-4"}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h1 className="text-2xl font-bold text-slate-900">작업일지</h1>
+          <WorkLogExportButtons
+            year={selectedYear}
+            month={selectedMonth}
+            weeks={weeks}
+            logs={rows.map((l) => ({ log_date: l.log_date, title: l.title, color: l.color, site_id: l.site_id }))}
+            sites={sites ?? []}
+          />
+        </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm print:rounded-none print:border-0 print:shadow-none print:overflow-visible">
-        <div className="min-w-[900px] print:min-w-0 print:w-full">
-          <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-center text-xs font-semibold text-slate-500">
-            {WEEKDAY_LABELS.map((w, i) => (
-              <div
-                key={w}
-                className={cx(
-                  "py-2",
-                  i === 0 && "text-red-500",
-                  i === 6 && "text-blue-500"
-                )}
-              >
-                {w}
+        <div className="print:hidden">
+          <WorkLogMonthFilter year={selectedYear} month={selectedMonth} />
+        </div>
+
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm print:rounded-none print:border-0 print:shadow-none print:overflow-visible">
+          <div className="min-w-[900px] print:min-w-0 print:w-full">
+            <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-center text-xs font-semibold text-slate-500">
+              {WEEKDAY_LABELS.map((w, i) => (
+                <div
+                  key={w}
+                  className={cx(
+                    "py-2",
+                    i === 0 && "text-red-500",
+                    i === 6 && "text-blue-500"
+                  )}
+                >
+                  {w}
+                </div>
+              ))}
+            </div>
+            {weeks.map((week) => (
+              <div key={week[0].dateKey} className="grid grid-cols-7">
+                {week.map((cell) => {
+                  const isHoliday = holidayDates.has(cell.dateKey);
+                  const cellClass = cx(
+                    "flex min-h-[110px] flex-col gap-0.5 border-b border-r border-slate-200 p-1.5 text-xs last:border-r-0",
+                    !cell.inMonth && "bg-slate-50",
+                    isHoliday && "bg-red-50"
+                  );
+                  const dayLabel = (
+                    <span
+                      className={cx(
+                        "text-right font-mono text-[11px]",
+                        !cell.inMonth
+                          ? "text-slate-300"
+                          : isHoliday
+                            ? "font-bold text-red-600"
+                            : cell.weekday === 0
+                              ? "text-red-500"
+                              : cell.weekday === 6
+                                ? "text-blue-500"
+                                : "text-slate-500"
+                      )}
+                    >
+                      {cell.day}
+                    </span>
+                  );
+
+                  if (!cell.inMonth) {
+                    return (
+                      <div key={cell.dateKey} className={cellClass}>
+                        {dayLabel}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <Link key={cell.dateKey} href={`${basePath}&day=${cell.day}`} className={cx(cellClass, "hover:bg-slate-50")}>
+                      {dayLabel}
+                      <div className="flex flex-1 flex-col gap-0.5">
+                        {(logsByDate.get(cell.dateKey) ?? []).map((log) => {
+                          const label = log.title?.trim() || (log.site_id ? siteNameById.get(log.site_id) : "") || "";
+                          if (!label) return null;
+                          return (
+                            <span
+                              key={log.id}
+                              style={log.site_id ? siteColorStyle(log.site_id, siteColorById.get(log.site_id)) : undefined}
+                              className={cx(
+                                "truncate rounded px-1 py-0.5 leading-tight print:whitespace-normal print:overflow-visible",
+                                !log.site_id && workLogColorCellClass(log.color)
+                              )}
+                            >
+                              {label}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </Link>
+                  );
+                })}
               </div>
             ))}
           </div>
-          {weeks.map((week) => (
-            <div key={week[0].dateKey} className="grid grid-cols-7">
-              {week.map((cell) => {
-                const isHoliday = holidayDates.has(cell.dateKey);
-                const cellClass = cx(
-                  "flex min-h-[110px] flex-col gap-0.5 border-b border-r border-slate-200 p-1.5 text-xs last:border-r-0",
-                  !cell.inMonth && "bg-slate-50",
-                  isHoliday && "bg-red-50"
-                );
-                const dayLabel = (
-                  <span
-                    className={cx(
-                      "text-right font-mono text-[11px]",
-                      !cell.inMonth
-                        ? "text-slate-300"
-                        : isHoliday
-                          ? "font-bold text-red-600"
-                          : cell.weekday === 0
-                            ? "text-red-500"
-                            : cell.weekday === 6
-                              ? "text-blue-500"
-                              : "text-slate-500"
-                    )}
-                  >
-                    {cell.day}
-                  </span>
-                );
-
-                if (!cell.inMonth) {
-                  return (
-                    <div key={cell.dateKey} className={cellClass}>
-                      {dayLabel}
-                    </div>
-                  );
-                }
-
-                return (
-                  <Link key={cell.dateKey} href={`${basePath}&day=${cell.day}`} className={cx(cellClass, "hover:bg-slate-50")}>
-                    {dayLabel}
-                    <div className="flex flex-1 flex-col gap-0.5">
-                      {(logsByDate.get(cell.dateKey) ?? []).map((log) => {
-                        const label = log.title?.trim() || (log.site_id ? siteNameById.get(log.site_id) : "") || "";
-                        if (!label) return null;
-                        return (
-                          <span
-                            key={log.id}
-                            style={log.site_id ? siteColorStyle(log.site_id, siteColorById.get(log.site_id)) : undefined}
-                            className={cx(
-                              "truncate rounded px-1 py-0.5 leading-tight print:whitespace-normal print:overflow-visible",
-                              !log.site_id && workLogColorCellClass(log.color)
-                            )}
-                          >
-                            {label}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          ))}
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 font-semibold text-slate-900">
-          {selectedYear}년 {selectedMonth}월 작업 집계 (현장·내용별 일수)
-        </h2>
+      <div className={cx("rounded-2xl border border-slate-200 bg-white p-5 shadow-sm", !isolateSummary && "print:hidden")}>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="font-semibold text-slate-900">
+            {selectedYear}년 {selectedMonth}월 작업 집계 (현장·내용별 일수)
+          </h2>
+          <Link
+            href={`${basePath}&printSummary=1`}
+            className="inline-flex items-center rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 print:hidden"
+          >
+            인쇄
+          </Link>
+        </div>
         <WorkLogSummaryTable
           rows={monthlySummary}
           emptyMessage="이 달에 현장이 지정된 작업일지가 없습니다."
