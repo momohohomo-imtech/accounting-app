@@ -249,7 +249,11 @@ export function TransactionTable({
               </Td>
               <Td className="pr-4">{t.clients?.name ?? t.client_name_raw ?? "-"}</Td>
               <Td className="pr-4">
-                {t.projects?.name ?? <span className="font-medium text-red-600">일반경비</span>}
+                {t.needs_classification ? (
+                  <Badge className="bg-green-600 text-white">분류 대기 중</Badge>
+                ) : (
+                  (t.projects?.name ?? <span className="font-medium text-red-600">일반경비</span>)
+                )}
               </Td>
               <Td className="pr-4">{t.item_name ?? "-"}</Td>
               <Td className="pr-4">{t.payment_methods?.name ?? "-"}</Td>

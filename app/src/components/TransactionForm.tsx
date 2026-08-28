@@ -81,6 +81,7 @@ export function TransactionForm({
     payment_method_id: initial?.payment_method_id ?? "",
     tax_invoice_issued: initial?.tax_invoice_issued ?? false,
     vat_included: initial?.vat_included ?? false,
+    needs_classification: initial?.needs_classification ?? false,
     payment_type: initial?.payment_type ?? "immediate",
     note1: initial?.note1 ?? "",
     note2: initial?.note2 ?? "",
@@ -344,6 +345,7 @@ export function TransactionForm({
         payment_type: effectiveValues.payment_type,
         tax_invoice_issued: effectiveValues.tax_invoice_issued,
         vat_included: effectiveValues.vat_included,
+        needs_classification: effectiveValues.needs_classification,
         amount: Number(li.subtotal) || 0,
         note1: effectiveValues.note1 || null,
         note2: effectiveValues.note2 || null,
@@ -354,7 +356,7 @@ export function TransactionForm({
       const fd = new FormData();
       if (id) fd.append("id", id);
       Object.entries(effectiveValues).forEach(([k, v]) => {
-        if (k === "vat_included" || k === "tax_invoice_issued") {
+        if (k === "vat_included" || k === "tax_invoice_issued" || k === "needs_classification") {
           if (v) fd.append(k, "on");
         } else {
           fd.append(k, String(v));
@@ -475,6 +477,24 @@ export function TransactionForm({
           value={values.project_id}
           onChange={(v) => set("project_id", v)}
         />
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-slate-500">분류 상태</label>
+          <label
+            className={`flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              values.needs_classification
+                ? "bg-green-600 text-white"
+                : "border border-slate-300 text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={values.needs_classification}
+              onChange={(e) => set("needs_classification", e.target.checked)}
+              className="h-4 w-4"
+            />
+            분류 대기 중
+          </label>
+        </div>
         <Field label="종류구분">
           <select value={values.category_id} onChange={(e) => handleCategorySelect(e.target.value)} className={inputClass}>
             <option value="">선택 안함</option>

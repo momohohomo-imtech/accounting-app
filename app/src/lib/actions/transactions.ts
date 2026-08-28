@@ -46,6 +46,7 @@ export async function createTransactionRecord(formData: FormData) {
     ...amounts,
     payment_type: String(formData.get("payment_type") ?? "immediate"),
     is_verified_ai: formData.get("is_verified_ai") === "on",
+    needs_classification: formData.get("needs_classification") === "on",
     receipt_image_url: String(formData.get("receipt_image_url") ?? "") || null,
     ocr_extracted_raw: ocrRaw ? JSON.parse(ocrRaw) : null,
     note1: String(formData.get("note1") ?? "") || null,
@@ -85,6 +86,7 @@ export async function updateTransactionRecord(formData: FormData) {
       vat_included: vatIncluded,
       ...amounts,
       payment_type: String(formData.get("payment_type") ?? "immediate"),
+      needs_classification: formData.get("needs_classification") === "on",
       note1: String(formData.get("note1") ?? "") || null,
       note2: String(formData.get("note2") ?? "") || null,
     })
@@ -110,6 +112,7 @@ export type BulkTransactionInput = {
   payment_type: string;
   tax_invoice_issued: boolean;
   vat_included: boolean;
+  needs_classification: boolean;
   amount: number;
   note1: string | null;
   note2: string | null;
@@ -139,6 +142,7 @@ export async function bulkImportTransactions(rows: BulkTransactionInput[]) {
     ...computeAmounts(r.type, r.amount, r.vat_included),
     payment_type: r.payment_type,
     is_verified_ai: true,
+    needs_classification: r.needs_classification,
     note1: r.note1,
     note2: r.note2,
     created_by: user?.id ?? null,
@@ -157,7 +161,10 @@ export async function bulkUpdateProjectId(formData: FormData) {
   const projectId = String(formData.get("project_id") ?? "") || null;
   if (ids.length === 0) return;
 
-  const { error } = await supabase.from("transactions").update({ project_id: projectId }).in("id", ids);
+  const { error } = await supabase
+    .from("transactions")
+    .update({ project_id: projectId, needs_classification: false })
+    .in("id", ids);
   if (error) console.error("bulkUpdateProjectId failed:", error.message);
 
   revalidatePath("/transactions");

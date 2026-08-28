@@ -75,6 +75,7 @@ export type Transaction = {
   sales_vat: number;
   payment_type: "immediate" | "credit";
   is_verified_ai: boolean;
+  needs_classification: boolean;
   receipt_image_url: string | null;
   ocr_extracted_raw: unknown;
   note1: string | null;

@@ -72,13 +72,17 @@ export function TransactionBulkImport({
       setRows(
         parsed.map((r) => {
           const clientId = matchId(clients, r.client_name);
+          const projectId = matchId(projects, r.project_name);
           return {
             trans_date: r.trans_date || new Date().toISOString().slice(0, 10),
             type: r.type === "매출" ? "매출" : "매입",
             client_id: clientId,
             client_name_raw: clientId ? null : r.client_name?.trim() || null,
             client_name_display: r.client_name?.trim() ?? "",
-            project_id: matchId(projects, r.project_name),
+            project_id: projectId,
+            // 엑셀에 프로젝트명은 적혀 있는데 시스템 프로젝트와 매칭이 안 되면(오탈자, 신규
+            // 프로젝트 등) 담당자가 나중에 확인하도록 "분류 대기 중"으로 표시.
+            needs_classification: Boolean(r.project_name?.trim()) && !projectId,
             item_name: r.item_name?.trim() || null,
             category_id: matchId(expenseCategories, r.category_name),
             quantity: r.quantity ?? null,
@@ -203,8 +207,10 @@ export function TransactionBulkImport({
                     <td className="py-1 pr-2">
                       <select
                         value={r.project_id ?? ""}
-                        onChange={(e) => updateRow(i, { project_id: e.target.value || null })}
-                        className={cx(fieldClass, "min-w-[140px]")}
+                        onChange={(e) =>
+                          updateRow(i, { project_id: e.target.value || null, needs_classification: false })
+                        }
+                        className={cx(fieldClass, "min-w-[140px]", r.needs_classification && "border-green-500")}
                       >
                         <option value="">일반경비</option>
                         {projects.map((p) => (
@@ -213,6 +219,11 @@ export function TransactionBulkImport({
                           </option>
                         ))}
                       </select>
+                      {r.needs_classification && (
+                        <span className="mt-0.5 block rounded bg-green-600 px-1.5 py-0.5 text-center text-[10px] font-medium text-white">
+                          분류 대기 중
+                        </span>
+                      )}
                     </td>
                     <td className="py-1 pr-2">
                       <input
