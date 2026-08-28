@@ -76,3 +76,46 @@ export async function updateWorkLogMemo(formData: FormData) {
   revalidatePath("/worklogs");
   revalidatePath("/reports");
 }
+
+export type SiteWorkLogEntry = { log_date: string; title: string };
+export type SiteWorkLogDetail = { jobTypeCount: number; dayCount: number; entries: SiteWorkLogEntry[] };
+
+/**
+ * 현장집계에서 현장을 클릭했을 때, 지정한 연도·월 범위 안에서 그 현장의 실제 작업
+ * 내역(빈 내용은 마지막 내용을 이어받은 값)을 날짜순으로 뽑아준다.
+ */
+export async function getSiteWorkLogDetail(
+  year: number,
+  siteId: string,
+  monthStart: number,
+  monthEnd: number
+): Promise<SiteWorkLogDetail> {
+  const supabase = await createClient();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const start = `${year}-${pad(monthStart)}-01`;
+  const lastDay = new Date(year, monthEnd, 0).getDate();
+  const end = `${year}-${pad(monthEnd)}-${pad(lastDay)}`;
+
+  const { data } = await supabase
+    .from("work_logs")
+    .select("log_date, title")
+    .eq("site_id", siteId)
+    .gte("log_date", start)
+    .lte("log_date", end)
+    .order("log_date", { ascending: true });
+
+  let active = "";
+  const entries: SiteWorkLogEntry[] = [];
+  const titles = new Set<string>();
+  const dates = new Set<string>();
+  for (const r of data ?? []) {
+    const explicit = (r.title ?? "").trim();
+    if (explicit) active = explicit;
+    if (!active) continue;
+    entries.push({ log_date: r.log_date, title: active });
+    titles.add(active);
+    dates.add(r.log_date);
+  }
+
+  return { jobTypeCount: titles.size, dayCount: dates.size, entries };
+}

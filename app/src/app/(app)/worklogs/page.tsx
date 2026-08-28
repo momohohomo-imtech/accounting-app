@@ -3,11 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 import { buildMonthGrid, WEEKDAY_LABELS } from "@/lib/calendar";
 import { workLogColorCellClass } from "@/lib/workLogColors";
 import { siteColorStyle } from "@/lib/siteColor";
-import { buildWorkLogSummary } from "@/lib/workLogSummary";
+import { buildWorkLogSummary, buildSiteAggregate } from "@/lib/workLogSummary";
 import { WorkLogMonthFilter } from "@/components/WorkLogMonthFilter";
 import { WorkLogExportButtons } from "@/components/WorkLogExportButtons";
 import { WorkLogDayEditor } from "@/components/WorkLogDayEditor";
 import { WorkLogSummaryTable } from "@/components/WorkLogSummaryTable";
+import { SiteAggregateTable } from "@/components/SiteAggregateTable";
 import { SiteColorLegend } from "@/components/SiteColorLegend";
 import { AutoPrint } from "@/components/AutoPrint";
 import { cx } from "@/lib/cx";
@@ -57,6 +58,7 @@ export default async function WorkLogsPage({
   const siteNameById = new Map((sites ?? []).map((s) => [s.id, s.name]));
   const siteColorById = new Map((sites ?? []).map((s) => [s.id, s.color]));
   const monthlySummary = buildWorkLogSummary(rows, sites ?? []);
+  const siteAggregate = buildSiteAggregate(rows, sites ?? []);
 
   const monthsByYear = new Map<number, Set<number>>();
   for (const { log_date } of allDates ?? []) {
@@ -190,6 +192,17 @@ export default async function WorkLogsPage({
           rows={monthlySummary}
           emptyMessage="이 달에 현장이 지정된 작업일지가 없습니다."
           year={selectedYear}
+        />
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm print:hidden">
+        <h2 className="mb-3 font-semibold text-slate-900">
+          현장집계 — 현장별 작업 종류 수·일수 ({selectedYear}년 {selectedMonth}월)
+        </h2>
+        <SiteAggregateTable
+          rows={siteAggregate}
+          year={selectedYear}
+          emptyMessage="이 달에 현장이 지정된 작업일지가 없습니다."
         />
       </div>
 

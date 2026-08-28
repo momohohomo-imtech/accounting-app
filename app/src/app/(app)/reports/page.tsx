@@ -14,6 +14,7 @@ import { TransactionEditPopup } from "@/components/TransactionEditPopup";
 import { WorkLogSummaryTable } from "@/components/WorkLogSummaryTable";
 import { WorkLogMonthRangeFilter } from "@/components/WorkLogMonthRangeFilter";
 import { buildWorkLogSummary } from "@/lib/workLogSummary";
+import { parseMonthRange } from "@/lib/monthRange";
 import type { WorkLog } from "@/lib/types";
 
 const MONTH_LABELS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
@@ -38,23 +39,6 @@ function one<T>(v: T | T[] | null): T | null {
   return Array.isArray(v) ? v[0] ?? null : v;
 }
 
-function parseMonthRange(input: string | undefined): { start: number; end: number; label: string } {
-  const raw = (input ?? "1-12").trim();
-  const rangeMatch = raw.match(/^(\d{1,2})-(\d{1,2})$/);
-  if (rangeMatch) {
-    const a = Math.min(12, Math.max(1, Number(rangeMatch[1])));
-    const b = Math.min(12, Math.max(1, Number(rangeMatch[2])));
-    const start = Math.min(a, b);
-    const end = Math.max(a, b);
-    return { start, end, label: start === end ? `${start}월` : `${start}월~${end}월` };
-  }
-  const single = raw.match(/^(\d{1,2})$/);
-  if (single) {
-    const m = Math.min(12, Math.max(1, Number(single[1])));
-    return { start: m, end: m, label: `${m}월` };
-  }
-  return { start: 1, end: 12, label: "1월~12월" };
-}
 
 export default async function ReportsPage({
   searchParams,
