@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { WorkLogSummaryRow } from "@/lib/workLogSummary";
+import { WorkLogGroupDetailPopup } from "@/components/WorkLogGroupDetailPopup";
 
 type SortKey = "siteName" | "title" | "days";
 
@@ -16,9 +17,18 @@ function sortValue(r: WorkLogSummaryRow, key: SortKey): string | number {
   }
 }
 
-export function WorkLogSummaryTable({ rows, emptyMessage }: { rows: WorkLogSummaryRow[]; emptyMessage: string }) {
+export function WorkLogSummaryTable({
+  rows,
+  emptyMessage,
+  year,
+}: {
+  rows: WorkLogSummaryRow[];
+  emptyMessage: string;
+  year: number;
+}) {
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [openGroup, setOpenGroup] = useState<WorkLogSummaryRow | null>(null);
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -72,7 +82,15 @@ export function WorkLogSummaryTable({ rows, emptyMessage }: { rows: WorkLogSumma
                   {r.siteName}
                 </span>
               </td>
-              <td className="py-2 pr-4 text-slate-700">{r.title}</td>
+              <td className="py-2 pr-4">
+                <button
+                  type="button"
+                  onClick={() => setOpenGroup(r)}
+                  className="text-left text-slate-700 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
+                >
+                  {r.title}
+                </button>
+              </td>
               <td className="py-2 text-right font-mono text-slate-900">{r.days}일</td>
             </tr>
           ))}
@@ -85,6 +103,17 @@ export function WorkLogSummaryTable({ rows, emptyMessage }: { rows: WorkLogSumma
           )}
         </tbody>
       </table>
+
+      {openGroup && (
+        <WorkLogGroupDetailPopup
+          year={year}
+          siteId={openGroup.siteId}
+          siteName={openGroup.siteName}
+          siteColor={openGroup.siteColor}
+          title={openGroup.title}
+          onClose={() => setOpenGroup(null)}
+        />
+      )}
     </div>
   );
 }

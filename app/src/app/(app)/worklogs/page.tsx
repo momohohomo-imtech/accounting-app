@@ -172,7 +172,11 @@ export default async function WorkLogsPage({
         <h2 className="mb-3 font-semibold text-slate-900">
           {selectedYear}년 {selectedMonth}월 작업 집계 (현장·내용별 일수)
         </h2>
-        <WorkLogSummaryTable rows={monthlySummary} emptyMessage="이 달에 현장이 지정된 작업일지가 없습니다." />
+        <WorkLogSummaryTable
+          rows={monthlySummary}
+          emptyMessage="이 달에 현장이 지정된 작업일지가 없습니다."
+          year={selectedYear}
+        />
       </div>
 
       {savedYears.length > 0 && (

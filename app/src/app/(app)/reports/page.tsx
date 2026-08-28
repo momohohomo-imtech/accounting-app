@@ -321,6 +321,7 @@ export default async function ReportsPage({
           <WorkLogSummaryTable
             rows={workLogSummary}
             emptyMessage="이 기간에 현장이 지정된 작업일지가 없습니다."
+            year={selectedYear}
           />
         </CollapsibleSection>
       </div>
