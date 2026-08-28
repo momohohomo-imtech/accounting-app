@@ -44,7 +44,9 @@ export function BusinessTripListClient({ logs }: { logs: BusinessTripLog[] }) {
               <tr key={log.id} className="border-b border-slate-100 last:border-0">
                 <td className="p-3 text-slate-700">{log.work_date}</td>
                 <td className="p-3 text-slate-700">{log.site_name ?? "-"}</td>
-                <td className="p-3 text-slate-700">{log.project_name ?? "-"}</td>
+                <td className="p-3 text-slate-700">
+                  {log.projects.map((p) => p.project_name).filter(Boolean).join(", ") || "-"}
+                </td>
                 <td className="p-3 text-slate-700">{log.client_name ?? "-"}</td>
                 <td className="p-3 text-slate-700">{log.work_types.join(", ") || "-"}</td>
                 <td className="p-3 text-right">

@@ -33,16 +33,14 @@ export function BusinessTripBlankFormPopup({ onClose }: { onClose: () => void })
                   <td className={cell}></td>
                 </tr>
                 <tr>
-                  <td className={`${cell} bg-slate-50 font-medium`}>프로젝트명</td>
-                  <td className={cell}></td>
                   <td className={`${cell} bg-slate-50 font-medium`}>공사일</td>
+                  <td className={cell}></td>
+                  <td className={`${cell} bg-slate-50 font-medium`}>작성일</td>
                   <td className={cell}></td>
                 </tr>
                 <tr>
-                  <td className={`${cell} bg-slate-50 font-medium`}>작성일</td>
-                  <td className={cell}></td>
                   <td className={`${cell} bg-slate-50 font-medium`}>작업구분</td>
-                  <td className={cell}>
+                  <td className={cell} colSpan={3}>
                     {WORK_TYPE_OPTIONS.map((t) => (
                       <span key={t} className="mr-3 inline-flex items-center gap-1">
                         <span className="inline-block h-3 w-3 border border-slate-400" />
@@ -57,11 +55,16 @@ export function BusinessTripBlankFormPopup({ onClose }: { onClose: () => void })
                 </tr>
               </tbody>
             </table>
+            <p className="mb-2 text-slate-400">
+              ※ 하루에 여러 프로젝트를 진행한 경우, 아래 표의 "프로젝트명" 칸에 각 줄이 어느
+              프로젝트인지 적어주세요.
+            </p>
 
             <p className="mb-1 font-semibold">작업 인원 내역</p>
             <table className="mb-1 w-full border-collapse">
               <thead>
                 <tr>
+                  <th className={`${cell} w-20 bg-slate-50`}>프로젝트명</th>
                   <th className={`${cell} bg-slate-50`}>작업자명</th>
                   <th className={`${cell} w-24 bg-slate-50`}>근무일</th>
                   <th className={`${cell} w-16 bg-slate-50`}>추가근무</th>
@@ -71,6 +74,7 @@ export function BusinessTripBlankFormPopup({ onClose }: { onClose: () => void })
               <tbody>
                 {Array.from({ length: BLANK_WORKER_ROWS }, (_, i) => (
                   <tr key={i}>
+                    <td className={cell}></td>
                     <td className={cell}></td>
                     <td className={cell}></td>
                     <td className={cell}></td>
@@ -87,6 +91,7 @@ export function BusinessTripBlankFormPopup({ onClose }: { onClose: () => void })
             <table className="mb-2 w-full border-collapse">
               <thead>
                 <tr>
+                  <th className={`${cell} w-20 bg-slate-50`}>프로젝트명</th>
                   <th className={`${cell} bg-slate-50`}>장비명</th>
                   <th className={`${cell} bg-slate-50`}>사용처</th>
                   <th className={`${cell} w-20 bg-slate-50`}>작업시간</th>
@@ -100,6 +105,7 @@ export function BusinessTripBlankFormPopup({ onClose }: { onClose: () => void })
                     <td className={cell}></td>
                     <td className={cell}></td>
                     <td className={cell}></td>
+                    <td className={cell}></td>
                   </tr>
                 ))}
               </tbody>
@@ -109,6 +115,7 @@ export function BusinessTripBlankFormPopup({ onClose }: { onClose: () => void })
             <table className="w-full border-collapse">
               <thead>
                 <tr>
+                  <th className={`${cell} w-20 bg-slate-50`}>프로젝트명</th>
                   <th className={`${cell} bg-slate-50`}>사용처</th>
                   <th className={`${cell} w-24 bg-slate-50`}>금액</th>
                   <th className={`${cell} bg-slate-50`}>비고</th>
@@ -117,6 +124,7 @@ export function BusinessTripBlankFormPopup({ onClose }: { onClose: () => void })
               <tbody>
                 {Array.from({ length: BLANK_EXPENSE_ROWS }, (_, i) => (
                   <tr key={i}>
+                    <td className={cell}></td>
                     <td className={cell}></td>
                     <td className={cell}></td>
                     <td className={cell}></td>

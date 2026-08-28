@@ -82,7 +82,6 @@ export function BusinessTripLogViewPopup({ log, onClose }: { log: BusinessTripLo
               <div className="grid grid-cols-1 gap-3 border-b border-slate-100 pb-4 sm:grid-cols-3">
                 <Field label="원청사" value={log.client_name ?? ""} />
                 <Field label="현장명" value={log.site_name ?? ""} />
-                <Field label="프로젝트명" value={log.project_name ?? ""} />
                 <Field label="공사일" value={log.work_date} />
                 <Field label="작성일" value={log.created_date} />
                 <Field label="작업구분" value={log.work_types.join(", ")} />
@@ -91,99 +90,104 @@ export function BusinessTripLogViewPopup({ log, onClose }: { log: BusinessTripLo
                 </div>
               </div>
 
-              <div className="mt-4">
-                <h3 className="mb-2 font-semibold text-slate-900">작업 인원 내역</h3>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-left text-slate-500">
-                      <th className="pb-1 pr-2">작업자명</th>
-                      <th className="pb-1 pr-2">근무일</th>
-                      <th className="pb-1 pr-2">추가근무</th>
-                      <th className="pb-1">비고</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {log.workers.map((w, i) => (
-                      <tr key={i} className="border-b border-slate-100">
-                        <td className="py-1 pr-2 text-slate-900">{w.name}</td>
-                        <td className="py-1 pr-2 text-slate-600">{w.work_date}</td>
-                        <td className="py-1 pr-2 text-slate-600">{w.overtime ? "O" : ""}</td>
-                        <td className="py-1 text-slate-600">{w.note}</td>
-                      </tr>
-                    ))}
-                    {log.workers.length === 0 && (
-                      <tr>
-                        <td colSpan={4} className="py-3 text-center text-slate-400">
-                          인원 내역 없음
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-                <p className="mt-2 text-right text-sm text-slate-700">
-                  총 공수 <span className="font-semibold">{log.total_manpower ?? "-"}</span>명
-                </p>
-              </div>
+              {log.projects.map((p, pi) => (
+                <div key={pi} className="mt-4 border-t border-slate-100 pt-4 first:mt-0 first:border-0 first:pt-0">
+                  <h3 className="mb-3 font-semibold text-slate-900">
+                    {p.project_name || `프로젝트 ${pi + 1}`}
+                  </h3>
 
-              <div className="mt-4">
-                <h3 className="mb-2 font-semibold text-slate-900">장비 사용 내역</h3>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-left text-slate-500">
-                      <th className="pb-1 pr-2">장비명</th>
-                      <th className="pb-1 pr-2">사용처</th>
-                      <th className="pb-1 pr-2">작업시간</th>
-                      <th className="pb-1">비고</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {log.equipment.map((e, i) => (
-                      <tr key={i} className="border-b border-slate-100">
-                        <td className="py-1 pr-2 text-slate-900">{e.name}</td>
-                        <td className="py-1 pr-2 text-slate-600">{e.location}</td>
-                        <td className="py-1 pr-2 text-slate-600">{e.hours}</td>
-                        <td className="py-1 text-slate-600">{e.note}</td>
+                  <p className="mb-1 text-sm font-medium text-slate-700">작업 인원 내역</p>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-left text-slate-500">
+                        <th className="pb-1 pr-2">작업자명</th>
+                        <th className="pb-1 pr-2">근무일</th>
+                        <th className="pb-1 pr-2">추가근무</th>
+                        <th className="pb-1">비고</th>
                       </tr>
-                    ))}
-                    {log.equipment.length === 0 && (
-                      <tr>
-                        <td colSpan={4} className="py-3 text-center text-slate-400">
-                          장비 내역 없음
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {p.workers.map((w, i) => (
+                        <tr key={i} className="border-b border-slate-100">
+                          <td className="py-1 pr-2 text-slate-900">{w.name}</td>
+                          <td className="py-1 pr-2 text-slate-600">{w.work_date}</td>
+                          <td className="py-1 pr-2 text-slate-600">{w.overtime ? "O" : ""}</td>
+                          <td className="py-1 text-slate-600">{w.note}</td>
+                        </tr>
+                      ))}
+                      {p.workers.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="py-3 text-center text-slate-400">
+                            인원 내역 없음
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                  <p className="mb-3 mt-2 text-right text-sm text-slate-700">
+                    총 공수 <span className="font-semibold">{p.total_manpower || "-"}</span>명
+                  </p>
 
-              <div className="mt-4">
-                <h3 className="mb-2 font-semibold text-slate-900">현장 지출 내역</h3>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-left text-slate-500">
-                      <th className="pb-1 pr-2">사용처</th>
-                      <th className="pb-1 pr-2">금액</th>
-                      <th className="pb-1">비고</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {log.expenses.map((e, i) => (
-                      <tr key={i} className="border-b border-slate-100">
-                        <td className="py-1 pr-2 text-slate-900">{e.vendor}</td>
-                        <td className="py-1 pr-2 text-slate-600">{e.amount}</td>
-                        <td className="py-1 text-slate-600">{e.note}</td>
+                  <p className="mb-1 text-sm font-medium text-slate-700">장비 사용 내역</p>
+                  <table className="mb-3 w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-left text-slate-500">
+                        <th className="pb-1 pr-2">장비명</th>
+                        <th className="pb-1 pr-2">사용처</th>
+                        <th className="pb-1 pr-2">작업시간</th>
+                        <th className="pb-1">비고</th>
                       </tr>
-                    ))}
-                    {log.expenses.length === 0 && (
-                      <tr>
-                        <td colSpan={3} className="py-3 text-center text-slate-400">
-                          지출 내역 없음
-                        </td>
+                    </thead>
+                    <tbody>
+                      {p.equipment.map((e, i) => (
+                        <tr key={i} className="border-b border-slate-100">
+                          <td className="py-1 pr-2 text-slate-900">{e.name}</td>
+                          <td className="py-1 pr-2 text-slate-600">{e.location}</td>
+                          <td className="py-1 pr-2 text-slate-600">{e.hours}</td>
+                          <td className="py-1 text-slate-600">{e.note}</td>
+                        </tr>
+                      ))}
+                      {p.equipment.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="py-3 text-center text-slate-400">
+                            장비 내역 없음
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+
+                  <p className="mb-1 text-sm font-medium text-slate-700">현장 지출 내역</p>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-left text-slate-500">
+                        <th className="pb-1 pr-2">사용처</th>
+                        <th className="pb-1 pr-2">금액</th>
+                        <th className="pb-1">비고</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {p.expenses.map((e, i) => (
+                        <tr key={i} className="border-b border-slate-100">
+                          <td className="py-1 pr-2 text-slate-900">{e.vendor}</td>
+                          <td className="py-1 pr-2 text-slate-600">{e.amount}</td>
+                          <td className="py-1 text-slate-600">{e.note}</td>
+                        </tr>
+                      ))}
+                      {p.expenses.length === 0 && (
+                        <tr>
+                          <td colSpan={3} className="py-3 text-center text-slate-400">
+                            지출 내역 없음
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+              {log.projects.length === 0 && (
+                <p className="py-6 text-center text-sm text-slate-400">프로젝트 내역이 없습니다.</p>
+              )}
             </>
           )}
         </div>

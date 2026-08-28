@@ -238,18 +238,22 @@ export type BusinessTripWorker = { name: string; work_date: string; overtime: bo
 export type BusinessTripEquipment = { name: string; location: string; hours: string; note: string };
 export type BusinessTripExpense = { vendor: string; amount: string; note: string };
 
+export type BusinessTripProject = {
+  project_name: string;
+  workers: BusinessTripWorker[];
+  total_manpower: string;
+  equipment: BusinessTripEquipment[];
+  expenses: BusinessTripExpense[];
+};
+
 export type BusinessTripLog = {
   id: string;
   work_date: string;
   created_date: string;
   client_name: string | null;
   site_name: string | null;
-  project_name: string | null;
   work_types: string[];
   note: string | null;
-  workers: BusinessTripWorker[];
-  total_manpower: string | null;
-  equipment: BusinessTripEquipment[];
-  expenses: BusinessTripExpense[];
+  projects: BusinessTripProject[];
   created_at: string;
 };

@@ -18,13 +18,9 @@ function parse(formData: FormData) {
     created_date: String(formData.get("created_date") ?? ""),
     client_name: String(formData.get("client_name") ?? "") || null,
     site_name: String(formData.get("site_name") ?? "") || null,
-    project_name: String(formData.get("project_name") ?? "") || null,
     work_types: formData.getAll("work_types").map(String),
     note: String(formData.get("note") ?? "") || null,
-    workers: parseJsonField(formData, "workers_json"),
-    total_manpower: String(formData.get("total_manpower") ?? "") || null,
-    equipment: parseJsonField(formData, "equipment_json"),
-    expenses: parseJsonField(formData, "expenses_json"),
+    projects: parseJsonField(formData, "projects_json"),
   };
 }
 
