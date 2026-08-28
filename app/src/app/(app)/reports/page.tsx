@@ -106,10 +106,8 @@ export default async function ReportsPage({
 
   const byProjectAll = (projects ?? []).map((p) => {
     const rows = transactions.filter((t) => t.project_id === p.id);
-    // 손익 계산 시 매출은 VAT 10%를 뺀 금액을 사용 (VAT는 실제 이익이 아닌 세무서 납부분).
-    // 매입건마다 부가세 체크가 제각각이라 sales_vat 컬럼 대신 매출 합계에서 일괄로 10%를 뗀다.
-    const salesGross = rows.reduce((s, t) => s + t.sales_amount + t.sales_vat, 0);
-    const sales = Math.round(salesGross * 0.9);
+    // 손익 계산 시 매출은 실제 부가세(sales_vat)만큼만 뺀 금액을 사용 (VAT는 실제 이익이 아닌 세무서 납부분).
+    const sales = rows.reduce((s, t) => s + t.sales_amount, 0);
     const purchase = rows.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
     return { ...p, quoteAmount: p.quote_amount ?? 0, sales, purchase, profit: sales - purchase };
   });
