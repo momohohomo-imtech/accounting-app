@@ -253,6 +253,16 @@ export type BusinessTripProject = {
   expenses: BusinessTripExpense[];
 };
 
+export type ReportAiInsightMessage = { role: "user" | "model"; text: string };
+
+export type ReportAiInsight = {
+  id: string;
+  year: number;
+  title: string;
+  messages: ReportAiInsightMessage[];
+  created_at: string;
+};
+
 export type BusinessTripLog = {
   id: string;
   // 프로젝트들 중 가장 이른 공사일 — 목록 정렬/기본 표시용으로 서버에서 자동 계산.

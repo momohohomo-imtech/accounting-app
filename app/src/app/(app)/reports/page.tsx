@@ -8,6 +8,8 @@ import { ReportProjectSiteFilter } from "@/components/ReportProjectSiteFilter";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { AutoPrint } from "@/components/AutoPrint";
 import { ReportAIInsights } from "@/components/ReportAIInsights";
+import { saveReportAiInsight, deleteReportAiInsight } from "@/lib/actions/reportAiInsights";
+import type { ReportAiInsight } from "@/lib/types";
 import { VendorAggregateTable } from "@/components/VendorAggregateTable";
 import { ProjectProfitTable } from "@/components/ProjectProfitTable";
 import { TransactionEditPopup } from "@/components/TransactionEditPopup";
@@ -59,7 +61,7 @@ export default async function ReportsPage({
   const selectedYear = year ? Number(year) : currentYear;
 
   const supabase = await createClient();
-  const [{ data: rawTx }, { data: projects }, { data: firstTx }] = await Promise.all([
+  const [{ data: rawTx }, { data: projects }, { data: firstTx }, { data: savedInsights }] = await Promise.all([
     supabase
       .from("transactions")
       .select("*, clients(name), projects(name, sites(name))")
@@ -70,6 +72,11 @@ export default async function ReportsPage({
       .select("id, name, status, progress_pct, site_id, quote_amount, sites(name)")
       .eq("year", selectedYear),
     supabase.from("transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
+    supabase
+      .from("report_ai_insights")
+      .select("*")
+      .eq("year", selectedYear)
+      .order("created_at", { ascending: false }),
   ]);
 
   const transactions = (rawTx ?? []) as unknown as Row[];
@@ -219,7 +226,12 @@ export default async function ReportsPage({
           <YearFilter basePath="/reports" years={years} selectedYear={selectedYear} />
         </div>
 
-        <ReportAIInsights summary={aiSummary} />
+        <ReportAIInsights
+          summary={aiSummary}
+          savedInsights={(savedInsights ?? []) as unknown as ReportAiInsight[]}
+          saveAction={saveReportAiInsight}
+          deleteAction={deleteReportAiInsight}
+        />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
