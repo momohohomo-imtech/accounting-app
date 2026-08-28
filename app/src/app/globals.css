@@ -48,3 +48,21 @@ textarea {
     background: #ffffff;
   }
 }
+
+/* 팝업(모달) 안에서 "인쇄"를 누르면 나머지 페이지는 숨기고 모달 내용만 인쇄되게.
+   ModalPrintButton이 인쇄 직전 html에 이 클래스를 붙였다가 인쇄 후 제거한다. */
+@media print {
+  html.modal-print body > * {
+    visibility: hidden;
+  }
+  html.modal-print .modal-print-target,
+  html.modal-print .modal-print-target * {
+    visibility: visible;
+  }
+  html.modal-print .modal-print-target {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}

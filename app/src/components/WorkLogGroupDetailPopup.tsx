@@ -10,6 +10,8 @@ import {
 } from "@/lib/actions/worklogs";
 import { Button } from "@/components/ui/Button";
 import { fieldClass } from "@/components/ui/field";
+import { ModalPrintButton } from "@/components/ModalPrintButton";
+import { downloadXlsx } from "@/lib/xlsxExport";
 
 function formatMonthDay(dateKey: string) {
   const [, m, d] = dateKey.split("-");
@@ -36,7 +38,7 @@ function MemoRow({ entry }: { entry: WorkLogDetailEntry }) {
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-medium text-slate-900">{formatMonthDay(entry.log_date)}</span>
         {!editing && (
-          <Button type="button" variant="secondary" size="xs" onClick={() => setEditing(true)}>
+          <Button type="button" variant="secondary" size="xs" className="print:hidden" onClick={() => setEditing(true)}>
             {entry.content ? "메모 수정" : "메모 추가"}
           </Button>
         )}
@@ -122,9 +124,20 @@ export function WorkLogGroupDetailPopup({
     onClose();
   }
 
+  async function handleExcel() {
+    if (!entries) return;
+    await downloadXlsx(
+      `${siteName}_${title}_${year}년.xlsx`,
+      ["날짜", "메모"],
+      entries.map((e) => [formatMonthDay(e.log_date), e.content ?? ""]),
+      "작업집계 내역",
+      [[`${siteName} — ${title} (${year}년)`], [`총 ${entries.length}일`]]
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+      <div className="modal-print-target w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <p className="flex items-center gap-1.5 text-sm text-slate-500">
@@ -162,7 +175,7 @@ export function WorkLogGroupDetailPopup({
                   <button
                     type="button"
                     onClick={() => setEditingTitle(true)}
-                    className="text-xs font-normal text-slate-400 underline decoration-slate-300 underline-offset-2 hover:text-slate-700"
+                    className="text-xs font-normal text-slate-400 underline decoration-slate-300 underline-offset-2 hover:text-slate-700 print:hidden"
                   >
                     수정
                   </button>
@@ -173,9 +186,15 @@ export function WorkLogGroupDetailPopup({
               {year}년 전체 내역{entries !== null && ` · 총 ${entries.length}일`}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="text-sm text-slate-500 hover:text-slate-800">
-            닫기
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <ModalPrintButton />
+            <Button type="button" variant="secondary" size="xs" disabled={!entries} onClick={handleExcel}>
+              엑셀
+            </Button>
+            <button type="button" onClick={onClose} className="text-sm text-slate-500 hover:text-slate-800 print:hidden">
+              닫기
+            </button>
+          </div>
         </div>
 
         {entries === null ? (
