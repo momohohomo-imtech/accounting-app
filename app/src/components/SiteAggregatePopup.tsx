@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getSiteWorkLogDetail, type SiteWorkLogDetail } from "@/lib/actions/worklogs";
 import { parseMonthRange } from "@/lib/monthRange";
 import { downloadXlsx } from "@/lib/xlsxExport";
@@ -44,6 +44,17 @@ export function SiteAggregatePopup({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siteId]);
 
+  const breakdown = useMemo(() => {
+    if (!detail) return [];
+    const counts = new Map<string, number>();
+    for (const e of detail.entries) {
+      counts.set(e.title, (counts.get(e.title) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([title, days]) => ({ title, days }))
+      .sort((a, b) => b.days - a.days);
+  }, [detail]);
+
   async function handleExcel() {
     if (!detail) return;
     const { label } = parseMonthRange(monthInput);
@@ -85,6 +96,17 @@ export function SiteAggregatePopup({
             </button>
           </div>
         </div>
+
+        {breakdown.length > 0 && (
+          <div className="mb-4 space-y-1 rounded-lg bg-slate-50 p-3">
+            {breakdown.map((b) => (
+              <div key={b.title} className="flex items-center justify-between text-sm">
+                <span className="truncate pr-3 text-slate-700">{b.title}</span>
+                <span className="shrink-0 font-mono text-slate-900">{b.days}일</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="mb-4 flex flex-wrap items-center gap-2 border-y border-slate-100 py-3 print:hidden">
           <input
