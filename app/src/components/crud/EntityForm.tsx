@@ -23,6 +23,11 @@ export function EntityForm({
                 type="checkbox"
                 name={f.name}
                 defaultChecked={Boolean(raw)}
+                onChange={(e) => {
+                  if (!f.exclusiveWith || !e.target.checked) return;
+                  const other = e.currentTarget.form?.elements.namedItem(f.exclusiveWith);
+                  if (other instanceof HTMLInputElement) other.checked = false;
+                }}
                 className="h-4 w-4 rounded border-slate-300 accent-slate-900"
               />
               {f.label}

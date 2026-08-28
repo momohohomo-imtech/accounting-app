@@ -18,6 +18,7 @@ type ExportRow = {
   quote_amount: number | null;
   contract_amount: number | null;
   contract_amount_estimated: boolean;
+  contract_amount_minimum: boolean;
   profit: number | null;
   progress_pct: number | null;
   year: number;
@@ -37,7 +38,7 @@ export function ProjectListExportButtons({ year, rows }: { year: number; rows: E
       formatDate(p.order_date),
       p.quote_amount ?? 0,
       p.contract_amount ?? 0,
-      p.contract_amount_estimated ? "예상" : "",
+      p.contract_amount_estimated ? "예상" : p.contract_amount_minimum ? "최소" : "",
       p.profit ?? 0,
       p.progress_pct ?? 0,
       p.year,

@@ -32,6 +32,7 @@ export type Project = {
   quote_amount: number | null;
   contract_amount: number | null;
   contract_amount_estimated: boolean;
+  contract_amount_minimum: boolean;
   order_date: string | null;
   memo: string | null;
   year: number;

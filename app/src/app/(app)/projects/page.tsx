@@ -133,6 +133,14 @@ async function ProjectListSection({
       label: "수주액 예상금액 (체크 시 빨간색으로 표시)",
       type: "checkbox",
       hideInTable: true,
+      exclusiveWith: "contract_amount_minimum",
+    },
+    {
+      name: "contract_amount_minimum",
+      label: "최소금액 산정액 (체크시 녹색으로 표시)",
+      type: "checkbox",
+      hideInTable: true,
+      exclusiveWith: "contract_amount_estimated",
     },
     {
       name: "profit",
@@ -141,6 +149,7 @@ async function ProjectListSection({
       format: "currency",
       width: "8%",
       colorField: "contract_amount_estimated",
+      secondaryColorField: "contract_amount_minimum",
     },
     { name: "progress_pct", label: "진행률(%)", type: "number", display: "progress", width: "8%" },
     { name: "year", label: "연도", type: "number", required: true, hideInTable: true },
