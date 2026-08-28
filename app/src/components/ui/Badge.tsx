@@ -8,6 +8,7 @@ const variantClass = {
   amber: "bg-amber-50 text-amber-700",
   red: "bg-red-50 text-red-700",
   slate: "bg-slate-100 text-slate-600",
+  green: "bg-green-600 text-white",
 } as const;
 
 export function Badge({

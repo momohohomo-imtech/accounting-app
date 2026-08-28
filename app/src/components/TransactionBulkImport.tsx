@@ -210,7 +210,7 @@ export function TransactionBulkImport({
                         onChange={(e) =>
                           updateRow(i, { project_id: e.target.value || null, needs_classification: false })
                         }
-                        className={cx(fieldClass, "min-w-[140px]", r.needs_classification && "border-green-500")}
+                        className={cx(fieldClass, "min-w-[140px]")}
                       >
                         <option value="">일반경비</option>
                         {projects.map((p) => (

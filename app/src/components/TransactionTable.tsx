@@ -250,7 +250,7 @@ export function TransactionTable({
               <Td className="pr-4">{t.clients?.name ?? t.client_name_raw ?? "-"}</Td>
               <Td className="pr-4">
                 {t.needs_classification ? (
-                  <Badge className="bg-green-600 text-white">분류 대기 중</Badge>
+                  <Badge variant="green">분류 대기 중</Badge>
                 ) : (
                   (t.projects?.name ?? <span className="font-medium text-red-600">일반경비</span>)
                 )}
