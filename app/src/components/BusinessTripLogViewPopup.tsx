@@ -101,7 +101,6 @@ export function BusinessTripLogViewPopup({ log, onClose }: { log: BusinessTripLo
                     <thead>
                       <tr className="border-b border-slate-200 text-left text-slate-500">
                         <th className="pb-1 pr-2">작업자명</th>
-                        <th className="pb-1 pr-2">근무일</th>
                         <th className="pb-1 pr-2">추가근무</th>
                         <th className="pb-1">비고</th>
                       </tr>
@@ -110,20 +109,22 @@ export function BusinessTripLogViewPopup({ log, onClose }: { log: BusinessTripLo
                       {p.workers.map((w, i) => (
                         <tr key={i} className="border-b border-slate-100">
                           <td className="py-1 pr-2 text-slate-900">{w.name}</td>
-                          <td className="py-1 pr-2 text-slate-600">{w.work_date}</td>
                           <td className="py-1 pr-2 text-slate-600">{w.overtime ? "O" : ""}</td>
                           <td className="py-1 text-slate-600">{w.note}</td>
                         </tr>
                       ))}
                       {p.workers.length === 0 && (
                         <tr>
-                          <td colSpan={4} className="py-3 text-center text-slate-400">
+                          <td colSpan={3} className="py-3 text-center text-slate-400">
                             인원 내역 없음
                           </td>
                         </tr>
                       )}
                     </tbody>
                   </table>
+                  {p.personnel_note && (
+                    <p className="mt-2 text-sm text-slate-600">비고: {p.personnel_note}</p>
+                  )}
                   <p className="mb-3 mt-2 text-right text-sm text-slate-700">
                     총 공수 <span className="font-semibold">{p.total_manpower || "-"}</span>명
                   </p>

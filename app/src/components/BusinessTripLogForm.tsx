@@ -13,8 +13,8 @@ import { getWorkLogsForDate, type WorkLogDateEntry } from "@/lib/actions/worklog
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { Button } from "@/components/ui/Button";
 
-function emptyWorker(workDate: string): BusinessTripWorker {
-  return { name: "", work_date: workDate, overtime: false, note: "" };
+function emptyWorker(): BusinessTripWorker {
+  return { name: "", overtime: false, note: "" };
 }
 function emptyEquipment(): BusinessTripEquipment {
   return { name: "", location: "", hours: "", note: "" };
@@ -22,10 +22,11 @@ function emptyEquipment(): BusinessTripEquipment {
 function emptyExpense(): BusinessTripExpense {
   return { vendor: "", amount: "", note: "" };
 }
-function emptyProject(workDate: string): BusinessTripProject {
+function emptyProject(): BusinessTripProject {
   return {
     project_name: "",
-    workers: [emptyWorker(workDate), emptyWorker(workDate), emptyWorker(workDate)],
+    workers: [emptyWorker(), emptyWorker(), emptyWorker()],
+    personnel_note: "",
     total_manpower: "",
     equipment: [emptyEquipment()],
     expenses: [emptyExpense()],
@@ -139,29 +140,23 @@ function ProjectBlockEditor({
           <h3 className="text-sm font-semibold text-slate-900">작업 인원 내역</h3>
           <button
             type="button"
-            onClick={() => onChange({ ...project, workers: [...project.workers, emptyWorker(workDate)] })}
+            onClick={() => onChange({ ...project, workers: [...project.workers, emptyWorker()] })}
             className="text-xs font-medium text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
           >
             + 인원 추가
           </button>
         </div>
+        <p className="mb-1.5 text-xs text-slate-400">근무일은 상단 공사일과 동일하게 적용됩니다.</p>
         <div className="space-y-1.5">
-          <div className="grid grid-cols-[1fr_8rem_5rem_1fr_3rem] gap-2 px-1 text-xs font-medium text-slate-500">
+          <div className="grid grid-cols-[1fr_5rem_1fr_3rem] gap-2 px-1 text-xs font-medium text-slate-500">
             <span>작업자명</span>
-            <span>근무일</span>
             <span>추가근무</span>
             <span>비고</span>
             <span />
           </div>
           {project.workers.map((w, i) => (
-            <div key={i} className="grid grid-cols-[1fr_8rem_5rem_1fr_3rem] items-center gap-2">
+            <div key={i} className="grid grid-cols-[1fr_5rem_1fr_3rem] items-center gap-2">
               <input value={w.name} onChange={(e) => updateWorker(i, { name: e.target.value })} className={fieldClass} />
-              <input
-                type="date"
-                value={w.work_date}
-                onChange={(e) => updateWorker(i, { work_date: e.target.value })}
-                className={fieldClass}
-              />
               <input
                 type="checkbox"
                 checked={w.overtime}
@@ -182,6 +177,14 @@ function ProjectBlockEditor({
               )}
             </div>
           ))}
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <span className="shrink-0 text-sm text-slate-500">비고</span>
+          <input
+            value={project.personnel_note}
+            onChange={(e) => onChange({ ...project, personnel_note: e.target.value })}
+            className={`${fieldClass} flex-1`}
+          />
         </div>
         <div className="mt-2 flex items-center justify-end gap-2">
           <span className="text-sm text-slate-500">총 공수</span>
@@ -307,7 +310,7 @@ export function BusinessTripLogForm({
   const [workTypes, setWorkTypes] = useState<Set<string>>(new Set(initial?.work_types ?? []));
   const [note, setNote] = useState(initial?.note ?? "");
   const [projects, setProjects] = useState<BusinessTripProject[]>(
-    initial?.projects?.length ? initial.projects : [emptyProject(workDate)]
+    initial?.projects?.length ? initial.projects.map((p) => ({ ...p, personnel_note: p.personnel_note ?? "" })) : [emptyProject()]
   );
   const [saving, setSaving] = useState(false);
 
@@ -388,7 +391,7 @@ export function BusinessTripLogForm({
           <h2 className="font-semibold text-slate-900">프로젝트별 내역 (하루에 여러 프로젝트 가능)</h2>
           <button
             type="button"
-            onClick={() => setProjects((prev) => [...prev, emptyProject(workDateValue)])}
+            onClick={() => setProjects((prev) => [...prev, emptyProject()])}
             className="text-xs font-medium text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
           >
             + 프로젝트 추가

@@ -60,13 +60,12 @@ export function BusinessTripBlankFormPopup({ onClose }: { onClose: () => void })
               프로젝트인지 적어주세요.
             </p>
 
-            <p className="mb-1 font-semibold">작업 인원 내역</p>
+            <p className="mb-1 font-semibold">작업 인원 내역 (근무일은 상단 공사일과 동일)</p>
             <table className="mb-1 w-full border-collapse">
               <thead>
                 <tr>
                   <th className={`${cell} w-20 bg-slate-50`}>프로젝트명</th>
                   <th className={`${cell} bg-slate-50`}>작업자명</th>
-                  <th className={`${cell} w-24 bg-slate-50`}>근무일</th>
                   <th className={`${cell} w-16 bg-slate-50`}>추가근무</th>
                   <th className={`${cell} bg-slate-50`}>비고</th>
                 </tr>
@@ -78,11 +77,13 @@ export function BusinessTripBlankFormPopup({ onClose }: { onClose: () => void })
                     <td className={cell}></td>
                     <td className={cell}></td>
                     <td className={cell}></td>
-                    <td className={cell}></td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            <p className="mb-1">
+              비고 <span className="inline-block w-full max-w-xs border-b border-slate-400">&nbsp;</span>
+            </p>
             <p className="mb-2 text-right">
               총 공수 <span className="inline-block w-16 border-b border-slate-400">&nbsp;</span> 명
             </p>

@@ -235,13 +235,15 @@ export type Backup = {
   created_at: string;
 };
 
-export type BusinessTripWorker = { name: string; work_date: string; overtime: boolean; note: string };
+// 근무일은 항상 출장일지 상단의 공사일과 동일하므로 인원별로 따로 갖지 않는다.
+export type BusinessTripWorker = { name: string; overtime: boolean; note: string };
 export type BusinessTripEquipment = { name: string; location: string; hours: string; note: string };
 export type BusinessTripExpense = { vendor: string; amount: string; note: string };
 
 export type BusinessTripProject = {
   project_name: string;
   workers: BusinessTripWorker[];
+  personnel_note: string;
   total_manpower: string;
   equipment: BusinessTripEquipment[];
   expenses: BusinessTripExpense[];
