@@ -7,6 +7,7 @@ import { downloadXlsx } from "@/lib/xlsxExport";
 import { fieldClass } from "@/components/ui/field";
 import { Button } from "@/components/ui/Button";
 import { ModalPrintButton } from "@/components/ModalPrintButton";
+import { ModalPortal } from "@/components/ModalPortal";
 
 function formatMonthDay(dateKey: string) {
   const [, m, d] = dateKey.split("-");
@@ -71,8 +72,9 @@ export function SiteAggregatePopup({
   }
 
   return (
-    <div className="modal-print-overlay fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10">
-      <div className="modal-print-target w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+    <ModalPortal>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10">
+      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <p className="flex items-center gap-1.5 text-sm text-slate-500">
@@ -145,5 +147,6 @@ export function SiteAggregatePopup({
         )}
       </div>
     </div>
+    </ModalPortal>
   );
 }
