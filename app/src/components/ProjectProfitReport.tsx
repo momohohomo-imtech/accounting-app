@@ -7,6 +7,7 @@ import { ProjectMemoProvider } from "@/components/ProjectMemoProvider";
 import { ReportCloseButton } from "@/components/ReportCloseButton";
 import { ReportMemoField } from "@/components/ReportMemoField";
 import { ProjectPurchaseChartButton } from "@/components/ProjectPurchaseChartButton";
+import { ProjectPurchaseTable } from "@/components/ProjectPurchaseTable";
 
 export async function ProjectProfitReport({ projectId, closeHref }: { projectId: string; closeHref: string }) {
   const supabase = await createClient();
@@ -119,35 +120,15 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[500px] text-sm">
-          <thead>
-            <tr className="border-b border-slate-200 text-left text-slate-500">
-              <th className="pb-2 pr-4">날짜</th>
-              <th className="pb-2 pr-4">거래처</th>
-              <th className="pb-2 pr-4">품목</th>
-              <th className="pb-2 text-right">금액</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((t) => (
-              <tr key={t.id} className="border-b border-slate-100 last:border-0">
-                <td className="py-2 pr-4 text-slate-600">{formatDate(t.trans_date)}</td>
-                <td className="py-2 pr-4 text-slate-700">{t.clients?.name ?? t.client_name_raw ?? "-"}</td>
-                <td className="py-2 pr-4 text-slate-700">{t.item_name ?? "-"}</td>
-                <td className="py-2 text-right font-mono text-slate-900">{formatWon(t.purchase_amount + t.purchase_vat)}</td>
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={4} className="py-6 text-center text-slate-400">
-                  매입 내역이 없습니다.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <ProjectPurchaseTable
+        rows={rows.map((t) => ({
+          id: t.id,
+          date: t.trans_date,
+          vendor: t.clients?.name ?? t.client_name_raw ?? "-",
+          item: t.item_name ?? "-",
+          amount: t.purchase_amount + t.purchase_vat,
+        }))}
+      />
 
       <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3 lg:grid-cols-6">
         <div>
