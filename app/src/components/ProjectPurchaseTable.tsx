@@ -9,6 +9,7 @@ type PurchaseRow = {
   vendor: string;
   item: string;
   category: string;
+  categoryColor?: string;
   amount: number;
 };
 
@@ -81,7 +82,12 @@ export function ProjectPurchaseTable({ rows }: { rows: PurchaseRow[] }) {
               <td className="py-2 pr-4 text-slate-600">{formatDate(r.date)}</td>
               <td className="py-2 pr-4 text-slate-700">{r.vendor}</td>
               <td className="py-2 pr-4 text-slate-700">{r.item}</td>
-              <td className={`py-2 pr-4 ${r.category === "미분류" ? "text-red-600" : "text-slate-700"}`}>{r.category}</td>
+              <td
+                className={`py-2 pr-4 ${r.category === "미분류" ? "text-red-600" : "text-slate-700"}`}
+                style={r.category === "미분류" ? undefined : { color: r.categoryColor }}
+              >
+                {r.category}
+              </td>
               <td className="py-2 text-right font-mono text-slate-900">{formatWon(r.amount)}</td>
             </tr>
           ))}

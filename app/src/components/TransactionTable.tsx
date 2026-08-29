@@ -11,6 +11,7 @@ import {
 } from "@/lib/actions/transactions";
 import { formatWon, formatDate } from "@/lib/format";
 import { transactionTotal } from "@/lib/credit";
+import { resolveCategoryColor } from "@/lib/categoryColor";
 import { Badge } from "@/components/ui/Badge";
 import { LinkButton, Button } from "@/components/ui/Button";
 import { Table, THead, Tr, Td, EmptyRow } from "@/components/ui/Table";
@@ -408,7 +409,10 @@ export function TransactionTable({
               )}
               {showCategory && (
                 <Td className="pr-4">
-                  <span className={t.expense_categories?.project_only ? "font-medium text-red-600" : undefined}>
+                  <span
+                    className={t.expense_categories?.project_only ? "font-medium" : undefined}
+                    style={{ color: resolveCategoryColor(t.expense_categories) }}
+                  >
                     {t.expense_categories?.name ?? "-"}
                   </span>
                 </Td>

@@ -7,6 +7,7 @@ import {
   deleteExpenseCategoryRecord,
 } from "@/lib/actions/expense-categories";
 import type { FieldConfig } from "@/components/crud/types";
+import { CategoryColorLegend } from "@/components/CategoryColorLegend";
 
 const fields: FieldConfig[] = [
   { name: "name", label: "이름", required: true, placeholder: "예: 차량, 출장, 회식, 접대", colorField: "project_only" },
@@ -34,6 +35,7 @@ export async function ExpenseCategoriesSection() {
           deleteAction={deleteExpenseCategoryRecord}
         />
       </div>
+      <CategoryColorLegend categories={categories ?? []} />
     </div>
   );
 }

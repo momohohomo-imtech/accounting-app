@@ -7,6 +7,7 @@ import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components
 import { bulkImportTransactions, type BulkTransactionInput } from "@/lib/actions/transactions";
 import { formatWon } from "@/lib/format";
 import { VAT_EXEMPT_CATEGORIES } from "@/lib/vatExempt";
+import { resolveCategoryColor } from "@/lib/categoryColor";
 
 type Option = { id: string; name: string };
 type ClientOption = Option & { default_item_name?: string | null; default_category_id?: string | null };
@@ -502,7 +503,7 @@ export function TransactionForm({
           <select value={values.category_id} onChange={(e) => handleCategorySelect(e.target.value)} className={inputClass}>
             <option value="">선택 안함</option>
             {expenseCategories.map((c) => (
-              <option key={c.id} value={c.id} style={c.project_only ? { color: "#dc2626" } : undefined}>
+              <option key={c.id} value={c.id} style={{ color: resolveCategoryColor(c) }}>
                 {c.name}
               </option>
             ))}

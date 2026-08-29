@@ -52,8 +52,9 @@ export type ExpenseCategory = {
   name: string;
   sort_order: number;
   // true면 항상 특정 프로젝트에 귀속되는 지출(빨간색 표시), false면 프로젝트에 걸릴 수도
-  // 일반경비로 남을 수도 있는 지출(검정색 표시).
+  // 일반경비로 남을 수도 있는 지출(검정색 표시). color가 지정돼 있으면 그게 우선한다.
   project_only: boolean;
+  color: string | null;
   created_at: string;
 };
 

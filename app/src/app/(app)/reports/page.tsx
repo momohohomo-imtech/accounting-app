@@ -38,7 +38,10 @@ type Row = {
   needs_classification: boolean;
   clients: { name: string } | { name: string }[] | null;
   projects: { name: string; sites: { name: string } | { name: string }[] | null } | { name: string; sites: { name: string } | { name: string }[] | null }[] | null;
-  expense_categories: { name: string; project_only: boolean } | { name: string; project_only: boolean }[] | null;
+  expense_categories:
+    | { name: string; project_only: boolean; color: string | null }
+    | { name: string; project_only: boolean; color: string | null }[]
+    | null;
 };
 
 function one<T>(v: T | T[] | null): T | null {
@@ -68,7 +71,7 @@ export default async function ReportsPage({
     await Promise.all([
       supabase
         .from("transactions")
-        .select("*, clients(name), projects(name, sites(name)), expense_categories(name, project_only)")
+        .select("*, clients(name), projects(name, sites(name)), expense_categories(name, project_only, color)")
         .gte("trans_date", `${selectedYear}-01-01`)
         .lte("trans_date", `${selectedYear}-12-31`),
       supabase
@@ -197,16 +200,20 @@ export default async function ReportsPage({
   const vendorRows = vendor
     ? transactions
         .filter((t) => t.type === "매입" && ((one(t.clients) as { name: string } | null)?.name ?? t.client_name_raw ?? "미지정") === vendor)
-        .map((t) => ({
-          id: t.id,
-          trans_date: t.trans_date,
-          item_name: t.item_name,
-          amount: t.purchase_amount + t.purchase_vat,
-          project_name: (one(t.projects) as { name: string } | null)?.name ?? null,
-          needs_classification: t.needs_classification,
-          category_name: (one(t.expense_categories) as { name: string; project_only: boolean } | null)?.name ?? null,
-          category_project_only: (one(t.expense_categories) as { name: string; project_only: boolean } | null)?.project_only ?? false,
-        }))
+        .map((t) => {
+          const category = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
+          return {
+            id: t.id,
+            trans_date: t.trans_date,
+            item_name: t.item_name,
+            amount: t.purchase_amount + t.purchase_vat,
+            project_name: (one(t.projects) as { name: string } | null)?.name ?? null,
+            needs_classification: t.needs_classification,
+            category_name: category?.name ?? null,
+            category_project_only: category?.project_only ?? false,
+            category_color: category?.color ?? null,
+          };
+        })
     : [];
 
   const popupOpen = Boolean(project || vendor);

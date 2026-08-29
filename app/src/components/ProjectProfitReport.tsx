@@ -8,6 +8,7 @@ import { ReportCloseButton } from "@/components/ReportCloseButton";
 import { ReportMemoField } from "@/components/ReportMemoField";
 import { ProjectPurchaseChartButton } from "@/components/ProjectPurchaseChartButton";
 import { ProjectPurchaseTable } from "@/components/ProjectPurchaseTable";
+import { resolveCategoryColor } from "@/lib/categoryColor";
 
 export async function ProjectProfitReport({ projectId, closeHref }: { projectId: string; closeHref: string }) {
   const supabase = await createClient();
@@ -25,7 +26,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
 
   const { data: purchaseRows } = await supabase
     .from("transactions")
-    .select("*, clients(name), expense_categories(name)")
+    .select("*, clients(name), expense_categories(name, project_only, color)")
     .in("project_id", groupIds)
     .eq("type", "매입")
     .order("trans_date", { ascending: true });
@@ -121,14 +122,18 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
       </div>
 
       <ProjectPurchaseTable
-        rows={rows.map((t) => ({
-          id: t.id,
-          date: t.trans_date,
-          vendor: t.clients?.name ?? t.client_name_raw ?? "-",
-          item: t.item_name ?? "-",
-          category: (one(t.expense_categories) as { name: string } | null)?.name ?? "미분류",
-          amount: t.purchase_amount + t.purchase_vat,
-        }))}
+        rows={rows.map((t) => {
+          const category = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
+          return {
+            id: t.id,
+            date: t.trans_date,
+            vendor: t.clients?.name ?? t.client_name_raw ?? "-",
+            item: t.item_name ?? "-",
+            category: category?.name ?? "미분류",
+            categoryColor: category ? resolveCategoryColor(category) : undefined,
+            amount: t.purchase_amount + t.purchase_vat,
+          };
+        })}
       />
 
       <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3 lg:grid-cols-6">

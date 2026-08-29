@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatWon, formatDate } from "@/lib/format";
 import { VendorReportActions } from "@/components/VendorReportActions";
+import { resolveCategoryColor } from "@/lib/categoryColor";
 
 type VendorRow = {
   id: string;
@@ -14,6 +15,7 @@ type VendorRow = {
   needs_classification: boolean;
   category_name: string | null;
   category_project_only: boolean;
+  category_color: string | null;
 };
 
 type SortKey = "trans_date" | "project_name" | "item_name" | "amount";
@@ -139,7 +141,10 @@ export function VendorDetailReport({
                   </td>
                 )}
                 {showCategory && (
-                  <td className={`py-2 pr-4 ${r.category_project_only ? "font-medium text-red-600" : "text-slate-700"}`}>
+                  <td
+                    className={`py-2 pr-4 ${r.category_project_only ? "font-medium" : "text-slate-700"}`}
+                    style={{ color: resolveCategoryColor({ color: r.category_color, project_only: r.category_project_only }) }}
+                  >
                     {r.category_name ?? "-"}
                   </td>
                 )}
