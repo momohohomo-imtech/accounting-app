@@ -9,7 +9,8 @@ import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { AutoPrint } from "@/components/AutoPrint";
 import { ReportAIInsights } from "@/components/ReportAIInsights";
 import { saveReportAiInsight, deleteReportAiInsight } from "@/lib/actions/reportAiInsights";
-import type { ReportAiInsight } from "@/lib/types";
+import { isLedgerVisible } from "@/lib/credit";
+import type { ReportAiInsight, CreditPayment } from "@/lib/types";
 import { VendorAggregateTable } from "@/components/VendorAggregateTable";
 import { ProjectProfitTable } from "@/components/ProjectProfitTable";
 import { TransactionEditPopup } from "@/components/TransactionEditPopup";
@@ -25,6 +26,7 @@ type Row = {
   id: string;
   trans_date: string;
   type: string;
+  payment_type: string;
   client_id: string | null;
   client_name_raw: string | null;
   project_id: string | null;
@@ -62,25 +64,29 @@ export default async function ReportsPage({
   const selectedYear = year ? Number(year) : currentYear;
 
   const supabase = await createClient();
-  const [{ data: rawTx }, { data: projects }, { data: firstTx }, { data: savedInsights }] = await Promise.all([
-    supabase
-      .from("transactions")
-      .select("*, clients(name), projects(name, sites(name)), expense_categories(name, project_only)")
-      .gte("trans_date", `${selectedYear}-01-01`)
-      .lte("trans_date", `${selectedYear}-12-31`),
-    supabase
-      .from("projects")
-      .select("id, name, status, progress_pct, site_id, quote_amount, sites(name)")
-      .eq("year", selectedYear),
-    supabase.from("transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
-    supabase
-      .from("report_ai_insights")
-      .select("*")
-      .eq("year", selectedYear)
-      .order("created_at", { ascending: false }),
-  ]);
+  const [{ data: rawTx }, { data: projects }, { data: firstTx }, { data: savedInsights }, { data: creditPayments }] =
+    await Promise.all([
+      supabase
+        .from("transactions")
+        .select("*, clients(name), projects(name, sites(name)), expense_categories(name, project_only)")
+        .gte("trans_date", `${selectedYear}-01-01`)
+        .lte("trans_date", `${selectedYear}-12-31`),
+      supabase
+        .from("projects")
+        .select("id, name, status, progress_pct, site_id, quote_amount, sites(name)")
+        .eq("year", selectedYear),
+      supabase.from("transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
+      supabase
+        .from("report_ai_insights")
+        .select("*")
+        .eq("year", selectedYear)
+        .order("created_at", { ascending: false }),
+      supabase.from("credit_payments").select("*"),
+    ]);
 
-  const transactions = (rawTx ?? []) as unknown as Row[];
+  const transactions = ((rawTx ?? []) as unknown as Row[]).filter((t) =>
+    isLedgerVisible(t, (creditPayments ?? []) as CreditPayment[])
+  );
 
   const firstYear = Math.min(
     firstTx?.[0]?.trans_date ? Number(firstTx[0].trans_date.slice(0, 4)) : currentYear,

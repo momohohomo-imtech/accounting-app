@@ -244,80 +244,57 @@ export async function updateTransactionNote(formData: FormData) {
   revalidatePath("/transactions");
 }
 
-// 외상 여러 건을 같은 날짜로 정산 → 매입매출장에 합계 1건(세금계산서 발행) 자동 생성
+// 외상 여러 건을 정산 → 원본 거래 그대로 장부에 편입(결제수단 지정 + 메모에 정산일/방법 기록),
+// 정산 이력(credit_payments)만 별도로 남긴다. 이전에는 별도 합계 거래를 새로 만들었지만, 그러면
+// 장부에서 프로젝트/카테고리/품목별 상세가 사라지고 연도별 합계도 원본+합계로 이중 집계됐음.
 export async function settleCreditTransactions(formData: FormData) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
   const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
   const paidDate = String(formData.get("paid_date") ?? "");
   const paymentMethodId = String(formData.get("payment_method_id") ?? "") || null;
-  const clientId = String(formData.get("client_id") ?? "") || null;
-  const clientNameRaw = String(formData.get("client_name_raw") ?? "") || null;
 
   if (ids.length === 0 || !paidDate) {
     revalidatePath("/transactions");
     return;
   }
 
-  const [{ data: txs }, { data: payments }] = await Promise.all([
+  const [{ data: txs }, { data: payments }, { data: paymentMethod }] = await Promise.all([
     supabase.from("transactions").select("*").in("id", ids),
     supabase.from("credit_payments").select("*").in("transaction_id", ids),
+    paymentMethodId
+      ? supabase.from("payment_methods").select("name").eq("id", paymentMethodId).single()
+      : Promise.resolve({ data: null }),
   ]);
 
   const targetTxs = (txs ?? []) as Transaction[];
   const existingPayments = (payments ?? []) as CreditPayment[];
   if (targetTxs.length === 0) return;
 
-  const type = targetTxs[0].type;
-  const purchase_amount = targetTxs.reduce((s, t) => s + t.purchase_amount, 0);
-  const purchase_vat = targetTxs.reduce((s, t) => s + t.purchase_vat, 0);
-  const sales_amount = targetTxs.reduce((s, t) => s + t.sales_amount, 0);
-  const sales_vat = targetTxs.reduce((s, t) => s + t.sales_vat, 0);
+  const settleNote = `정산일: ${paidDate}${paymentMethod?.name ? ` · ${paymentMethod.name}` : ""}`;
 
-  const originalDates = Array.from(new Set(targetTxs.map((t) => t.trans_date))).sort();
-
-  const { data: settlementTx, error: settlementError } = await supabase
-    .from("transactions")
-    .insert({
-      trans_date: paidDate,
-      type,
-      client_id: clientId,
-      client_name_raw: clientNameRaw,
-      project_id: null,
-      item_name: `외상 정산 (${targetTxs.length}건)`,
-      payment_method_id: paymentMethodId,
-      tax_invoice_issued: true,
-      vat_included: true,
-      purchase_amount,
-      purchase_vat,
-      sales_amount,
-      sales_vat,
-      payment_type: "immediate",
-      is_verified_ai: false,
-      note2: `실 ${type}일자: ${originalDates.join(", ")}`,
-      created_by: user?.id ?? null,
-    })
-    .select()
-    .single();
-
-  if (settlementError || !settlementTx) {
-    revalidatePath("/transactions");
-    return;
-  }
+  await Promise.all(
+    targetTxs.map((tx) =>
+      supabase
+        .from("transactions")
+        .update({
+          payment_method_id: paymentMethodId,
+          note2: tx.note2 ? `${tx.note2} / ${settleNote}` : settleNote,
+        })
+        .eq("id", tx.id)
+    )
+  );
 
   const creditPaymentRows = targetTxs.map((tx) => ({
     transaction_id: tx.id,
     paid_date: paidDate,
     paid_amount: remainingBalance(tx, existingPayments),
     remaining_amount: 0,
-    settlement_transaction_id: settlementTx.id,
   }));
 
   await supabase.from("credit_payments").insert(creditPaymentRows);
 
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
+  revalidatePath("/reports");
 }

@@ -16,7 +16,8 @@ import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { LinkButton } from "@/components/ui/Button";
 import { formatWon } from "@/lib/format";
-import type { Transaction } from "@/lib/types";
+import { isLedgerVisible } from "@/lib/credit";
+import type { CreditPayment, Transaction } from "@/lib/types";
 
 const TABS = [
   { key: "list", label: "매입매출" },
@@ -125,17 +126,23 @@ async function fetchTransactionTotals({
 
   let query = supabase
     .from("transactions")
-    .select("purchase_amount, purchase_vat, sales_amount, sales_vat")
-    .neq("payment_type", "credit")
+    .select("id, type, payment_type, purchase_amount, purchase_vat, sales_amount, sales_vat")
     .gte("trans_date", start)
     .lte("trans_date", end);
   if (type) query = query.eq("type", type);
   if (project_id) query = query.eq("project_id", project_id);
 
   const { data } = await query;
+  const rows = data ?? [];
+  const creditIds = rows.filter((t) => t.payment_type === "credit").map((t) => t.id);
+  const { data: payments } = creditIds.length
+    ? await supabase.from("credit_payments").select("*").in("transaction_id", creditIds)
+    : { data: [] as CreditPayment[] };
+  const visible = rows.filter((t) => isLedgerVisible(t, (payments ?? []) as CreditPayment[]));
+
   return {
-    purchase: (data ?? []).reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0),
-    sales: (data ?? []).reduce((s, t) => s + t.sales_amount + t.sales_vat, 0),
+    purchase: visible.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0),
+    sales: visible.reduce((s, t) => s + t.sales_amount + t.sales_vat, 0),
   };
 }
 
@@ -183,7 +190,6 @@ async function TransactionListSection({
   let query = supabase
     .from("transactions")
     .select("*, clients(name), projects(name), payment_methods(*), expense_categories(*)")
-    .neq("payment_type", "credit")
     .gte("trans_date", start)
     .lte("trans_date", end)
     .order("trans_date", { ascending: false });
@@ -192,7 +198,7 @@ async function TransactionListSection({
   if (project_id) query = query.eq("project_id", project_id);
 
   const [
-    { data: transactions },
+    { data: rawTransactions },
     { data: projectTree },
     { data: latestTx },
     { data: importClients },
@@ -208,6 +214,14 @@ async function TransactionListSection({
     supabase.from("payment_methods").select("id, name").order("sort_order"),
     supabase.from("expense_categories").select("id, name").order("sort_order"),
   ]);
+
+  const creditIds = (rawTransactions ?? []).filter((t) => t.payment_type === "credit").map((t) => t.id);
+  const { data: relevantPayments } = creditIds.length
+    ? await supabase.from("credit_payments").select("*").in("transaction_id", creditIds)
+    : { data: [] as CreditPayment[] };
+  const transactions = (rawTransactions ?? []).filter((t) =>
+    isLedgerVisible(t, (relevantPayments ?? []) as CreditPayment[])
+  );
 
   const projectNodes = (projectTree ?? []).map((p) => {
     const site = one(p.sites) as { name: string; clients?: unknown } | undefined;
@@ -267,13 +281,13 @@ async function TransactionListSection({
               </Pill>
             ))}
           </div>
-          <TransactionExportButtons transactions={(transactions ?? []) as Transaction[]} />
+          <TransactionExportButtons transactions={transactions as Transaction[]} />
         </div>
       </div>
 
       <Card>
         <TransactionTable
-          transactions={(transactions ?? []) as Transaction[]}
+          transactions={transactions as Transaction[]}
           projectNodes={projectNodes}
           clients={importClients ?? []}
           categories={importExpenseCategories ?? []}

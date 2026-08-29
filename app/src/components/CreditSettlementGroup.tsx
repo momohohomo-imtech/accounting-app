@@ -12,14 +12,10 @@ export type OutstandingItem = { tx: Transaction; remaining: number };
 
 export function CreditSettlementGroup({
   label,
-  clientId,
-  clientNameRaw,
   items,
   paymentMethods,
 }: {
   label: string;
-  clientId: string | null;
-  clientNameRaw: string | null;
   items: OutstandingItem[];
   paymentMethods: PaymentMethod[];
 }) {
@@ -106,8 +102,6 @@ export function CreditSettlementGroup({
           {Array.from(selected).map((id) => (
             <input key={id} type="hidden" name="transaction_ids" value={id} />
           ))}
-          <input type="hidden" name="client_id" value={clientId ?? ""} />
-          <input type="hidden" name="client_name_raw" value={clientNameRaw ?? ""} />
 
           <div className="flex flex-col gap-1">
             <label className={labelClass}>정산일</label>

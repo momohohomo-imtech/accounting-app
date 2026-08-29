@@ -126,14 +126,7 @@ export async function CreditSection() {
 
       <div className="space-y-4">
         {groupList.map((g) => (
-          <CreditSettlementGroup
-            key={g.key}
-            label={g.label}
-            clientId={g.client_id}
-            clientNameRaw={g.client_name_raw}
-            items={g.items}
-            paymentMethods={methods}
-          />
+          <CreditSettlementGroup key={g.key} label={g.label} items={g.items} paymentMethods={methods} />
         ))}
         {groupList.length === 0 && <p className="py-8 text-center text-sm text-slate-400">미정산 외상 거래가 없습니다.</p>}
       </div>
