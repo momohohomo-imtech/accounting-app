@@ -8,10 +8,11 @@ type PurchaseRow = {
   date: string;
   vendor: string;
   item: string;
+  category: string;
   amount: number;
 };
 
-type SortKey = "date" | "vendor" | "item" | "amount";
+type SortKey = "date" | "vendor" | "item" | "category" | "amount";
 
 function sortValue(r: PurchaseRow, key: SortKey): string | number {
   switch (key) {
@@ -21,6 +22,8 @@ function sortValue(r: PurchaseRow, key: SortKey): string | number {
       return r.vendor;
     case "item":
       return r.item;
+    case "category":
+      return r.category;
     case "amount":
       return r.amount;
   }
@@ -62,12 +65,13 @@ export function ProjectPurchaseTable({ rows }: { rows: PurchaseRow[] }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[500px] text-sm">
+      <table className="w-full min-w-[600px] text-sm">
         <thead>
           <tr className="border-b border-slate-200 text-left text-slate-500">
             <th className="pb-2 pr-4">{headerButton("date", "날짜")}</th>
             <th className="pb-2 pr-4">{headerButton("vendor", "거래처")}</th>
             <th className="pb-2 pr-4">{headerButton("item", "품목")}</th>
+            <th className="pb-2 pr-4">{headerButton("category", "카테고리")}</th>
             <th className="pb-2 text-right">{headerButton("amount", "금액")}</th>
           </tr>
         </thead>
@@ -77,12 +81,13 @@ export function ProjectPurchaseTable({ rows }: { rows: PurchaseRow[] }) {
               <td className="py-2 pr-4 text-slate-600">{formatDate(r.date)}</td>
               <td className="py-2 pr-4 text-slate-700">{r.vendor}</td>
               <td className="py-2 pr-4 text-slate-700">{r.item}</td>
+              <td className={`py-2 pr-4 ${r.category === "미분류" ? "text-red-600" : "text-slate-700"}`}>{r.category}</td>
               <td className="py-2 text-right font-mono text-slate-900">{formatWon(r.amount)}</td>
             </tr>
           ))}
           {sorted.length === 0 && (
             <tr>
-              <td colSpan={4} className="py-6 text-center text-slate-400">
+              <td colSpan={5} className="py-6 text-center text-slate-400">
                 매입 내역이 없습니다.
               </td>
             </tr>

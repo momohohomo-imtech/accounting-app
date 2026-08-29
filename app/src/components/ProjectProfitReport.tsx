@@ -126,6 +126,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
           date: t.trans_date,
           vendor: t.clients?.name ?? t.client_name_raw ?? "-",
           item: t.item_name ?? "-",
+          category: (one(t.expense_categories) as { name: string } | null)?.name ?? "미분류",
           amount: t.purchase_amount + t.purchase_vat,
         }))}
       />

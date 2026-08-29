@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { BusinessTripLog } from "@/lib/types";
 import { createBusinessTripLog } from "@/lib/actions/businessTripLogs";
@@ -10,11 +10,58 @@ import { BusinessTripBlankFormPopup } from "@/components/BusinessTripBlankFormPo
 import { ModalPortal } from "@/components/ModalPortal";
 import { Button } from "@/components/ui/Button";
 
+type SortKey = "work_date" | "site_name" | "project_name" | "client_name" | "work_types";
+
+function sortValue(log: BusinessTripLog, key: SortKey): string {
+  switch (key) {
+    case "work_date":
+      return log.work_date;
+    case "site_name":
+      return log.site_name ?? "";
+    case "project_name":
+      return log.projects.map((p) => p.project_name).filter(Boolean).join(", ");
+    case "client_name":
+      return log.client_name ?? "";
+    case "work_types":
+      return log.work_types.join(", ");
+  }
+}
+
 export function BusinessTripListClient({ logs }: { logs: BusinessTripLog[] }) {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
   const [blankForm, setBlankForm] = useState(false);
   const [viewing, setViewing] = useState<BusinessTripLog | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  function handleSort(key: SortKey) {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  const sortedLogs = useMemo(() => {
+    if (!sortKey) return logs;
+    const copy = [...logs];
+    copy.sort((a, b) => {
+      const cmp = sortValue(a, sortKey).localeCompare(sortValue(b, sortKey));
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return copy;
+  }, [logs, sortKey, sortDir]);
+
+  function headerButton(key: SortKey, label: string) {
+    return (
+      <button type="button" onClick={() => handleSort(key)} className="inline-flex items-center gap-1 hover:text-slate-800">
+        {label}
+        {sortKey === key && <span className="text-[10px]">{sortDir === "asc" ? "▲" : "▼"}</span>}
+      </button>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -31,16 +78,16 @@ export function BusinessTripListClient({ logs }: { logs: BusinessTripLog[] }) {
         <table className="w-full min-w-[700px] text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-left text-slate-500">
-              <th className="p-3">공사일</th>
-              <th className="p-3">현장명</th>
-              <th className="p-3">프로젝트명</th>
-              <th className="p-3">원청사</th>
-              <th className="p-3">작업구분</th>
+              <th className="p-3">{headerButton("work_date", "공사일")}</th>
+              <th className="p-3">{headerButton("site_name", "현장명")}</th>
+              <th className="p-3">{headerButton("project_name", "프로젝트명")}</th>
+              <th className="p-3">{headerButton("client_name", "원청사")}</th>
+              <th className="p-3">{headerButton("work_types", "작업구분")}</th>
               <th className="p-3 text-right">관리</th>
             </tr>
           </thead>
           <tbody>
-            {logs.map((log) => (
+            {sortedLogs.map((log) => (
               <tr key={log.id} className="border-b border-slate-100 last:border-0">
                 <td className="p-3 text-slate-700">{log.work_date}</td>
                 <td className="p-3 text-slate-700">{log.site_name ?? "-"}</td>
