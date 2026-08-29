@@ -3,6 +3,9 @@ import { runBackup } from "@/lib/backup";
 
 // 자식 → 부모 순서 (삭제용). 복원할 때는 이 배열을 뒤집어서 부모 → 자식 순서로 넣는다.
 const DELETE_ORDER = [
+  "memos",
+  "business_trip_logs",
+  "report_ai_insights",
   "bank_transactions",
   "access_list_workers",
   "access_lists",

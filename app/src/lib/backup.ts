@@ -17,6 +17,9 @@ const TABLES = [
   "access_list_workers",
   "bank_accounts",
   "bank_transactions",
+  "memos",
+  "business_trip_logs",
+  "report_ai_insights",
 ];
 
 export async function runBackup(supabase: SupabaseClient, backupType: "manual" | "auto") {
