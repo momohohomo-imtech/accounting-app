@@ -9,7 +9,7 @@ import { formatWon } from "@/lib/format";
 import { VAT_EXEMPT_CATEGORIES } from "@/lib/vatExempt";
 
 type Option = { id: string; name: string };
-type ClientOption = Option & { default_item_name?: string | null };
+type ClientOption = Option & { default_item_name?: string | null; default_category_id?: string | null };
 type LineItem = { item_name: string; quantity: string; unit_price: string; subtotal: string; project_id: string };
 
 function emptyLineItem(): LineItem {
@@ -169,6 +169,9 @@ export function TransactionForm({
       setLineItems((prev) =>
         prev.map((li, idx) => (idx === 0 ? { ...li, item_name: client.default_item_name as string } : li))
       );
+    }
+    if (client?.default_category_id) {
+      handleCategorySelect(client.default_category_id);
     }
   }
 

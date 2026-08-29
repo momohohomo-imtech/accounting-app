@@ -9,6 +9,7 @@ function parse(formData: FormData) {
     type: String(formData.get("type") ?? "both"),
     phone: String(formData.get("phone") ?? "") || null,
     default_item_name: String(formData.get("default_item_name") ?? "") || null,
+    default_category_id: String(formData.get("default_category_id") ?? "") || null,
     memo: String(formData.get("memo") ?? "") || null,
   };
 }
