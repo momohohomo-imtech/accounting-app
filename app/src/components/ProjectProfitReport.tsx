@@ -6,6 +6,7 @@ import { ProjectReportActions } from "@/components/ProjectReportActions";
 import { ProjectMemoProvider } from "@/components/ProjectMemoProvider";
 import { ReportCloseButton } from "@/components/ReportCloseButton";
 import { ReportMemoField } from "@/components/ReportMemoField";
+import { ProjectPurchaseChartButton } from "@/components/ProjectPurchaseChartButton";
 
 export async function ProjectProfitReport({ projectId, closeHref }: { projectId: string; closeHref: string }) {
   const supabase = await createClient();
@@ -23,13 +24,24 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
 
   const { data: purchaseRows } = await supabase
     .from("transactions")
-    .select("*, clients(name)")
+    .select("*, clients(name), expense_categories(name)")
     .in("project_id", groupIds)
     .eq("type", "매입")
     .order("trans_date", { ascending: true });
 
   const rows = purchaseRows ?? [];
   const purchaseTotal = rows.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
+
+  const categoryBreakdown = (() => {
+    const map = new Map<string, number>();
+    for (const t of rows) {
+      const name = (one(t.expense_categories) as { name: string } | null)?.name ?? "미분류";
+      map.set(name, (map.get(name) ?? 0) + t.purchase_amount + t.purchase_vat);
+    }
+    return Array.from(map.entries())
+      .map(([name, amount]) => ({ name, amount }))
+      .sort((a, b) => b.amount - a.amount);
+  })();
   const quoteTotal = group.reduce((s, p) => s + (p.quote_amount ?? 0), 0);
   const contractTotal = group.reduce((s, p) => s + (p.contract_amount ?? 0), 0);
   // 이익금 = 발주액 - (발주액 - 수주액) - 매입합계 = 수주액 - 매입합계
@@ -88,6 +100,10 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <ProjectPurchaseChartButton
+            data={categoryBreakdown}
+            title={`${project.project_code ?? ""} ${project.name}`.trim()}
+          />
           <ProjectReportActions
             filename={`${project.project_code ?? project.name}_손익보고서`}
             title={`${project.project_code ?? ""} ${project.name}`.trim()}
