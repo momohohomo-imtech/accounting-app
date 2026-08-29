@@ -103,6 +103,10 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
           <ProjectPurchaseChartButton
             data={categoryBreakdown}
             title={`${project.project_code ?? ""} ${project.name}`.trim()}
+            quoteTotal={quoteTotal}
+            contractTotal={contractTotal}
+            profit={profit}
+            margin={margin}
           />
           <ProjectReportActions
             filename={`${project.project_code ?? project.name}_손익보고서`}

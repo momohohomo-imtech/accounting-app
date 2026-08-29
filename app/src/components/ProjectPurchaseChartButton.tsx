@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { formatWon } from "@/lib/format";
 import { autoSiteColorHex } from "@/lib/siteColor";
 import { ModalPortal } from "@/components/ModalPortal";
+import { ModalPrintButton } from "@/components/ModalPrintButton";
 
 type CategoryAmount = { name: string; amount: number };
 
@@ -26,12 +27,12 @@ function PieChart({ data, total }: { data: CategoryAmount[]; total: number }) {
   const cy = size / 2;
 
   let cursor = 0;
-  const slices = data.map((d) => {
+  const slices = data.map((d, i) => {
     const pct = total > 0 ? d.amount / total : 0;
     const startAngle = cursor * 360;
     cursor += pct;
     const endAngle = cursor * 360;
-    return { ...d, pct, startAngle, endAngle };
+    return { ...d, pct, startAngle, endAngle, isTop: i === 0 };
   });
 
   return (
@@ -50,7 +51,14 @@ function PieChart({ data, total }: { data: CategoryAmount[]; total: number }) {
         {slices.map((s) => (
           <div key={s.name} className="flex items-center gap-2 text-sm">
             <span className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: autoSiteColorHex(s.name) }} />
-            <span className="min-w-0 flex-1 truncate text-slate-700">{s.name}</span>
+            <span className={`min-w-0 flex-1 truncate ${s.isTop ? "font-semibold text-slate-900" : "text-slate-700"}`}>
+              {s.name}
+              {s.isTop && (
+                <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                  최다 지출
+                </span>
+              )}
+            </span>
             <span className="shrink-0 font-mono text-xs text-slate-500">{(s.pct * 100).toFixed(1)}%</span>
             <span className="shrink-0 font-mono font-semibold text-slate-900">{formatWon(s.amount)}</span>
           </div>
@@ -65,9 +73,9 @@ function BarChart({ data }: { data: CategoryAmount[] }) {
   const max = Math.max(1, ...data.map((d) => d.amount));
   return (
     <div className="space-y-2.5">
-      {data.map((d) => (
+      {data.map((d, i) => (
         <div key={d.name} className="flex items-center gap-2">
-          <span className="w-24 shrink-0 truncate text-sm text-slate-700" title={d.name}>
+          <span className={`w-24 shrink-0 truncate text-sm ${i === 0 ? "font-semibold text-slate-900" : "text-slate-700"}`} title={d.name}>
             {d.name}
           </span>
           <div className="h-5 flex-1 overflow-hidden rounded bg-slate-100">
@@ -86,7 +94,21 @@ function BarChart({ data }: { data: CategoryAmount[] }) {
   );
 }
 
-export function ProjectPurchaseChartButton({ data, title }: { data: CategoryAmount[]; title: string }) {
+export function ProjectPurchaseChartButton({
+  data,
+  title,
+  quoteTotal,
+  contractTotal,
+  profit,
+  margin,
+}: {
+  data: CategoryAmount[];
+  title: string;
+  quoteTotal: number;
+  contractTotal: number;
+  profit: number | null;
+  margin: number | null;
+}) {
   const [open, setOpen] = useState(false);
   const [chartType, setChartType] = useState<"pie" | "bar">("pie");
 
@@ -100,6 +122,15 @@ export function ProjectPurchaseChartButton({ data, title }: { data: CategoryAmou
   }, [open]);
 
   const total = data.reduce((s, d) => s + d.amount, 0);
+  const topCategory = data[0];
+
+  const bottomStats: [string, string][] = [
+    ["발주액", formatWon(quoteTotal)],
+    ["수주액", formatWon(contractTotal)],
+    ["총 지출액", formatWon(total)],
+    ["이익금", profit === null ? "수주액 미입력" : formatWon(profit)],
+    ["이익율", margin === null ? "-" : `${margin.toFixed(2)}%`],
+  ];
 
   return (
     <>
@@ -118,19 +149,16 @@ export function ProjectPurchaseChartButton({ data, title }: { data: CategoryAmou
       {open && (
         <ModalPortal>
           <div
-            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10"
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:static print:block print:h-auto print:overflow-visible print:bg-white print:p-0"
             onClick={() => setOpen(false)}
           >
             <div
-              className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
+              className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="mb-4 flex items-center justify-between gap-2">
-                <div>
-                  <h3 className="font-semibold text-slate-900">{title} — 매입 카테고리별</h3>
-                  <p className="text-xs text-slate-400">매입 합계 {formatWon(total)}</p>
-                </div>
-                <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-slate-900">{title} — 매입 카테고리별</h3>
+                <div className="flex items-center gap-2 print:hidden">
                   <div className="flex rounded-lg border border-slate-300 p-0.5 text-xs">
                     <button
                       type="button"
@@ -147,6 +175,7 @@ export function ProjectPurchaseChartButton({ data, title }: { data: CategoryAmou
                       막대
                     </button>
                   </div>
+                  <ModalPrintButton />
                   <button
                     type="button"
                     onClick={() => setOpen(false)}
@@ -157,7 +186,31 @@ export function ProjectPurchaseChartButton({ data, title }: { data: CategoryAmou
                 </div>
               </div>
 
+              <div className="mb-4 flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-xl bg-slate-50 px-4 py-3">
+                <div>
+                  <p className="text-xs text-slate-500">총 지출액</p>
+                  <p className="font-mono text-2xl font-bold text-slate-900">{formatWon(total)}</p>
+                </div>
+                {topCategory && (
+                  <p className="text-sm text-slate-600">
+                    최다 지출 카테고리: <span className="font-semibold text-slate-900">{topCategory.name}</span>
+                    <span className="ml-1 font-mono text-xs text-slate-500">
+                      ({total > 0 ? ((topCategory.amount / total) * 100).toFixed(1) : "0"}%)
+                    </span>
+                  </p>
+                )}
+              </div>
+
               {chartType === "pie" ? <PieChart data={data} total={total} /> : <BarChart data={data} />}
+
+              <div className="mt-5 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3">
+                {bottomStats.map(([label, value]) => (
+                  <div key={label}>
+                    <p className="text-xs text-slate-500">{label}</p>
+                    <p className="font-mono text-base font-bold text-slate-900">{value}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </ModalPortal>
