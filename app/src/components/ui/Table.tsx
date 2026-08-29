@@ -22,7 +22,7 @@ export function Th({ className, ...props }: ComponentProps<"th">) {
 }
 
 export function Tr({ className, ...props }: ComponentProps<"tr">) {
-  return <tr className={cx("border-b border-slate-100 transition-colors hover:bg-slate-50 last:border-0", className)} {...props} />;
+  return <tr className={cx("border-b border-slate-100 transition-colors hover:bg-blue-100 last:border-0", className)} {...props} />;
 }
 
 export function Td({ className, ...props }: ComponentProps<"td">) {
