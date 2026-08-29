@@ -30,11 +30,11 @@ export function DailyWorkerUsageFilter({
   }
 
   return (
-    <div className="flex flex-nowrap items-center gap-2 print:hidden">
+    <div className="flex flex-wrap items-center gap-2 print:hidden">
       <select
         value={selectedYear}
         onChange={(e) => navigate(Number(e.target.value), monthInput)}
-        className={`${fieldClass} w-[6ch] shrink-0`}
+        className={`${fieldClass} w-20 shrink-0`}
       >
         {years.map((y) => (
           <option key={y} value={y}>
@@ -64,7 +64,7 @@ export function DailyWorkerUsageFilter({
         onChange={(e) => setMonthInput(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && navigate(selectedYear, monthInput)}
         placeholder="예: 1-12"
-        className={`${fieldClass} w-[6ch] shrink-0`}
+        className={`${fieldClass} w-20 shrink-0`}
       />
       <button
         type="button"
