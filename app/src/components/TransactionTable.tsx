@@ -407,8 +407,10 @@ export function TransactionTable({
                 </Td>
               )}
               {showCategory && (
-                <Td className={cx("pr-4", t.expense_categories?.project_only ? "font-medium text-red-600" : undefined)}>
-                  {t.expense_categories?.name ?? "-"}
+                <Td className="pr-4">
+                  <span className={t.expense_categories?.project_only ? "font-medium text-red-600" : undefined}>
+                    {t.expense_categories?.name ?? "-"}
+                  </span>
                 </Td>
               )}
               {showItem && <Td className="pr-4">{t.item_name ?? "-"}</Td>}
