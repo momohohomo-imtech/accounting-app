@@ -3,8 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { TAX_AGENT_SUSPEND_DURATION } from "@/lib/taxAgentSuspend";
 
-export type TaxAgentAccount = { id: string; email: string; name: string; suspended: boolean };
+export type TaxAgentAccount = {
+  id: string;
+  email: string;
+  name: string;
+  suspended: boolean;
+  resuspendAt: string | null;
+};
 
 async function requireAdmin(): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = await createClient();
@@ -17,15 +24,12 @@ async function requireAdmin(): Promise<{ ok: true } | { ok: false; error: string
   return { ok: true };
 }
 
-// 정지: 100년짜리 ban을 걸어 관리자가 직접 해제하기 전까지 사실상 무기한 로그인 차단.
-const SUSPEND_DURATION = "876000h";
-
 export async function getTaxAgentAccounts(): Promise<TaxAgentAccount[]> {
   const guard = await requireAdmin();
   if (!guard.ok) return [];
 
   const supabase = await createClient();
-  const { data: rows } = await supabase.from("users").select("id, email, name").eq("role", "tax_agent");
+  const { data: rows } = await supabase.from("users").select("id, email, name, resuspend_at").eq("role", "tax_agent");
   if (!rows || rows.length === 0) return [];
 
   try {
@@ -34,12 +38,22 @@ export async function getTaxAgentAccounts(): Promise<TaxAgentAccount[]> {
       rows.map(async (r) => {
         const { data } = await admin.auth.admin.getUserById(r.id);
         const bannedUntil = data.user?.banned_until;
-        const suspended = Boolean(bannedUntil && new Date(bannedUntil).getTime() > Date.now());
-        return { id: r.id, email: r.email, name: r.name, suspended };
+        let suspended = Boolean(bannedUntil && new Date(bannedUntil).getTime() > Date.now());
+        let resuspendAt = r.resuspend_at;
+
+        // 예약된 재정지 시각이 지났는데 아직 정지 안 됐으면 지금 정지시키고 예약을 지운다.
+        if (!suspended && resuspendAt && new Date(resuspendAt).getTime() <= Date.now()) {
+          await admin.auth.admin.updateUserById(r.id, { ban_duration: TAX_AGENT_SUSPEND_DURATION });
+          await admin.from("users").update({ resuspend_at: null }).eq("id", r.id);
+          suspended = true;
+          resuspendAt = null;
+        }
+
+        return { id: r.id, email: r.email, name: r.name, suspended, resuspendAt };
       })
     );
   } catch {
-    return rows.map((r) => ({ id: r.id, email: r.email, name: r.name, suspended: false }));
+    return rows.map((r) => ({ id: r.id, email: r.email, name: r.name, suspended: false, resuspendAt: null }));
   }
 }
 
@@ -71,8 +85,9 @@ export async function suspendTaxAgentAccount(formData: FormData): Promise<{ erro
 
   try {
     const admin = createAdminClient();
-    const { error } = await admin.auth.admin.updateUserById(userId, { ban_duration: SUSPEND_DURATION });
+    const { error } = await admin.auth.admin.updateUserById(userId, { ban_duration: TAX_AGENT_SUSPEND_DURATION });
     if (error) return { error: error.message };
+    await admin.from("users").update({ resuspend_at: null }).eq("id", userId);
     revalidatePath("/backups");
     return {};
   } catch (err) {
@@ -86,11 +101,14 @@ export async function unsuspendTaxAgentAccount(formData: FormData): Promise<{ er
 
   const userId = String(formData.get("user_id") ?? "");
   if (!userId) return { error: "계정을 찾을 수 없습니다." };
+  const hours = Number(formData.get("hours") ?? "");
+  const resuspendAt = hours > 0 ? new Date(Date.now() + hours * 3600_000).toISOString() : null;
 
   try {
     const admin = createAdminClient();
     const { error } = await admin.auth.admin.updateUserById(userId, { ban_duration: "none" });
     if (error) return { error: error.message };
+    await admin.from("users").update({ resuspend_at: resuspendAt }).eq("id", userId);
     revalidatePath("/backups");
     return {};
   } catch (err) {

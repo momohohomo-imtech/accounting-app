@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { toSessionCookie } from "./sessionCookie";
+import { createAdminClient } from "./admin";
+import { TAX_AGENT_SUSPEND_DURATION } from "@/lib/taxAgentSuspend";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -38,8 +40,24 @@ export async function updateSession(request: NextRequest) {
 
   let role: string | null = null;
   if (user) {
-    const { data } = await supabase.from("users").select("role").eq("id", user.id).maybeSingle();
+    const { data } = await supabase.from("users").select("role, resuspend_at").eq("id", user.id).maybeSingle();
     role = data?.role ?? null;
+
+    // 세무사 계정을 "N시간만 열어주고" 해제했는데 그 시각이 지났으면, 지금 이 요청에서 바로
+    // 다시 정지시키고 세션을 끊는다 (관리자가 관리 화면을 다시 열 때까지 기다리지 않아도 됨).
+    if (role === "tax_agent" && data?.resuspend_at && new Date(data.resuspend_at).getTime() <= Date.now()) {
+      try {
+        const admin = createAdminClient();
+        await admin.auth.admin.updateUserById(user.id, { ban_duration: TAX_AGENT_SUSPEND_DURATION });
+        await admin.from("users").update({ resuspend_at: null }).eq("id", user.id);
+      } catch {
+        // SUPABASE_SERVICE_ROLE_KEY 미설정 등으로 실패해도 아래에서 세션은 끊는다.
+      }
+      await supabase.auth.signOut();
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
+    }
   }
   const homePath = role === "tax_agent" ? "/transactions" : "/dashboard";
 

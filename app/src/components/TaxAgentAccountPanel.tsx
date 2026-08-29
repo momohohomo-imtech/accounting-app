@@ -12,12 +12,18 @@ import {
   type TaxAgentAccount,
 } from "@/lib/actions/tax-agent";
 
+function formatDateTime(iso: string) {
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 function AccountRow({ account }: { account: TaxAgentAccount }) {
   const router = useRouter();
   const [changingPassword, setChangingPassword] = useState(false);
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [hours, setHours] = useState("");
 
   async function handleSetPassword() {
     if (password.length < 6) {
@@ -42,17 +48,21 @@ function AccountRow({ account }: { account: TaxAgentAccount }) {
   }
 
   async function handleToggleSuspend() {
+    const hoursNum = Number(hours);
+    const durationLabel = account.suspended && hoursNum > 0 ? ` (${hoursNum}시간 동안만)` : "";
     const verb = account.suspended ? "정지를 해제" : "일시 정지";
-    if (!confirm(`${account.name}(${account.email}) 계정을 ${verb}하시겠습니까?`)) return;
+    if (!confirm(`${account.name}(${account.email}) 계정을 ${verb}${durationLabel}하시겠습니까?`)) return;
     setPending(true);
     setMessage(null);
     const fd = new FormData();
     fd.append("user_id", account.id);
+    if (account.suspended && hoursNum > 0) fd.append("hours", String(hoursNum));
     const result = await (account.suspended ? unsuspendTaxAgentAccount(fd) : suspendTaxAgentAccount(fd));
     setPending(false);
     if (result?.error) {
       setMessage(result.error);
     } else {
+      setHours("");
       router.refresh();
     }
   }
@@ -67,6 +77,9 @@ function AccountRow({ account }: { account: TaxAgentAccount }) {
           <p className={`mt-0.5 text-xs font-medium ${account.suspended ? "text-red-600" : "text-emerald-600"}`}>
             {account.suspended ? "정지됨 — 로그인 불가" : "정상 — 로그인 가능"}
           </p>
+          {!account.suspended && account.resuspendAt && (
+            <p className="mt-0.5 text-xs text-amber-600">{formatDateTime(account.resuspendAt)}에 자동으로 다시 정지됩니다</p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -78,6 +91,17 @@ function AccountRow({ account }: { account: TaxAgentAccount }) {
           >
             비밀번호 변경
           </Button>
+          {account.suspended && (
+            <input
+              type="number"
+              min={1}
+              value={hours}
+              onChange={(e) => setHours(e.target.value)}
+              placeholder="시간(선택)"
+              title="입력하면 그 시간 뒤에 자동으로 다시 정지됩니다. 비워두면 무기한 해제됩니다."
+              className={`${fieldClass} w-24`}
+            />
+          )}
           <Button
             type="button"
             variant={account.suspended ? "primary" : "danger"}
