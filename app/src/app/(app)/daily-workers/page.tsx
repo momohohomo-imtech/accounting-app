@@ -10,12 +10,14 @@ import type { FieldConfig } from "@/components/crud/types";
 import { PageTabs } from "@/components/PageTabs";
 import { DailyWorkerOfficesSection } from "@/components/sections/DailyWorkerOfficesSection";
 import { AccessListsSection } from "@/components/sections/AccessListsSection";
+import { DailyWorkerUsageSection } from "@/components/sections/DailyWorkerUsageSection";
 import { Pill } from "@/components/ui/Pill";
 
 const TABS = [
   { key: "list", label: "일용직 근로자" },
   { key: "offices", label: "인력사무소" },
   { key: "access", label: "출입명단" },
+  { key: "usage", label: "일용직 사용내역" },
 ];
 
 export default async function DailyWorkersPage({
@@ -32,6 +34,7 @@ export default async function DailyWorkersPage({
       <PageTabs basePath="/daily-workers" tabs={TABS} active={active} />
       {active === "offices" && <DailyWorkerOfficesSection />}
       {active === "access" && <AccessListsSection />}
+      {active === "usage" && <DailyWorkerUsageSection />}
       {active === "list" && <WorkerListSection officeId={office_id} />}
     </div>
   );
