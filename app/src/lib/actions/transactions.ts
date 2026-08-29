@@ -172,6 +172,22 @@ export async function bulkUpdateProjectId(formData: FormData) {
   revalidatePath("/reports");
 }
 
+export async function bulkUpdateClientId(formData: FormData) {
+  const supabase = await createClient();
+  const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
+  const clientId = String(formData.get("client_id") ?? "") || null;
+  if (ids.length === 0) return;
+
+  const { error } = await supabase
+    .from("transactions")
+    .update({ client_id: clientId, client_name_raw: null })
+    .in("id", ids);
+  if (error) console.error("bulkUpdateClientId failed:", error.message);
+
+  revalidatePath("/transactions");
+  revalidatePath("/reports");
+}
+
 export async function bulkUpdateCategoryId(formData: FormData) {
   const supabase = await createClient();
   const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);

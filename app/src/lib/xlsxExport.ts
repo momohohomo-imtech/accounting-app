@@ -19,7 +19,9 @@ export async function downloadXlsx(
   headers: string[],
   rows: (string | number)[][],
   sheetName = "Sheet1",
-  leadingRows: (string | number)[][] = []
+  leadingRows: (string | number)[][] = [],
+  /** rows와 같은 순서로, 해당 행에 배경색을 줄 ARGB 코드(예: "FFDCFCE7") 또는 null(기본색 유지). */
+  rowFillArgb?: (string | null)[]
 ) {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet(sheetName, { views: [{ state: "frozen", ySplit: leadingRows.length + 1 }] });
@@ -35,7 +37,11 @@ export async function downloadXlsx(
   headerRow.alignment = { vertical: "middle", horizontal: "center" };
   headerRow.height = 20;
 
-  ws.addRows(rows);
+  rows.forEach((r, i) => {
+    const row = ws.addRow(r);
+    const argb = rowFillArgb?.[i];
+    if (argb) row.fill = { type: "pattern", pattern: "solid", fgColor: { argb } };
+  });
 
   const thin = { style: "thin" as const, color: { argb: "FFCBD5E1" } };
   ws.eachRow((row) => {

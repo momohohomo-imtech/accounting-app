@@ -275,6 +275,7 @@ async function TransactionListSection({
         <TransactionTable
           transactions={(transactions ?? []) as Transaction[]}
           projectNodes={projectNodes}
+          clients={importClients ?? []}
           categories={importExpenseCategories ?? []}
           paymentMethods={importPaymentMethods ?? []}
           listParams={{ year: selectedYear, month: selectedMonth, type: type ?? "", project_id: project_id ?? "" }}

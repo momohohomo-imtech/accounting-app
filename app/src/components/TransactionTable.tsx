@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import {
   deleteTransactionRecord,
   bulkUpdateProjectId,
+  bulkUpdateClientId,
   bulkUpdateCategoryId,
   bulkUpdatePaymentMethodId,
   bulkUpdateItemName,
@@ -65,11 +66,12 @@ function sortValue(t: Transaction, key: SortKey): string | number {
   }
 }
 
-type BulkField = "project" | "category" | "payment_method" | "item_name";
+type BulkField = "project" | "client" | "category" | "payment_method" | "item_name";
 
 export function TransactionTable({
   transactions,
   projectNodes,
+  clients,
   categories,
   paymentMethods,
   listParams,
@@ -79,6 +81,7 @@ export function TransactionTable({
 }: {
   transactions: Transaction[];
   projectNodes: ProjectTreeNode[];
+  clients: { id: string; name: string }[];
   categories: { id: string; name: string }[];
   paymentMethods: { id: string; name: string }[];
   listParams: { year: number; month: string; type: string; project_id: string };
@@ -111,6 +114,7 @@ export function TransactionTable({
   const [bulkYear, setBulkYear] = useState("");
   const [bulkSiteId, setBulkSiteId] = useState("");
   const [bulkProjectId, setBulkProjectId] = useState("");
+  const [bulkClientId, setBulkClientId] = useState("");
   const [bulkCategoryId, setBulkCategoryId] = useState("");
   const [bulkPaymentMethodId, setBulkPaymentMethodId] = useState("");
   const [bulkItemName, setBulkItemName] = useState("");
@@ -120,6 +124,7 @@ export function TransactionTable({
     setBulkYear("");
     setBulkSiteId("");
     setBulkProjectId("");
+    setBulkClientId("");
     setBulkCategoryId("");
     setBulkPaymentMethodId("");
     setBulkItemName("");
@@ -128,11 +133,13 @@ export function TransactionTable({
   const bulkAction =
     bulkField === "project"
       ? bulkUpdateProjectId
-      : bulkField === "category"
-        ? bulkUpdateCategoryId
-        : bulkField === "payment_method"
-          ? bulkUpdatePaymentMethodId
-          : bulkUpdateItemName;
+      : bulkField === "client"
+        ? bulkUpdateClientId
+        : bulkField === "category"
+          ? bulkUpdateCategoryId
+          : bulkField === "payment_method"
+            ? bulkUpdatePaymentMethodId
+            : bulkUpdateItemName;
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -211,6 +218,7 @@ export function TransactionTable({
                 setBulkYear("");
                 setBulkSiteId("");
                 setBulkProjectId("");
+                setBulkClientId("");
                 setBulkCategoryId("");
                 setBulkPaymentMethodId("");
                 setBulkItemName("");
@@ -218,6 +226,7 @@ export function TransactionTable({
               className={fieldClass}
             >
               <option value="project">프로젝트</option>
+              <option value="client">거래처</option>
               <option value="category">카테고리</option>
               <option value="payment_method">결제방식</option>
               <option value="item_name">품목</option>
@@ -267,6 +276,22 @@ export function TransactionTable({
                   ))}
                 </select>
               </>
+            )}
+
+            {bulkField === "client" && (
+              <select
+                name="client_id"
+                value={bulkClientId}
+                onChange={(e) => setBulkClientId(e.target.value)}
+                className={fieldClass}
+              >
+                <option value="">선택 안함</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
             )}
 
             {bulkField === "category" && (
@@ -355,7 +380,16 @@ export function TransactionTable({
         </THead>
         <tbody>
           {sorted.map((t) => (
-            <Tr key={t.id} className={selected.has(t.id) ? "bg-blue-50/60" : undefined}>
+            <Tr
+              key={t.id}
+              className={
+                selected.has(t.id)
+                  ? "bg-blue-50/60"
+                  : t.expense_categories?.name === "출장"
+                    ? "bg-green-50"
+                    : undefined
+              }
+            >
               <Td className="pr-2">
                 <input
                   type="checkbox"
