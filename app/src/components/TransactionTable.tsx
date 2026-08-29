@@ -76,7 +76,7 @@ export function TransactionTable({
   paymentMethods,
   listParams,
   showProject = true,
-  showCategory = false,
+  showCategory = true,
   showItem = true,
 }: {
   transactions: Transaction[];

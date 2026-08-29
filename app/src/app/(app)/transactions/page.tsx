@@ -168,7 +168,7 @@ async function TransactionListSection({
 }) {
   const columnVisibility = {
     showProject: showProject !== "0",
-    showCategory: showCategory === "1",
+    showCategory: showCategory !== "0",
     showItem: showItem !== "0",
   };
   const supabase = await createClient();
