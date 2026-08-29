@@ -180,6 +180,15 @@ export async function deleteTransactionRecord(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+export async function updateTransactionNote(formData: FormData) {
+  const supabase = await createClient();
+  const id = String(formData.get("id"));
+  const note1 = String(formData.get("note1") ?? "") || null;
+  await supabase.from("transactions").update({ note1 }).eq("id", id);
+  revalidatePath("/daily-workers");
+  revalidatePath("/transactions");
+}
+
 // 외상 여러 건을 같은 날짜로 정산 → 매입매출장에 합계 1건(세금계산서 발행) 자동 생성
 export async function settleCreditTransactions(formData: FormData) {
   const supabase = await createClient();

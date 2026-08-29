@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
-import { formatWon, formatDate } from "@/lib/format";
-import { Table, THead, Tr, Td, EmptyRow } from "@/components/ui/Table";
+import { DailyWorkerUsageTable } from "@/components/DailyWorkerUsageTable";
 
 export async function DailyWorkerUsageSection() {
   const supabase = await createClient();
@@ -9,7 +8,7 @@ export async function DailyWorkerUsageSection() {
     supabase.from("daily_worker_offices").select("name"),
     supabase
       .from("transactions")
-      .select("trans_date, item_name, note1, note2, purchase_amount, purchase_vat, clients(name), client_name_raw")
+      .select("id, trans_date, item_name, note1, note2, purchase_amount, purchase_vat, clients(name), client_name_raw")
       .eq("type", "매입")
       .order("trans_date", { ascending: false }),
   ]);
@@ -18,19 +17,14 @@ export async function DailyWorkerUsageSection() {
 
   const usageRows = (rows ?? [])
     .map((t) => ({
+      id: t.id,
       trans_date: t.trans_date,
       client_name: (one(t.clients) as { name: string } | undefined)?.name ?? t.client_name_raw ?? "-",
       amount: t.purchase_amount + t.purchase_vat,
       note: t.note1 ?? t.note2 ?? "",
       item_name: t.item_name ?? "",
     }))
-    .filter(
-      (t) =>
-        officeNames.has(t.client_name) ||
-        t.item_name.includes("인건비")
-    );
-
-  const total = usageRows.reduce((s, t) => s + t.amount, 0);
+    .filter((t) => officeNames.has(t.client_name) || t.item_name.includes("인건비"));
 
   return (
     <div className="space-y-4">
@@ -42,33 +36,7 @@ export async function DailyWorkerUsageSection() {
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <Table className="min-w-[600px]">
-          <THead>
-            <th className="pb-2 pr-4">날짜</th>
-            <th className="pb-2 pr-4">거래처</th>
-            <th className="pb-2 pr-4 text-right">금액</th>
-            <th className="pb-2">비고</th>
-          </THead>
-          <tbody>
-            {usageRows.map((t, i) => (
-              <Tr key={i}>
-                <Td className="pr-4">{formatDate(t.trans_date)}</Td>
-                <Td className="pr-4">{t.client_name}</Td>
-                <Td className="pr-4 text-right font-medium text-slate-900">{formatWon(t.amount)}</Td>
-                <Td>{t.note || "-"}</Td>
-              </Tr>
-            ))}
-            {usageRows.length === 0 && <EmptyRow colSpan={4}>일용직 사용 내역이 없습니다.</EmptyRow>}
-          </tbody>
-        </Table>
-        {usageRows.length > 0 && (
-          <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-sm text-slate-600">
-            <span className="font-medium text-slate-500">총 {usageRows.length}건</span>
-            <span>
-              합계 <span className="font-mono font-semibold text-slate-900">{formatWon(total)}</span>
-            </span>
-          </div>
-        )}
+        <DailyWorkerUsageTable rows={usageRows} />
       </div>
     </div>
   );
