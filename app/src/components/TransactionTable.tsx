@@ -382,13 +382,7 @@ export function TransactionTable({
           {sorted.map((t) => (
             <Tr
               key={t.id}
-              className={
-                selected.has(t.id)
-                  ? "bg-blue-50/60"
-                  : t.expense_categories?.name === "출장"
-                    ? "bg-green-50"
-                    : undefined
-              }
+              className={selected.has(t.id) ? "bg-blue-50/60" : undefined}
             >
               <Td className="pr-2">
                 <input

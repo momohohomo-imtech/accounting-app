@@ -19,14 +19,11 @@ export function TransactionExportButtons({ transactions }: { transactions: Trans
       t.tax_invoice_issued ? "발행" : "-",
       transactionTotal(t),
     ]);
-    const rowFillArgb = transactions.map((t) => (t.expense_categories?.name === "출장" ? "FFDCFCE7" : null));
     await downloadXlsx(
       `매입매출_${new Date().toISOString().slice(0, 10)}.xlsx`,
       ["날짜", "구분", "거래처", "프로젝트", "품목", "결제방식", "세금계산서", "금액"],
       rows,
-      "매입매출",
-      [],
-      rowFillArgb
+      "매입매출"
     );
   }
 
