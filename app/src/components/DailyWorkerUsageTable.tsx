@@ -36,8 +36,8 @@ function NoteCell({ id, initialNote }: { id: string; initialNote: string }) {
 }
 
 export function DailyWorkerUsageTable({ rows }: { rows: UsageRow[] }) {
-  const [sortKey, setSortKey] = useState<SortKey | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [sortKey, setSortKey] = useState<SortKey | null>("trans_date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
