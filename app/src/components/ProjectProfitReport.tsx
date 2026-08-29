@@ -9,6 +9,7 @@ import { ReportMemoField } from "@/components/ReportMemoField";
 import { ProjectPurchaseChartButton } from "@/components/ProjectPurchaseChartButton";
 import { ProjectPurchaseTable } from "@/components/ProjectPurchaseTable";
 import { resolveCategoryColor } from "@/lib/categoryColor";
+import { ProjectAgencyPurchaseList } from "@/components/ProjectAgencyPurchaseList";
 
 export async function ProjectProfitReport({ projectId, closeHref }: { projectId: string; closeHref: string }) {
   const supabase = await createClient();
@@ -31,8 +32,15 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
     .eq("type", "매입")
     .order("trans_date", { ascending: true });
 
+  const { data: agencyRows } = await supabase
+    .from("project_agency_purchases")
+    .select("*")
+    .in("project_id", groupIds)
+    .order("created_at", { ascending: true });
+
   const rows = purchaseRows ?? [];
   const purchaseTotal = rows.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
+  const agencyTotal = (agencyRows ?? []).reduce((s, a) => s + a.amount, 0);
 
   const categoryBreakdown = (() => {
     const map = new Map<string, number>();
@@ -46,8 +54,11 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
   })();
   const quoteTotal = group.reduce((s, p) => s + (p.quote_amount ?? 0), 0);
   const contractTotal = group.reduce((s, p) => s + (p.contract_amount ?? 0), 0);
-  // 이익금 = 발주액 - (발주액 - 수주액) - 매입합계 = 수주액 - 매입합계
+  // 이익금 = 발주액 - (발주액 - 수주액) - 매입합계 = 수주액 - 매입합계.
+  // 수주액은 이미 대행구매액·수수료를 다 뺀 실수령액이라 이익금 계산은 그대로 두고,
+  // 발주액-수주액 차액만 대행구매액(위 project_agency_purchases 합계) / 기타 공제(수수료 등)로 나눠서 보여줌.
   const gap = quoteTotal - contractTotal;
+  const otherDeduction = gap - agencyTotal;
   const profit = contractTotal ? contractTotal - purchaseTotal : null;
   // 이익율은 발주액 대비 비율
   const margin = quoteTotal && profit !== null ? (profit / quoteTotal) * 100 : null;
@@ -61,7 +72,8 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
 
   const summaryRows: [string, string | number][] = [
     ["발주액 (원청 발주금액)", formatWon(quoteTotal)],
-    ["차액 (발주액-수주액)", `-${formatWon(gap)}`],
+    ["대행구매액", `-${formatWon(agencyTotal)}`],
+    ["기타 공제 (수수료 등)", `-${formatWon(otherDeduction)}`],
     [
       `수주액 (실수령액)${project.contract_amount_estimated ? " - 예상금액" : project.contract_amount_minimum ? " - 최소금액 산정액" : ""}`,
       formatWon(contractTotal),
@@ -136,14 +148,23 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
         })}
       />
 
-      <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3 lg:grid-cols-6">
+      <ProjectAgencyPurchaseList
+        projectId={project.id}
+        items={(agencyRows ?? []).map((a) => ({ id: a.id, item_name: a.item_name, amount: a.amount }))}
+      />
+
+      <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3 lg:grid-cols-7">
         <div>
           <p className="text-xs text-slate-500">발주액 (원청 발주금액)</p>
           <p className="font-mono text-lg font-bold text-slate-900">{formatWon(quoteTotal)}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500">차액 (발주액-수주액)</p>
-          <p className="font-mono text-lg font-bold text-slate-500">-{formatWon(gap)}</p>
+          <p className="text-xs text-slate-500">대행구매액</p>
+          <p className="font-mono text-lg font-bold text-slate-500">-{formatWon(agencyTotal)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-500">기타 공제 (수수료 등)</p>
+          <p className="font-mono text-lg font-bold text-slate-500">-{formatWon(otherDeduction)}</p>
         </div>
         <div>
           <p className="text-xs text-slate-500">

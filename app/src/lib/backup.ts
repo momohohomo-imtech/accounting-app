@@ -20,6 +20,7 @@ const TABLES = [
   "memos",
   "business_trip_logs",
   "report_ai_insights",
+  "project_agency_purchases",
 ];
 
 export async function runBackup(supabase: SupabaseClient, backupType: "manual" | "auto") {
