@@ -19,13 +19,23 @@ import { cx } from "@/lib/cx";
 import type { Transaction } from "@/lib/types";
 import type { ProjectTreeNode } from "@/components/ProjectTreeFilter";
 
-type SortKey = "trans_date" | "type" | "client" | "project" | "item_name" | "payment_method" | "tax_invoice" | "amount";
+type SortKey =
+  | "trans_date"
+  | "type"
+  | "client"
+  | "project"
+  | "category"
+  | "item_name"
+  | "payment_method"
+  | "tax_invoice"
+  | "amount";
 
-const COLUMNS: { key: SortKey; label: string }[] = [
+const ALL_COLUMNS: { key: SortKey; label: string }[] = [
   { key: "trans_date", label: "날짜" },
   { key: "type", label: "구분" },
   { key: "client", label: "거래처" },
   { key: "project", label: "프로젝트" },
+  { key: "category", label: "카테고리" },
   { key: "item_name", label: "품목" },
   { key: "payment_method", label: "결제방식" },
   { key: "tax_invoice", label: "세금계산서" },
@@ -42,6 +52,8 @@ function sortValue(t: Transaction, key: SortKey): string | number {
       return t.clients?.name ?? t.client_name_raw ?? "";
     case "project":
       return t.projects?.name ?? "";
+    case "category":
+      return t.expense_categories?.name ?? "";
     case "item_name":
       return t.item_name ?? "";
     case "payment_method":
@@ -61,13 +73,25 @@ export function TransactionTable({
   categories,
   paymentMethods,
   listParams,
+  showProject = true,
+  showCategory = false,
+  showItem = true,
 }: {
   transactions: Transaction[];
   projectNodes: ProjectTreeNode[];
   categories: { id: string; name: string }[];
   paymentMethods: { id: string; name: string }[];
   listParams: { year: number; month: string; type: string; project_id: string };
+  showProject?: boolean;
+  showCategory?: boolean;
+  showItem?: boolean;
 }) {
+  const COLUMNS = ALL_COLUMNS.filter(
+    (c) =>
+      (c.key !== "project" || showProject) &&
+      (c.key !== "category" || showCategory) &&
+      (c.key !== "item_name" || showItem)
+  );
   function editHrefFor(id: string) {
     const p = new URLSearchParams({
       year: String(listParams.year),
@@ -345,14 +369,21 @@ export function TransactionTable({
                 <Badge variant={t.type === "매출" ? "blue" : "orange"}>{t.type}</Badge>
               </Td>
               <Td className="pr-4">{t.clients?.name ?? t.client_name_raw ?? "-"}</Td>
-              <Td className="pr-4">
-                {t.needs_classification ? (
-                  <Badge variant="green">분류 대기 중</Badge>
-                ) : (
-                  (t.projects?.name ?? <span className="font-medium text-red-600">일반경비</span>)
-                )}
-              </Td>
-              <Td className="pr-4">{t.item_name ?? "-"}</Td>
+              {showProject && (
+                <Td className="pr-4">
+                  {t.needs_classification ? (
+                    <Badge variant="green">분류 대기 중</Badge>
+                  ) : (
+                    (t.projects?.name ?? <span className="font-medium text-red-600">일반경비</span>)
+                  )}
+                </Td>
+              )}
+              {showCategory && (
+                <Td className={cx("pr-4", t.expense_categories?.project_only ? "font-medium text-red-600" : undefined)}>
+                  {t.expense_categories?.name ?? "-"}
+                </Td>
+              )}
+              {showItem && <Td className="pr-4">{t.item_name ?? "-"}</Td>}
               <Td className="pr-4">{t.payment_methods?.name ?? "-"}</Td>
               <Td className="pr-4">
                 {t.tax_invoice_issued ? <Badge variant="emerald">발행</Badge> : <span className="text-slate-300">-</span>}

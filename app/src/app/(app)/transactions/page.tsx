@@ -7,6 +7,7 @@ import { PaymentMethodsSection } from "@/components/sections/PaymentMethodsSecti
 import { ExpenseCategoriesSection } from "@/components/sections/ExpenseCategoriesSection";
 import { YearMonthFilter } from "@/components/YearMonthFilter";
 import { TransactionTable } from "@/components/TransactionTable";
+import { TransactionColumnToggles } from "@/components/TransactionColumnToggles";
 import { TransactionExportButtons } from "@/components/TransactionExportButtons";
 import { ProjectTreeFilter } from "@/components/ProjectTreeFilter";
 import { TransactionBulkImport } from "@/components/TransactionBulkImport";
@@ -37,9 +38,12 @@ export default async function TransactionsPage({
     type?: string;
     project_id?: string;
     editTx?: string;
+    showProject?: string;
+    showCategory?: string;
+    showItem?: string;
   }>;
 }) {
-  const { tab, year, month, type, project_id, editTx } = await searchParams;
+  const { tab, year, month, type, project_id, editTx, showProject, showCategory, showItem } = await searchParams;
   const active = tab ?? "list";
 
   const redirectTo = (() => {
@@ -84,7 +88,15 @@ export default async function TransactionsPage({
       {active === "payment-methods" && <PaymentMethodsSection />}
       {active === "expense-categories" && <ExpenseCategoriesSection />}
       {active === "list" && (
-        <TransactionListSection year={year} month={month} type={type} project_id={project_id} />
+        <TransactionListSection
+          year={year}
+          month={month}
+          type={type}
+          project_id={project_id}
+          showProject={showProject}
+          showCategory={showCategory}
+          showItem={showItem}
+        />
       )}
 
       <TransactionEditPopup editTx={editTx} redirectTo={redirectTo} />
@@ -142,12 +154,23 @@ async function TransactionListSection({
   month,
   type,
   project_id,
+  showProject,
+  showCategory,
+  showItem,
 }: {
   year?: string;
   month?: string;
   type?: string;
   project_id?: string;
+  showProject?: string;
+  showCategory?: string;
+  showItem?: string;
 }) {
+  const columnVisibility = {
+    showProject: showProject !== "0",
+    showCategory: showCategory === "1",
+    showItem: showItem !== "0",
+  };
   const supabase = await createClient();
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -159,7 +182,7 @@ async function TransactionListSection({
 
   let query = supabase
     .from("transactions")
-    .select("*, clients(name), projects(name), payment_methods(*)")
+    .select("*, clients(name), projects(name), payment_methods(*), expense_categories(*)")
     .neq("payment_type", "credit")
     .gte("trans_date", start)
     .lte("trans_date", end)
@@ -228,7 +251,10 @@ async function TransactionListSection({
       </Card>
 
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <YearMonthFilter years={years} selectedYear={selectedYear} selectedMonth={selectedMonth} />
+        <div className="flex flex-wrap items-end gap-3">
+          <YearMonthFilter years={years} selectedYear={selectedYear} selectedMonth={selectedMonth} />
+          <TransactionColumnToggles {...columnVisibility} />
+        </div>
         <div className="flex flex-wrap items-center gap-3 print:hidden">
           <div className="flex gap-1">
             {[
@@ -252,6 +278,7 @@ async function TransactionListSection({
           categories={importExpenseCategories ?? []}
           paymentMethods={importPaymentMethods ?? []}
           listParams={{ year: selectedYear, month: selectedMonth, type: type ?? "", project_id: project_id ?? "" }}
+          {...columnVisibility}
         />
       </Card>
 
