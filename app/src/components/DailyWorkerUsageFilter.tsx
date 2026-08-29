@@ -30,22 +30,26 @@ export function DailyWorkerUsageFilter({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 print:hidden">
-      <select value={selectedYear} onChange={(e) => navigate(Number(e.target.value), monthInput)} className={fieldClass}>
+    <div className="flex flex-nowrap items-center gap-2 print:hidden">
+      <select
+        value={selectedYear}
+        onChange={(e) => navigate(Number(e.target.value), monthInput)}
+        className={`${fieldClass} shrink-0`}
+      >
         {years.map((y) => (
           <option key={y} value={y}>
             {y}년
           </option>
         ))}
       </select>
-      <div className="flex gap-1">
+      <div className="flex shrink-0 gap-1">
         {PRESETS.map((p) => (
           <button
             key={p.value}
             type="button"
             onClick={() => navigate(selectedYear, p.value)}
             className={cx(
-              "rounded-lg border px-2.5 py-1.5 text-xs transition-colors",
+              "shrink-0 rounded-lg border px-2.5 py-1.5 text-xs transition-colors",
               monthInput === p.value
                 ? "border-slate-900 bg-slate-900 text-white"
                 : "border-slate-300 text-slate-600 hover:bg-slate-100"
@@ -60,12 +64,12 @@ export function DailyWorkerUsageFilter({
         onChange={(e) => setMonthInput(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && navigate(selectedYear, monthInput)}
         placeholder="월 (예: 3 또는 1-12)"
-        className={`${fieldClass} w-32`}
+        className={`${fieldClass} w-32 shrink-0`}
       />
       <button
         type="button"
         onClick={() => navigate(selectedYear, monthInput)}
-        className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100"
+        className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100"
       >
         적용
       </button>

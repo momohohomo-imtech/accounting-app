@@ -52,17 +52,17 @@ export async function DailyWorkerUsageSection({ year, months }: { year?: string;
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900">일용직 사용내역</h2>
-          <p className="text-xs text-slate-400">
-            매입 내역 중 거래처가 인력사무소이거나 품목에 &ldquo;인건비&rdquo;가 포함된 건을 자동으로 모았습니다.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <DailyWorkerUsageFilter years={years} selectedYear={selectedYear} months={months ?? "1-12"} />
-          <DailyWorkerUsageExportButtons rows={usageRows} periodLabel={`${selectedYear}년_${monthLabel}`} />
-        </div>
+      <div className="print:hidden">
+        <h2 className="text-lg font-semibold text-slate-900">일용직 사용내역</h2>
+        <p className="text-xs text-slate-400">
+          매입 내역 중 거래처가 인력사무소이거나 품목에 &ldquo;인건비&rdquo;가 포함된 건을 자동으로 모았습니다.
+        </p>
+      </div>
+
+      <div className="flex flex-nowrap items-center gap-2 overflow-x-auto print:hidden">
+        <DailyWorkerUsageFilter years={years} selectedYear={selectedYear} months={months ?? "1-12"} />
+        <span className="h-5 w-px shrink-0 bg-slate-200" />
+        <DailyWorkerUsageExportButtons rows={usageRows} periodLabel={`${selectedYear}년_${monthLabel}`} />
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm print:border-0 print:p-0 print:shadow-none">

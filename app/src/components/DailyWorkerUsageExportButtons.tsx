@@ -19,7 +19,7 @@ export function DailyWorkerUsageExportButtons({ rows, periodLabel }: { rows: Exp
   }
 
   return (
-    <div className="flex gap-2 print:hidden">
+    <div className="flex shrink-0 flex-nowrap gap-2 print:hidden">
       <PrintButton />
       <Button variant="secondary" size="sm" onClick={handleExport}>
         엑셀 다운로드
