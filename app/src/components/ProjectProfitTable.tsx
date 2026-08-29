@@ -14,7 +14,7 @@ type ProjectRow = {
   profit: number;
 };
 
-type SortKey = "name" | "progress_pct" | "quoteAmount" | "profitRate" | "sales" | "purchase";
+type SortKey = "name" | "progress_pct" | "quoteAmount" | "profitRate" | "sales" | "purchase" | "profit";
 
 function sortValue(p: ProjectRow & { profitRate: number }, key: SortKey): string | number {
   switch (key) {
@@ -30,6 +30,8 @@ function sortValue(p: ProjectRow & { profitRate: number }, key: SortKey): string
       return p.sales;
     case "purchase":
       return p.purchase;
+    case "profit":
+      return p.profit;
   }
 }
 
@@ -91,7 +93,7 @@ export function ProjectProfitTable({
             <th className="pb-2 pr-4 text-right">{headerButton("profitRate", "이익율")}</th>
             <th className="pb-2 pr-4 text-right">{headerButton("sales", "매출")}</th>
             <th className="pb-2 pr-4 text-right">{headerButton("purchase", "매입")}</th>
-            <th className="pb-2 text-right">손익</th>
+            <th className="pb-2 text-right">{headerButton("profit", "손익")}</th>
           </tr>
         </thead>
         <tbody>
