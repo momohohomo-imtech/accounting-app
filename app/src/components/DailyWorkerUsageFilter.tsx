@@ -34,7 +34,7 @@ export function DailyWorkerUsageFilter({
       <select
         value={selectedYear}
         onChange={(e) => navigate(Number(e.target.value), monthInput)}
-        className={`${fieldClass} shrink-0`}
+        className={`${fieldClass} w-[6ch] shrink-0`}
       >
         {years.map((y) => (
           <option key={y} value={y}>
@@ -63,8 +63,8 @@ export function DailyWorkerUsageFilter({
         value={monthInput}
         onChange={(e) => setMonthInput(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && navigate(selectedYear, monthInput)}
-        placeholder="월 (예: 3 또는 1-12)"
-        className={`${fieldClass} w-32 shrink-0`}
+        placeholder="예: 1-12"
+        className={`${fieldClass} w-[6ch] shrink-0`}
       />
       <button
         type="button"

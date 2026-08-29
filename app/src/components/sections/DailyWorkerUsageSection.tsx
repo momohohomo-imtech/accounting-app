@@ -59,9 +59,8 @@ export async function DailyWorkerUsageSection({ year, months }: { year?: string;
         </p>
       </div>
 
-      <div className="flex flex-nowrap items-center gap-2 overflow-x-auto print:hidden">
+      <div className="flex flex-nowrap items-center justify-between gap-2 overflow-x-auto print:hidden">
         <DailyWorkerUsageFilter years={years} selectedYear={selectedYear} months={months ?? "1-12"} />
-        <span className="h-5 w-px shrink-0 bg-slate-200" />
         <DailyWorkerUsageExportButtons rows={usageRows} periodLabel={`${selectedYear}년_${monthLabel}`} />
       </div>
 
