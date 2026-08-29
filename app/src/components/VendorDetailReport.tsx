@@ -46,6 +46,7 @@ export function VendorDetailReport({
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [showProject, setShowProject] = useState(true);
   const [showCategory, setShowCategory] = useState(false);
+  const [showItem, setShowItem] = useState(true);
 
   const total = rows.reduce((s, r) => s + r.amount, 0);
   const exportRows = rows.map((r) => [formatDate(r.trans_date), r.item_name ?? "-", r.amount]);
@@ -99,6 +100,10 @@ export function VendorDetailReport({
             <input type="checkbox" checked={showCategory} onChange={(e) => setShowCategory(e.target.checked)} className="h-3.5 w-3.5" />
             카테고리
           </label>
+          <label className="flex items-center gap-1.5 text-xs text-slate-600">
+            <input type="checkbox" checked={showItem} onChange={(e) => setShowItem(e.target.checked)} className="h-3.5 w-3.5" />
+            품목
+          </label>
           <VendorReportActions vendorName={vendorName} year={year} rows={exportRows} total={total} />
           <Link href={closeHref} className="text-sm text-slate-500 hover:text-slate-800">
             닫기
@@ -113,7 +118,7 @@ export function VendorDetailReport({
               <th className="pb-2 pr-4">{headerButton("trans_date", "날짜")}</th>
               {showProject && <th className="pb-2 pr-4">{headerButton("project_name", "프로젝트")}</th>}
               {showCategory && <th className="pb-2 pr-4">카테고리</th>}
-              <th className="pb-2 pr-4">{headerButton("item_name", "품목")}</th>
+              {showItem && <th className="pb-2 pr-4">{headerButton("item_name", "품목")}</th>}
               <th className="pb-2 text-right">{headerButton("amount", "금액")}</th>
               <th className="pb-2 pl-4 text-right print:hidden">관리</th>
             </tr>
@@ -138,7 +143,7 @@ export function VendorDetailReport({
                     {r.category_name ?? "-"}
                   </td>
                 )}
-                <td className="py-2 pr-4 text-slate-700">{r.item_name ?? "-"}</td>
+                {showItem && <td className="py-2 pr-4 text-slate-700">{r.item_name ?? "-"}</td>}
                 <td className="py-2 text-right font-mono text-slate-900">{formatWon(r.amount)}</td>
                 <td className="py-2 pl-4 text-right print:hidden">
                   <Link
@@ -153,7 +158,7 @@ export function VendorDetailReport({
             {sortedRows.length === 0 && (
               <tr>
                 <td
-                  colSpan={4 + (showProject ? 1 : 0) + (showCategory ? 1 : 0)}
+                  colSpan={3 + (showProject ? 1 : 0) + (showCategory ? 1 : 0) + (showItem ? 1 : 0)}
                   className="py-6 text-center text-slate-400"
                 >
                   매입 내역이 없습니다.
