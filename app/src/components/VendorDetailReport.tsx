@@ -12,6 +12,8 @@ type VendorRow = {
   amount: number;
   project_name: string | null;
   needs_classification: boolean;
+  category_name: string | null;
+  category_project_only: boolean;
 };
 
 type SortKey = "trans_date" | "project_name" | "item_name" | "amount";
@@ -42,6 +44,8 @@ export function VendorDetailReport({
 }) {
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [showProject, setShowProject] = useState(true);
+  const [showCategory, setShowCategory] = useState(false);
 
   const total = rows.reduce((s, r) => s + r.amount, 0);
   const exportRows = rows.map((r) => [formatDate(r.trans_date), r.item_name ?? "-", r.amount]);
@@ -86,9 +90,17 @@ export function VendorDetailReport({
         <h2 className="text-lg font-semibold text-slate-900">
           {vendorName} 매입 내역 <span className="font-mono text-sm font-normal text-slate-400">{year}년</span>
         </h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3 print:hidden">
+          <label className="flex items-center gap-1.5 text-xs text-slate-600">
+            <input type="checkbox" checked={showProject} onChange={(e) => setShowProject(e.target.checked)} className="h-3.5 w-3.5" />
+            프로젝트
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-slate-600">
+            <input type="checkbox" checked={showCategory} onChange={(e) => setShowCategory(e.target.checked)} className="h-3.5 w-3.5" />
+            종류구분
+          </label>
           <VendorReportActions vendorName={vendorName} year={year} rows={exportRows} total={total} />
-          <Link href={closeHref} className="text-sm text-slate-500 hover:text-slate-800 print:hidden">
+          <Link href={closeHref} className="text-sm text-slate-500 hover:text-slate-800">
             닫기
           </Link>
         </div>
@@ -99,7 +111,8 @@ export function VendorDetailReport({
           <thead>
             <tr className="border-b border-slate-200 text-left text-slate-500">
               <th className="pb-2 pr-4">{headerButton("trans_date", "날짜")}</th>
-              <th className="pb-2 pr-4">{headerButton("project_name", "프로젝트")}</th>
+              {showProject && <th className="pb-2 pr-4">{headerButton("project_name", "프로젝트")}</th>}
+              {showCategory && <th className="pb-2 pr-4">종류구분</th>}
               <th className="pb-2 pr-4">{headerButton("item_name", "품목")}</th>
               <th className="pb-2 text-right">{headerButton("amount", "금액")}</th>
               <th className="pb-2 pl-4 text-right print:hidden">관리</th>
@@ -109,15 +122,22 @@ export function VendorDetailReport({
             {sortedRows.map((r) => (
               <tr key={r.id} className="border-b border-slate-100 last:border-0">
                 <td className="py-2 pr-4 text-slate-600">{formatDate(r.trans_date)}</td>
-                <td className="py-2 pr-4 text-slate-700">
-                  {r.needs_classification ? (
-                    <span className="inline-flex rounded-full bg-green-600 px-2 py-0.5 text-xs font-medium text-white">
-                      분류 대기 중
-                    </span>
-                  ) : (
-                    (r.project_name ?? <span className="font-medium text-red-600">일반경비</span>)
-                  )}
-                </td>
+                {showProject && (
+                  <td className="py-2 pr-4 text-slate-700">
+                    {r.needs_classification ? (
+                      <span className="inline-flex rounded-full bg-green-600 px-2 py-0.5 text-xs font-medium text-white">
+                        분류 대기 중
+                      </span>
+                    ) : (
+                      (r.project_name ?? <span className="font-medium text-red-600">일반경비</span>)
+                    )}
+                  </td>
+                )}
+                {showCategory && (
+                  <td className={`py-2 pr-4 ${r.category_project_only ? "font-medium text-red-600" : "text-slate-700"}`}>
+                    {r.category_name ?? "-"}
+                  </td>
+                )}
                 <td className="py-2 pr-4 text-slate-700">{r.item_name ?? "-"}</td>
                 <td className="py-2 text-right font-mono text-slate-900">{formatWon(r.amount)}</td>
                 <td className="py-2 pl-4 text-right print:hidden">
@@ -132,7 +152,10 @@ export function VendorDetailReport({
             ))}
             {sortedRows.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-6 text-center text-slate-400">
+                <td
+                  colSpan={4 + (showProject ? 1 : 0) + (showCategory ? 1 : 0)}
+                  className="py-6 text-center text-slate-400"
+                >
                   매입 내역이 없습니다.
                 </td>
               </tr>

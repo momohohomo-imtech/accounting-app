@@ -36,6 +36,7 @@ type Row = {
   needs_classification: boolean;
   clients: { name: string } | { name: string }[] | null;
   projects: { name: string; sites: { name: string } | { name: string }[] | null } | { name: string; sites: { name: string } | { name: string }[] | null }[] | null;
+  expense_categories: { name: string; project_only: boolean } | { name: string; project_only: boolean }[] | null;
 };
 
 function one<T>(v: T | T[] | null): T | null {
@@ -64,7 +65,7 @@ export default async function ReportsPage({
   const [{ data: rawTx }, { data: projects }, { data: firstTx }, { data: savedInsights }] = await Promise.all([
     supabase
       .from("transactions")
-      .select("*, clients(name), projects(name, sites(name))")
+      .select("*, clients(name), projects(name, sites(name)), expense_categories(name, project_only)")
       .gte("trans_date", `${selectedYear}-01-01`)
       .lte("trans_date", `${selectedYear}-12-31`),
     supabase
@@ -197,6 +198,8 @@ export default async function ReportsPage({
           amount: t.purchase_amount + t.purchase_vat,
           project_name: (one(t.projects) as { name: string } | null)?.name ?? null,
           needs_classification: t.needs_classification,
+          category_name: (one(t.expense_categories) as { name: string; project_only: boolean } | null)?.name ?? null,
+          category_project_only: (one(t.expense_categories) as { name: string; project_only: boolean } | null)?.project_only ?? false,
         }))
     : [];
 

@@ -9,8 +9,13 @@ import {
 import type { FieldConfig } from "@/components/crud/types";
 
 const fields: FieldConfig[] = [
-  { name: "name", label: "이름", required: true, placeholder: "예: 차량, 출장, 회식, 접대" },
+  { name: "name", label: "이름", required: true, placeholder: "예: 차량, 출장, 회식, 접대", colorField: "project_only" },
   { name: "sort_order", label: "정렬순서", type: "number" },
+  {
+    name: "project_only",
+    label: "프로젝트 전용 (체크 시 빨간색으로 표시 — 항상 특정 프로젝트에 귀속되는 지출)",
+    type: "checkbox",
+  },
 ];
 
 export async function ExpenseCategoriesSection() {

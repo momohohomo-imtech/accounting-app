@@ -7,6 +7,7 @@ function parse(formData: FormData) {
   return {
     name: String(formData.get("name") ?? ""),
     sort_order: formData.get("sort_order") ? Number(formData.get("sort_order")) : 0,
+    project_only: formData.get("project_only") === "on",
   };
 }
 

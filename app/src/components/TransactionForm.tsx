@@ -499,7 +499,7 @@ export function TransactionForm({
           <select value={values.category_id} onChange={(e) => handleCategorySelect(e.target.value)} className={inputClass}>
             <option value="">선택 안함</option>
             {expenseCategories.map((c) => (
-              <option key={c.id} value={c.id}>
+              <option key={c.id} value={c.id} style={c.project_only ? { color: "#dc2626" } : undefined}>
                 {c.name}
               </option>
             ))}
