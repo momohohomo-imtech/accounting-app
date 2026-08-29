@@ -20,7 +20,7 @@ export async function DailyWorkerUsageSection({ year, months }: { year?: string;
     supabase.from("daily_worker_offices").select("name"),
     supabase
       .from("transactions")
-      .select("id, trans_date, item_name, note1, note2, purchase_amount, purchase_vat, clients(name), client_name_raw")
+      .select("id, trans_date, item_name, note1, note2, purchase_amount, purchase_vat, clients(name), client_name_raw, projects(name)")
       .eq("type", "매입")
       .gte("trans_date", rangeStart)
       .lte("trans_date", rangeEnd)
@@ -36,6 +36,7 @@ export async function DailyWorkerUsageSection({ year, months }: { year?: string;
       trans_date: t.trans_date,
       client_name: (one(t.clients) as { name: string } | undefined)?.name ?? t.client_name_raw ?? "-",
       amount: t.purchase_amount + t.purchase_vat,
+      project_name: (one(t.projects) as { name: string } | undefined)?.name ?? "",
       note: t.note1 ?? t.note2 ?? "",
       item_name: t.item_name ?? "",
     }))

@@ -5,7 +5,7 @@ import { formatWon, formatDate } from "@/lib/format";
 import { Table, THead, Tr, Td, EmptyRow } from "@/components/ui/Table";
 import { updateTransactionNote } from "@/lib/actions/transactions";
 
-type UsageRow = { id: string; trans_date: string; client_name: string; amount: number; note: string };
+type UsageRow = { id: string; trans_date: string; client_name: string; amount: number; project_name: string; note: string };
 
 type SortKey = "trans_date" | "client_name" | "amount";
 
@@ -84,6 +84,7 @@ export function DailyWorkerUsageTable({ rows }: { rows: UsageRow[] }) {
           <th className="pb-2 pr-4">{headerButton("trans_date", "날짜")}</th>
           <th className="pb-2 pr-4">{headerButton("client_name", "거래처")}</th>
           <th className="pb-2 pr-4 text-right">{headerButton("amount", "금액")}</th>
+          <th className="pb-2 pr-4">프로젝트</th>
           <th className="pb-2">비고</th>
         </THead>
         <tbody>
@@ -92,12 +93,13 @@ export function DailyWorkerUsageTable({ rows }: { rows: UsageRow[] }) {
               <Td className="pr-4">{formatDate(r.trans_date)}</Td>
               <Td className="pr-4">{r.client_name}</Td>
               <Td className="pr-4 text-right font-medium text-slate-900">{formatWon(r.amount)}</Td>
+              <Td className="pr-4 text-slate-600">{r.project_name || "-"}</Td>
               <Td>
                 <NoteCell id={r.id} initialNote={r.note} />
               </Td>
             </Tr>
           ))}
-          {sorted.length === 0 && <EmptyRow colSpan={4}>일용직 사용 내역이 없습니다.</EmptyRow>}
+          {sorted.length === 0 && <EmptyRow colSpan={5}>일용직 사용 내역이 없습니다.</EmptyRow>}
         </tbody>
       </Table>
 
