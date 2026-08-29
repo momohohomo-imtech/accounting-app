@@ -10,6 +10,7 @@ type SortKey = "name" | "count" | "amount";
 export function VendorAggregateTable({ rows, year }: { rows: VendorAgg[]; year: number }) {
   const [sortKey, setSortKey] = useState<SortKey>("amount");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [query, setQuery] = useState("");
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -20,14 +21,19 @@ export function VendorAggregateTable({ rows, year }: { rows: VendorAgg[]; year: 
     }
   }
 
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? rows.filter((v) => v.name.toLowerCase().includes(q)) : rows;
+  }, [rows, query]);
+
   const sorted = useMemo(() => {
-    const copy = [...rows];
+    const copy = [...filtered];
     copy.sort((a, b) => {
       const cmp = sortKey === "name" ? a.name.localeCompare(b.name) : a[sortKey] - b[sortKey];
       return sortDir === "asc" ? cmp : -cmp;
     });
     return copy;
-  }, [rows, sortKey, sortDir]);
+  }, [filtered, sortKey, sortDir]);
 
   function headerButton(key: SortKey, label: string) {
     return (
@@ -39,7 +45,14 @@ export function VendorAggregateTable({ rows, year }: { rows: VendorAgg[]; year: 
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div>
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="거래처 검색"
+        className="mb-3 w-48 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-slate-500 focus:outline-none print:hidden"
+      />
+      <div className="overflow-x-auto">
       <table className="w-full min-w-[600px] text-sm">
         <thead>
           <tr className="border-b border-slate-200 text-left text-slate-500">
@@ -72,6 +85,7 @@ export function VendorAggregateTable({ rows, year }: { rows: VendorAgg[]; year: 
           )}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
