@@ -132,7 +132,7 @@ export function TransactionBulkImport({
   return (
     <div className="space-y-3">
       <p className="text-xs text-slate-500">
-        정해진 엑셀 양식을 올리면 AI가 표를 읽어서 아래에 미리보기로 보여줘요. 거래처/프로젝트/결제수단/종류구분은
+        정해진 엑셀 양식을 올리면 AI가 표를 읽어서 아래에 미리보기로 보여줘요. 거래처/프로젝트/결제수단/카테고리는
         등록된 이름과 일치하면 자동 연결되고, 안 맞으면 직접 선택해서 고치면 돼요.
       </p>
       <input
@@ -158,7 +158,7 @@ export function TransactionBulkImport({
                   <th className="pb-2 pr-2">거래처</th>
                   <th className="pb-2 pr-2">프로젝트</th>
                   <th className="pb-2 pr-2">품목</th>
-                  <th className="pb-2 pr-2">종류구분</th>
+                  <th className="pb-2 pr-2">카테고리</th>
                   <th className="pb-2 pr-2 text-right">금액</th>
                   <th className="pb-2 pr-2">결제수단</th>
                   <th className="pb-2 pr-2">결제시점</th>

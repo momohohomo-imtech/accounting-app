@@ -495,7 +495,7 @@ export function TransactionForm({
             분류 대기 중
           </label>
         </div>
-        <Field label="종류구분">
+        <Field label="카테고리">
           <select value={values.category_id} onChange={(e) => handleCategorySelect(e.target.value)} className={inputClass}>
             <option value="">선택 안함</option>
             {expenseCategories.map((c) => (
@@ -552,7 +552,7 @@ export function TransactionForm({
             className="h-4 w-4 disabled:cursor-not-allowed disabled:opacity-50"
           />
           세금계산서 발행
-          {vatExempt && <span className="text-xs text-slate-400">(비과세 종류구분이라 선택 불가)</span>}
+          {vatExempt && <span className="text-xs text-slate-400">(비과세 카테고리라 선택 불가)</span>}
         </label>
         <Field label="메모1">
           <input value={values.note1} onChange={(e) => set("note1", e.target.value)} className={inputClass} />

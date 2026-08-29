@@ -172,6 +172,45 @@ export async function bulkUpdateProjectId(formData: FormData) {
   revalidatePath("/reports");
 }
 
+export async function bulkUpdateCategoryId(formData: FormData) {
+  const supabase = await createClient();
+  const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
+  const categoryId = String(formData.get("category_id") ?? "") || null;
+  if (ids.length === 0) return;
+
+  const { error } = await supabase.from("transactions").update({ category_id: categoryId }).in("id", ids);
+  if (error) console.error("bulkUpdateCategoryId failed:", error.message);
+
+  revalidatePath("/transactions");
+  revalidatePath("/reports");
+}
+
+export async function bulkUpdatePaymentMethodId(formData: FormData) {
+  const supabase = await createClient();
+  const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
+  const paymentMethodId = String(formData.get("payment_method_id") ?? "") || null;
+  if (ids.length === 0) return;
+
+  const { error } = await supabase.from("transactions").update({ payment_method_id: paymentMethodId }).in("id", ids);
+  if (error) console.error("bulkUpdatePaymentMethodId failed:", error.message);
+
+  revalidatePath("/transactions");
+  revalidatePath("/reports");
+}
+
+export async function bulkUpdateItemName(formData: FormData) {
+  const supabase = await createClient();
+  const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
+  const itemName = String(formData.get("item_name") ?? "").trim() || null;
+  if (ids.length === 0) return;
+
+  const { error } = await supabase.from("transactions").update({ item_name: itemName }).in("id", ids);
+  if (error) console.error("bulkUpdateItemName failed:", error.message);
+
+  revalidatePath("/transactions");
+  revalidatePath("/reports");
+}
+
 export async function deleteTransactionRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));

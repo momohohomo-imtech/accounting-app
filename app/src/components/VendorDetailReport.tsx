@@ -97,7 +97,7 @@ export function VendorDetailReport({
           </label>
           <label className="flex items-center gap-1.5 text-xs text-slate-600">
             <input type="checkbox" checked={showCategory} onChange={(e) => setShowCategory(e.target.checked)} className="h-3.5 w-3.5" />
-            종류구분
+            카테고리
           </label>
           <VendorReportActions vendorName={vendorName} year={year} rows={exportRows} total={total} />
           <Link href={closeHref} className="text-sm text-slate-500 hover:text-slate-800">
@@ -112,7 +112,7 @@ export function VendorDetailReport({
             <tr className="border-b border-slate-200 text-left text-slate-500">
               <th className="pb-2 pr-4">{headerButton("trans_date", "날짜")}</th>
               {showProject && <th className="pb-2 pr-4">{headerButton("project_name", "프로젝트")}</th>}
-              {showCategory && <th className="pb-2 pr-4">종류구분</th>}
+              {showCategory && <th className="pb-2 pr-4">카테고리</th>}
               <th className="pb-2 pr-4">{headerButton("item_name", "품목")}</th>
               <th className="pb-2 text-right">{headerButton("amount", "금액")}</th>
               <th className="pb-2 pl-4 text-right print:hidden">관리</th>

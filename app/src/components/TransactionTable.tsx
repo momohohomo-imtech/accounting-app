@@ -1,7 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { deleteTransactionRecord, bulkUpdateProjectId } from "@/lib/actions/transactions";
+import {
+  deleteTransactionRecord,
+  bulkUpdateProjectId,
+  bulkUpdateCategoryId,
+  bulkUpdatePaymentMethodId,
+  bulkUpdateItemName,
+} from "@/lib/actions/transactions";
 import { formatWon, formatDate } from "@/lib/format";
 import { transactionTotal } from "@/lib/credit";
 import { Badge } from "@/components/ui/Badge";
@@ -47,13 +53,19 @@ function sortValue(t: Transaction, key: SortKey): string | number {
   }
 }
 
+type BulkField = "project" | "category" | "payment_method" | "item_name";
+
 export function TransactionTable({
   transactions,
   projectNodes,
+  categories,
+  paymentMethods,
   listParams,
 }: {
   transactions: Transaction[];
   projectNodes: ProjectTreeNode[];
+  categories: { id: string; name: string }[];
+  paymentMethods: { id: string; name: string }[];
   listParams: { year: number; month: string; type: string; project_id: string };
 }) {
   function editHrefFor(id: string) {
@@ -71,9 +83,32 @@ export function TransactionTable({
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [bulkField, setBulkField] = useState<BulkField>("project");
   const [bulkYear, setBulkYear] = useState("");
   const [bulkSiteId, setBulkSiteId] = useState("");
   const [bulkProjectId, setBulkProjectId] = useState("");
+  const [bulkCategoryId, setBulkCategoryId] = useState("");
+  const [bulkPaymentMethodId, setBulkPaymentMethodId] = useState("");
+  const [bulkItemName, setBulkItemName] = useState("");
+
+  function resetBulkFields() {
+    setBulkField("project");
+    setBulkYear("");
+    setBulkSiteId("");
+    setBulkProjectId("");
+    setBulkCategoryId("");
+    setBulkPaymentMethodId("");
+    setBulkItemName("");
+  }
+
+  const bulkAction =
+    bulkField === "project"
+      ? bulkUpdateProjectId
+      : bulkField === "category"
+        ? bulkUpdateCategoryId
+        : bulkField === "payment_method"
+          ? bulkUpdatePaymentMethodId
+          : bulkUpdateItemName;
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -134,60 +169,124 @@ export function TransactionTable({
       {selected.size > 0 && (
         <Card padding="none" className="flex flex-wrap items-center gap-2 border-slate-300 bg-slate-50 p-3 print:hidden">
           <form
-            action={bulkUpdateProjectId}
+            action={bulkAction}
             onSubmit={() => {
               setSelected(new Set());
-              setBulkYear("");
-              setBulkSiteId("");
-              setBulkProjectId("");
+              resetBulkFields();
             }}
             className="flex flex-wrap items-center gap-2"
           >
             {Array.from(selected).map((id) => (
               <input key={id} type="hidden" name="transaction_ids" value={id} />
             ))}
-            <input type="hidden" name="project_id" value={bulkProjectId} />
-            <span className="text-sm text-slate-600">{selected.size}건 선택됨 · 프로젝트 변경:</span>
+            <span className="text-sm text-slate-600">{selected.size}건 선택됨 · 항목 변경:</span>
             <select
-              value={bulkYear}
+              value={bulkField}
               onChange={(e) => {
-                setBulkYear(e.target.value);
+                setBulkField(e.target.value as BulkField);
+                setBulkYear("");
                 setBulkSiteId("");
                 setBulkProjectId("");
+                setBulkCategoryId("");
+                setBulkPaymentMethodId("");
+                setBulkItemName("");
               }}
               className={fieldClass}
             >
-              <option value="">연도 선택</option>
-              {bulkYears.map((y) => (
-                <option key={y} value={y}>
-                  {y}년
-                </option>
-              ))}
+              <option value="project">프로젝트</option>
+              <option value="category">카테고리</option>
+              <option value="payment_method">결제방식</option>
+              <option value="item_name">품목</option>
             </select>
-            <select
-              value={bulkSiteId}
-              onChange={(e) => {
-                setBulkSiteId(e.target.value);
-                setBulkProjectId("");
-              }}
-              className={fieldClass}
-              disabled={!bulkYear}
-            >
-              <option value="">현장 선택</option>
-              {bulkSites.map(([id, name]) => (
-                <option key={id} value={id}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            <select value={bulkProjectId} onChange={(e) => setBulkProjectId(e.target.value)} className={fieldClass}>
-              <option value="">일반경비</option>
-              {bulkProjects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+
+            {bulkField === "project" && (
+              <>
+                <input type="hidden" name="project_id" value={bulkProjectId} />
+                <select
+                  value={bulkYear}
+                  onChange={(e) => {
+                    setBulkYear(e.target.value);
+                    setBulkSiteId("");
+                    setBulkProjectId("");
+                  }}
+                  className={fieldClass}
+                >
+                  <option value="">연도 선택</option>
+                  {bulkYears.map((y) => (
+                    <option key={y} value={y}>
+                      {y}년
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={bulkSiteId}
+                  onChange={(e) => {
+                    setBulkSiteId(e.target.value);
+                    setBulkProjectId("");
+                  }}
+                  className={fieldClass}
+                  disabled={!bulkYear}
+                >
+                  <option value="">현장 선택</option>
+                  {bulkSites.map(([id, name]) => (
+                    <option key={id} value={id}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                <select value={bulkProjectId} onChange={(e) => setBulkProjectId(e.target.value)} className={fieldClass}>
+                  <option value="">일반경비</option>
+                  {bulkProjects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+
+            {bulkField === "category" && (
+              <select
+                name="category_id"
+                value={bulkCategoryId}
+                onChange={(e) => setBulkCategoryId(e.target.value)}
+                className={fieldClass}
+              >
+                <option value="">선택 안함</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {bulkField === "payment_method" && (
+              <select
+                name="payment_method_id"
+                value={bulkPaymentMethodId}
+                onChange={(e) => setBulkPaymentMethodId(e.target.value)}
+                className={fieldClass}
+              >
+                <option value="">선택 안함</option>
+                {paymentMethods.map((pm) => (
+                  <option key={pm.id} value={pm.id}>
+                    {pm.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {bulkField === "item_name" && (
+              <input
+                name="item_name"
+                value={bulkItemName}
+                onChange={(e) => setBulkItemName(e.target.value)}
+                placeholder="새 품목명 입력"
+                className={fieldClass}
+              />
+            )}
+
             <Button type="submit" size="sm">
               변경
             </Button>
@@ -197,9 +296,7 @@ export function TransactionTable({
               size="sm"
               onClick={() => {
                 setSelected(new Set());
-                setBulkYear("");
-                setBulkSiteId("");
-                setBulkProjectId("");
+                resetBulkFields();
               }}
             >
               선택 해제
