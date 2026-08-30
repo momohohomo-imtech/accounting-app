@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { addAgencyPurchase, updateAgencyPurchase, deleteAgencyPurchase } from "@/lib/actions/projectAgencyPurchases";
 import { formatWon } from "@/lib/format";
@@ -19,6 +19,21 @@ type AgencyPurchase = {
   memo: string | null;
   client_name: string | null;
 };
+
+type SortKey = "client" | "item" | "category" | "amount";
+
+function sortValue(r: AgencyPurchase, key: SortKey): string | number {
+  switch (key) {
+    case "client":
+      return r.client_name ?? "";
+    case "item":
+      return r.item_name ?? "";
+    case "category":
+      return r.category_name ?? "";
+    case "amount":
+      return r.amount;
+  }
+}
 
 function CategorySelect({
   value,
@@ -100,79 +115,95 @@ function AgencyRow({
 
   if (editing) {
     return (
-      <li className="flex flex-wrap items-center gap-2 py-1.5 text-sm">
-        <input value={itemName} onChange={(e) => setItemName(e.target.value)} placeholder="품목명" className={`${fieldClass} w-40`} />
-        <input
-          list={`agency-client-names-${item.id}`}
-          value={clientName}
-          onChange={(e) => setClientName(e.target.value)}
-          placeholder="매입처 (자유 입력)"
-          className={`${fieldClass} w-32`}
-        />
-        <datalist id={`agency-client-names-${item.id}`}>
-          {clientNames.map((name) => (
-            <option key={name} value={name} />
-          ))}
-        </datalist>
-        <CategorySelect value={categoryId} onChange={setCategoryId} categories={categories} />
-        <input
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          type="number"
-          step="1"
-          placeholder="금액"
-          className={`${fieldClass} w-32`}
-        />
-        <input
-          value={memo}
-          onChange={(e) => setMemo(e.target.value)}
-          placeholder="메모 (무슨 물품/사항인지)"
-          className={`${fieldClass} w-full min-w-[12rem] flex-1`}
-        />
-        <Button size="xs" type="button" disabled={pending} onClick={save}>
-          저장
-        </Button>
-        <Button variant="secondary" size="xs" type="button" disabled={pending} onClick={() => setEditing(false)}>
-          취소
-        </Button>
-        {error && <span className="w-full text-xs text-red-600">{error}</span>}
-      </li>
+      <tr className="border-b border-slate-100 last:border-0 align-top">
+        <td className="py-2 pr-4">
+          <input
+            list={`agency-client-names-${item.id}`}
+            value={clientName}
+            onChange={(e) => setClientName(e.target.value)}
+            placeholder="매입처"
+            className={`${fieldClass} w-full`}
+          />
+          <datalist id={`agency-client-names-${item.id}`}>
+            {clientNames.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+        </td>
+        <td className="py-2 pr-4">
+          <input value={itemName} onChange={(e) => setItemName(e.target.value)} placeholder="품목명" className={`${fieldClass} w-full`} />
+          <input
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+            placeholder="메모 (무슨 물품/사항인지)"
+            className={`${fieldClass} mt-1 w-full text-xs`}
+          />
+        </td>
+        <td className="py-2 pr-4">
+          <CategorySelect value={categoryId} onChange={setCategoryId} categories={categories} />
+        </td>
+        <td className="py-2 pr-4 text-right">
+          <input
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            type="number"
+            step="1"
+            placeholder="금액"
+            className={`${fieldClass} w-full text-right`}
+          />
+        </td>
+        <td className="py-2 pl-2 text-right print:hidden">
+          <div className="flex justify-end gap-1">
+            <Button size="xs" type="button" disabled={pending} onClick={save}>
+              저장
+            </Button>
+            <Button variant="secondary" size="xs" type="button" disabled={pending} onClick={() => setEditing(false)}>
+              취소
+            </Button>
+          </div>
+          {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+        </td>
+      </tr>
     );
   }
 
   return (
-    <li className="flex flex-wrap items-center gap-2 py-1.5 text-sm">
-      <span className="flex-1 truncate text-slate-700">{item.item_name ?? "-"}</span>
-      {item.client_name && <span className="text-slate-500">{item.client_name}</span>}
-      <span
-        className={item.category_name ? undefined : "text-red-600"}
-        style={{ color: item.category_name ? item.category_color : undefined }}
+    <tr className="border-b border-slate-100 last:border-0 text-sm">
+      <td className="py-2 pr-4 text-slate-700">{item.client_name ?? "-"}</td>
+      <td className="py-2 pr-4 text-slate-700">
+        <div>{item.item_name ?? "-"}</div>
+        {item.memo && <div className="text-xs text-slate-500">{item.memo}</div>}
+      </td>
+      <td
+        className={`py-2 pr-4 ${item.category_name ? "" : "text-red-600"}`}
+        style={item.category_name ? { color: item.category_color } : undefined}
       >
         {item.category_name ?? "미분류"}
-      </span>
-      <span className="font-mono text-slate-900">{formatWon(item.amount)}</span>
-      {confirmDelete ? (
-        <span className="flex items-center gap-1 print:hidden">
-          <Button variant="danger" size="xs" type="button" disabled={pending} onClick={remove}>
-            확인
-          </Button>
-          <Button variant="secondary" size="xs" type="button" onClick={() => setConfirmDelete(false)}>
-            취소
-          </Button>
-        </span>
-      ) : (
-        <span className="flex items-center gap-1 print:hidden">
-          <Button variant="secondary" size="xs" type="button" onClick={() => setEditing(true)}>
-            수정
-          </Button>
-          <Button variant="danger" size="xs" type="button" onClick={() => setConfirmDelete(true)}>
-            삭제
-          </Button>
-        </span>
-      )}
-      {item.memo && <span className="w-full text-xs text-slate-500">{item.memo}</span>}
-      {error && <span className="w-full text-xs text-red-600 print:hidden">{error}</span>}
-    </li>
+      </td>
+      <td className="py-2 pr-4 text-right font-mono text-slate-900">{formatWon(item.amount)}</td>
+      <td className="py-2 pl-2 text-right print:hidden">
+        {confirmDelete ? (
+          <div className="flex justify-end gap-1">
+            <Button variant="danger" size="xs" type="button" disabled={pending} onClick={remove}>
+              확인
+            </Button>
+            <Button variant="secondary" size="xs" type="button" onClick={() => setConfirmDelete(false)}>
+              취소
+            </Button>
+          </div>
+        ) : (
+          <div className="flex justify-end gap-1">
+            <Button variant="secondary" size="xs" type="button" onClick={() => setEditing(true)}>
+              수정
+            </Button>
+            <Button variant="danger" size="xs" type="button" onClick={() => setConfirmDelete(true)}>
+              삭제
+            </Button>
+          </div>
+        )}
+        {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      </td>
+    </tr>
   );
 }
 
@@ -188,11 +219,43 @@ export function ProjectAgencyPurchaseList({
   clientNames: string[];
 }) {
   const router = useRouter();
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [pending, setPending] = useState(false);
   const [newCategoryId, setNewCategoryId] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const total = items.reduce((s, i) => s + i.amount, 0);
+
+  const sorted = useMemo(() => {
+    if (!sortKey) return items;
+    const copy = [...items];
+    copy.sort((a, b) => {
+      const va = sortValue(a, sortKey);
+      const vb = sortValue(b, sortKey);
+      const cmp = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb));
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return copy;
+  }, [items, sortKey, sortDir]);
+
+  function handleSort(key: SortKey) {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  function headerButton(key: SortKey, label: string) {
+    return (
+      <button type="button" onClick={() => handleSort(key)} className="inline-flex items-center gap-1 hover:text-slate-800">
+        {label}
+        {sortKey === key && <span className="text-[10px]">{sortDir === "asc" ? "▲" : "▼"}</span>}
+      </button>
+    );
+  }
 
   async function handleAdd(formData: FormData) {
     setPending(true);
@@ -215,24 +278,37 @@ export function ProjectAgencyPurchaseList({
       </div>
 
       {items.length > 0 ? (
-        <ul className="mb-2 divide-y divide-slate-100">
-          {items.map((it) => (
-            <AgencyRow key={it.id} item={it} categories={categories} clientNames={clientNames} onChanged={() => router.refresh()} />
-          ))}
-        </ul>
+        <div className="mb-2 overflow-x-auto">
+          <table className="w-full min-w-[500px] text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-slate-500">
+                <th className="pb-2 pr-4">{headerButton("client", "거래처")}</th>
+                <th className="pb-2 pr-4">{headerButton("item", "품목")}</th>
+                <th className="pb-2 pr-4">{headerButton("category", "카테고리")}</th>
+                <th className="pb-2 pr-4 text-right">{headerButton("amount", "금액")}</th>
+                <th className="pb-2 text-right print:hidden">관리</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((it) => (
+                <AgencyRow key={it.id} item={it} categories={categories} clientNames={clientNames} onChanged={() => router.refresh()} />
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <p className="mb-2 hidden text-sm text-slate-400 print:block">대행구매 내역이 없습니다.</p>
       )}
 
       <form action={handleAdd} className="flex flex-wrap items-end gap-2 print:hidden">
         <input type="hidden" name="project_id" value={projectId} />
-        <input name="item_name" placeholder="품목명" className={`${fieldClass} w-40`} />
         <input list="agency-client-names-new" name="client_name" placeholder="매입처 (자유 입력)" className={`${fieldClass} w-32`} />
         <datalist id="agency-client-names-new">
           {clientNames.map((name) => (
             <option key={name} value={name} />
           ))}
         </datalist>
+        <input name="item_name" placeholder="품목명" className={`${fieldClass} w-40`} />
         <CategorySelect name="category_id" value={newCategoryId} onChange={setNewCategoryId} categories={categories} />
         <input name="amount" type="number" step="1" placeholder="금액" required className={`${fieldClass} w-32`} />
         <input name="memo" placeholder="메모 (무슨 물품/사항인지)" className={`${fieldClass} w-full min-w-[12rem] flex-1`} />
