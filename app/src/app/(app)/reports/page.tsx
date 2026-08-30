@@ -69,8 +69,14 @@ export default async function ReportsPage({
   const selectedYear = year ? Number(year) : currentYear;
 
   const supabase = await createClient();
-  const [{ data: rawTx }, { data: projects }, { data: firstTx }, { data: savedInsights }, { data: creditPayments }] =
-    await Promise.all([
+  const [
+    { data: rawTx },
+    { data: projects },
+    { data: firstTx },
+    { data: savedInsights },
+    { data: creditPayments },
+    { data: agencyPurchases },
+  ] = await Promise.all([
       supabase
         .from("transactions")
         .select("*, clients(name), projects(name, sites(name)), expense_categories(name, project_only, color)")
@@ -87,6 +93,10 @@ export default async function ReportsPage({
         .eq("year", selectedYear)
         .order("created_at", { ascending: false }),
       supabase.from("credit_payments").select("*"),
+      supabase
+        .from("project_agency_purchases")
+        .select("amount, expense_categories(name, project_only, color), projects!inner(year)")
+        .eq("projects.year", selectedYear),
     ]);
 
   const transactions = ((rawTx ?? []) as unknown as Row[]).filter((t) =>
@@ -196,6 +206,20 @@ export default async function ReportsPage({
       const entry = map.get(name) ?? { name, count: 0, amount: 0, color: category ? resolveCategoryColor(category) : undefined };
       entry.count += 1;
       entry.amount += t.purchase_amount + t.purchase_vat;
+      map.set(name, entry);
+    }
+    return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
+  })();
+
+  // 카테고리별 대행구매 집계 (매입장과 별개 — 절대 합산하지 않고 별도 컬럼으로만 표시)
+  const agencyByCategory = (() => {
+    const map = new Map<string, { name: string; count: number; amount: number; color?: string }>();
+    for (const a of agencyPurchases ?? []) {
+      const category = one(a.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
+      const name = category?.name ?? "미분류";
+      const entry = map.get(name) ?? { name, count: 0, amount: 0, color: category ? resolveCategoryColor(category) : undefined };
+      entry.count += 1;
+      entry.amount += a.amount;
       map.set(name, entry);
     }
     return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
@@ -343,7 +367,7 @@ export default async function ReportsPage({
         </CollapsibleSection>
 
         <CollapsibleSection title="카테고리별 집계 — 어느 카테고리에 얼마를 매입했는지">
-          <CategoryAggregateTable rows={byCategory} />
+          <CategoryAggregateTable rows={byCategory} agencyRows={agencyByCategory} />
         </CollapsibleSection>
 
         <CollapsibleSection title="매출처별 집계">
