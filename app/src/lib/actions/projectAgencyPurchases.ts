@@ -25,6 +25,19 @@ export async function addAgencyPurchase(formData: FormData) {
   revalidatePath("/reports");
 }
 
+export async function updateAgencyPurchase(formData: FormData) {
+  const supabase = await createClient();
+  const id = String(formData.get("id") ?? "");
+  const itemName = String(formData.get("item_name") ?? "") || null;
+  const amount = Number(formData.get("amount") ?? 0);
+  if (!id || !amount) return;
+
+  await supabase.from("project_agency_purchases").update({ item_name: itemName, amount }).eq("id", id);
+
+  revalidatePath("/projects");
+  revalidatePath("/reports");
+}
+
 export async function deleteAgencyPurchase(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id") ?? "");
