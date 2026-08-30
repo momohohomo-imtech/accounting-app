@@ -2,7 +2,7 @@
 -- 품목별 라인이 필요해서 quote_items를 별도 테이블로 둠(계산서/거래 등록 폼의
 -- 여러 줄 패턴과 동일). 기존 프로젝트의 매입 내역을 그대로 불러와 견적 초안으로
 -- 쓸 수 있게 할 예정이라 quote_items 컬럼 구성을 transactions 품목 입력과 맞춤.
-create table public.quotes (
+create table if not exists public.quotes (
     id                uuid primary key default gen_random_uuid(),
     quote_number      text,
     project_id        uuid references public.projects(id) on delete set null,
@@ -16,7 +16,7 @@ create table public.quotes (
     created_at        timestamptz not null default now(),
     updated_at        timestamptz not null default now()
 );
-create unique index idx_quotes_quote_number on public.quotes(quote_number);
+create unique index if not exists idx_quotes_quote_number on public.quotes(quote_number);
 
 -- projects.project_code와 동일한 "연도-순번" 자동 채번 (Q 접두어만 다름).
 create or replace function public.set_quote_number()
@@ -43,7 +43,7 @@ create trigger trg_set_quote_number
   before insert on public.quotes
   for each row execute procedure public.set_quote_number();
 
-create table public.quote_items (
+create table if not exists public.quote_items (
     id          uuid primary key default gen_random_uuid(),
     quote_id    uuid not null references public.quotes(id) on delete cascade,
     item_name   text,
@@ -53,16 +53,18 @@ create table public.quote_items (
     amount      numeric not null default 0,
     sort_order  int not null default 0
 );
-create index idx_quote_items_quote on public.quote_items(quote_id);
+create index if not exists idx_quote_items_quote on public.quote_items(quote_id);
 
 alter table public.quotes enable row level security;
 alter table public.quote_items enable row level security;
 
 -- 019_role_based_access.sql과 동일한 admin_staff 전체 권한 패턴 (세무사 계정은 접근 불가).
+drop policy if exists "admin_staff all quotes" on public.quotes;
 create policy "admin_staff all quotes" on public.quotes
   for all using (public.current_user_role() in ('admin', 'staff'))
   with check (public.current_user_role() in ('admin', 'staff'));
 
+drop policy if exists "admin_staff all quote_items" on public.quote_items;
 create policy "admin_staff all quote_items" on public.quote_items
   for all using (public.current_user_role() in ('admin', 'staff'))
   with check (public.current_user_role() in ('admin', 'staff'));
