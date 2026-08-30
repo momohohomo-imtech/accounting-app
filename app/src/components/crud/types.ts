@@ -25,6 +25,8 @@ export type FieldConfig = {
   colorField?: string;
   /** When the row's value at this field name is truthy, render this cell's text in green (table view only). Checked after colorField. */
   secondaryColorField?: string;
+  /** When the row's value at this field name is truthy, render this cell's text in amber (table view only). Checked after secondaryColorField. */
+  tertiaryColorField?: string;
   /** When this field's own raw value equals this string, render its cell's text in red (table view only). */
   redValue?: string;
   /** For type "checkbox": checking this field unchecks the named sibling checkbox field in the form (mutual exclusivity). */

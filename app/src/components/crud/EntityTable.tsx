@@ -25,6 +25,7 @@ function displayValue(row: Row, f: FieldConfig) {
 function cellColorClass(row: Row, f: FieldConfig): string | undefined {
   if (f.colorField && row[f.colorField]) return "text-red-600";
   if (f.secondaryColorField && row[f.secondaryColorField]) return "text-green-600";
+  if (f.tertiaryColorField && row[f.tertiaryColorField]) return "text-amber-600";
   if (f.redValue !== undefined) return row[f.name] === f.redValue ? "text-red-600" : undefined;
   if (f.type === "select") {
     const color = f.options?.find((o) => o.value === row[f.name])?.color;

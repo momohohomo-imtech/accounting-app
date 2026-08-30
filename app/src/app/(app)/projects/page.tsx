@@ -117,7 +117,13 @@ async function ProjectListSection({
       options: siteOptions,
       width: "10%",
     },
-    { name: "name", label: "프로젝트명", required: true, width: "13%" },
+    {
+      name: "name",
+      label: "프로젝트명",
+      required: true,
+      width: "13%",
+      tertiaryColorField: "contractMismatch",
+    },
     {
       name: "parent_project_id",
       label: "귀속 프로젝트 (비용 합산 대상)",
@@ -171,13 +177,18 @@ async function ProjectListSection({
     new Set([...(allYears ?? []).map((p) => p.year), currentYear, selectedYear])
   ).sort((a, b) => b - a);
 
-  const tableRows = (projects ?? []).map((p) => ({
-    ...p,
-    site_name: (one(p.sites) as { name: string } | undefined)?.name,
-    profit: p.quote_amount
-      ? p.quote_amount - (purchaseByProject.get(p.id) ?? 0) - (agencyByProject.get(p.id) ?? 0)
-      : null,
-  }));
+  const tableRows = (projects ?? []).map((p) => {
+    const agencyAmount = agencyByProject.get(p.id) ?? 0;
+    // 수주액이 발주액-대행구매액과 다르면(입력 실수 가능성) 프로젝트명을 노란색으로 표시.
+    const contractMismatch =
+      (p.contract_amount ?? 0) > 0 && (p.quote_amount ?? 0) - (p.contract_amount ?? 0) - agencyAmount !== 0;
+    return {
+      ...p,
+      site_name: (one(p.sites) as { name: string } | undefined)?.name,
+      profit: p.quote_amount ? p.quote_amount - (purchaseByProject.get(p.id) ?? 0) - agencyAmount : null,
+      contractMismatch,
+    };
+  });
 
   const estimatedProjects = tableRows.filter((p) => p.contract_amount_estimated);
   const estimatedProfitSum = estimatedProjects.reduce((sum, p) => sum + (p.profit ?? 0), 0);

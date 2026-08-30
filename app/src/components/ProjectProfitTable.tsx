@@ -12,6 +12,7 @@ type ProjectRow = {
   sales: number;
   purchase: number;
   profit: number;
+  contractMismatch?: boolean;
 };
 
 type SortKey = "name" | "progress_pct" | "quoteAmount" | "profitRate" | "sales" | "purchase" | "profit";
@@ -102,7 +103,9 @@ export function ProjectProfitTable({
               <td className="py-2 pr-4">
                 <Link
                   href={`/reports?year=${year}${site ? `&site=${site}` : ""}&project=${p.id}`}
-                  className="text-slate-700 underline decoration-slate-300 underline-offset-2 hover:text-slate-900 print:no-underline"
+                  className={`underline decoration-slate-300 underline-offset-2 hover:text-slate-900 print:no-underline ${
+                    p.contractMismatch ? "text-amber-600" : "text-slate-700"
+                  }`}
                 >
                   {p.name}
                 </Link>
