@@ -34,9 +34,11 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
 
   const { data: agencyRows } = await supabase
     .from("project_agency_purchases")
-    .select("*")
+    .select("*, expense_categories(name, project_only, color)")
     .in("project_id", groupIds)
     .order("created_at", { ascending: true });
+
+  const { data: expenseCategories } = await supabase.from("expense_categories").select("id, name, project_only, color").order("sort_order");
 
   const rows = purchaseRows ?? [];
   const purchaseTotal = rows.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
@@ -47,6 +49,10 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
     for (const t of rows) {
       const name = (one(t.expense_categories) as { name: string } | null)?.name ?? "미분류";
       map.set(name, (map.get(name) ?? 0) + t.purchase_amount + t.purchase_vat);
+    }
+    for (const a of agencyRows ?? []) {
+      const name = (one(a.expense_categories) as { name: string } | null)?.name ?? "미분류";
+      map.set(name, (map.get(name) ?? 0) + a.amount);
     }
     return Array.from(map.entries())
       .map(([name, amount]) => ({ name, amount }))
@@ -150,7 +156,18 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
 
       <ProjectAgencyPurchaseList
         projectId={project.id}
-        items={(agencyRows ?? []).map((a) => ({ id: a.id, item_name: a.item_name, amount: a.amount }))}
+        categories={expenseCategories ?? []}
+        items={(agencyRows ?? []).map((a) => {
+          const category = one(a.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
+          return {
+            id: a.id,
+            item_name: a.item_name,
+            amount: a.amount,
+            category_id: a.category_id,
+            category_name: category?.name ?? null,
+            category_color: category ? resolveCategoryColor(category) : undefined,
+          };
+        })}
       />
 
       <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3 lg:grid-cols-7">
