@@ -83,7 +83,17 @@ function AttachmentRow({ item, onChanged }: { item: AttachmentItem; onChanged: (
   );
 }
 
-export function ProjectAttachments({ projectId, items }: { projectId: string; items: AttachmentItem[] }) {
+export function AttachmentList({
+  projectId,
+  workDate,
+  items,
+  title = "첨부파일 (사양서·도면·사진 등)",
+}: {
+  projectId?: string;
+  workDate?: string;
+  items: AttachmentItem[];
+  title?: string;
+}) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,7 +112,7 @@ export function ProjectAttachments({ projectId, items }: { projectId: string; it
 
   return (
     <div className="rounded-xl border border-slate-200 p-3">
-      <p className="mb-2 text-sm font-semibold text-slate-900">첨부파일 (사양서·도면·사진 등)</p>
+      <p className="mb-2 text-sm font-semibold text-slate-900">{title}</p>
 
       {items.length > 0 ? (
         <ul className="mb-2 divide-y divide-slate-100">
@@ -115,7 +125,8 @@ export function ProjectAttachments({ projectId, items }: { projectId: string; it
       )}
 
       <form action={handleUpload} className="flex flex-wrap items-end gap-2 print:hidden">
-        <input type="hidden" name="project_id" value={projectId} />
+        {projectId && <input type="hidden" name="project_id" value={projectId} />}
+        {workDate && <input type="hidden" name="work_date" value={workDate} />}
         <input name="file" type="file" required className="text-xs" />
         <input name="memo" placeholder="메모 (선택)" className={`${fieldClass} w-40`} />
         <Button type="submit" size="xs" disabled={pending}>

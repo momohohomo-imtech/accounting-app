@@ -10,7 +10,7 @@ import { ProjectPurchaseChartButton } from "@/components/ProjectPurchaseChartBut
 import { ProjectPurchaseTable } from "@/components/ProjectPurchaseTable";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import { ProjectAgencyPurchaseList } from "@/components/ProjectAgencyPurchaseList";
-import { ProjectAttachments } from "@/components/ProjectAttachments";
+import { AttachmentList } from "@/components/AttachmentList";
 
 export async function ProjectProfitReport({ projectId, closeHref }: { projectId: string; closeHref: string }) {
   const supabase = await createClient();
@@ -194,7 +194,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
         })}
       />
 
-      <ProjectAttachments projectId={project.id} items={attachments} />
+      <AttachmentList projectId={project.id} items={attachments} />
 
       <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
         <div>

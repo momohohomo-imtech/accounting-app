@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { WorkLogForm } from "@/components/WorkLogForm";
 import { WorkLogDayTripLinks } from "@/components/WorkLogDayTripLinks";
+import { AttachmentList } from "@/components/AttachmentList";
 import type { BusinessTripLog } from "@/lib/types";
 
 export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string; closeHref: string }) {
@@ -12,12 +13,32 @@ export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string
   const lastDay = new Date(year, month, 0).getDate();
   const monthEnd = `${year}-${pad(month)}-${pad(lastDay)}`;
 
-  const [{ data: logs }, { data: sites }, { data: monthLogs }, { data: tripLogs }] = await Promise.all([
-    supabase.from("work_logs").select("*").eq("log_date", dateKey).order("sort_order", { ascending: true }),
-    supabase.from("sites").select("id, name, color").order("name"),
-    supabase.from("work_logs").select("title").gte("log_date", monthStart).lte("log_date", monthEnd),
-    supabase.from("business_trip_logs").select("*"),
-  ]);
+  const [{ data: logs }, { data: sites }, { data: monthLogs }, { data: tripLogs }, { data: attachmentRows }] =
+    await Promise.all([
+      supabase.from("work_logs").select("*").eq("log_date", dateKey).order("sort_order", { ascending: true }),
+      supabase.from("sites").select("id, name, color").order("name"),
+      supabase.from("work_logs").select("title").gte("log_date", monthStart).lte("log_date", monthEnd),
+      supabase.from("business_trip_logs").select("*"),
+      supabase
+        .from("attachments")
+        .select("id, file_name, mime_type, file_size, memo, storage_path")
+        .eq("work_date", dateKey)
+        .order("created_at", { ascending: false }),
+    ]);
+
+  const attachments = await Promise.all(
+    (attachmentRows ?? []).map(async (a) => {
+      const { data: signed } = await supabase.storage.from("project-files").createSignedUrl(a.storage_path, 3600);
+      return {
+        id: a.id,
+        file_name: a.file_name,
+        mime_type: a.mime_type,
+        file_size: a.file_size,
+        memo: a.memo,
+        url: signed?.signedUrl ?? null,
+      };
+    })
+  );
 
   const dayTripLogs = ((tripLogs ?? []) as BusinessTripLog[]).filter((t) =>
     t.projects.some((p) => p.work_date === dateKey)
@@ -40,6 +61,8 @@ export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string
       <WorkLogDayTripLinks logs={dayTripLogs} />
 
       <WorkLogForm dateKey={dateKey} rows={rows} sites={sites ?? []} contentSuggestions={contentSuggestions} />
+
+      <AttachmentList workDate={dateKey} items={attachments} title="현장사진·메모 첨부" />
     </div>
   );
 }
