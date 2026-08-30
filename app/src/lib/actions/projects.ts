@@ -47,6 +47,15 @@ export async function updateProjectMemo(formData: FormData) {
   revalidatePath("/reports");
 }
 
+export async function updateProjectSettlementFinalized(formData: FormData) {
+  const supabase = await createClient();
+  const id = String(formData.get("id"));
+  const settlementFinalized = formData.get("settlement_finalized") === "on";
+  await supabase.from("projects").update({ settlement_finalized: settlementFinalized }).eq("id", id);
+  revalidatePath("/projects");
+  revalidatePath("/reports");
+}
+
 export async function deleteProjectRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));

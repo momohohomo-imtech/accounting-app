@@ -173,12 +173,6 @@ async function ProjectListSection({
     },
     { name: "progress_pct", label: "진행률(%)", type: "number", display: "progress", width: "8%" },
     { name: "year", label: "연도", type: "number", required: true, hideInTable: true },
-    {
-      name: "settlement_finalized",
-      label: "프로젝트 결산 정리완료",
-      type: "checkbox",
-      hideInTable: true,
-    },
     { name: "memo", label: "메모", type: "textarea", width: "15%" },
   ];
 

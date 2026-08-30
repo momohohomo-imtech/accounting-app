@@ -11,6 +11,7 @@ import { ProjectPurchaseTable } from "@/components/ProjectPurchaseTable";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import { ProjectAgencyPurchaseList } from "@/components/ProjectAgencyPurchaseList";
 import { AttachmentList } from "@/components/AttachmentList";
+import { SettlementFinalizedCheckbox } from "@/components/SettlementFinalizedCheckbox";
 
 export async function ProjectProfitReport({ projectId, closeHref }: { projectId: string; closeHref: string }) {
   const supabase = await createClient();
@@ -261,7 +262,8 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
         </div>
       </div>
 
-      <div className="border-t border-slate-100 pt-4">
+      <div className="border-t border-slate-100 pt-4 space-y-3">
+        <SettlementFinalizedCheckbox projectId={project.id} initialChecked={Boolean(project.settlement_finalized)} />
         <ReportMemoField />
       </div>
     </div>
