@@ -170,18 +170,18 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
         })}
       />
 
-      <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3 lg:grid-cols-7">
+      <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
         <div>
           <p className="text-xs text-slate-500">발주액 (원청 발주금액)</p>
-          <p className="font-mono text-lg font-bold text-slate-900">{formatWon(quoteTotal)}</p>
+          <p className="font-mono text-base font-bold whitespace-nowrap text-slate-900">{formatWon(quoteTotal)}</p>
         </div>
         <div>
           <p className="text-xs text-slate-500">대행구매액</p>
-          <p className="font-mono text-lg font-bold text-slate-500">-{formatWon(agencyTotal)}</p>
+          <p className="font-mono text-base font-bold whitespace-nowrap text-slate-500">-{formatWon(agencyTotal)}</p>
         </div>
         <div>
           <p className="text-xs text-slate-500">기타 공제 (수수료 등)</p>
-          <p className="font-mono text-lg font-bold text-slate-500">-{formatWon(otherDeduction)}</p>
+          <p className="font-mono text-base font-bold whitespace-nowrap text-slate-500">-{formatWon(otherDeduction)}</p>
         </div>
         <div>
           <p className="text-xs text-slate-500">
@@ -190,7 +190,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
             {project.contract_amount_minimum && <span className="ml-1 text-green-600">최소</span>}
           </p>
           <p
-            className={`font-mono text-lg font-bold ${
+            className={`font-mono text-base font-bold whitespace-nowrap ${
               project.contract_amount_estimated
                 ? "text-red-600"
                 : project.contract_amount_minimum
@@ -208,17 +208,17 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
         </div>
         <div>
           <p className="text-xs text-slate-500">매입 합계</p>
-          <p className="font-mono text-lg font-bold text-slate-500">-{formatWon(purchaseTotal)}</p>
+          <p className="font-mono text-base font-bold whitespace-nowrap text-slate-500">-{formatWon(purchaseTotal)}</p>
         </div>
         <div>
           <p className="text-xs text-slate-500">이익금</p>
-          <p className={`font-mono text-lg font-bold ${profit === null ? "text-slate-400" : profit >= 0 ? "text-slate-900" : "text-red-600"}`}>
+          <p className={`font-mono text-base font-bold whitespace-nowrap ${profit === null ? "text-slate-400" : profit >= 0 ? "text-slate-900" : "text-red-600"}`}>
             {profit === null ? "발주액 미입력" : formatWon(profit)}
           </p>
         </div>
         <div>
           <p className="text-xs text-slate-500">이익율</p>
-          <p className={`font-mono text-lg font-bold ${margin === null ? "text-slate-400" : margin >= 0 ? "text-slate-900" : "text-red-600"}`}>
+          <p className={`font-mono text-base font-bold whitespace-nowrap ${margin === null ? "text-slate-400" : margin >= 0 ? "text-slate-900" : "text-red-600"}`}>
             {margin === null ? "-" : `${margin.toFixed(2)}%`}
           </p>
         </div>
