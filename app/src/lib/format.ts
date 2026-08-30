@@ -13,6 +13,13 @@ export function formatDate(date: string | null | undefined) {
   return date.slice(0, 10);
 }
 
+export function formatFileSize(bytes: number | null | undefined) {
+  if (!bytes) return "-";
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+}
+
 /** Sorts by employee_no ascending (numeric-aware); entries without a numeric employee_no go last. */
 export function sortByEmployeeNo<T extends { employee_no: string | null }>(items: T[]): T[] {
   return [...items].sort((a, b) => {

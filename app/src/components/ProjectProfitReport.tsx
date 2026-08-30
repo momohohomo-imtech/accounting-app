@@ -10,6 +10,7 @@ import { ProjectPurchaseChartButton } from "@/components/ProjectPurchaseChartBut
 import { ProjectPurchaseTable } from "@/components/ProjectPurchaseTable";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import { ProjectAgencyPurchaseList } from "@/components/ProjectAgencyPurchaseList";
+import { ProjectAttachments } from "@/components/ProjectAttachments";
 
 export async function ProjectProfitReport({ projectId, closeHref }: { projectId: string; closeHref: string }) {
   const supabase = await createClient();
@@ -39,6 +40,26 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
     .order("created_at", { ascending: true });
 
   const { data: expenseCategories } = await supabase.from("expense_categories").select("id, name, project_only, color").order("sort_order");
+
+  const { data: attachmentRows } = await supabase
+    .from("attachments")
+    .select("id, file_name, mime_type, file_size, memo, storage_path")
+    .in("project_id", groupIds)
+    .order("created_at", { ascending: false });
+
+  const attachments = await Promise.all(
+    (attachmentRows ?? []).map(async (a) => {
+      const { data: signed } = await supabase.storage.from("project-files").createSignedUrl(a.storage_path, 3600);
+      return {
+        id: a.id,
+        file_name: a.file_name,
+        mime_type: a.mime_type,
+        file_size: a.file_size,
+        memo: a.memo,
+        url: signed?.signedUrl ?? null,
+      };
+    })
+  );
 
   const rows = purchaseRows ?? [];
   const purchaseTotal = rows.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
@@ -172,6 +193,8 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
           };
         })}
       />
+
+      <ProjectAttachments projectId={project.id} items={attachments} />
 
       <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
         <div>

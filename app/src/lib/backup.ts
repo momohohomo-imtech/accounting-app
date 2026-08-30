@@ -21,6 +21,8 @@ const TABLES = [
   "business_trip_logs",
   "report_ai_insights",
   "project_agency_purchases",
+  // 파일 자체(storage 버킷 내용)는 백업 안 됨 — 이 목록은 메타데이터(파일명/경로)만 담음.
+  "attachments",
 ];
 
 export async function runBackup(supabase: SupabaseClient, backupType: "manual" | "auto") {

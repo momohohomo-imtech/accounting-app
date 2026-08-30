@@ -15,6 +15,7 @@ const DELETE_ORDER = [
   "transactions",
   "work_logs",
   "project_agency_purchases",
+  "attachments",
   "projects",
   "bank_accounts",
   "employees",
