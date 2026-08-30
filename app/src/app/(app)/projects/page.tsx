@@ -173,6 +173,12 @@ async function ProjectListSection({
     },
     { name: "progress_pct", label: "진행률(%)", type: "number", display: "progress", width: "8%" },
     { name: "year", label: "연도", type: "number", required: true, hideInTable: true },
+    {
+      name: "settlement_finalized",
+      label: "프로젝트 결산 정리완료",
+      type: "checkbox",
+      hideInTable: true,
+    },
     { name: "memo", label: "메모", type: "textarea", width: "15%" },
   ];
 
@@ -183,7 +189,9 @@ async function ProjectListSection({
   const tableRows = (projects ?? []).map((p) => {
     const agencyAmount = agencyByProject.get(p.id) ?? 0;
     // 수주액이 발주액-대행구매액과 다르면(입력 실수 가능성) 프로젝트명을 노란색으로 표시.
+    // 단, 결산 정리가 끝난 프로젝트는 목록에서 일반 검정으로 되돌림(보고서 팝업 안 경고는 별개, 항상 유지).
     const contractMismatch =
+      !p.settlement_finalized &&
       (p.contract_amount ?? 0) > 0 && (p.quote_amount ?? 0) - (p.contract_amount ?? 0) - agencyAmount !== 0;
     return {
       ...p,

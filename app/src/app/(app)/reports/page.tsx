@@ -84,7 +84,7 @@ export default async function ReportsPage({
         .lte("trans_date", `${selectedYear}-12-31`),
       supabase
         .from("projects")
-        .select("id, name, status, progress_pct, site_id, quote_amount, contract_amount, sites(name)")
+        .select("id, name, status, progress_pct, site_id, quote_amount, contract_amount, settlement_finalized, sites(name)")
         .eq("year", selectedYear),
       supabase.from("transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
       supabase
@@ -150,7 +150,9 @@ export default async function ReportsPage({
     // 프로젝트 손익보고서 팝업과 동일한 방식(발주액-매입-대행구매액)으로 통일.
     const profit = quoteAmount - purchase - agencyAmount;
     // 수주액이 발주액-대행구매액과 다르면(입력 실수 가능성) 프로젝트명을 노란색으로 표시.
-    const contractMismatch = (p.contract_amount ?? 0) > 0 && quoteAmount - (p.contract_amount ?? 0) - agencyAmount !== 0;
+    // 단, 결산 정리가 끝난 프로젝트는 목록에서 일반 검정으로 되돌림(보고서 팝업 안 경고는 별개, 항상 유지).
+    const contractMismatch =
+      !p.settlement_finalized && (p.contract_amount ?? 0) > 0 && quoteAmount - (p.contract_amount ?? 0) - agencyAmount !== 0;
     return { ...p, quoteAmount, sales, purchase, profit, contractMismatch };
   });
 
