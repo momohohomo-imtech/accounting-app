@@ -41,6 +41,9 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
 
   const { data: expenseCategories } = await supabase.from("expense_categories").select("id, name, project_only, color").order("sort_order");
 
+  const { data: clientRows } = await supabase.from("clients").select("name").order("name");
+  const clientNames = (clientRows ?? []).map((c) => c.name);
+
   const { data: attachmentRows } = await supabase
     .from("attachments")
     .select("id, file_name, mime_type, file_size, memo, storage_path")
@@ -97,10 +100,12 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
     t.purchase_amount + t.purchase_vat,
   ]);
 
-  const agencyExportRows: [string, number][] = (agencyRows ?? []).map((a) => [
-    a.item_name && a.memo ? `${a.item_name} (${a.memo})` : (a.item_name ?? "-"),
-    a.amount,
-  ]);
+  const agencyExportRows: [string, number][] = (agencyRows ?? []).map((a) => {
+    let label = a.item_name ?? "-";
+    if (a.client_name) label += ` - ${a.client_name}`;
+    if (a.memo) label += ` (${a.memo})`;
+    return [label, a.amount];
+  });
 
   const summaryRows: [string, string | number][] = [
     ["발주액 (원청 발주금액)", formatWon(quoteTotal)],
@@ -184,6 +189,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
       <ProjectAgencyPurchaseList
         projectId={project.id}
         categories={expenseCategories ?? []}
+        clientNames={clientNames}
         items={(agencyRows ?? []).map((a) => {
           const category = one(a.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
           return {
@@ -194,6 +200,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
             category_name: category?.name ?? null,
             category_color: category ? resolveCategoryColor(category) : undefined,
             memo: a.memo,
+            client_name: a.client_name,
           };
         })}
       />

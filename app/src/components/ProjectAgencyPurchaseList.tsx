@@ -17,6 +17,7 @@ type AgencyPurchase = {
   category_name: string | null;
   category_color?: string;
   memo: string | null;
+  client_name: string | null;
 };
 
 function CategorySelect({
@@ -45,10 +46,12 @@ function CategorySelect({
 function AgencyRow({
   item,
   categories,
+  clientNames,
   onChanged,
 }: {
   item: AgencyPurchase;
   categories: Category[];
+  clientNames: string[];
   onChanged: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -57,6 +60,7 @@ function AgencyRow({
   const [amount, setAmount] = useState(String(item.amount));
   const [categoryId, setCategoryId] = useState(item.category_id ?? "");
   const [memo, setMemo] = useState(item.memo ?? "");
+  const [clientName, setClientName] = useState(item.client_name ?? "");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,6 +73,7 @@ function AgencyRow({
     fd.append("amount", amount);
     fd.append("category_id", categoryId);
     fd.append("memo", memo);
+    fd.append("client_name", clientName);
     const result = await updateAgencyPurchase(fd);
     setPending(false);
     if (result?.error) {
@@ -97,6 +102,18 @@ function AgencyRow({
     return (
       <li className="flex flex-wrap items-center gap-2 py-1.5 text-sm">
         <input value={itemName} onChange={(e) => setItemName(e.target.value)} placeholder="품목명" className={`${fieldClass} w-40`} />
+        <input
+          list={`agency-client-names-${item.id}`}
+          value={clientName}
+          onChange={(e) => setClientName(e.target.value)}
+          placeholder="매입처 (자유 입력)"
+          className={`${fieldClass} w-32`}
+        />
+        <datalist id={`agency-client-names-${item.id}`}>
+          {clientNames.map((name) => (
+            <option key={name} value={name} />
+          ))}
+        </datalist>
         <CategorySelect value={categoryId} onChange={setCategoryId} categories={categories} />
         <input
           value={amount}
@@ -126,6 +143,7 @@ function AgencyRow({
   return (
     <li className="flex flex-wrap items-center gap-2 py-1.5 text-sm">
       <span className="flex-1 truncate text-slate-700">{item.item_name ?? "-"}</span>
+      {item.client_name && <span className="text-slate-500">{item.client_name}</span>}
       <span
         className={item.category_name ? undefined : "text-red-600"}
         style={{ color: item.category_name ? item.category_color : undefined }}
@@ -162,10 +180,12 @@ export function ProjectAgencyPurchaseList({
   projectId,
   items,
   categories,
+  clientNames,
 }: {
   projectId: string;
   items: AgencyPurchase[];
   categories: Category[];
+  clientNames: string[];
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -197,7 +217,7 @@ export function ProjectAgencyPurchaseList({
       {items.length > 0 ? (
         <ul className="mb-2 divide-y divide-slate-100">
           {items.map((it) => (
-            <AgencyRow key={it.id} item={it} categories={categories} onChanged={() => router.refresh()} />
+            <AgencyRow key={it.id} item={it} categories={categories} clientNames={clientNames} onChanged={() => router.refresh()} />
           ))}
         </ul>
       ) : (
@@ -207,6 +227,12 @@ export function ProjectAgencyPurchaseList({
       <form action={handleAdd} className="flex flex-wrap items-end gap-2 print:hidden">
         <input type="hidden" name="project_id" value={projectId} />
         <input name="item_name" placeholder="품목명" className={`${fieldClass} w-40`} />
+        <input list="agency-client-names-new" name="client_name" placeholder="매입처 (자유 입력)" className={`${fieldClass} w-32`} />
+        <datalist id="agency-client-names-new">
+          {clientNames.map((name) => (
+            <option key={name} value={name} />
+          ))}
+        </datalist>
         <CategorySelect name="category_id" value={newCategoryId} onChange={setNewCategoryId} categories={categories} />
         <input name="amount" type="number" step="1" placeholder="금액" required className={`${fieldClass} w-32`} />
         <input name="memo" placeholder="메모 (무슨 물품/사항인지)" className={`${fieldClass} w-full min-w-[12rem] flex-1`} />
