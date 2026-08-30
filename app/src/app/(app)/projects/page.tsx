@@ -6,6 +6,7 @@ import { createProjectRecord, updateProjectRecord, deleteProjectRecord } from "@
 import type { FieldConfig } from "@/components/crud/types";
 import { PageTabs } from "@/components/PageTabs";
 import { SitesSection } from "@/components/sections/SitesSection";
+import { QuotesSection } from "@/components/sections/QuotesSection";
 import { YearFilter } from "@/components/YearFilter";
 import { ProjectProfitReport } from "@/components/ProjectProfitReport";
 import { LinkButton } from "@/components/ui/Button";
@@ -16,6 +17,7 @@ import { ProjectListExportButtons } from "@/components/ProjectListExportButtons"
 const TABS = [
   { key: "list", label: "프로젝트" },
   { key: "sites", label: "현장" },
+  { key: "quotes", label: "견적서" },
 ];
 
 export default async function ProjectsPage({
@@ -33,6 +35,7 @@ export default async function ProjectsPage({
         <PageTabs basePath="/projects" tabs={TABS} active={active} />
       </div>
       {active === "sites" && <SitesSection />}
+      {active === "quotes" && <QuotesSection />}
       {active === "list" && <ProjectListSection year={year} siteId={site_id} status={status} report={report} />}
     </div>
   );

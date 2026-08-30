@@ -24,12 +24,14 @@ export function ProjectPicker({
   value,
   onChange,
   label = "프로젝트 (일반경비는 비워두기)",
+  emptyLabel = "일반경비",
 }: {
   sites: SiteOption[];
   projects: ProjectOption[];
   value: string;
   onChange: (v: string) => void;
   label?: string;
+  emptyLabel?: string;
 }) {
   // 수정 화면 등에서 이미 선택된 프로젝트가 "진행중"이 아니면(완료/검토중 등) 기본 드롭다운에
   // 안 나와서 공란처럼 보였음 — 마운트 시 현재 값에 맞춰 완료 프로젝트 검색 상태를 미리 채워둠.
@@ -92,7 +94,7 @@ export function ProjectPicker({
 
       {!showCompleted ? (
         <select value={value} onChange={(e) => onChange(e.target.value)} className={fieldClass}>
-          <option value="">일반경비</option>
+          <option value="">{emptyLabel}</option>
           {Array.from(ongoingBySite.entries()).map(([sId, projs]) => (
             <optgroup key={sId} label={siteLabel(siteMap.get(sId))}>
               {projs.map((p) => (
