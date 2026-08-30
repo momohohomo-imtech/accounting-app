@@ -16,6 +16,7 @@ type AgencyPurchase = {
   category_id: string | null;
   category_name: string | null;
   category_color?: string;
+  memo: string | null;
 };
 
 function CategorySelect({
@@ -55,6 +56,7 @@ function AgencyRow({
   const [itemName, setItemName] = useState(item.item_name ?? "");
   const [amount, setAmount] = useState(String(item.amount));
   const [categoryId, setCategoryId] = useState(item.category_id ?? "");
+  const [memo, setMemo] = useState(item.memo ?? "");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,6 +68,7 @@ function AgencyRow({
     fd.append("item_name", itemName);
     fd.append("amount", amount);
     fd.append("category_id", categoryId);
+    fd.append("memo", memo);
     const result = await updateAgencyPurchase(fd);
     setPending(false);
     if (result?.error) {
@@ -103,6 +106,12 @@ function AgencyRow({
           placeholder="금액"
           className={`${fieldClass} w-32`}
         />
+        <input
+          value={memo}
+          onChange={(e) => setMemo(e.target.value)}
+          placeholder="메모 (무슨 물품/사항인지)"
+          className={`${fieldClass} w-full min-w-[12rem] flex-1`}
+        />
         <Button size="xs" type="button" disabled={pending} onClick={save}>
           저장
         </Button>
@@ -115,7 +124,7 @@ function AgencyRow({
   }
 
   return (
-    <li className="flex items-center gap-2 py-1.5 text-sm">
+    <li className="flex flex-wrap items-center gap-2 py-1.5 text-sm">
       <span className="flex-1 truncate text-slate-700">{item.item_name ?? "-"}</span>
       <span
         className={item.category_name ? undefined : "text-red-600"}
@@ -143,6 +152,7 @@ function AgencyRow({
           </Button>
         </span>
       )}
+      {item.memo && <span className="w-full text-xs text-slate-500">{item.memo}</span>}
       {error && <span className="w-full text-xs text-red-600 print:hidden">{error}</span>}
     </li>
   );
@@ -199,6 +209,7 @@ export function ProjectAgencyPurchaseList({
         <input name="item_name" placeholder="품목명" className={`${fieldClass} w-40`} />
         <CategorySelect name="category_id" value={newCategoryId} onChange={setNewCategoryId} categories={categories} />
         <input name="amount" type="number" step="1" placeholder="금액" required className={`${fieldClass} w-32`} />
+        <input name="memo" placeholder="메모 (무슨 물품/사항인지)" className={`${fieldClass} w-full min-w-[12rem] flex-1`} />
         <Button type="submit" size="xs" disabled={pending}>
           + 추가
         </Button>

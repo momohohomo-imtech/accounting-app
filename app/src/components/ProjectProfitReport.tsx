@@ -97,7 +97,10 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
     t.purchase_amount + t.purchase_vat,
   ]);
 
-  const agencyExportRows: [string, number][] = (agencyRows ?? []).map((a) => [a.item_name ?? "-", a.amount]);
+  const agencyExportRows: [string, number][] = (agencyRows ?? []).map((a) => [
+    a.item_name && a.memo ? `${a.item_name} (${a.memo})` : (a.item_name ?? "-"),
+    a.amount,
+  ]);
 
   const summaryRows: [string, string | number][] = [
     ["발주액 (원청 발주금액)", formatWon(quoteTotal)],
@@ -190,6 +193,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
             category_id: a.category_id,
             category_name: category?.name ?? null,
             category_color: category ? resolveCategoryColor(category) : undefined,
+            memo: a.memo,
           };
         })}
       />

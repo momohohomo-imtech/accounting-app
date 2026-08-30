@@ -13,6 +13,7 @@ export async function addAgencyPurchase(formData: FormData) {
   const itemName = String(formData.get("item_name") ?? "") || null;
   const amount = Number(formData.get("amount") ?? 0);
   const categoryId = String(formData.get("category_id") ?? "") || null;
+  const memo = String(formData.get("memo") ?? "") || null;
   if (!projectId || !amount) return { error: "품목명과 금액을 확인해주세요." };
 
   const { error } = await supabase.from("project_agency_purchases").insert({
@@ -20,6 +21,7 @@ export async function addAgencyPurchase(formData: FormData) {
     item_name: itemName,
     amount,
     category_id: categoryId,
+    memo,
     created_by: user?.id ?? null,
   });
   if (error) return { error: error.message };
@@ -34,11 +36,12 @@ export async function updateAgencyPurchase(formData: FormData) {
   const itemName = String(formData.get("item_name") ?? "") || null;
   const amount = Number(formData.get("amount") ?? 0);
   const categoryId = String(formData.get("category_id") ?? "") || null;
+  const memo = String(formData.get("memo") ?? "") || null;
   if (!id || !amount) return { error: "품목명과 금액을 확인해주세요." };
 
   const { error } = await supabase
     .from("project_agency_purchases")
-    .update({ item_name: itemName, amount, category_id: categoryId })
+    .update({ item_name: itemName, amount, category_id: categoryId, memo })
     .eq("id", id);
   if (error) return { error: error.message };
 
