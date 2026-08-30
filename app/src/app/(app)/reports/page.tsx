@@ -10,8 +10,10 @@ import { AutoPrint } from "@/components/AutoPrint";
 import { ReportAIInsights } from "@/components/ReportAIInsights";
 import { saveReportAiInsight, deleteReportAiInsight } from "@/lib/actions/reportAiInsights";
 import { isLedgerVisible } from "@/lib/credit";
+import { resolveCategoryColor } from "@/lib/categoryColor";
 import type { ReportAiInsight, CreditPayment } from "@/lib/types";
 import { VendorAggregateTable } from "@/components/VendorAggregateTable";
+import { CategoryAggregateTable } from "@/components/CategoryAggregateTable";
 import { ProjectProfitTable } from "@/components/ProjectProfitTable";
 import { TransactionEditPopup } from "@/components/TransactionEditPopup";
 import { WorkLogSummaryTable } from "@/components/WorkLogSummaryTable";
@@ -185,6 +187,20 @@ export default async function ReportsPage({
   const byVendor = clientBreakdown("매입");
   const byCustomer = clientBreakdown("매출");
 
+  // 카테고리별 매입 집계
+  const byCategory = (() => {
+    const map = new Map<string, { name: string; count: number; amount: number; color?: string }>();
+    for (const t of transactions.filter((t) => t.type === "매입")) {
+      const category = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
+      const name = category?.name ?? "미분류";
+      const entry = map.get(name) ?? { name, count: 0, amount: 0, color: category ? resolveCategoryColor(category) : undefined };
+      entry.count += 1;
+      entry.amount += t.purchase_amount + t.purchase_vat;
+      map.set(name, entry);
+    }
+    return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
+  })();
+
   const pad = (n: number) => String(n).padStart(2, "0");
   const wlMonthRange = parseMonthRange(wlMonths);
   const wlStart = `${selectedYear}-${pad(wlMonthRange.start)}-01`;
@@ -324,6 +340,10 @@ export default async function ReportsPage({
       <div className={popupOpen || isolateProjects ? "space-y-6 print:hidden" : "space-y-6"}>
         <CollapsibleSection title="매입처별 집계 — 어느 업체에서 얼마를 매입했는지">
           <VendorAggregateTable rows={byVendor} year={selectedYear} />
+        </CollapsibleSection>
+
+        <CollapsibleSection title="카테고리별 집계 — 어느 카테고리에 얼마를 매입했는지">
+          <CategoryAggregateTable rows={byCategory} />
         </CollapsibleSection>
 
         <CollapsibleSection title="매출처별 집계">
