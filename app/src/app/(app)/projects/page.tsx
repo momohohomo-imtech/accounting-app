@@ -82,18 +82,29 @@ async function ProjectListSection({
   }));
 
   const projectIds = (projects ?? []).map((p) => p.id);
-  const { data: purchaseRows } = projectIds.length
-    ? await supabase
-        .from("transactions")
-        .select("project_id, purchase_amount, purchase_vat")
-        .eq("type", "매입")
-        .in("project_id", projectIds)
-    : { data: [] as { project_id: string | null; purchase_amount: number; purchase_vat: number }[] };
+  const [{ data: purchaseRows }, { data: agencyRows }] = projectIds.length
+    ? await Promise.all([
+        supabase
+          .from("transactions")
+          .select("project_id, purchase_amount, purchase_vat")
+          .eq("type", "매입")
+          .in("project_id", projectIds),
+        supabase.from("project_agency_purchases").select("project_id, amount").in("project_id", projectIds),
+      ])
+    : [
+        { data: [] as { project_id: string | null; purchase_amount: number; purchase_vat: number }[] },
+        { data: [] as { project_id: string; amount: number }[] },
+      ];
 
   const purchaseByProject = new Map<string, number>();
   for (const t of purchaseRows ?? []) {
     if (!t.project_id) continue;
     purchaseByProject.set(t.project_id, (purchaseByProject.get(t.project_id) ?? 0) + t.purchase_amount + t.purchase_vat);
+  }
+
+  const agencyByProject = new Map<string, number>();
+  for (const a of agencyRows ?? []) {
+    agencyByProject.set(a.project_id, (agencyByProject.get(a.project_id) ?? 0) + a.amount);
   }
 
   const fields: FieldConfig[] = [
@@ -163,7 +174,9 @@ async function ProjectListSection({
   const tableRows = (projects ?? []).map((p) => ({
     ...p,
     site_name: (one(p.sites) as { name: string } | undefined)?.name,
-    profit: p.contract_amount ? p.contract_amount - (purchaseByProject.get(p.id) ?? 0) : null,
+    profit: p.quote_amount
+      ? p.quote_amount - (purchaseByProject.get(p.id) ?? 0) - (agencyByProject.get(p.id) ?? 0)
+      : null,
   }));
 
   const estimatedProjects = tableRows.filter((p) => p.contract_amount_estimated);

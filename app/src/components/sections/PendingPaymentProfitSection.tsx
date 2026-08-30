@@ -17,7 +17,7 @@ export async function PendingPaymentProfitSection() {
 
   const [{ data: pendingProjects }, { data: yearProjects }, { data: yearTx }] = await Promise.all([
     supabase.from("projects").select("id, contract_amount, quote_amount").eq("status", "done_awaiting_payment"),
-    supabase.from("projects").select("id, contract_amount").eq("year", currentYear),
+    supabase.from("projects").select("id, quote_amount").eq("year", currentYear),
     supabase
       .from("transactions")
       .select("sales_amount, sales_vat, purchase_amount, purchase_vat")
@@ -29,14 +29,13 @@ export async function PendingPaymentProfitSection() {
   const yearRows = yearProjects ?? [];
   if (pendingRows.length === 0 && yearRows.length === 0) return null;
 
-  const { data: purchaseTx } = await supabase
-    .from("transactions")
-    .select("project_id, purchase_amount, purchase_vat")
-    .eq("type", "매입")
-    .in(
-      "project_id",
-      yearRows.map((p) => p.id)
-    );
+  const yearProjectIds = yearRows.map((p) => p.id);
+  const [{ data: purchaseTx }, { data: agencyTx }] = yearProjectIds.length
+    ? await Promise.all([
+        supabase.from("transactions").select("project_id, purchase_amount, purchase_vat").eq("type", "매입").in("project_id", yearProjectIds),
+        supabase.from("project_agency_purchases").select("project_id, amount").in("project_id", yearProjectIds),
+      ])
+    : [{ data: [] as { project_id: string | null; purchase_amount: number; purchase_vat: number }[] }, { data: [] as { project_id: string; amount: number }[] }];
 
   // --- 미수금 포함 내역: 올해 전체 매출-매입(부가세 제외) + 완료 수금대기 프로젝트들의 미수 합계금 ---
   const yearSalesGross = (yearTx ?? []).reduce((s, t) => s + t.sales_amount + t.sales_vat, 0);
@@ -45,15 +44,19 @@ export async function PendingPaymentProfitSection() {
   const pendingReceivable = pendingRows.reduce((s, p) => s + (p.contract_amount ?? p.quote_amount ?? 0), 0);
   const pendingTax = taxLine(companyProfit + pendingReceivable);
 
-  // --- 전체 프로젝트 이익금 예상액 (프로젝트 목록·내역서와 동일한 방식: 수주액 - 매입 합계, 수주액이 있는 프로젝트만) ---
+  // --- 전체 프로젝트 이익금 예상액 (프로젝트 목록·손익보고서와 동일한 방식: 발주액 - 매입합계 - 대행구매액, 발주액이 있는 프로젝트만) ---
   const purchaseByProject = new Map<string, number>();
   for (const t of purchaseTx ?? []) {
     if (!t.project_id) continue;
     purchaseByProject.set(t.project_id, (purchaseByProject.get(t.project_id) ?? 0) + t.purchase_amount + t.purchase_vat);
   }
+  const agencyByProject = new Map<string, number>();
+  for (const a of agencyTx ?? []) {
+    agencyByProject.set(a.project_id, (agencyByProject.get(a.project_id) ?? 0) + a.amount);
+  }
   const yearProfits = yearRows
-    .filter((p) => p.contract_amount != null)
-    .map((p) => p.contract_amount! - (purchaseByProject.get(p.id) ?? 0));
+    .filter((p) => p.quote_amount != null)
+    .map((p) => p.quote_amount! - (purchaseByProject.get(p.id) ?? 0) - (agencyByProject.get(p.id) ?? 0));
   const yearProfitSum = yearProfits.reduce((s, v) => s + v, 0);
   const yearTax = taxLine(yearProfitSum);
 

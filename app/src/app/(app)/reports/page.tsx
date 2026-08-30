@@ -95,7 +95,7 @@ export default async function ReportsPage({
       supabase.from("credit_payments").select("*"),
       supabase
         .from("project_agency_purchases")
-        .select("amount, expense_categories(name, project_only, color), projects!inner(year)")
+        .select("project_id, amount, expense_categories(name, project_only, color), projects!inner(year)")
         .eq("projects.year", selectedYear),
     ]);
 
@@ -133,6 +133,11 @@ export default async function ReportsPage({
     purchase: monthly.reduce((s, m) => s + m.purchase, 0),
   };
 
+  const agencyByProject = new Map<string, number>();
+  for (const a of agencyPurchases ?? []) {
+    agencyByProject.set(a.project_id, (agencyByProject.get(a.project_id) ?? 0) + a.amount);
+  }
+
   const byProjectAll = (projects ?? []).map((p) => {
     const rows = transactions.filter((t) => t.project_id === p.id);
     // 손익 계산 시 매출은 부가세를 뺀 금액을 사용 (VAT는 실제 이익이 아닌 세무서 납부분).
@@ -140,7 +145,10 @@ export default async function ReportsPage({
     const salesGross = rows.reduce((s, t) => s + t.sales_amount + t.sales_vat, 0);
     const sales = Math.round(salesGross / 1.1);
     const purchase = rows.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
-    return { ...p, quoteAmount: p.quote_amount ?? 0, sales, purchase, profit: sales - purchase };
+    const quoteAmount = p.quote_amount ?? 0;
+    // 프로젝트 손익보고서 팝업과 동일한 방식(발주액-매입-대행구매액)으로 통일.
+    const profit = quoteAmount - purchase - (agencyByProject.get(p.id) ?? 0);
+    return { ...p, quoteAmount, sales, purchase, profit };
   });
 
   const projectSiteOptions = Array.from(
