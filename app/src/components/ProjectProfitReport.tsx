@@ -60,12 +60,12 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
   })();
   const quoteTotal = group.reduce((s, p) => s + (p.quote_amount ?? 0), 0);
   const contractTotal = group.reduce((s, p) => s + (p.contract_amount ?? 0), 0);
-  // 이익금 = 발주액 - (발주액 - 수주액) - 매입합계 = 수주액 - 매입합계.
-  // 수주액은 이미 대행구매액·수수료를 다 뺀 실수령액이라 이익금 계산은 그대로 두고,
-  // 발주액-수주액 차액만 대행구매액(위 project_agency_purchases 합계) / 기타 공제(수수료 등)로 나눠서 보여줌.
+  // 이익금 = 발주액 - 매입합계 - 대행구매액(부속비·수수료 등 전부 여기에 품목으로 기록).
+  // 수주액은 더 이상 이익 계산에 안 쓰고 참고용(예상금액/최소금액 표시 등)으로만 남겨둠.
+  // gap/otherDeduction은 "수주액이 발주액-대행구매액과 실제로 맞는지" 확인용 참고치일 뿐임.
   const gap = quoteTotal - contractTotal;
   const otherDeduction = gap - agencyTotal;
-  const profit = contractTotal ? contractTotal - purchaseTotal : null;
+  const profit = quoteTotal ? quoteTotal - purchaseTotal - agencyTotal : null;
   // 이익율은 발주액 대비 비율
   const margin = quoteTotal && profit !== null ? (profit / quoteTotal) * 100 : null;
 
@@ -85,7 +85,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
       formatWon(contractTotal),
     ],
     ["매입 합계", `-${formatWon(purchaseTotal)}`],
-    ["이익금", profit === null ? "수주액 미입력" : formatWon(profit)],
+    ["이익금", profit === null ? "발주액 미입력" : formatWon(profit)],
     ["이익율", margin === null ? "-" : `${margin.toFixed(2)}%`],
   ];
 
@@ -200,6 +200,11 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
           >
             {formatWon(contractTotal)}
           </p>
+          {contractTotal > 0 && otherDeduction !== 0 && (
+            <p className="mt-0.5 text-[11px] text-amber-600">
+              발주액-대행구매액 기준 예상 {formatWon(quoteTotal - agencyTotal)} (차이 {formatWon(Math.abs(otherDeduction))})
+            </p>
+          )}
         </div>
         <div>
           <p className="text-xs text-slate-500">매입 합계</p>
@@ -208,7 +213,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
         <div>
           <p className="text-xs text-slate-500">이익금</p>
           <p className={`font-mono text-lg font-bold ${profit === null ? "text-slate-400" : profit >= 0 ? "text-slate-900" : "text-red-600"}`}>
-            {profit === null ? "수주액 미입력" : formatWon(profit)}
+            {profit === null ? "발주액 미입력" : formatWon(profit)}
           </p>
         </div>
         <div>

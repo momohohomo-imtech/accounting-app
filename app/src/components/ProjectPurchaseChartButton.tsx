@@ -144,7 +144,7 @@ export function ProjectPurchaseChartButton({
     ["발주액", formatWon(quoteTotal)],
     ["수주액", formatWon(contractTotal)],
     ["총 지출액", formatWon(total)],
-    ["이익금", profit === null ? "수주액 미입력" : formatWon(profit)],
+    ["이익금", profit === null ? "발주액 미입력" : formatWon(profit)],
     ["이익율", margin === null ? "-" : `${margin.toFixed(2)}%`],
   ];
 
