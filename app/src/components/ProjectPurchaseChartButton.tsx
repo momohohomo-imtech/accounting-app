@@ -8,6 +8,12 @@ import { ModalPrintButton } from "@/components/ModalPrintButton";
 
 type CategoryAmount = { name: string; amount: number };
 
+const REMAINDER_LABEL = "잔여 (발주액 중 미지출분)";
+
+function sliceColor(name: string) {
+  return name === REMAINDER_LABEL ? "#cbd5e1" : autoSiteColorHex(name);
+}
+
 function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
   const rad = ((angleDeg - 90) * Math.PI) / 180;
   return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
@@ -32,17 +38,17 @@ function PieChart({ data, total }: { data: CategoryAmount[]; total: number }) {
     const startAngle = cursor * 360;
     cursor += pct;
     const endAngle = cursor * 360;
-    return { ...d, pct, startAngle, endAngle, isTop: i === 0 };
+    return { ...d, pct, startAngle, endAngle, isTop: i === 0 && d.name !== REMAINDER_LABEL };
   });
 
   return (
     <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
       <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} className="shrink-0">
         {slices.length === 1 ? (
-          <circle cx={cx} cy={cy} r={r} fill={autoSiteColorHex(slices[0].name)} />
+          <circle cx={cx} cy={cy} r={r} fill={sliceColor(slices[0].name)} />
         ) : (
           slices.map((s) => (
-            <path key={s.name} d={arcPath(cx, cy, r, s.startAngle, s.endAngle)} fill={autoSiteColorHex(s.name)} />
+            <path key={s.name} d={arcPath(cx, cy, r, s.startAngle, s.endAngle)} fill={sliceColor(s.name)} />
           ))
         )}
         {data.length === 0 && <circle cx={cx} cy={cy} r={r} fill="#e2e8f0" />}
@@ -50,7 +56,7 @@ function PieChart({ data, total }: { data: CategoryAmount[]; total: number }) {
       <div className="min-w-0 flex-1 space-y-1.5">
         {slices.map((s) => (
           <div key={s.name} className="flex items-center gap-2 text-sm">
-            <span className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: autoSiteColorHex(s.name) }} />
+            <span className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: sliceColor(s.name) }} />
             <span className={`min-w-0 flex-1 truncate ${s.isTop ? "font-semibold text-slate-900" : "text-slate-700"}`}>
               {s.name}
               {s.isTop && (
@@ -69,19 +75,22 @@ function PieChart({ data, total }: { data: CategoryAmount[]; total: number }) {
   );
 }
 
-function BarChart({ data }: { data: CategoryAmount[] }) {
-  const max = Math.max(1, ...data.map((d) => d.amount));
+function BarChart({ data, max: maxOverride }: { data: CategoryAmount[]; max?: number }) {
+  const max = Math.max(1, maxOverride ?? 0, ...data.map((d) => d.amount));
   return (
     <div className="space-y-2.5">
       {data.map((d, i) => (
         <div key={d.name} className="flex items-center gap-2">
-          <span className={`w-24 shrink-0 truncate text-sm ${i === 0 ? "font-semibold text-slate-900" : "text-slate-700"}`} title={d.name}>
+          <span
+            className={`w-24 shrink-0 truncate text-sm ${i === 0 && d.name !== REMAINDER_LABEL ? "font-semibold text-slate-900" : "text-slate-700"}`}
+            title={d.name}
+          >
             {d.name}
           </span>
           <div className="h-5 flex-1 overflow-hidden rounded bg-slate-100">
             <div
               className="h-full rounded"
-              style={{ width: `${(d.amount / max) * 100}%`, backgroundColor: autoSiteColorHex(d.name) }}
+              style={{ width: `${(d.amount / max) * 100}%`, backgroundColor: sliceColor(d.name) }}
             />
           </div>
           <span className="w-24 shrink-0 text-right font-mono text-sm font-semibold text-slate-900">
@@ -123,6 +132,13 @@ export function ProjectPurchaseChartButton({
 
   const total = data.reduce((s, d) => s + d.amount, 0);
   const topCategory = data[0];
+
+  // 그래프는 카테고리별 지출 비중을 "전체 지출 대비"가 아니라 "발주액 대비"로 보여줌 —
+  // 카테고리 합계가 발주액보다 적으면 나머지를 "잔여" 조각으로 채워서, 이 프로젝트에서
+  // 각 비용이 발주액의 몇 %를 차지하는지 한눈에 보이게 함.
+  const chartBase = quoteTotal > 0 ? quoteTotal : total;
+  const remainder = Math.max(0, chartBase - total);
+  const chartData = remainder > 0 ? [...data, { name: REMAINDER_LABEL, amount: remainder }] : data;
 
   const bottomStats: [string, string][] = [
     ["발주액", formatWon(quoteTotal)],
@@ -201,7 +217,11 @@ export function ProjectPurchaseChartButton({
                 )}
               </div>
 
-              {chartType === "pie" ? <PieChart data={data} total={total} /> : <BarChart data={data} />}
+              {chartType === "pie" ? (
+                <PieChart data={chartData} total={chartBase} />
+              ) : (
+                <BarChart data={chartData} max={chartBase} />
+              )}
 
               <div className="mt-5 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3">
                 {bottomStats.map(([label, value]) => (
