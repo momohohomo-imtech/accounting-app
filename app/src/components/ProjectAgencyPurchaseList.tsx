@@ -56,26 +56,37 @@ function AgencyRow({
   const [amount, setAmount] = useState(String(item.amount));
   const [categoryId, setCategoryId] = useState(item.category_id ?? "");
   const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function save() {
     setPending(true);
+    setError(null);
     const fd = new FormData();
     fd.append("id", item.id);
     fd.append("item_name", itemName);
     fd.append("amount", amount);
     fd.append("category_id", categoryId);
-    await updateAgencyPurchase(fd);
+    const result = await updateAgencyPurchase(fd);
     setPending(false);
+    if (result?.error) {
+      setError(result.error);
+      return;
+    }
     setEditing(false);
     onChanged();
   }
 
   async function remove() {
     setPending(true);
+    setError(null);
     const fd = new FormData();
     fd.append("id", item.id);
-    await deleteAgencyPurchase(fd);
+    const result = await deleteAgencyPurchase(fd);
     setPending(false);
+    if (result?.error) {
+      setError(result.error);
+      return;
+    }
     onChanged();
   }
 
@@ -98,6 +109,7 @@ function AgencyRow({
         <Button variant="secondary" size="xs" type="button" disabled={pending} onClick={() => setEditing(false)}>
           취소
         </Button>
+        {error && <span className="w-full text-xs text-red-600">{error}</span>}
       </li>
     );
   }
@@ -131,6 +143,7 @@ function AgencyRow({
           </Button>
         </span>
       )}
+      {error && <span className="w-full text-xs text-red-600">{error}</span>}
     </li>
   );
 }
@@ -147,13 +160,19 @@ export function ProjectAgencyPurchaseList({
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [newCategoryId, setNewCategoryId] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const total = items.reduce((s, i) => s + i.amount, 0);
 
   async function handleAdd(formData: FormData) {
     setPending(true);
-    await addAgencyPurchase(formData);
+    setError(null);
+    const result = await addAgencyPurchase(formData);
     setPending(false);
+    if (result?.error) {
+      setError(result.error);
+      return;
+    }
     setNewCategoryId("");
     router.refresh();
   }
@@ -181,6 +200,7 @@ export function ProjectAgencyPurchaseList({
         <Button type="submit" size="xs" disabled={pending}>
           + 추가
         </Button>
+        {error && <span className="w-full text-xs text-red-600">{error}</span>}
       </form>
     </div>
   );
