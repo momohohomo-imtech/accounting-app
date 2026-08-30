@@ -9,12 +9,14 @@ export function ProjectReportActions({
   title,
   infoLines,
   exportRows,
+  agencyExportRows = [],
   summaryRows,
 }: {
   filename: string;
   title: string;
   infoLines: string[];
   exportRows: (string | number)[][];
+  agencyExportRows?: [string, number][];
   summaryRows: [string, string | number][];
 }) {
   async function handleExport() {
@@ -22,6 +24,13 @@ export function ProjectReportActions({
     const rows: (string | number)[][] = [
       ...exportRows,
       ["", "", "", ""],
+      ...(agencyExportRows.length > 0
+        ? [
+            ["", "", "── 대행구매액 ──", ""] as (string | number)[],
+            ...agencyExportRows.map(([name, amount]) => ["", "", name, amount] as (string | number)[]),
+            ["", "", "", ""],
+          ]
+        : []),
       ...summaryRows.map(([label, value]) => ["", "", label, value] as (string | number)[]),
     ];
     await downloadXlsx(

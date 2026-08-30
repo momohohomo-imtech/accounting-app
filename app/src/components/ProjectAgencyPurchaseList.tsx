@@ -125,7 +125,7 @@ function AgencyRow({
       </span>
       <span className="font-mono text-slate-900">{formatWon(item.amount)}</span>
       {confirmDelete ? (
-        <span className="flex items-center gap-1">
+        <span className="flex items-center gap-1 print:hidden">
           <Button variant="danger" size="xs" type="button" disabled={pending} onClick={remove}>
             확인
           </Button>
@@ -134,7 +134,7 @@ function AgencyRow({
           </Button>
         </span>
       ) : (
-        <span className="flex items-center gap-1">
+        <span className="flex items-center gap-1 print:hidden">
           <Button variant="secondary" size="xs" type="button" onClick={() => setEditing(true)}>
             수정
           </Button>
@@ -143,7 +143,7 @@ function AgencyRow({
           </Button>
         </span>
       )}
-      {error && <span className="w-full text-xs text-red-600">{error}</span>}
+      {error && <span className="w-full text-xs text-red-600 print:hidden">{error}</span>}
     </li>
   );
 }
@@ -178,21 +178,23 @@ export function ProjectAgencyPurchaseList({
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 p-3 print:hidden">
+    <div className="rounded-xl border border-slate-200 p-3">
       <div className="mb-2 flex items-center justify-between">
         <p className="text-sm font-semibold text-slate-900">대행구매액 (원청이 대신 구매해 공제한 품목)</p>
         <span className="font-mono text-sm text-slate-700">합계 {formatWon(total)}</span>
       </div>
 
-      {items.length > 0 && (
+      {items.length > 0 ? (
         <ul className="mb-2 divide-y divide-slate-100">
           {items.map((it) => (
             <AgencyRow key={it.id} item={it} categories={categories} onChanged={() => router.refresh()} />
           ))}
         </ul>
+      ) : (
+        <p className="mb-2 hidden text-sm text-slate-400 print:block">대행구매 내역이 없습니다.</p>
       )}
 
-      <form action={handleAdd} className="flex flex-wrap items-end gap-2">
+      <form action={handleAdd} className="flex flex-wrap items-end gap-2 print:hidden">
         <input type="hidden" name="project_id" value={projectId} />
         <input name="item_name" placeholder="품목명" className={`${fieldClass} w-40`} />
         <CategorySelect name="category_id" value={newCategoryId} onChange={setNewCategoryId} categories={categories} />

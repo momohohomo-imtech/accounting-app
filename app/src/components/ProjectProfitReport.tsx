@@ -76,6 +76,8 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
     t.purchase_amount + t.purchase_vat,
   ]);
 
+  const agencyExportRows: [string, number][] = (agencyRows ?? []).map((a) => [a.item_name ?? "-", a.amount]);
+
   const summaryRows: [string, string | number][] = [
     ["발주액 (원청 발주금액)", formatWon(quoteTotal)],
     ["대행구매액", `-${formatWon(agencyTotal)}`],
@@ -133,6 +135,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
             title={`${project.project_code ?? ""} ${project.name}`.trim()}
             infoLines={infoLines}
             exportRows={exportRows}
+            agencyExportRows={agencyExportRows}
             summaryRows={summaryRows}
           />
           <ReportCloseButton />
