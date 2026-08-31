@@ -150,8 +150,8 @@ export function EntityTable({
                       }
                       setFormError(null);
                       setEditingId(null);
-                    } catch {
-                      setFormError("저장 중 오류가 발생했습니다.");
+                    } catch (err) {
+                      setFormError(err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.");
                     }
                   }}
                   className="space-y-3"
@@ -242,8 +242,8 @@ export function EntityTable({
                 }
                 setFormError(null);
                 setEditingId(null);
-              } catch {
-                setFormError("저장 중 오류가 발생했습니다.");
+              } catch (err) {
+                setFormError(err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.");
               }
             }}
             className="space-y-3"

@@ -26,18 +26,28 @@ function parse(formData: FormData) {
 }
 
 export async function createProjectRecord(formData: FormData) {
-  const supabase = await createClient();
-  const { error } = await supabase.from("projects").insert(parse(formData));
-  if (error) return { error: error.message };
-  revalidatePath("/projects");
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.from("projects").insert(parse(formData));
+    if (error) return { error: error.message };
+    revalidatePath("/projects");
+  } catch (err) {
+    // 예상 못 한 예외까지 잡아서 그대로 반환 — 프로덕션에서 서버 액션이 그냥 throw하면
+    // 진짜 메시지 대신 "Minified React error #441" 같은 걸로 가려지는 문제(HANDOFF 교훈)를 피함.
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export async function updateProjectRecord(formData: FormData) {
-  const supabase = await createClient();
-  const id = String(formData.get("id"));
-  const { error } = await supabase.from("projects").update(parse(formData)).eq("id", id);
-  if (error) return { error: error.message };
-  revalidatePath("/projects");
+  try {
+    const supabase = await createClient();
+    const id = String(formData.get("id"));
+    const { error } = await supabase.from("projects").update(parse(formData)).eq("id", id);
+    if (error) return { error: error.message };
+    revalidatePath("/projects");
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export async function updateProjectMemo(formData: FormData) {

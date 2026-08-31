@@ -46,8 +46,8 @@ export function CreatePanel({
             }
             setFormError(null);
             setOpen(false);
-          } catch {
-            setFormError("저장 중 오류가 발생했습니다.");
+          } catch (err) {
+            setFormError(err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.");
           }
         }}
         className="space-y-3"
