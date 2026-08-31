@@ -614,6 +614,29 @@ HANDOFF에 실행 여부 기록이 없어서 사용자에게 확인 — **사용
 - **미검증**: 마찬가지로 로그인 세션 없어서 실제 클릭/저장 테스트 못 함 —
   빌드/린트만 통과.
 
+**후속: 발주서(내가 보내는 발주서) 기능 추가** — 사용자가 "발주서를 받기도
+하지만 보내기도 한다"고 해서, 이미 있는 `quotes`/`quote_items`(견적서) 구조를
+그대로 미러링해서 만듦(구조가 완전히 검증돼 있어서 새로 설계 안 하고 그대로
+복붙 후 이름/라벨만 바꿈):
+- `/projects` "견적서" 탭 옆에 **"발주서"** 탭 추가(사이드바 무변경, 견적서와
+  동일하게 실제 작성/수정 폼은 `/purchase-orders/new`,
+  `/purchase-orders/[id]/edit` 최상위 경로).
+- `supabase/047_purchase_orders.sql` — `purchase_orders`/`purchase_order_items`
+  테이블, `project_code`/`quote_number`와 동일한 "PO연도-순번" 자동채번 트리거.
+  **실행 여부 확인할 것.**
+- 필드는 quotes와 거의 동일하되 방향에 맞게 라벨/의미만 바꿈: `client_id`/
+  `client_name_raw`는 여기선 "매입처"(발주를 받는 쪽), `valid_until` 자리에
+  `expected_date`(입고예정일). 상태는 견적서의 draft/sent/accepted/rejected
+  대신 **작성중/발송완료/입고완료/취소**(`lib/purchaseOrderStatus.ts`).
+- 견적서에 있던 "이 프로젝트 매입내역 불러오기"는 **의도적으로 안 넣음** —
+  발주서는 매입이 일어나기 전에 쓰는 문서라 방향이 반대라서 그대로 옮기면
+  안 맞음. 나중에 필요하면 "이전 발주서 복사" 같은 걸 대신 만들 것(공구리스트
+  체크리스트의 "복사해서 새로 만들기" 패턴 참고).
+- 인쇄 양식(`PurchaseOrderPrintView.tsx`)도 `QuotePrintView.tsx` 그대로
+  미러링, 제목만 "발주서".
+- **미검증**: 로그인 세션 없어서 실제 작성/수정/인쇄 못 눌러봄 — 빌드/린트만
+  통과. 마이그레이션 047 실행 여부 확인 필요.
+
 ## 작업 방식 (계속 유지)
 
 - 코드 수정 → `npx next build`(타입체크 포함) → `npx eslint .` → 문제 없으면

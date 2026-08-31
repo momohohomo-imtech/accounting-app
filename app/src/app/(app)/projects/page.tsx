@@ -7,6 +7,7 @@ import type { FieldConfig } from "@/components/crud/types";
 import { PageTabs } from "@/components/PageTabs";
 import { SitesSection } from "@/components/sections/SitesSection";
 import { QuotesSection } from "@/components/sections/QuotesSection";
+import { PurchaseOrdersSection } from "@/components/sections/PurchaseOrdersSection";
 import { YearFilter } from "@/components/YearFilter";
 import { ProjectProfitReport } from "@/components/ProjectProfitReport";
 import { LinkButton } from "@/components/ui/Button";
@@ -18,6 +19,7 @@ const TABS = [
   { key: "list", label: "프로젝트" },
   { key: "sites", label: "현장" },
   { key: "quotes", label: "견적서" },
+  { key: "purchase_orders", label: "발주서" },
 ];
 
 export default async function ProjectsPage({
@@ -36,6 +38,7 @@ export default async function ProjectsPage({
       </div>
       {active === "sites" && <SitesSection />}
       {active === "quotes" && <QuotesSection />}
+      {active === "purchase_orders" && <PurchaseOrdersSection />}
       {active === "list" && <ProjectListSection year={year} siteId={site_id} status={status} report={report} />}
     </div>
   );
