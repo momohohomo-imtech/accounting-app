@@ -780,6 +780,33 @@ HANDOFF에 실행 여부 기록이 없어서 사용자에게 확인 — **사용
 - **미검증**: 로그인 세션 없어서 실제 체크/묶기/해제 흐름을 못 눌러봄 —
   빌드/린트만 통과.
 
+**버그: 견적서 저장이 통째로 안 되던 문제 — PostgREST 스키마 캐시 문제**
+(사용자가 실사용하다 발견, 다음 세션에서 꼭 재확인할 것):
+- 증상: 품목 묶기/대행구매 불러오기 후 "수정 저장"을 눌러도 에러 없이 저장된
+  것처럼 보였지만, 페이지를 나갔다 들어오면 아무것도 저장 안 돼 있었음.
+  화면 에러 메시지 위치를 몰라서 처음엔 못 봤다가, 나중에 콘솔/화면 맨
+  위에서 `Could not find the 'target_amount' column of 'quotes' in the
+  schema cache` 에러를 확인함.
+- **원인**: `updateQuote()`가 `quotes` 테이블 UPDATE(target_amount 포함) →
+  `saveItems()`(품목 저장) 순서로 실행되는데, 첫 단계인 quotes UPDATE가
+  이 에러로 실패하면서 **함수가 그 자리에서 바로 return 해버려 품목 저장
+  단계(saveItems)까지 아예 도달을 못 함** — 그래서 묶기/대행구매 항목이
+  저장 안 되는 것처럼 보였지만 실제 원인은 target_amount 하나였음(HANDOFF
+  버그 교훈 8번과 같은 부류: PostgREST가 스키마 변경을 즉시 인식 못 함).
+  049번 마이그레이션(`quotes.target_amount`)을 실행했다고 했는데도 이
+  에러가 났던 걸로 봐서 컬럼 자체는 생겼어도 PostgREST 캐시가 안 갱신된
+  것으로 추정.
+- **조치**: `supabase/051_fix_quotes_schema_cache.sql` 전달함 —
+  `target_amount` 컬럼 재보장(`add column if not exists`, 이미 있으면
+  무해) + `notify pgrst, 'reload schema';`로 캐시 강제 새로고침.
+  **실행 여부 및 실제로 저장되는지 다음 세션에서 꼭 재확인할 것.** 안
+  되면 Supabase 대시보드 Settings → API에서 수동 새로고침 버튼도 눌러보게
+  안내함.
+- **교훈 추가**: 앞으로 새 컬럼을 추가하는 마이그레이션을 보낼 때, 특히
+  최근처럼 짧은 간격으로 여러 마이그레이션(048/049/050)을 연달아 보낸
+  경우, "실행했다"는 답변만으로 안심하지 말고 실제 기능이 동작하는지
+  (에러 없이 저장되는지) 사용자가 확인할 때까지는 "미해결"로 간주할 것.
+
 **"이 프로젝트 매입내역 불러오기"에 대행구매도 같이 불러오게 확장**
 (사용자 요청, DB 스키마 변경 없음): `fetchProjectPurchaseItems()`가
 이제 `transactions`(매입) 뿐 아니라 `project_agency_purchases`도 같이
