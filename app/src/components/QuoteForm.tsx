@@ -184,12 +184,12 @@ export function QuoteForm({
 
   async function loadFromProject() {
     if (!values.project_id) return;
-    if (items.some((it) => it.item_name || it.amount) && !(await confirm("지금 입력된 품목을 지우고 이 프로젝트의 매입 내역으로 채우시겠습니까?"))) return;
+    if (items.some((it) => it.item_name || it.amount) && !(await confirm("지금 입력된 품목을 지우고 이 프로젝트의 매입/대행구매 내역으로 채우시겠습니까?"))) return;
     setLoadingFromProject(true);
     const loaded = await fetchProjectPurchaseItems(values.project_id);
     setLoadingFromProject(false);
     if (loaded.length === 0) {
-      setError("이 프로젝트에 매입 내역이 없습니다.");
+      setError("이 프로젝트에 매입/대행구매 내역이 없습니다.");
       return;
     }
     setItems(loaded);
@@ -358,7 +358,7 @@ export function QuoteForm({
             )}
             {values.project_id && (
               <Button type="button" variant="secondary" size="sm" disabled={loadingFromProject} onClick={loadFromProject}>
-                {loadingFromProject ? "불러오는 중..." : "이 프로젝트 매입내역 불러오기"}
+                {loadingFromProject ? "불러오는 중..." : "이 프로젝트 매입/대행구매 내역 불러오기"}
               </Button>
             )}
             <button

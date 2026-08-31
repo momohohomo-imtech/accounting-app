@@ -121,17 +121,20 @@ export async function deleteQuoteRecord(formData: FormData) {
   revalidatePath("/projects");
 }
 
-// 기존 프로젝트의 매입 내역을 그대로 견적 품목 초안으로 불러오기.
+// 기존 프로젝트의 매입 내역 + 대행구매 내역을 그대로 견적 품목 초안으로 불러오기.
 export async function fetchProjectPurchaseItems(projectId: string): Promise<QuoteItemInput[]> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("transactions")
-    .select("item_name, quantity, unit_price, purchase_amount, purchase_vat")
-    .eq("project_id", projectId)
-    .eq("type", "매입")
-    .order("trans_date", { ascending: true });
+  const [{ data: transactions }, { data: agencyPurchases }] = await Promise.all([
+    supabase
+      .from("transactions")
+      .select("item_name, quantity, unit_price, purchase_amount, purchase_vat")
+      .eq("project_id", projectId)
+      .eq("type", "매입")
+      .order("trans_date", { ascending: true }),
+    supabase.from("project_agency_purchases").select("item_name, amount, memo").eq("project_id", projectId),
+  ]);
 
-  return (data ?? []).map((t) => ({
+  const fromTransactions = (transactions ?? []).map((t) => ({
     item_name: t.item_name ?? "",
     spec: "",
     quantity: t.quantity,
@@ -143,4 +146,19 @@ export async function fetchProjectPurchaseItems(projectId: string): Promise<Quot
     group_label: null,
     is_group_summary: false,
   }));
+
+  const fromAgencyPurchases = (agencyPurchases ?? []).map((a) => ({
+    item_name: a.item_name ?? "",
+    spec: "대행구매",
+    quantity: null,
+    unit_price: null,
+    amount: a.amount,
+    handling_fee_pct: 0,
+    note: a.memo ?? "",
+    unit: "",
+    group_label: null,
+    is_group_summary: false,
+  }));
+
+  return [...fromTransactions, ...fromAgencyPurchases];
 }
