@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { formatWon, formatDate } from "@/lib/format";
+import { numberToKoreanAmount } from "@/lib/numberToKorean";
 import { PrintButton } from "@/components/PrintButton";
 import { fieldClass, labelClass } from "@/components/ui/field";
 
@@ -166,6 +167,13 @@ export function QuotePrintView({
               </tbody>
             </table>
           </div>
+        </div>
+
+        <div className="mt-5 flex items-center justify-between rounded-lg border-2 border-brand bg-brand-soft px-4 py-3">
+          <span className="text-sm font-semibold text-slate-700">합계금액 (공급가액+세액)</span>
+          <span className="text-sm font-bold text-slate-900">
+            {numberToKoreanAmount(total)} (<span className="font-mono">{formatWon(total)}</span>)
+          </span>
         </div>
 
         <p className="mt-5 text-sm text-slate-700">아래와 같이 견적합니다.</p>
