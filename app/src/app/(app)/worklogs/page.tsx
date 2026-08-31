@@ -154,6 +154,22 @@ async function WorkLogCalendarSection({
           <WorkLogMonthFilter year={selectedYear} month={selectedMonth} />
         </div>
 
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 print:hidden">
+          <span className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-sm bg-red-50 ring-1 ring-inset ring-red-200" />
+            공휴일
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="rounded bg-indigo-600 px-1.5 py-0.5 text-[10px] font-medium text-white">출장일지</span>
+            출장일지 있음
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+            프로젝트 미선정 작업일지 있음
+          </span>
+          <span>현장 색상은 아래 &quot;현장별 색상&quot; 참고</span>
+        </div>
+
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm print:rounded-none print:border-0 print:shadow-none print:overflow-visible">
           <div className="min-w-[900px] print:min-w-0 print:w-full">
             <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-center text-xs font-semibold text-slate-500">

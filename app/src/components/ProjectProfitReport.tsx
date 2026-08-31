@@ -15,6 +15,7 @@ import { SettlementFinalizedCheckbox } from "@/components/SettlementFinalizedChe
 import { ReportPrintChart } from "@/components/ReportPrintChart";
 import { ReportChartProvider } from "@/components/ReportChartProvider";
 import { ReportChartToggle } from "@/components/ReportChartToggle";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 
 export async function ProjectProfitReport({ projectId, closeHref }: { projectId: string; closeHref: string }) {
   const supabase = await createClient();
@@ -254,43 +255,45 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
         </div>
       </div>
 
-      <div className="order-2 print:order-3 space-y-4">
-        <ProjectPurchaseTable
-          rows={rows.map((t) => {
-            const category = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
-            return {
-              id: t.id,
-              date: t.trans_date,
-              vendor: t.clients?.name ?? t.client_name_raw ?? "-",
-              item: t.item_name ?? "-",
-              category: category?.name ?? "미분류",
-              categoryColor: category ? resolveCategoryColor(category) : undefined,
-              amount: t.purchase_amount + t.purchase_vat,
-            };
-          })}
-        />
-
-        <div className="print:mt-2 print:border-t print:border-slate-400 print:pt-2">
-          <ProjectAgencyPurchaseList
-            projectId={project.id}
-            categories={expenseCategories ?? []}
-            clientNames={clientNames}
-            items={(agencyRows ?? []).map((a) => {
-              const category = one(a.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
+      <CollapsibleSection title="매입내역 · 대행구매액" defaultOpen printAlways bare className="order-2 print:order-3">
+        <div className="space-y-4">
+          <ProjectPurchaseTable
+            rows={rows.map((t) => {
+              const category = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
               return {
-                id: a.id,
-                item_name: a.item_name,
-                amount: a.amount,
-                category_id: a.category_id,
-                category_name: category?.name ?? null,
-                category_color: category ? resolveCategoryColor(category) : undefined,
-                memo: a.memo,
-                client_name: a.client_name,
+                id: t.id,
+                date: t.trans_date,
+                vendor: t.clients?.name ?? t.client_name_raw ?? "-",
+                item: t.item_name ?? "-",
+                category: category?.name ?? "미분류",
+                categoryColor: category ? resolveCategoryColor(category) : undefined,
+                amount: t.purchase_amount + t.purchase_vat,
               };
             })}
           />
+
+          <div className="print:mt-2 print:border-t print:border-slate-400 print:pt-2">
+            <ProjectAgencyPurchaseList
+              projectId={project.id}
+              categories={expenseCategories ?? []}
+              clientNames={clientNames}
+              items={(agencyRows ?? []).map((a) => {
+                const category = one(a.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
+                return {
+                  id: a.id,
+                  item_name: a.item_name,
+                  amount: a.amount,
+                  category_id: a.category_id,
+                  category_name: category?.name ?? null,
+                  category_color: category ? resolveCategoryColor(category) : undefined,
+                  memo: a.memo,
+                  client_name: a.client_name,
+                };
+              })}
+            />
+          </div>
         </div>
-      </div>
+      </CollapsibleSection>
 
       <div className="order-6 print:order-5 border-t border-slate-100 pt-4 space-y-3 print:break-inside-avoid">
         <SettlementFinalizedCheckbox projectId={project.id} initialChecked={Boolean(project.settlement_finalized)} />
@@ -301,14 +304,16 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
         <ReportPrintChart data={categoryBreakdown} quoteTotal={quoteTotal} />
       </div>
 
-      <div className="order-4 print:order-7">
-        <AttachmentList projectId={project.id} items={attachments} />
-      </div>
+      <CollapsibleSection title="첨부파일 (사양서·도면·사진 등)" defaultOpen printAlways bare className="order-4 print:order-7">
+        <AttachmentList projectId={project.id} items={attachments} title="" />
+      </CollapsibleSection>
 
-      <div className="order-8 print:hidden border-t border-slate-100 pt-4">
-        <p className="mb-2 text-sm font-semibold text-slate-900">
-          작업일지내 프로젝트 미선정 <span className="font-normal text-slate-500">(총 {unassignedDayCount}일)</span>
-        </p>
+      <CollapsibleSection
+        title="작업일지내 프로젝트 미선정"
+        headerExtra={<span className="text-sm font-normal text-slate-500">총 {unassignedDayCount}일</span>}
+        bare
+        className="order-8 print:hidden border-t border-slate-100 pt-4"
+      >
         {unassignedLogRows && unassignedLogRows.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[400px] text-sm">
@@ -333,7 +338,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
         ) : (
           <p className="text-sm text-slate-400">미선정 항목이 없습니다.</p>
         )}
-      </div>
+      </CollapsibleSection>
     </div>
     </ReportChartProvider>
     </ProjectMemoProvider>

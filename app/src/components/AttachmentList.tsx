@@ -92,6 +92,7 @@ export function AttachmentList({
   projectId?: string;
   workDate?: string;
   items: AttachmentItem[];
+  /** 빈 문자열을 넘기면 제목을 안 보여줌 — 이미 바깥에서 접이식 섹션 제목으로 보여주고 있을 때. */
   title?: string;
 }) {
   const router = useRouter();
@@ -112,7 +113,7 @@ export function AttachmentList({
 
   return (
     <div className="rounded-xl border border-slate-200 p-3">
-      <p className="mb-2 text-sm font-semibold text-slate-900">{title}</p>
+      {title && <p className="mb-2 text-sm font-semibold text-slate-900">{title}</p>}
 
       {items.length > 0 ? (
         <ul className="mb-2 divide-y divide-slate-100">
