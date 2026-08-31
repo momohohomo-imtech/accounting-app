@@ -7,6 +7,8 @@ import { createTool, updateTool, deleteTool } from "@/lib/actions/tools";
 import { ToolChecklistCreateForm } from "@/components/ToolChecklistCreateForm";
 import { ToolChecklistHistoryTable } from "@/components/ToolChecklistHistoryTable";
 import { ToolChecklistDetailReport } from "@/components/ToolChecklistDetailReport";
+import { KnowHowSection } from "@/components/KnowHowSection";
+import { createKnowHowNote, updateKnowHowNote, deleteKnowHowNote } from "@/lib/actions/knowHow";
 
 const toolFields: FieldConfig[] = [
   { name: "name", label: "공구명", required: true },
@@ -17,12 +19,20 @@ type ChecklistItemRow = { id: string; checklist_id: string; tool_id: string | nu
 
 export async function ToolListSection({ copyFrom, checklist }: { copyFrom?: string; checklist?: string }) {
   const supabase = await createClient();
-  const [{ data: tools }, { data: projects }, { data: checklists }, { data: items }] = await Promise.all([
-    supabase.from("tools").select("*").order("name"),
-    supabase.from("projects").select("id, name, year, sites(name)").order("year", { ascending: false }).order("name"),
-    supabase.from("tool_checklists").select("*, projects(name)").order("created_at", { ascending: false }),
-    supabase.from("tool_checklist_items").select("*"),
-  ]);
+  const [{ data: tools }, { data: projects }, { data: checklists }, { data: items }, { data: knowHowNotes }] =
+    await Promise.all([
+      supabase.from("tools").select("*").order("name"),
+      supabase.from("projects").select("id, name, year, sites(name)").order("year", { ascending: false }).order("name"),
+      supabase.from("tool_checklists").select("*, projects(name)").order("created_at", { ascending: false }),
+      supabase.from("tool_checklist_items").select("*"),
+      supabase.from("know_how_notes").select("*").eq("category", "tools").order("created_at", { ascending: false }),
+    ]);
+
+  async function createKnowHowBound(formData: FormData) {
+    "use server";
+    formData.set("category", "tools");
+    return createKnowHowNote(formData);
+  }
 
   const itemsByChecklist = new Map<string, ChecklistItemRow[]>();
   for (const it of (items ?? []) as ChecklistItemRow[]) {
@@ -81,6 +91,14 @@ export async function ToolListSection({ copyFrom, checklist }: { copyFrom?: stri
             <ToolChecklistHistoryTable rows={historyRows} />
           </div>
         </div>
+
+        <KnowHowSection
+          title="공구리스트 노하우"
+          notes={(knowHowNotes ?? []) as unknown as { id: string; title: string; content: string | null; memo: string | null; created_at: string }[]}
+          createAction={createKnowHowBound}
+          updateAction={updateKnowHowNote}
+          deleteAction={deleteKnowHowNote}
+        />
       </div>
 
       {detailChecklist && (

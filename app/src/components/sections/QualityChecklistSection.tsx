@@ -9,6 +9,8 @@ import {
   updateQualityChecklistItem,
   deleteQualityChecklistItem,
 } from "@/lib/actions/qualityChecklist";
+import { KnowHowSection } from "@/components/KnowHowSection";
+import { createKnowHowNote, updateKnowHowNote, deleteKnowHowNote } from "@/lib/actions/knowHow";
 
 const fields: FieldConfig[] = [
   { name: "process_name", label: "공정/공사명", required: true },
@@ -29,7 +31,7 @@ const fields: FieldConfig[] = [
 
 export async function QualityChecklistSection({ projectId }: { projectId?: string }) {
   const supabase = await createClient();
-  const [{ data: projectTree }, { data: items }] = await Promise.all([
+  const [{ data: projectTree }, { data: items }, { data: knowHowNotes }] = await Promise.all([
     supabase.from("projects").select("id, name, year, site_id, sites(name, clients(name))").order("name"),
     projectId
       ? supabase
@@ -39,6 +41,7 @@ export async function QualityChecklistSection({ projectId }: { projectId?: strin
           .order("process_name")
           .order("created_at")
       : Promise.resolve({ data: [] as { id: string }[] }),
+    supabase.from("know_how_notes").select("*").eq("category", "quality").order("created_at", { ascending: false }),
   ]);
 
   const projectNodes: ProjectTreeNode[] = (projectTree ?? []).map((p) => {
@@ -60,10 +63,16 @@ export async function QualityChecklistSection({ projectId }: { projectId?: strin
     return createQualityChecklistItem(formData);
   }
 
+  async function createKnowHowBound(formData: FormData) {
+    "use server";
+    formData.set("category", "quality");
+    return createKnowHowNote(formData);
+  }
+
   return (
     <div className="space-y-6">
       <div className="print:hidden">
-        <h2 className="mb-3 text-lg font-semibold text-slate-900">품질관리 — 공정/공사별 체크리스트</h2>
+        <h2 className="mb-3 text-lg font-semibold text-slate-900">품질관리 — 공정/공사별 하자보수관리 및 이력</h2>
         <ProjectTreeFilter basePath="/quality-construction" projects={projectNodes} selectedProjectId={projectId ?? ""} />
       </div>
 
@@ -84,6 +93,14 @@ export async function QualityChecklistSection({ projectId }: { projectId?: strin
           </div>
         </>
       )}
+
+      <KnowHowSection
+        title="품질관리 노하우"
+        notes={(knowHowNotes ?? []) as unknown as { id: string; title: string; content: string | null; memo: string | null; created_at: string }[]}
+        createAction={createKnowHowBound}
+        updateAction={updateKnowHowNote}
+        deleteAction={deleteKnowHowNote}
+      />
     </div>
   );
 }

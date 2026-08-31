@@ -9,6 +9,8 @@ import {
   updateConstructionStage,
   deleteConstructionStage,
 } from "@/lib/actions/constructionStages";
+import { KnowHowSection } from "@/components/KnowHowSection";
+import { createKnowHowNote, updateKnowHowNote, deleteKnowHowNote } from "@/lib/actions/knowHow";
 
 const fields: FieldConfig[] = [
   { name: "sort_order", label: "순서", type: "number", width: "8%" },
@@ -30,7 +32,7 @@ const fields: FieldConfig[] = [
 
 export async function ConstructionStageSection({ projectId }: { projectId?: string }) {
   const supabase = await createClient();
-  const [{ data: projectTree }, { data: stages }] = await Promise.all([
+  const [{ data: projectTree }, { data: stages }, { data: knowHowNotes }] = await Promise.all([
     supabase.from("projects").select("id, name, year, site_id, sites(name, clients(name))").order("name"),
     projectId
       ? supabase
@@ -40,6 +42,11 @@ export async function ConstructionStageSection({ projectId }: { projectId?: stri
           .order("sort_order")
           .order("created_at")
       : Promise.resolve({ data: [] as { id: string; status: string }[] }),
+    supabase
+      .from("know_how_notes")
+      .select("*")
+      .eq("category", "construction")
+      .order("created_at", { ascending: false }),
   ]);
 
   const projectNodes: ProjectTreeNode[] = (projectTree ?? []).map((p) => {
@@ -63,6 +70,12 @@ export async function ConstructionStageSection({ projectId }: { projectId?: stri
     "use server";
     formData.set("project_id", projectId ?? "");
     return createConstructionStage(formData);
+  }
+
+  async function createKnowHowBound(formData: FormData) {
+    "use server";
+    formData.set("category", "construction");
+    return createKnowHowNote(formData);
   }
 
   return (
@@ -106,6 +119,14 @@ export async function ConstructionStageSection({ projectId }: { projectId?: stri
           </div>
         </>
       )}
+
+      <KnowHowSection
+        title="공사관리 노하우"
+        notes={(knowHowNotes ?? []) as unknown as { id: string; title: string; content: string | null; memo: string | null; created_at: string }[]}
+        createAction={createKnowHowBound}
+        updateAction={updateKnowHowNote}
+        deleteAction={deleteKnowHowNote}
+      />
     </div>
   );
 }
