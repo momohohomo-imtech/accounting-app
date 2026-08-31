@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { formatWon, formatDate } from "@/lib/format";
 import { numberToKoreanAmount } from "@/lib/numberToKorean";
-import { computeConfirmedAmount, splitVat } from "@/lib/quoteCalc";
+import { computeConfirmedAmount } from "@/lib/quoteCalc";
 import { PrintButton } from "@/components/PrintButton";
 import { QuoteExportButton } from "@/components/QuoteExportButton";
 import { fieldClass, labelClass } from "@/components/ui/field";
@@ -46,12 +46,10 @@ export function QuotePrintView({
 
   const rows = items.map((it) => {
     const confirmed = computeConfirmedAmount(it.amount, it.handling_fee_pct);
-    const { supply, vat } = splitVat(confirmed);
-    return { ...it, confirmed, supply, vat };
+    const adjustedUnitPrice = it.unit_price != null ? computeConfirmedAmount(it.unit_price, it.handling_fee_pct) : null;
+    return { ...it, confirmed, adjustedUnitPrice };
   });
   const total = rows.reduce((s, r) => s + r.confirmed, 0);
-  const supplyAmount = rows.reduce((s, r) => s + r.supply, 0);
-  const vatAmount = rows.reduce((s, r) => s + r.vat, 0);
 
   return (
     <div className="space-y-4">
@@ -104,7 +102,7 @@ export function QuotePrintView({
         <p className="mr-auto text-xs text-slate-400">
           PDF로 저장하려면 인쇄 대화상자의 대상(프린터)에서 &ldquo;PDF로 저장&rdquo;을 선택하세요.
         </p>
-        <QuoteExportButton quote={quote} rows={rows} total={total} supplyAmount={supplyAmount} vatAmount={vatAmount} />
+        <QuoteExportButton quote={quote} rows={rows} total={total} />
         <PrintButton />
       </div>
 
@@ -205,8 +203,8 @@ export function QuotePrintView({
               <th className="py-2 pr-2">품명</th>
               <th className="py-2 pr-2">규격</th>
               <th className="py-2 pr-2 text-right">수량</th>
-              <th className="py-2 pr-2 text-right">공급가액</th>
-              <th className="py-2 pr-2 text-right">세액</th>
+              <th className="py-2 pr-2 text-right">단가</th>
+              <th className="py-2 pr-2 text-right">금액</th>
               <th className="py-2">비고</th>
             </tr>
           </thead>
@@ -217,8 +215,10 @@ export function QuotePrintView({
                 <td className="py-2 pr-2">{it.item_name ?? "-"}</td>
                 <td className="py-2 pr-2 text-slate-500">{it.spec ?? "-"}</td>
                 <td className="py-2 pr-2 text-right font-mono">{it.quantity ?? "-"}</td>
-                <td className="py-2 pr-2 text-right font-mono">{formatWon(it.supply)}</td>
-                <td className="py-2 pr-2 text-right font-mono">{formatWon(it.vat)}</td>
+                <td className="py-2 pr-2 text-right font-mono">
+                  {it.adjustedUnitPrice != null ? formatWon(it.adjustedUnitPrice) : "-"}
+                </td>
+                <td className="py-2 pr-2 text-right font-mono">{formatWon(it.confirmed)}</td>
                 <td className="py-2 text-slate-500">{it.note ?? "-"}</td>
               </tr>
             ))}
@@ -233,11 +233,10 @@ export function QuotePrintView({
           {rows.length > 0 && (
             <tfoot>
               <tr className="border-t-2 border-slate-300">
-                <td colSpan={4} className="py-2 text-right font-semibold text-slate-900">
+                <td colSpan={5} className="py-2 text-right font-semibold text-slate-900">
                   합계
                 </td>
-                <td className="py-2 text-right font-mono font-bold text-slate-900">{formatWon(supplyAmount)}</td>
-                <td className="py-2 text-right font-mono font-bold text-slate-900">{formatWon(vatAmount)}</td>
+                <td className="py-2 text-right font-mono font-bold text-slate-900">{formatWon(total)}</td>
                 <td />
               </tr>
             </tfoot>

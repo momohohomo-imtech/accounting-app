@@ -66,6 +66,30 @@ export function QuoteForm({
     setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
   }
 
+  function handleQuantity(i: number, v: string) {
+    const quantity = v ? Number(v) : null;
+    setItems((prev) =>
+      prev.map((it, idx) => {
+        if (idx !== i) return it;
+        const next = { ...it, quantity };
+        if (quantity && it.unit_price) next.amount = quantity * it.unit_price;
+        return next;
+      })
+    );
+  }
+
+  function handleUnitPrice(i: number, v: string) {
+    const unit_price = v ? Number(v) : null;
+    setItems((prev) =>
+      prev.map((it, idx) => {
+        if (idx !== i) return it;
+        const next = { ...it, unit_price };
+        if (it.quantity && unit_price) next.amount = it.quantity * unit_price;
+        return next;
+      })
+    );
+  }
+
   function addItem() {
     setItems((prev) => [...prev, emptyItem()]);
   }
@@ -202,14 +226,23 @@ export function QuoteForm({
       <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
         <div className="flex flex-wrap items-end gap-4">
           <div className="flex flex-col gap-1">
-            <label className={labelClass}>목표 견적금액 (내부용)</label>
+            <label className={labelClass}>목표 견적금액 (내부용, 100원 단위)</label>
             <input
               type="number"
+              step={100}
               value={values.target_amount}
               onChange={(e) => set("target_amount", e.target.value)}
+              onBlur={(e) => {
+                if (!e.target.value) return;
+                const rounded = Math.round(Number(e.target.value) / 100) * 100;
+                set("target_amount", String(rounded));
+              }}
               placeholder="목표 금액"
               className={`${inputClass} w-40`}
             />
+            {targetAmountNum !== null && (
+              <span className="font-mono text-xs text-slate-500">{formatWon(targetAmountNum)}</span>
+            )}
           </div>
           <p className="text-sm text-slate-600">
             현재 견적액 <span className="font-mono font-semibold text-slate-900">{formatWon(total)}</span>
@@ -248,11 +281,13 @@ export function QuoteForm({
 
         <div className="space-y-1.5 overflow-x-auto">
           <div className="hidden items-center gap-1.5 whitespace-nowrap px-1 text-[11px] font-medium text-slate-500 sm:flex">
+            <span className="w-[3ch] text-center">No</span>
             <span className="w-[10ch]">품명</span>
             <span className="w-[4ch]">규격</span>
-            <span className="w-[4ch]">수량</span>
-            <span className="w-[8ch]">금액</span>
             <span className="w-[2ch] text-center">fee%</span>
+            <span className="w-[4ch]">수량</span>
+            <span className="w-[10ch]">단가</span>
+            <span className="w-[8ch]">금액</span>
             <span className="w-[9ch] text-right">확정금액</span>
             <span className="flex-1">비고</span>
             <span className="w-8" />
@@ -261,6 +296,7 @@ export function QuoteForm({
             const confirmed = computeConfirmedAmount(it.amount || 0, it.handling_fee_pct || 0);
             return (
               <div key={i} className="flex flex-wrap items-center gap-1.5">
+                <span className="w-[3ch] shrink-0 text-center text-xs text-slate-400">{i + 1}</span>
                 <input
                   value={it.item_name}
                   onChange={(e) => updateItem(i, { item_name: e.target.value })}
@@ -275,10 +311,25 @@ export function QuoteForm({
                 />
                 <input
                   type="number"
+                  value={it.handling_fee_pct || ""}
+                  onChange={(e) => updateItem(i, { handling_fee_pct: Number(e.target.value) || 0 })}
+                  placeholder="0"
+                  title="핸들링fee %"
+                  className={`${compactInputClass} w-[2ch]`}
+                />
+                <input
+                  type="number"
                   value={it.quantity ?? ""}
-                  onChange={(e) => updateItem(i, { quantity: e.target.value ? Number(e.target.value) : null })}
+                  onChange={(e) => handleQuantity(i, e.target.value)}
                   placeholder="수량"
                   className={`${compactInputClass} w-[4ch]`}
+                />
+                <input
+                  type="number"
+                  value={it.unit_price ?? ""}
+                  onChange={(e) => handleUnitPrice(i, e.target.value)}
+                  placeholder="단가"
+                  className={`${compactInputClass} w-[10ch]`}
                 />
                 <input
                   type="number"
@@ -286,14 +337,6 @@ export function QuoteForm({
                   onChange={(e) => updateItem(i, { amount: Number(e.target.value) || 0 })}
                   placeholder="금액"
                   className={`${compactInputClass} w-[8ch]`}
-                />
-                <input
-                  type="number"
-                  value={it.handling_fee_pct || ""}
-                  onChange={(e) => updateItem(i, { handling_fee_pct: Number(e.target.value) || 0 })}
-                  placeholder="0"
-                  title="핸들링fee %"
-                  className={`${compactInputClass} w-[2ch]`}
                 />
                 <span className="w-[9ch] shrink-0 text-right font-mono text-xs text-slate-600">{formatWon(confirmed)}</span>
                 <input

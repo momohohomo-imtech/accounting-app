@@ -10,21 +10,18 @@ type Row = {
   spec: string | null;
   quantity: number | null;
   note: string | null;
-  supply: number;
-  vat: number;
+  adjustedUnitPrice: number | null;
+  confirmed: number;
 };
 
 export function QuoteExportButton({
   quote,
   rows,
-  supplyAmount,
-  vatAmount,
+  total,
 }: {
   quote: { quote_number: string | null; title: string; clientName: string | null; created_at: string };
   rows: Row[];
   total: number;
-  supplyAmount: number;
-  vatAmount: number;
 }) {
   async function handleExport() {
     const leadingRows: (string | number)[][] = [
@@ -36,15 +33,15 @@ export function QuoteExportButton({
       r.item_name ?? "-",
       r.spec ?? "-",
       r.quantity ?? "-",
-      r.supply,
-      r.vat,
+      r.adjustedUnitPrice ?? "-",
+      r.confirmed,
       r.note ?? "-",
     ]);
-    data.push(["", "", "합계", "", supplyAmount, vatAmount, ""]);
+    data.push(["", "", "", "", "합계", total, ""]);
 
     await downloadXlsx(
       `견적서_${quote.quote_number ?? quote.title}.xlsx`,
-      ["No", "품명", "규격", "수량", "공급가액", "세액", "비고"],
+      ["No", "품명", "규격", "수량", "단가", "금액", "비고"],
       data,
       "견적서",
       leadingRows
