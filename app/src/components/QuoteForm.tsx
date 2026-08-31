@@ -8,6 +8,7 @@ import { QUOTE_STATUS_OPTIONS } from "@/lib/quoteStatus";
 import { formatWon } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { labelClass } from "@/components/ui/field";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 type ClientOption = { id: string; name: string };
 
@@ -39,6 +40,7 @@ export function QuoteForm({
   quoteId?: string;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [values, setValues] = useState({
     title: initial?.title ?? "",
     client_id: initial?.client_id ?? "",
@@ -95,7 +97,7 @@ export function QuoteForm({
 
   async function loadFromProject() {
     if (!values.project_id) return;
-    if (items.some((it) => it.item_name || it.amount) && !confirm("지금 입력된 품목을 지우고 이 프로젝트의 매입 내역으로 채우시겠습니까?")) return;
+    if (items.some((it) => it.item_name || it.amount) && !(await confirm("지금 입력된 품목을 지우고 이 프로젝트의 매입 내역으로 채우시겠습니까?"))) return;
     setLoadingFromProject(true);
     const loaded = await fetchProjectPurchaseItems(values.project_id);
     setLoadingFromProject(false);
@@ -114,7 +116,7 @@ export function QuoteForm({
       setError("제목을 입력해주세요.");
       return;
     }
-    if (!confirm(quoteId ? "수정 내용을 저장하시겠습니까?" : "견적서를 등록하시겠습니까?")) return;
+    if (!(await confirm(quoteId ? "수정 내용을 저장하시겠습니까?" : "견적서를 등록하시겠습니까?"))) return;
 
     setError(null);
     setPending(true);

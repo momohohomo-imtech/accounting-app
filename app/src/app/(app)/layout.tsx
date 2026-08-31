@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/lib/actions/auth";
 import { SidebarNav, MobileNav } from "@/components/AppNav";
 import { IdleLogout } from "@/components/IdleLogout";
+import { ConfirmProvider } from "@/components/ConfirmProvider";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -15,6 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const role = profile?.role ?? null;
 
   return (
+    <ConfirmProvider>
     <div className="flex min-h-screen bg-slate-50">
       <IdleLogout />
       <aside className="hidden w-60 shrink-0 bg-slate-900 md:flex md:flex-col">
@@ -43,5 +45,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <main className="flex-1 p-4 md:p-8">{children}</main>
       </div>
     </div>
+    </ConfirmProvider>
   );
 }

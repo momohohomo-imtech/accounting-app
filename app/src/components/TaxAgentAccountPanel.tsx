@@ -11,6 +11,7 @@ import {
   unsuspendTaxAgentAccount,
   type TaxAgentAccount,
 } from "@/lib/actions/tax-agent";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 function formatDateTime(iso: string) {
   const d = new Date(iso);
@@ -19,6 +20,7 @@ function formatDateTime(iso: string) {
 
 function AccountRow({ account }: { account: TaxAgentAccount }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [changingPassword, setChangingPassword] = useState(false);
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
@@ -30,7 +32,7 @@ function AccountRow({ account }: { account: TaxAgentAccount }) {
       setMessage("비밀번호는 6자 이상이어야 합니다.");
       return;
     }
-    if (!confirm(`${account.name}(${account.email}) 계정의 비밀번호를 변경하시겠습니까?`)) return;
+    if (!(await confirm(`${account.name}(${account.email}) 계정의 비밀번호를 변경하시겠습니까?`))) return;
     setPending(true);
     setMessage(null);
     const fd = new FormData();
@@ -51,7 +53,7 @@ function AccountRow({ account }: { account: TaxAgentAccount }) {
     const hoursNum = Number(hours);
     const durationLabel = account.suspended && hoursNum > 0 ? ` (${hoursNum}시간 동안만)` : "";
     const verb = account.suspended ? "정지를 해제" : "일시 정지";
-    if (!confirm(`${account.name}(${account.email}) 계정을 ${verb}${durationLabel}하시겠습니까?`)) return;
+    if (!(await confirm(`${account.name}(${account.email}) 계정을 ${verb}${durationLabel}하시겠습니까?`))) return;
     setPending(true);
     setMessage(null);
     const fd = new FormData();

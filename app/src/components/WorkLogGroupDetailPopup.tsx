@@ -14,6 +14,7 @@ import { ModalPrintButton } from "@/components/ModalPrintButton";
 import { ModalPortal } from "@/components/ModalPortal";
 import { downloadXlsx } from "@/lib/xlsxExport";
 import { useEscapeKey } from "@/lib/useEscapeKey";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 function formatMonthDay(dateKey: string) {
   const [, m, d] = dateKey.split("-");
@@ -86,6 +87,7 @@ export function WorkLogGroupDetailPopup({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [entries, setEntries] = useState<WorkLogDetailEntry[] | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(title);
@@ -110,9 +112,9 @@ export function WorkLogGroupDetailPopup({
       return;
     }
     if (
-      !confirm(
+      !(await confirm(
         `"${title}"을(를) "${newTitle}"(으)로 바꾸면 ${year}년 달력에 있는 이 내용의 모든 날짜에 반영됩니다. 계속할까요?`
-      )
+      ))
     )
       return;
     setRenaming(true);

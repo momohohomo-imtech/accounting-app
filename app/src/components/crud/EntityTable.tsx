@@ -7,6 +7,7 @@ import { Table, THead, Tr, Td } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
 import { formatNumber } from "@/lib/format";
 import { useEscapeKey } from "@/lib/useEscapeKey";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 type Row = Record<string, unknown> & { id: string };
 
@@ -64,6 +65,7 @@ export function EntityTable({
   /** Show the edit form in a modal instead of expanding the row inline. */
   editPopup?: boolean;
 }) {
+  const confirm = useConfirm();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -136,12 +138,11 @@ export function EntityTable({
             <Tr key={row.id} className="bg-slate-50">
               <td colSpan={visibleFields.length + 1} className="py-3 pr-4">
                 <form
-                  action={(fd) => {
-                    updateAction(fd);
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!(await confirm("수정 내용을 저장하시겠습니까?"))) return;
+                    updateAction(new FormData(e.currentTarget));
                     setEditingId(null);
-                  }}
-                  onSubmit={(e) => {
-                    if (!confirm("수정 내용을 저장하시겠습니까?")) e.preventDefault();
                   }}
                   className="space-y-3"
                 >
@@ -211,12 +212,11 @@ export function EntityTable({
         <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
           <h2 className="mb-4 text-lg font-semibold text-slate-900">수정</h2>
           <form
-            action={(fd) => {
-              updateAction(fd);
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!(await confirm("수정 내용을 저장하시겠습니까?"))) return;
+              updateAction(new FormData(e.currentTarget));
               setEditingId(null);
-            }}
-            onSubmit={(e) => {
-              if (!confirm("수정 내용을 저장하시겠습니까?")) e.preventDefault();
             }}
             className="space-y-3"
           >

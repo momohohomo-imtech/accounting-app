@@ -6,6 +6,7 @@ import { formatWon } from "@/lib/format";
 import { cx } from "@/lib/cx";
 import { Button } from "@/components/ui/Button";
 import { bulkImportPayroll } from "@/lib/actions/employees";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 type EmployeeRef = { id: string; employee_no: string | null; name: string };
 
@@ -56,6 +57,7 @@ function netOf(r: EditableRow) {
 
 export function PayrollImport({ employees }: { employees: EmployeeRef[] }) {
   const [payMonth, setPayMonth] = useState("");
+  const confirm = useConfirm();
   const [rows, setRows] = useState<EditableRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -104,7 +106,7 @@ export function PayrollImport({ employees }: { employees: EmployeeRef[] }) {
       setError("직원이 지정되지 않은 행이 있습니다. 모든 행에 직원을 선택해주세요.");
       return;
     }
-    if (!confirm(`${rows.length}건을 ${payMonth} 급여로 등록하시겠습니까?`)) return;
+    if (!(await confirm(`${rows.length}건을 ${payMonth} 급여로 등록하시겠습니까?`))) return;
 
     setSaving(true);
     setError(null);

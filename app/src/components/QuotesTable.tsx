@@ -108,14 +108,7 @@ export function QuotesTable({ rows }: { rows: QuoteRow[] }) {
                   {confirmDeleteId === q.id ? (
                     <form action={deleteQuoteRecord} className="flex items-center gap-1">
                       <input type="hidden" name="id" value={q.id} />
-                      <Button
-                        variant="danger"
-                        size="xs"
-                        type="submit"
-                        onClick={(e) => {
-                          if (!confirm("정말로 삭제하시겠습니까? 삭제하면 복구할 수 없습니다.")) e.preventDefault();
-                        }}
-                      >
+                      <Button variant="danger" size="xs" type="submit">
                         확인
                       </Button>
                       <Button variant="secondary" size="xs" type="button" onClick={() => setConfirmDeleteId(null)}>

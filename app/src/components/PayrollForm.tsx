@@ -4,6 +4,7 @@ import { useState } from "react";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { formatWon } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 export type EmployeeOption = {
   id: string;
@@ -96,6 +97,7 @@ export function PayrollForm({
   submitLabel?: string;
   onCancel?: () => void;
 }) {
+  const confirm = useConfirm();
   const [employeeId, setEmployeeId] = useState(initial?.employee_id ?? employees[0]?.id ?? "");
   const [values, setValues] = useState<Values>(() =>
     initial ? valuesFromInitial(initial) : defaultsFor(employees[0])
@@ -124,9 +126,10 @@ export function PayrollForm({
 
   return (
     <form
-      action={action}
-      onSubmit={(e) => {
-        if (!confirm(initial ? "수정 내용을 저장하시겠습니까?" : "이 급여를 등록하시겠습니까?")) e.preventDefault();
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!(await confirm(initial ? "수정 내용을 저장하시겠습니까?" : "이 급여를 등록하시겠습니까?"))) return;
+        action(new FormData(e.currentTarget));
       }}
       className="space-y-3"
     >

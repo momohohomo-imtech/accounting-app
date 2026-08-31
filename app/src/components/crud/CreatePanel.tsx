@@ -5,6 +5,7 @@ import type { FieldConfig } from "./types";
 import { EntityForm } from "./EntityForm";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 export function CreatePanel({
   title,
@@ -15,6 +16,7 @@ export function CreatePanel({
   fields: FieldConfig[];
   createAction: (formData: FormData) => void;
 }) {
+  const confirm = useConfirm();
   const [open, setOpen] = useState(false);
 
   if (!open) {
@@ -32,12 +34,11 @@ export function CreatePanel({
         </Button>
       </CardHeader>
       <form
-        action={(fd) => {
-          createAction(fd);
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!(await confirm(`${title}을(를) 추가하시겠습니까?`))) return;
+          createAction(new FormData(e.currentTarget));
           setOpen(false);
-        }}
-        onSubmit={(e) => {
-          if (!confirm(`${title}을(를) 추가하시겠습니까?`)) e.preventDefault();
         }}
         className="space-y-3"
       >

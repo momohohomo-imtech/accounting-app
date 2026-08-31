@@ -9,6 +9,7 @@ import { formatWon } from "@/lib/format";
 import { VAT_EXEMPT_CATEGORIES } from "@/lib/vatExempt";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import { useEscapeKey } from "@/lib/useEscapeKey";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 type Option = { id: string; name: string };
 type ClientOption = Option & { default_item_name?: string | null; default_category_id?: string | null };
@@ -69,6 +70,7 @@ export function TransactionForm({
   redirectTo?: string;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const clientNameSuggestions = Array.from(new Set([...clients.map((c) => c.name), ...rawClientNames])).sort((a, b) =>
     a.localeCompare(b, "ko")
   );
@@ -325,7 +327,7 @@ export function TransactionForm({
       return;
     }
 
-    if (!confirm(initial ? "수정 내용을 저장하시겠습니까?" : `이 거래를 등록하시겠습니까? (${validItems.length}건)`)) return;
+    if (!(await confirm(initial ? "수정 내용을 저장하시겠습니까?" : `이 거래를 등록하시겠습니까? (${validItems.length}건)`))) return;
     setError(null);
 
     // 종류구분이 비과세면 체크박스 state가(예전 데이터 등으로) true로 남아있어도 무조건 무시 —

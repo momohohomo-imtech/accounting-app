@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
@@ -23,7 +22,11 @@ export async function saveDayWorkLogs(formData: FormData) {
   if (rows.length) await supabase.from("work_logs").insert(rows);
 
   const [year, month] = logDate.split("-");
-  redirect(`/worklogs?year=${Number(year)}&month=${Number(month)}`);
+  revalidatePath("/worklogs");
+  // 커스텀 확인 팝업(비동기) 도입 이후로는 네이티브 <form action>을 통해 호출되지 않고
+  // 클라이언트에서 직접 호출하므로, 여기서 redirect()를 던지면 깨짐 — 경로만 반환하고
+  // 이동은 호출한 쪽(WorkLogForm)에서 router.push로 처리.
+  return { redirectTo: `/worklogs?year=${Number(year)}&month=${Number(month)}` };
 }
 
 export type WorkLogDetailEntry = { id: string; log_date: string; content: string | null };

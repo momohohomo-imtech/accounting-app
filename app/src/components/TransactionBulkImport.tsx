@@ -6,6 +6,7 @@ import { formatWon } from "@/lib/format";
 import { cx } from "@/lib/cx";
 import { Button } from "@/components/ui/Button";
 import { bulkImportTransactions, type BulkTransactionInput } from "@/lib/actions/transactions";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 type Option = { id: string; name: string };
 
@@ -44,6 +45,7 @@ export function TransactionBulkImport({
   paymentMethods: Option[];
   expenseCategories: Option[];
 }) {
+  const confirm = useConfirm();
   const [rows, setRows] = useState<EditableRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -111,10 +113,11 @@ export function TransactionBulkImport({
 
   async function handleSave() {
     if (!rows) return;
-    if (!confirm(`${rows.length}건을 일괄 등록하시겠습니까?`)) return;
+    if (!(await confirm(`${rows.length}건을 일괄 등록하시겠습니까?`))) return;
     setSaving(true);
     setError(null);
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- client_name_display is UI-only, strip it before sending
       const result = await bulkImportTransactions(rows.map(({ client_name_display, ...r }) => r));
       if (result?.error) {
         setError(result.error);

@@ -166,14 +166,7 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
                         <form action={deleteTransactionRecord} className="flex shrink-0 items-center gap-1 print:hidden">
                           <input type="hidden" name="id" value={it.id} />
                           <span className="text-xs font-medium text-red-600">정말 삭제?</span>
-                          <Button
-                            variant="danger"
-                            size="xs"
-                            type="submit"
-                            onClick={(e) => {
-                              if (!confirm("정말로 이 내역을 삭제하시겠습니까? 삭제하면 복구할 수 없습니다.")) e.preventDefault();
-                            }}
-                          >
+                          <Button variant="danger" size="xs" type="submit">
                             확인
                           </Button>
                           <Button variant="secondary" size="xs" type="button" onClick={() => setConfirmDeleteId(null)}>

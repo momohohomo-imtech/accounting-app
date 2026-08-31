@@ -43,6 +43,7 @@ export function SiteAggregatePopup({
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 팝업 열릴 때 최초 데이터 로드
     load(initialYear, "1-12");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siteId]);
