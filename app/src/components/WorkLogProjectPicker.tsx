@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ModalPortal } from "@/components/ModalPortal";
 import { Button } from "@/components/ui/Button";
 import { fieldClass } from "@/components/ui/field";
+import { projectStatusLabel } from "@/lib/projectStatus";
 import type { WorkLogProjectOption } from "@/components/WorkLogRowInput";
 
 function projectNumber(code: string | null) {
@@ -25,18 +26,20 @@ export function WorkLogProjectPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [year, setYear] = useState(defaultYear);
+  const selected = projects.find((p) => p.id === value);
+  // 이미 완료 프로젝트가 선택돼 있으면 다시 열었을 때도 목록에 계속 보이도록 기본값을 맞춤.
+  const [showCompleted, setShowCompleted] = useState(Boolean(selected && selected.status !== "ongoing"));
 
   const years = useMemo(() => Array.from(new Set(projects.map((p) => p.year))).sort((a, b) => b - a), [projects]);
 
-  const selected = projects.find((p) => p.id === value);
-
-  // 진행중 프로젝트만, 번호(프로젝트코드 뒤 순번) 큰 것이 위로.
+  // 기본은 진행중만, 체크박스로 완료 등 나머지 상태도 함께 보이게. 번호(프로젝트코드
+  // 뒤 순번) 큰 것이 위로.
   const listForYear = useMemo(
     () =>
       [...projects]
-        .filter((p) => p.year === year && p.status === "ongoing")
+        .filter((p) => p.year === year && (showCompleted || p.status === "ongoing"))
         .sort((a, b) => projectNumber(b.project_code) - projectNumber(a.project_code)),
-    [projects, year]
+    [projects, year, showCompleted]
   );
 
   function openPicker() {
@@ -57,7 +60,18 @@ export function WorkLogProjectPicker({
             onClick={() => setOpen(false)}
           >
             <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-              <h3 className="mb-3 font-semibold text-slate-900">프로젝트 선택</h3>
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="font-semibold text-slate-900">프로젝트 선택</h3>
+                <label className="flex items-center gap-1 text-xs text-slate-500">
+                  <input
+                    type="checkbox"
+                    checked={showCompleted}
+                    onChange={(e) => setShowCompleted(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-slate-900"
+                  />
+                  완료 프로젝트도 보기
+                </label>
+              </div>
               <div className="mb-3 flex items-center gap-2">
                 <label className="text-xs text-slate-500">연도</label>
                 <select value={year} onChange={(e) => setYear(Number(e.target.value))} className={fieldClass}>
@@ -91,10 +105,15 @@ export function WorkLogProjectPicker({
                   >
                     {p.name}
                     {p.project_code ? ` (${p.project_code})` : ""}
+                    {p.status !== "ongoing" && (
+                      <span className="ml-1.5 text-xs opacity-70">[{projectStatusLabel(p.status)}]</span>
+                    )}
                   </button>
                 ))}
                 {listForYear.length === 0 && (
-                  <p className="px-3 py-2 text-sm text-slate-400">해당 연도에 진행중인 프로젝트가 없습니다.</p>
+                  <p className="px-3 py-2 text-sm text-slate-400">
+                    해당 연도에 {showCompleted ? "" : "진행중인 "}프로젝트가 없습니다.
+                  </p>
                 )}
               </div>
               <div className="mt-4 flex justify-end">
