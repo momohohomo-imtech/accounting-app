@@ -28,10 +28,11 @@ export function PurchaseOrderPrintView({
   const total = items.reduce((s, it) => s + it.amount, 0);
 
   return (
-    <div className="hidden rounded-2xl border border-slate-200 bg-white p-6 print:block print:rounded-none print:border-0 print:p-0">
-      <div className="mb-2 flex justify-end">
+    <div className="space-y-2">
+      <div className="flex justify-end print:hidden">
         <PrintButton />
       </div>
+      <div className="hidden rounded-2xl border border-slate-200 bg-white p-6 print:block print:rounded-none print:border-0 print:p-0">
       <div className="mb-6 flex items-start justify-between">
         <div>
           <h2 className="text-xl font-bold text-slate-900">발주서</h2>
@@ -107,6 +108,7 @@ export function PurchaseOrderPrintView({
           <p className="whitespace-pre-wrap text-slate-700">{purchaseOrder.memo}</p>
         </div>
       )}
+      </div>
     </div>
   );
 }

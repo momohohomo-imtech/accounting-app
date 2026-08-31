@@ -85,11 +85,11 @@ export function QuotePrintView({
         </div>
       </div>
 
-      <div className="hidden rounded-2xl border border-slate-200 bg-white p-6 print:block print:rounded-none print:border-0 print:p-0">
-        <div className="mb-2 flex justify-end print:hidden">
-          <PrintButton />
-        </div>
+      <div className="flex justify-end print:hidden">
+        <PrintButton />
+      </div>
 
+      <div className="hidden rounded-2xl border border-slate-200 bg-white p-6 print:block print:rounded-none print:border-0 print:p-0">
         <div className="flex items-center gap-2.5">
           <Image src="/logo-lockup.png" alt="" width={30} height={24} className="h-6 w-auto" />
           <span className="ml-auto font-mono text-[11px] tracking-widest text-slate-400">QUOTATION</span>
