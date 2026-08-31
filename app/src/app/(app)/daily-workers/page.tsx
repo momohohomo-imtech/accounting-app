@@ -23,9 +23,9 @@ const TABS = [
 export default async function DailyWorkersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; office_id?: string; year?: string; months?: string }>;
+  searchParams: Promise<{ tab?: string; office_id?: string; year?: string; months?: string; client?: string }>;
 }) {
-  const { tab, office_id, year, months } = await searchParams;
+  const { tab, office_id, year, months, client } = await searchParams;
   const active = tab ?? "list";
 
   return (
@@ -36,7 +36,7 @@ export default async function DailyWorkersPage({
       </div>
       {active === "offices" && <DailyWorkerOfficesSection />}
       {active === "access" && <AccessListsSection />}
-      {active === "usage" && <DailyWorkerUsageSection year={year} months={months} />}
+      {active === "usage" && <DailyWorkerUsageSection year={year} months={months} client={client} />}
       {active === "list" && <WorkerListSection officeId={office_id} />}
     </div>
   );

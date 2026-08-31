@@ -5,7 +5,15 @@ import { DailyWorkerUsageFilter } from "@/components/DailyWorkerUsageFilter";
 import { DailyWorkerUsageExportButtons } from "@/components/DailyWorkerUsageExportButtons";
 import { DailyWorkerUsageTable } from "@/components/DailyWorkerUsageTable";
 
-export async function DailyWorkerUsageSection({ year, months }: { year?: string; months?: string }) {
+export async function DailyWorkerUsageSection({
+  year,
+  months,
+  client,
+}: {
+  year?: string;
+  months?: string;
+  client?: string;
+}) {
   const supabase = await createClient();
   const currentYear = new Date().getFullYear();
   const selectedYear = year ? Number(year) : currentYear;
@@ -42,6 +50,9 @@ export async function DailyWorkerUsageSection({ year, months }: { year?: string;
     }))
     .filter((t) => officeNames.has(t.client_name) || t.item_name.includes("인건비"));
 
+  const clientOptions = Array.from(new Set(usageRows.map((r) => r.client_name))).sort((a, b) => a.localeCompare(b));
+  const filteredRows = client ? usageRows.filter((r) => r.client_name === client) : usageRows;
+
   const firstYear = Math.min(
     firstTx?.[0]?.trans_date ? Number(firstTx[0].trans_date.slice(0, 4)) : currentYear,
     currentYear
@@ -60,15 +71,22 @@ export async function DailyWorkerUsageSection({ year, months }: { year?: string;
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
-        <DailyWorkerUsageFilter years={years} selectedYear={selectedYear} months={months ?? "1-12"} />
-        <DailyWorkerUsageExportButtons rows={usageRows} periodLabel={`${selectedYear}년_${monthLabel}`} />
+        <DailyWorkerUsageFilter
+          years={years}
+          selectedYear={selectedYear}
+          months={months ?? "1-12"}
+          clientOptions={clientOptions}
+          selectedClient={client ?? ""}
+        />
+        <DailyWorkerUsageExportButtons rows={filteredRows} periodLabel={`${selectedYear}년_${monthLabel}`} />
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm print:border-0 print:p-0 print:shadow-none">
         <h2 className="mb-3 hidden font-semibold text-slate-900 print:block">
           일용직 사용내역 — {selectedYear}년 {monthLabel}
+          {client ? ` · ${client}` : ""}
         </h2>
-        <DailyWorkerUsageTable rows={usageRows} />
+        <DailyWorkerUsageTable rows={filteredRows} />
       </div>
     </div>
   );
