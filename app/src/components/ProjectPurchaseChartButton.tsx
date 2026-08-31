@@ -55,19 +55,19 @@ export function PieChart({ data, total }: { data: CategoryAmount[]; total: numbe
         )}
         {data.length === 0 && <circle cx={cx} cy={cy} r={r} fill="#e2e8f0" />}
       </svg>
-      <div className="min-w-0 flex-1 space-y-1.5">
+      <div className="min-w-0 flex-1 space-y-1.5 print:space-y-0.5">
         {slices.map((s) => (
-          <div key={s.name} className="flex items-center gap-2 text-sm">
-            <span className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: sliceColor(s.name) }} />
+          <div key={s.name} className="flex items-center gap-2 text-sm print:text-[10px]">
+            <span className="h-3 w-3 shrink-0 rounded-sm print:h-2 print:w-2" style={{ backgroundColor: sliceColor(s.name) }} />
             <span className={`min-w-0 flex-1 truncate ${s.isTop ? "font-semibold text-slate-900" : "text-slate-700"}`}>
               {s.name}
               {s.isTop && (
-                <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 print:px-1 print:py-0 print:text-[8px]">
                   최다 지출
                 </span>
               )}
             </span>
-            <span className="shrink-0 font-mono text-xs text-slate-500">{(s.pct * 100).toFixed(1)}%</span>
+            <span className="shrink-0 font-mono text-xs text-slate-500 print:text-[9px]">{(s.pct * 100).toFixed(1)}%</span>
             <span className="shrink-0 font-mono font-semibold text-slate-900">{formatWon(s.amount)}</span>
           </div>
         ))}
@@ -84,25 +84,25 @@ export function BarChart({ data, max: maxOverride }: { data: CategoryAmount[]; m
   const base = maxOverride ?? totalSum;
   const barMax = Math.max(1, maxOverride ?? 0, ...data.map((d) => d.amount));
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-2.5 print:space-y-0.5">
       {data.map((d, i) => (
-        <div key={d.name} className="flex items-center gap-2">
+        <div key={d.name} className="flex items-center gap-2 print:text-[10px]">
           <span
-            className={`w-24 shrink-0 truncate text-sm ${i === 0 && d.name !== REMAINDER_LABEL ? "font-semibold text-slate-900" : "text-slate-700"}`}
+            className={`w-24 shrink-0 truncate text-sm print:text-[10px] ${i === 0 && d.name !== REMAINDER_LABEL ? "font-semibold text-slate-900" : "text-slate-700"}`}
             title={d.name}
           >
             {d.name}
           </span>
-          <span className="w-12 shrink-0 text-right font-mono text-xs text-slate-500">
+          <span className="w-12 shrink-0 text-right font-mono text-xs text-slate-500 print:text-[9px]">
             {(base > 0 ? (d.amount / base) * 100 : 0).toFixed(1)}%
           </span>
-          <div className="h-5 flex-1 overflow-hidden rounded bg-slate-100">
+          <div className="h-5 flex-1 overflow-hidden rounded bg-slate-100 print:h-3">
             <div
               className="h-full rounded"
               style={{ width: `${(d.amount / barMax) * 100}%`, backgroundColor: sliceColor(d.name) }}
             />
           </div>
-          <span className="w-24 shrink-0 text-right font-mono text-sm font-semibold text-slate-900">
+          <span className="w-24 shrink-0 text-right font-mono text-sm font-semibold text-slate-900 print:text-[10px]">
             {formatWon(d.amount)}
           </span>
         </div>
