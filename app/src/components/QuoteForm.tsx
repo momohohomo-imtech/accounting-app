@@ -282,12 +282,12 @@ export function QuoteForm({
         <div className="space-y-1.5 overflow-x-auto">
           <div className="hidden items-center gap-1.5 whitespace-nowrap px-1 text-[11px] font-medium text-slate-500 sm:flex">
             <span className="w-[3ch] text-center">No</span>
-            <span className="w-[10ch]">품명</span>
-            <span className="w-[4ch]">규격</span>
-            <span className="w-[2ch] text-center">fee%</span>
-            <span className="w-[4ch]">수량</span>
-            <span className="w-[10ch]">단가</span>
-            <span className="w-[8ch]">금액</span>
+            <span className="w-[20ch]">품명</span>
+            <span className="w-[5ch]">규격</span>
+            <span className="w-[10ch] text-center">fee%</span>
+            <span className="w-[10ch]">수량</span>
+            <span className="w-[15ch]">단가</span>
+            <span className="w-[20ch]">금액</span>
             <span className="w-[9ch] text-right">확정금액</span>
             <span className="flex-1">비고</span>
             <span className="w-8" />
@@ -301,13 +301,13 @@ export function QuoteForm({
                   value={it.item_name}
                   onChange={(e) => updateItem(i, { item_name: e.target.value })}
                   placeholder="품명"
-                  className={`${compactInputClass} w-[10ch]`}
+                  className={`${compactInputClass} w-[20ch]`}
                 />
                 <input
                   value={it.spec}
                   onChange={(e) => updateItem(i, { spec: e.target.value })}
                   placeholder="규격"
-                  className={`${compactInputClass} w-[4ch]`}
+                  className={`${compactInputClass} w-[5ch]`}
                 />
                 <input
                   type="number"
@@ -315,28 +315,28 @@ export function QuoteForm({
                   onChange={(e) => updateItem(i, { handling_fee_pct: Number(e.target.value) || 0 })}
                   placeholder="0"
                   title="핸들링fee %"
-                  className={`${compactInputClass} w-[2ch]`}
+                  className={`${compactInputClass} w-[10ch]`}
                 />
                 <input
                   type="number"
                   value={it.quantity ?? ""}
                   onChange={(e) => handleQuantity(i, e.target.value)}
                   placeholder="수량"
-                  className={`${compactInputClass} w-[4ch]`}
+                  className={`${compactInputClass} w-[10ch]`}
                 />
                 <input
                   type="number"
                   value={it.unit_price ?? ""}
                   onChange={(e) => handleUnitPrice(i, e.target.value)}
                   placeholder="단가"
-                  className={`${compactInputClass} w-[10ch]`}
+                  className={`${compactInputClass} w-[15ch]`}
                 />
                 <input
                   type="number"
                   value={it.amount || ""}
                   onChange={(e) => updateItem(i, { amount: Number(e.target.value) || 0 })}
                   placeholder="금액"
-                  className={`${compactInputClass} w-[8ch]`}
+                  className={`${compactInputClass} w-[20ch]`}
                 />
                 <span className="w-[9ch] shrink-0 text-right font-mono text-xs text-slate-600">{formatWon(confirmed)}</span>
                 <input
