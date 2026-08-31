@@ -54,7 +54,7 @@ export function BusinessTripBlankFormPopup({ onClose }: { onClose: () => void })
               </tbody>
             </table>
             <p className="mb-2 text-slate-400">
-              ※ 하루에 여러 프로젝트(같거나 다른 공사일)를 진행한 경우, 아래 표의 "공사일"과 "프로젝트명" 칸에
+              ※ 하루에 여러 프로젝트(같거나 다른 공사일)를 진행한 경우, 아래 표의 &quot;공사일&quot;과 &quot;프로젝트명&quot; 칸에
               각 줄이 어느 날짜/프로젝트인지 적어주세요.
             </p>
 

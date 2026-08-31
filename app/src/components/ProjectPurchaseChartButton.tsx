@@ -32,14 +32,16 @@ export function PieChart({ data, total }: { data: CategoryAmount[]; total: numbe
   const cx = size / 2;
   const cy = size / 2;
 
-  let cursor = 0;
-  const slices = data.map((d, i) => {
-    const pct = total > 0 ? d.amount / total : 0;
-    const startAngle = cursor * 360;
-    cursor += pct;
-    const endAngle = cursor * 360;
-    return { ...d, pct, startAngle, endAngle, isTop: i === 0 && d.name !== REMAINDER_LABEL };
-  });
+  const slices = data.reduce<Array<CategoryAmount & { pct: number; startAngle: number; endAngle: number; isTop: boolean }>>(
+    (acc, d, i) => {
+      const pct = total > 0 ? d.amount / total : 0;
+      const startAngle = acc.length > 0 ? acc[acc.length - 1].endAngle : 0;
+      const endAngle = startAngle + pct * 360;
+      acc.push({ ...d, pct, startAngle, endAngle, isTop: i === 0 && d.name !== REMAINDER_LABEL });
+      return acc;
+    },
+    []
+  );
 
   return (
     <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">

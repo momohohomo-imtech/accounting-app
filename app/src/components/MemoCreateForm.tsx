@@ -22,7 +22,6 @@ export function MemoCreateForm({ createAction }: { createAction: (formData: Form
       >
         <div className="flex flex-col gap-1">
           <label className={labelClass}>제목</label>
-          {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
           <input name="title" required autoFocus className={fieldClass} />
         </div>
         <div className="flex flex-col gap-1">

@@ -8,17 +8,18 @@ const CHECK_INTERVAL_MS = 30 * 1000;
 const ACTIVITY_EVENTS = ["mousemove", "mousedown", "keydown", "scroll", "touchstart"] as const;
 
 export function IdleLogout() {
-  const lastActivity = useRef(Date.now());
+  const lastActivity = useRef<number | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     const markActive = () => {
       lastActivity.current = Date.now();
     };
+    markActive();
     ACTIVITY_EVENTS.forEach((event) => window.addEventListener(event, markActive, { passive: true }));
 
     const interval = setInterval(() => {
-      if (Date.now() - lastActivity.current >= IDLE_LIMIT_MS) {
+      if (lastActivity.current !== null && Date.now() - lastActivity.current >= IDLE_LIMIT_MS) {
         formRef.current?.requestSubmit();
       }
     }, CHECK_INTERVAL_MS);

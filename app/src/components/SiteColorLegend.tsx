@@ -73,7 +73,7 @@ export function SiteColorLegend({ sites }: { sites: SiteWithColor[] }) {
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm print:hidden">
       <h2 className="mb-1 font-semibold text-slate-900">현장별 색상</h2>
       <p className="mb-3 text-xs text-slate-400">
-        현장마다 자동으로 고유색이 배정돼요. 특정 현장 색을 바꾸고 싶으면 "수정"을 눌러 직접 지정하세요.
+        현장마다 자동으로 고유색이 배정돼요. 특정 현장 색을 바꾸고 싶으면 &quot;수정&quot;을 눌러 직접 지정하세요.
       </p>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {sites.map((s) => (
