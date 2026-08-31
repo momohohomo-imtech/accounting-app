@@ -171,6 +171,14 @@ async function ProjectListSection({
       colorField: "contract_amount_estimated",
       secondaryColorField: "contract_amount_minimum",
     },
+    {
+      name: "profitRate",
+      label: "이익율",
+      readOnly: true,
+      width: "6%",
+      colorField: "contract_amount_estimated",
+      secondaryColorField: "contract_amount_minimum",
+    },
     { name: "progress_pct", label: "진행률(%)", type: "number", display: "progress", width: "8%" },
     { name: "year", label: "연도", type: "number", required: true, hideInTable: true },
     { name: "memo", label: "메모", type: "textarea", width: "15%" },
@@ -187,10 +195,14 @@ async function ProjectListSection({
     const contractMismatch =
       !p.settlement_finalized &&
       (p.contract_amount ?? 0) > 0 && (p.quote_amount ?? 0) - (p.contract_amount ?? 0) - agencyAmount !== 0;
+    const profit = p.quote_amount ? p.quote_amount - (purchaseByProject.get(p.id) ?? 0) - agencyAmount : null;
+    // 이익율은 발주액 대비 비율 — 손익보고서 팝업/보고서 페이지와 동일한 계산 기준.
+    const profitRate = p.quote_amount && profit !== null ? `${((profit / p.quote_amount) * 100).toFixed(1)}%` : "-";
     return {
       ...p,
       site_name: (one(p.sites) as { name: string } | undefined)?.name,
-      profit: p.quote_amount ? p.quote_amount - (purchaseByProject.get(p.id) ?? 0) - agencyAmount : null,
+      profit,
+      profitRate,
       contractMismatch,
     };
   });
