@@ -128,8 +128,9 @@ export function PayrollForm({
     <form
       onSubmit={async (e) => {
         e.preventDefault();
+        const form = e.currentTarget;
         if (!(await confirm(initial ? "수정 내용을 저장하시겠습니까?" : "이 급여를 등록하시겠습니까?"))) return;
-        await action(new FormData(e.currentTarget));
+        await action(new FormData(form));
       }}
       className="space-y-3"
     >

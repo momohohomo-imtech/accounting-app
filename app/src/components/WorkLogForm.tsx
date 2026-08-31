@@ -33,9 +33,10 @@ export function WorkLogForm({
     <form
       onSubmit={async (e) => {
         e.preventDefault();
+        const form = e.currentTarget;
         if (!(await confirm("저장하시겠습니까?"))) return;
         setPending(true);
-        const { redirectTo } = await saveDayWorkLogs(new FormData(e.currentTarget));
+        const { redirectTo } = await saveDayWorkLogs(new FormData(form));
         router.push(redirectTo);
       }}
       className="space-y-4"

@@ -141,9 +141,10 @@ export function EntityTable({
                 <form
                   onSubmit={async (e) => {
                     e.preventDefault();
+                    const form = e.currentTarget;
                     if (!(await confirm("수정 내용을 저장하시겠습니까?"))) return;
                     try {
-                      const result = await updateAction(new FormData(e.currentTarget));
+                      const result = await updateAction(new FormData(form));
                       if (result && typeof result === "object" && "error" in result && result.error) {
                         setFormError(String(result.error));
                         return;
@@ -233,9 +234,10 @@ export function EntityTable({
           <form
             onSubmit={async (e) => {
               e.preventDefault();
+              const form = e.currentTarget;
               if (!(await confirm("수정 내용을 저장하시겠습니까?"))) return;
               try {
-                const result = await updateAction(new FormData(e.currentTarget));
+                const result = await updateAction(new FormData(form));
                 if (result && typeof result === "object" && "error" in result && result.error) {
                   setFormError(String(result.error));
                   return;

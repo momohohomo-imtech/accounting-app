@@ -37,9 +37,10 @@ export function CreatePanel({
       <form
         onSubmit={async (e) => {
           e.preventDefault();
+          const form = e.currentTarget;
           if (!(await confirm(`${title}을(를) 추가하시겠습니까?`))) return;
           try {
-            const result = await createAction(new FormData(e.currentTarget));
+            const result = await createAction(new FormData(form));
             if (result && typeof result === "object" && "error" in result && result.error) {
               setFormError(String(result.error));
               return;
