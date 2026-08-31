@@ -28,7 +28,7 @@ export function WorkLogForm({
       onSubmit={(e) => {
         if (!confirm("저장하시겠습니까?")) e.preventDefault();
       }}
-      className="space-y-2"
+      className="space-y-4"
     >
       <input type="hidden" name="log_date" value={dateKey} />
       {rows.map((row, i) => (
