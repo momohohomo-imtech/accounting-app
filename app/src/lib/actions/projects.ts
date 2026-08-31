@@ -31,6 +31,7 @@ export async function createProjectRecord(formData: FormData) {
     const { error } = await supabase.from("projects").insert(parse(formData));
     if (error) return { error: error.message };
     revalidatePath("/projects");
+    revalidatePath("/reports");
   } catch (err) {
     // 예상 못 한 예외까지 잡아서 그대로 반환 — 프로덕션에서 서버 액션이 그냥 throw하면
     // 진짜 메시지 대신 "Minified React error #441" 같은 걸로 가려지는 문제(HANDOFF 교훈)를 피함.
@@ -45,6 +46,7 @@ export async function updateProjectRecord(formData: FormData) {
     const { error } = await supabase.from("projects").update(parse(formData)).eq("id", id);
     if (error) return { error: error.message };
     revalidatePath("/projects");
+    revalidatePath("/reports");
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) };
   }
@@ -73,4 +75,5 @@ export async function deleteProjectRecord(formData: FormData) {
   const id = String(formData.get("id"));
   await supabase.from("projects").delete().eq("id", id);
   revalidatePath("/projects");
+  revalidatePath("/reports");
 }
