@@ -21,6 +21,7 @@ export function WorkLogForm({
   contentSuggestions: string[];
 }) {
   const contentListId = "worklog-content-suggestions";
+  const logYear = Number(dateKey.slice(0, 4));
 
   return (
     <form
@@ -38,6 +39,7 @@ export function WorkLogForm({
           defaultTitle={row?.title ?? ""}
           defaultSiteId={row?.site_id ?? ""}
           defaultProjectId={row?.project_id ?? ""}
+          defaultYear={logYear}
           sites={sites}
           projects={projects}
           contentListId={contentListId}

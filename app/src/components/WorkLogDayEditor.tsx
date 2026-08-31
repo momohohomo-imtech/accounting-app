@@ -17,7 +17,7 @@ export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string
     await Promise.all([
       supabase.from("work_logs").select("*").eq("log_date", dateKey).order("sort_order", { ascending: true }),
       supabase.from("sites").select("id, name, color").order("name"),
-      supabase.from("projects").select("id, name, site_id, year, project_code").order("year", { ascending: false }),
+      supabase.from("projects").select("id, name, site_id, year, project_code, status").order("year", { ascending: false }),
       supabase.from("work_logs").select("title").gte("log_date", monthStart).lte("log_date", monthEnd),
       supabase.from("business_trip_logs").select("*"),
       supabase

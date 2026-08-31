@@ -3,15 +3,24 @@
 import { useMemo, useState } from "react";
 import { resolveSiteColor } from "@/lib/siteColor";
 import { fieldClass } from "@/components/ui/field";
+import { WorkLogProjectPicker } from "@/components/WorkLogProjectPicker";
 
 type SiteOption = { id: string; name: string; color: string | null };
-export type WorkLogProjectOption = { id: string; name: string; site_id: string; year: number; project_code: string | null };
+export type WorkLogProjectOption = {
+  id: string;
+  name: string;
+  site_id: string;
+  year: number;
+  project_code: string | null;
+  status: string;
+};
 
 export function WorkLogRowInput({
   index,
   defaultTitle,
   defaultSiteId,
   defaultProjectId,
+  defaultYear,
   sites,
   projects,
   contentListId,
@@ -20,6 +29,7 @@ export function WorkLogRowInput({
   defaultTitle: string;
   defaultSiteId: string;
   defaultProjectId: string;
+  defaultYear: number;
   sites: SiteOption[];
   projects: WorkLogProjectOption[];
   contentListId: string;
@@ -28,22 +38,7 @@ export function WorkLogRowInput({
   const [projectId, setProjectId] = useState(defaultProjectId || "");
   const selectedSite = sites.find((s) => s.id === siteId);
 
-  const projectsForSite = useMemo(
-    () =>
-      [...projects.filter((p) => p.site_id === siteId)].sort(
-        (a, b) => b.year - a.year || a.name.localeCompare(b.name, "ko")
-      ),
-    [projects, siteId]
-  );
-  const projectsByYear = useMemo(() => {
-    const map = new Map<number, WorkLogProjectOption[]>();
-    for (const p of projectsForSite) {
-      const arr = map.get(p.year) ?? [];
-      arr.push(p);
-      map.set(p.year, arr);
-    }
-    return Array.from(map.entries());
-  }, [projectsForSite]);
+  const projectsForSite = useMemo(() => projects.filter((p) => p.site_id === siteId), [projects, siteId]);
 
   return (
     <div className="flex flex-col gap-1">
@@ -71,26 +66,13 @@ export function WorkLogRowInput({
             ))}
           </select>
         </div>
-        <div className="w-36 shrink-0">
-          <select
-            name={`project_id_${index}`}
-            value={projectId}
-            onChange={(e) => setProjectId(e.target.value)}
-            disabled={!siteId}
-            className={fieldClass}
-          >
-            <option value="">프로젝트 없음</option>
-            {projectsByYear.map(([year, projs]) => (
-              <optgroup key={year} label={`${year}년`}>
-                {projs.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                    {p.project_code ? ` (${p.project_code})` : ""}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+        <input type="hidden" name={`project_id_${index}`} value={projectId} />
+        <div className="w-40 shrink-0">
+          {siteId ? (
+            <WorkLogProjectPicker projects={projectsForSite} value={projectId} onChange={setProjectId} defaultYear={defaultYear} />
+          ) : (
+            <span className={`${fieldClass} block truncate text-slate-400`}>현장 먼저 선택</span>
+          )}
         </div>
       </div>
       <input
