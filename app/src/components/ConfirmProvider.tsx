@@ -29,6 +29,9 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const resolveRef = useRef<((value: boolean) => void) | null>(null);
 
   const confirm = useCallback<ConfirmFn>((message, options) => {
+    // 이전 확인창이 응답 안 된 채 남아있으면(예: 두 번 연속 호출) 그쪽을 취소로 먼저
+    // 끝내서, 그 Promise가 영원히 안 풀리는 채로 남는 일이 없게 함.
+    resolveRef.current?.(false);
     return new Promise((resolve) => {
       resolveRef.current = resolve;
       setState({ message, options });

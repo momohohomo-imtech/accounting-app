@@ -59,7 +59,7 @@ export function EntityTable({
 }: {
   fields: FieldConfig[];
   rows: Row[];
-  updateAction: (formData: FormData) => void | Promise<void>;
+  updateAction: (formData: FormData) => unknown;
   deleteAction: (formData: FormData) => void;
   extraActions?: Record<string, ReactNode>;
   /** Show the edit form in a modal instead of expanding the row inline. */
@@ -67,6 +67,7 @@ export function EntityTable({
 }) {
   const confirm = useConfirm();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -141,18 +142,36 @@ export function EntityTable({
                   onSubmit={async (e) => {
                     e.preventDefault();
                     if (!(await confirm("수정 내용을 저장하시겠습니까?"))) return;
-                    await updateAction(new FormData(e.currentTarget));
-                    setEditingId(null);
+                    try {
+                      const result = await updateAction(new FormData(e.currentTarget));
+                      if (result && typeof result === "object" && "error" in result && result.error) {
+                        setFormError(String(result.error));
+                        return;
+                      }
+                      setFormError(null);
+                      setEditingId(null);
+                    } catch {
+                      setFormError("저장 중 오류가 발생했습니다.");
+                    }
                   }}
                   className="space-y-3"
                 >
                   <input type="hidden" name="id" value={row.id} />
                   <EntityForm fields={fields} defaultValues={row} />
+                  {formError && <p className="text-sm text-red-600">{formError}</p>}
                   <div className="flex gap-2">
                     <Button type="submit" size="sm">
                       저장
                     </Button>
-                    <Button type="button" variant="secondary" size="sm" onClick={() => setEditingId(null)}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setFormError(null);
+                        setEditingId(null);
+                      }}
+                    >
                       취소
                     </Button>
                   </div>
@@ -215,18 +234,36 @@ export function EntityTable({
             onSubmit={async (e) => {
               e.preventDefault();
               if (!(await confirm("수정 내용을 저장하시겠습니까?"))) return;
-              await updateAction(new FormData(e.currentTarget));
-              setEditingId(null);
+              try {
+                const result = await updateAction(new FormData(e.currentTarget));
+                if (result && typeof result === "object" && "error" in result && result.error) {
+                  setFormError(String(result.error));
+                  return;
+                }
+                setFormError(null);
+                setEditingId(null);
+              } catch {
+                setFormError("저장 중 오류가 발생했습니다.");
+              }
             }}
             className="space-y-3"
           >
             <input type="hidden" name="id" value={editingRow.id} />
             <EntityForm fields={fields} defaultValues={editingRow} />
+            {formError && <p className="text-sm text-red-600">{formError}</p>}
             <div className="flex gap-2">
               <Button type="submit" size="sm">
                 저장
               </Button>
-              <Button type="button" variant="secondary" size="sm" onClick={() => setEditingId(null)}>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setFormError(null);
+                  setEditingId(null);
+                }}
+              >
                 취소
               </Button>
             </div>

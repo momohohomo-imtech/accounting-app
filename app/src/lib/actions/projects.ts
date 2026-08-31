@@ -27,14 +27,16 @@ function parse(formData: FormData) {
 
 export async function createProjectRecord(formData: FormData) {
   const supabase = await createClient();
-  await supabase.from("projects").insert(parse(formData));
+  const { error } = await supabase.from("projects").insert(parse(formData));
+  if (error) return { error: error.message };
   revalidatePath("/projects");
 }
 
 export async function updateProjectRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("projects").update(parse(formData)).eq("id", id);
+  const { error } = await supabase.from("projects").update(parse(formData)).eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/projects");
 }
 
