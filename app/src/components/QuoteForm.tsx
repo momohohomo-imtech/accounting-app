@@ -36,6 +36,7 @@ export function QuoteForm({
     status: string;
     valid_until: string | null;
     memo: string | null;
+    target_amount: number | null;
   };
   initialItems?: QuoteItemInput[];
   quoteId?: string;
@@ -50,6 +51,7 @@ export function QuoteForm({
     status: initial?.status ?? "draft",
     valid_until: initial?.valid_until ?? "",
     memo: initial?.memo ?? "",
+    target_amount: initial?.target_amount != null ? String(initial.target_amount) : "",
   });
   const [items, setItems] = useState<QuoteItemInput[]>(initialItems?.length ? initialItems : [emptyItem()]);
   const [pending, setPending] = useState(false);
@@ -62,30 +64,6 @@ export function QuoteForm({
 
   function updateItem(i: number, patch: Partial<QuoteItemInput>) {
     setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
-  }
-
-  function handleQuantity(i: number, v: string) {
-    const quantity = v ? Number(v) : null;
-    setItems((prev) =>
-      prev.map((it, idx) => {
-        if (idx !== i) return it;
-        const next = { ...it, quantity };
-        if (quantity && it.unit_price) next.amount = quantity * it.unit_price;
-        return next;
-      })
-    );
-  }
-
-  function handleUnitPrice(i: number, v: string) {
-    const unit_price = v ? Number(v) : null;
-    setItems((prev) =>
-      prev.map((it, idx) => {
-        if (idx !== i) return it;
-        const next = { ...it, unit_price };
-        if (it.quantity && unit_price) next.amount = it.quantity * unit_price;
-        return next;
-      })
-    );
   }
 
   function addItem() {
@@ -110,6 +88,8 @@ export function QuoteForm({
   }
 
   const total = items.reduce((s, it) => s + computeConfirmedAmount(it.amount || 0, it.handling_fee_pct || 0), 0);
+  const targetAmountNum = values.target_amount ? Number(values.target_amount) : null;
+  const diff = targetAmountNum !== null ? targetAmountNum - total : null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -129,6 +109,7 @@ export function QuoteForm({
       status: values.status,
       valid_until: values.valid_until || null,
       memo: values.memo || null,
+      target_amount: values.target_amount ? Number(values.target_amount) : null,
       items,
     };
     let targetId = quoteId;
@@ -153,6 +134,7 @@ export function QuoteForm({
   }
 
   const inputClass = "rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none";
+  const compactInputClass = "rounded-lg border border-slate-300 px-1.5 py-1.5 text-xs focus:border-slate-500 focus:outline-none";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
@@ -217,6 +199,34 @@ export function QuoteForm({
         </div>
       </div>
 
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>목표 견적금액 (내부용)</label>
+            <input
+              type="number"
+              value={values.target_amount}
+              onChange={(e) => set("target_amount", e.target.value)}
+              placeholder="목표 금액"
+              className={`${inputClass} w-40`}
+            />
+          </div>
+          <p className="text-sm text-slate-600">
+            현재 견적액 <span className="font-mono font-semibold text-slate-900">{formatWon(total)}</span>
+          </p>
+          {diff !== null && (
+            <p className="text-sm text-slate-600">
+              차액{" "}
+              <span className={`font-mono font-semibold ${diff >= 0 ? "text-blue-600" : "text-red-600"}`}>
+                {diff >= 0 ? "+" : ""}
+                {formatWon(diff)}
+              </span>
+            </p>
+          )}
+        </div>
+        <p className="mt-1 text-xs text-slate-400">이 영역은 작성 화면 참고용이라 인쇄·엑셀·PDF에는 안 보여요.</p>
+      </div>
+
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-semibold text-slate-900">품목</h2>
@@ -236,77 +246,73 @@ export function QuoteForm({
           </div>
         </div>
 
-        <div className="space-y-2">
-          <div className="hidden grid-cols-[1fr_1fr_5rem_7rem_8rem_3rem] gap-2 px-1 text-xs font-medium text-slate-500 sm:grid">
-            <span>품목명</span>
-            <span>규격</span>
-            <span>수량</span>
-            <span>단가</span>
-            <span>금액</span>
-            <span />
+        <div className="space-y-1.5 overflow-x-auto">
+          <div className="hidden items-center gap-1.5 whitespace-nowrap px-1 text-[11px] font-medium text-slate-500 sm:flex">
+            <span className="w-[10ch]">품명</span>
+            <span className="w-[4ch]">규격</span>
+            <span className="w-[4ch]">수량</span>
+            <span className="w-[8ch]">금액</span>
+            <span className="w-[2ch] text-center">fee%</span>
+            <span className="w-[9ch] text-right">확정금액</span>
+            <span className="flex-1">비고</span>
+            <span className="w-8" />
           </div>
           {items.map((it, i) => {
             const confirmed = computeConfirmedAmount(it.amount || 0, it.handling_fee_pct || 0);
             return (
-              <div key={i} className="space-y-1.5 rounded-lg border border-slate-200 p-2">
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_5rem_7rem_8rem_3rem]">
-                  <input value={it.item_name} onChange={(e) => updateItem(i, { item_name: e.target.value })} placeholder="품목명" className={inputClass} />
-                  <input value={it.spec} onChange={(e) => updateItem(i, { spec: e.target.value })} placeholder="규격" className={inputClass} />
-                  <input
-                    type="number"
-                    value={it.quantity ?? ""}
-                    onChange={(e) => handleQuantity(i, e.target.value)}
-                    placeholder="수량"
-                    className={inputClass}
-                  />
-                  <input
-                    type="number"
-                    value={it.unit_price ?? ""}
-                    onChange={(e) => handleUnitPrice(i, e.target.value)}
-                    placeholder="단가"
-                    className={inputClass}
-                  />
-                  <input
-                    type="number"
-                    value={it.amount || ""}
-                    onChange={(e) => updateItem(i, { amount: Number(e.target.value) || 0 })}
-                    placeholder="금액"
-                    className={inputClass}
-                  />
-                  {items.length > 1 && (
-                    <button type="button" onClick={() => removeItem(i)} className="text-xs text-red-500 hover:text-red-700">
-                      삭제
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 items-center gap-2 border-t border-dashed border-slate-200 pt-1.5 sm:grid-cols-[8rem_1fr_10rem]">
-                  <label className="flex items-center gap-1 text-xs text-slate-500">
-                    핸들링fee
-                    <input
-                      type="number"
-                      value={it.handling_fee_pct || ""}
-                      onChange={(e) => updateItem(i, { handling_fee_pct: Number(e.target.value) || 0 })}
-                      placeholder="0"
-                      className={`${inputClass} w-16`}
-                    />
-                    %
-                  </label>
-                  <input
-                    value={it.note}
-                    onChange={(e) => updateItem(i, { note: e.target.value })}
-                    placeholder="비고 (인쇄·엑셀에 표시됨)"
-                    className={inputClass}
-                  />
-                  <p className="text-right text-xs text-slate-600">
-                    확정금액 <span className="font-mono font-semibold text-slate-900">{formatWon(confirmed)}</span>
-                  </p>
-                </div>
+              <div key={i} className="flex flex-wrap items-center gap-1.5">
+                <input
+                  value={it.item_name}
+                  onChange={(e) => updateItem(i, { item_name: e.target.value })}
+                  placeholder="품명"
+                  className={`${compactInputClass} w-[10ch]`}
+                />
+                <input
+                  value={it.spec}
+                  onChange={(e) => updateItem(i, { spec: e.target.value })}
+                  placeholder="규격"
+                  className={`${compactInputClass} w-[4ch]`}
+                />
+                <input
+                  type="number"
+                  value={it.quantity ?? ""}
+                  onChange={(e) => updateItem(i, { quantity: e.target.value ? Number(e.target.value) : null })}
+                  placeholder="수량"
+                  className={`${compactInputClass} w-[4ch]`}
+                />
+                <input
+                  type="number"
+                  value={it.amount || ""}
+                  onChange={(e) => updateItem(i, { amount: Number(e.target.value) || 0 })}
+                  placeholder="금액"
+                  className={`${compactInputClass} w-[8ch]`}
+                />
+                <input
+                  type="number"
+                  value={it.handling_fee_pct || ""}
+                  onChange={(e) => updateItem(i, { handling_fee_pct: Number(e.target.value) || 0 })}
+                  placeholder="0"
+                  title="핸들링fee %"
+                  className={`${compactInputClass} w-[2ch]`}
+                />
+                <span className="w-[9ch] shrink-0 text-right font-mono text-xs text-slate-600">{formatWon(confirmed)}</span>
+                <input
+                  value={it.note}
+                  onChange={(e) => updateItem(i, { note: e.target.value })}
+                  placeholder="비고"
+                  className={`${compactInputClass} min-w-[10ch] flex-1`}
+                />
+                {items.length > 1 && (
+                  <button type="button" onClick={() => removeItem(i)} className="shrink-0 text-xs text-red-500 hover:text-red-700">
+                    삭제
+                  </button>
+                )}
               </div>
             );
           })}
         </div>
         <p className="mt-1 text-xs text-slate-400">
-          핸들링fee는 견적 작성 화면에서만 보이고 인쇄·엑셀·PDF에는 나타나지 않아요 — 확정금액에만 반영됩니다.
+          fee%(핸들링fee)는 견적 작성 화면에서만 보이고 인쇄·엑셀·PDF에는 나타나지 않아요 — 확정금액에만 반영됩니다.
         </p>
 
         <p className="mt-3 text-right text-sm font-semibold text-slate-900">

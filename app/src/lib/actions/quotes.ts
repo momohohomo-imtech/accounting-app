@@ -21,6 +21,7 @@ export type QuoteInput = {
   status: string;
   valid_until: string | null;
   memo: string | null;
+  target_amount: number | null;
   items: QuoteItemInput[];
 };
 
@@ -66,6 +67,7 @@ export async function createQuote(input: QuoteInput): Promise<{ error?: string; 
       status: input.status,
       valid_until: input.valid_until,
       memo: input.memo,
+      target_amount: input.target_amount,
       created_by: user?.id ?? null,
     })
     .select()
@@ -92,6 +94,7 @@ export async function updateQuote(id: string, input: QuoteInput): Promise<{ erro
       status: input.status,
       valid_until: input.valid_until,
       memo: input.memo,
+      target_amount: input.target_amount,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);

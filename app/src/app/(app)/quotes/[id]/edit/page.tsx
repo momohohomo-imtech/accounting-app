@@ -48,6 +48,7 @@ export default async function EditQuotePage({ params }: { params: Promise<{ id: 
             status: quote.status,
             valid_until: quote.valid_until,
             memo: quote.memo,
+            target_amount: quote.target_amount,
           }}
           initialItems={(items ?? []).map((it) => ({
             item_name: it.item_name ?? "",
