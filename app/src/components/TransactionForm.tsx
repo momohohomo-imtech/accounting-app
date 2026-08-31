@@ -523,7 +523,7 @@ export function TransactionForm({
           <select
             value={values.payment_method_id}
             onChange={(e) => set("payment_method_id", e.target.value)}
-            className={inputClass}
+            className={`${inputClass} bg-red-600 text-white`}
             disabled={values.payment_type === "credit"}
           >
             <option value="">{values.payment_type === "credit" ? "정산 시 지정" : "선택 안함"}</option>
