@@ -97,11 +97,13 @@ async function WorkLogCalendarSection({
   const rows = (logs ?? []) as WorkLog[];
   const logsByDate = new Map<string, WorkLog[]>();
   const holidayDates = new Set<string>();
+  const unassignedDates = new Set<string>();
   for (const l of rows) {
     const arr = logsByDate.get(l.log_date) ?? [];
     arr.push(l);
     logsByDate.set(l.log_date, arr);
     if ((l.title ?? "").trim() === HOLIDAY_TITLE) holidayDates.add(l.log_date);
+    if (l.site_id && !l.project_id) unassignedDates.add(l.log_date);
   }
 
   const tripDates = new Set(
@@ -179,21 +181,26 @@ async function WorkLogCalendarSection({
                     isHoliday && "bg-red-50"
                   );
                   const dayLabel = (
-                    <span
-                      className={cx(
-                        "text-right font-mono text-[11px]",
-                        !cell.inMonth
-                          ? "text-slate-300"
-                          : isHoliday
-                            ? "font-bold text-red-600"
-                            : cell.weekday === 0
-                              ? "text-red-500"
-                              : cell.weekday === 6
-                                ? "text-blue-500"
-                                : "text-slate-500"
+                    <span className="flex items-center justify-end gap-1">
+                      {unassignedDates.has(cell.dateKey) && (
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" title="프로젝트 미선정 작업일지 있음" />
                       )}
-                    >
-                      {cell.day}
+                      <span
+                        className={cx(
+                          "font-mono text-[11px]",
+                          !cell.inMonth
+                            ? "text-slate-300"
+                            : isHoliday
+                              ? "font-bold text-red-600"
+                              : cell.weekday === 0
+                                ? "text-red-500"
+                                : cell.weekday === 6
+                                  ? "text-blue-500"
+                                  : "text-slate-500"
+                        )}
+                      >
+                        {cell.day}
+                      </span>
                     </span>
                   );
 
