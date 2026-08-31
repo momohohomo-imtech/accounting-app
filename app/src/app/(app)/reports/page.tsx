@@ -14,6 +14,7 @@ import { resolveCategoryColor } from "@/lib/categoryColor";
 import type { ReportAiInsight, CreditPayment } from "@/lib/types";
 import { VendorAggregateTable } from "@/components/VendorAggregateTable";
 import { CategoryAggregateTable } from "@/components/CategoryAggregateTable";
+import { CategoryDetailReport } from "@/components/CategoryDetailReport";
 import { ProjectProfitTable } from "@/components/ProjectProfitTable";
 import { TransactionEditPopup } from "@/components/TransactionEditPopup";
 import { WorkLogSummaryTable } from "@/components/WorkLogSummaryTable";
@@ -58,13 +59,14 @@ export default async function ReportsPage({
     year?: string;
     project?: string;
     vendor?: string;
+    category?: string;
     site?: string;
     printProjects?: string;
     editTx?: string;
     wlMonths?: string;
   }>;
 }) {
-  const { year, project, vendor, site, printProjects, editTx, wlMonths } = await searchParams;
+  const { year, project, vendor, category, site, printProjects, editTx, wlMonths } = await searchParams;
   const currentYear = new Date().getFullYear();
   const selectedYear = year ? Number(year) : currentYear;
 
@@ -95,7 +97,9 @@ export default async function ReportsPage({
       supabase.from("credit_payments").select("*"),
       supabase
         .from("project_agency_purchases")
-        .select("project_id, amount, expense_categories(name, project_only, color), projects!inner(year)")
+        .select(
+          "id, project_id, item_name, amount, client_name, memo, expense_categories(name, project_only, color), projects!inner(year, name)"
+        )
         .eq("projects.year", selectedYear),
     ]);
 
@@ -250,6 +254,49 @@ export default async function ReportsPage({
   ]);
   const workLogSummary = buildWorkLogSummary((wlRows ?? []) as WorkLog[], wlSites ?? []);
 
+  // 카테고리별 집계 팝업 — 매입 내역 + 대행구매 내역을 합쳐서 보여줌
+  const categoryPurchaseRows = category
+    ? transactions
+        .filter((t) => t.type === "매입")
+        .filter((t) => {
+          const c = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
+          return (c?.name ?? "미분류") === category;
+        })
+        .map((t) => {
+          const client = one(t.clients) as { name: string } | null;
+          const proj = one(t.projects) as { name: string } | null;
+          return {
+            id: t.id,
+            kind: "매입" as const,
+            trans_date: t.trans_date as string | null,
+            client_name: client?.name ?? t.client_name_raw ?? "미지정",
+            project_name: proj?.name ?? null,
+            item_name: t.item_name,
+            amount: t.purchase_amount + t.purchase_vat,
+          };
+        })
+    : [];
+
+  const categoryAgencyRows = category
+    ? (agencyPurchases ?? [])
+        .filter((a) => {
+          const c = one(a.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
+          return (c?.name ?? "미분류") === category;
+        })
+        .map((a) => {
+          const proj = one(a.projects) as { name: string } | null;
+          return {
+            id: a.id,
+            kind: "대행구매" as const,
+            trans_date: null as string | null,
+            client_name: a.client_name,
+            project_name: proj?.name ?? null,
+            item_name: a.item_name,
+            amount: a.amount,
+          };
+        })
+    : [];
+
   const vendorRows = vendor
     ? transactions
         .filter((t) => t.type === "매입" && ((one(t.clients) as { name: string } | null)?.name ?? t.client_name_raw ?? "미지정") === vendor)
@@ -269,7 +316,7 @@ export default async function ReportsPage({
         })
     : [];
 
-  const popupOpen = Boolean(project || vendor);
+  const popupOpen = Boolean(project || vendor || category);
   const isolateProjects = printProjects === "1";
 
   const aiSummary = {
@@ -380,7 +427,7 @@ export default async function ReportsPage({
         </CollapsibleSection>
 
         <CollapsibleSection title="카테고리별 집계 — 어느 카테고리에 얼마를 매입했는지">
-          <CategoryAggregateTable rows={byCategory} agencyRows={agencyByCategory} />
+          <CategoryAggregateTable rows={byCategory} agencyRows={agencyByCategory} year={selectedYear} />
         </CollapsibleSection>
 
         <CollapsibleSection title="매출처별 집계">
@@ -423,6 +470,20 @@ export default async function ReportsPage({
               year={selectedYear}
               rows={vendorRows}
               closeHref={`/reports?year=${selectedYear}`}
+            />
+          </div>
+        </div>
+      )}
+
+      {category && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:static print:bg-transparent print:p-0">
+          <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
+            <CategoryDetailReport
+              categoryName={category}
+              year={selectedYear}
+              purchaseRows={categoryPurchaseRows}
+              agencyRows={categoryAgencyRows}
+              closeHref={`/reports?year=${selectedYear}${site ? `&site=${site}` : ""}`}
             />
           </div>
         </div>
