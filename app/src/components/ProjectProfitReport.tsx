@@ -201,6 +201,38 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
         </div>
       </div>
 
+      {group.length > 1 && (
+        <div className="order-1 print:order-1 rounded-lg border border-slate-200 p-3 print:rounded-none print:border-0 print:border-t print:border-b print:border-slate-300 print:p-0 print:py-1">
+          <p className="mb-1 text-xs font-medium text-slate-500 print:text-[9px]">
+            합산된 프로젝트 (아래 항목의 발주액·수주액을 모두 더한 값이 이 보고서의 합계입니다)
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[400px] text-sm print:text-[10px]">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-slate-500">
+                  <th className="pb-1 pr-4">프로젝트</th>
+                  <th className="pb-1 pr-4 text-right">발주액</th>
+                  <th className="pb-1 text-right">수주액</th>
+                </tr>
+              </thead>
+              <tbody>
+                {group.map((p) => (
+                  <tr key={p.id} className="border-b border-slate-100 last:border-0">
+                    <td className="py-1 pr-4 text-slate-700">
+                      {p.project_code ? `${p.project_code} ` : ""}
+                      {p.name}
+                      {p.id === project.id && <span className="ml-1 text-xs text-slate-400 print:text-[8px]">(본 프로젝트)</span>}
+                    </td>
+                    <td className="py-1 pr-4 text-right font-mono text-slate-700">{formatWon(p.quote_amount ?? 0)}</td>
+                    <td className="py-1 text-right font-mono text-slate-700">{formatWon(p.contract_amount ?? 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <div className="order-5 print:order-2 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 print:grid-cols-4 print:gap-2 print:border-b print:pt-2 print:pb-2 print:break-inside-avoid">
         <div>
           <p className="text-xs text-slate-500 print:text-[9px]">발주액 (원청 발주금액)</p>
