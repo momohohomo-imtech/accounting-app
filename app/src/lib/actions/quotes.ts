@@ -11,6 +11,9 @@ export type QuoteItemInput = {
   amount: number;
   handling_fee_pct: number;
   note: string;
+  unit: string;
+  group_label: string | null;
+  is_group_summary: boolean;
 };
 
 export type QuoteInput = {
@@ -42,6 +45,9 @@ async function saveItems(
       amount: it.amount,
       handling_fee_pct: it.handling_fee_pct || 0,
       note: it.note || null,
+      unit: it.unit || null,
+      group_label: it.group_label || null,
+      is_group_summary: it.is_group_summary || false,
       sort_order: i,
     }));
   if (rows.length > 0) {
@@ -133,5 +139,8 @@ export async function fetchProjectPurchaseItems(projectId: string): Promise<Quot
     amount: t.purchase_amount + t.purchase_vat,
     handling_fee_pct: 0,
     note: "",
+    unit: "",
+    group_label: null,
+    is_group_summary: false,
   }));
 }

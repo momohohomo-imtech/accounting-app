@@ -8,6 +8,7 @@ type Row = {
   id: string;
   item_name: string | null;
   spec: string | null;
+  unit: string | null;
   quantity: number | null;
   note: string | null;
   adjustedUnitPrice: number | null;
@@ -32,16 +33,17 @@ export function QuoteExportButton({
       i + 1,
       r.item_name ?? "-",
       r.spec ?? "-",
+      r.unit ?? "-",
       r.quantity ?? "-",
       r.adjustedUnitPrice ?? "-",
       r.confirmed,
       r.note ?? "-",
     ]);
-    data.push(["", "", "", "", "합계", total, ""]);
+    data.push(["", "", "", "", "", "합계", total, ""]);
 
     await downloadXlsx(
       `견적서_${quote.quote_number ?? quote.title}.xlsx`,
-      ["No", "품명", "규격", "수량", "단가", "금액", "비고"],
+      ["No", "품명", "규격", "단위", "수량", "단가", "금액", "비고"],
       data,
       "견적서",
       leadingRows

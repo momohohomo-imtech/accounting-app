@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { formatWon, formatDate } from "@/lib/format";
 import { numberToKoreanAmount } from "@/lib/numberToKorean";
-import { computeConfirmedAmount } from "@/lib/quoteCalc";
+import { computeConfirmedAmount, isVisibleQuoteItem } from "@/lib/quoteCalc";
 import { PrintButton } from "@/components/PrintButton";
 import { QuoteExportButton } from "@/components/QuoteExportButton";
 import { fieldClass, labelClass } from "@/components/ui/field";
@@ -18,6 +18,9 @@ type QuoteItemRow = {
   amount: number;
   handling_fee_pct: number;
   note: string | null;
+  unit: string | null;
+  group_label: string | null;
+  is_group_summary: boolean;
 };
 
 export function QuotePrintView({
@@ -44,7 +47,7 @@ export function QuotePrintView({
   const [phone, setPhone] = useState("");
   const [fax, setFax] = useState("032-232-0914");
 
-  const rows = items.map((it) => {
+  const rows = items.filter(isVisibleQuoteItem).map((it) => {
     const confirmed = computeConfirmedAmount(it.amount, it.handling_fee_pct);
     const adjustedUnitPrice = it.unit_price != null ? computeConfirmedAmount(it.unit_price, it.handling_fee_pct) : null;
     return { ...it, confirmed, adjustedUnitPrice };
@@ -202,6 +205,7 @@ export function QuotePrintView({
               <th className="w-10 py-2 pr-2 text-center">No</th>
               <th className="py-2 pr-2">품명</th>
               <th className="py-2 pr-2">규격</th>
+              <th className="py-2 pr-2">단위</th>
               <th className="py-2 pr-2 text-right">수량</th>
               <th className="py-2 pr-2 text-right">단가</th>
               <th className="py-2 pr-2 text-right">금액</th>
@@ -214,6 +218,7 @@ export function QuotePrintView({
                 <td className="py-2 pr-2 text-center text-slate-500">{i + 1}</td>
                 <td className="py-2 pr-2">{it.item_name ?? "-"}</td>
                 <td className="py-2 pr-2 text-slate-500">{it.spec ?? "-"}</td>
+                <td className="py-2 pr-2 text-slate-500">{it.unit ?? "-"}</td>
                 <td className="py-2 pr-2 text-right font-mono">{it.quantity ?? "-"}</td>
                 <td className="py-2 pr-2 text-right font-mono">
                   {it.adjustedUnitPrice != null ? formatWon(it.adjustedUnitPrice) : "-"}
@@ -224,7 +229,7 @@ export function QuotePrintView({
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-6 text-center text-slate-400">
+                <td colSpan={8} className="py-6 text-center text-slate-400">
                   등록된 품목이 없습니다.
                 </td>
               </tr>
@@ -233,7 +238,7 @@ export function QuotePrintView({
           {rows.length > 0 && (
             <tfoot>
               <tr className="border-t-2 border-slate-300">
-                <td colSpan={5} className="py-2 text-right font-semibold text-slate-900">
+                <td colSpan={6} className="py-2 text-right font-semibold text-slate-900">
                   합계
                 </td>
                 <td className="py-2 text-right font-mono font-bold text-slate-900">{formatWon(total)}</td>

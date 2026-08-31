@@ -6,7 +6,7 @@ import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components
 import { createQuote, updateQuote, fetchProjectPurchaseItems, type QuoteInput, type QuoteItemInput } from "@/lib/actions/quotes";
 import { QUOTE_STATUS_OPTIONS } from "@/lib/quoteStatus";
 import { formatWon } from "@/lib/format";
-import { computeConfirmedAmount } from "@/lib/quoteCalc";
+import { computeConfirmedAmount, isVisibleQuoteItem } from "@/lib/quoteCalc";
 import { Button } from "@/components/ui/Button";
 import { labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -14,7 +14,22 @@ import { useConfirm } from "@/components/ConfirmProvider";
 type ClientOption = { id: string; name: string };
 
 function emptyItem(): QuoteItemInput {
-  return { item_name: "", spec: "", quantity: null, unit_price: null, amount: 0, handling_fee_pct: 0, note: "" };
+  return {
+    item_name: "",
+    spec: "",
+    quantity: null,
+    unit_price: null,
+    amount: 0,
+    handling_fee_pct: 0,
+    note: "",
+    unit: "",
+    group_label: null,
+    is_group_summary: false,
+  };
+}
+
+function newGroupId() {
+  return typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `group-${Date.now()}-${Math.random()}`;
 }
 
 export function QuoteForm({
@@ -57,6 +72,13 @@ export function QuoteForm({
   const [pending, setPending] = useState(false);
   const [loadingFromProject, setLoadingFromProject] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [grouping, setGrouping] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [groupUnit, setGroupUnit] = useState("");
+  const [groupFeePct, setGroupFeePct] = useState("0");
+  const [groupUnitPrice, setGroupUnitPrice] = useState("");
+  const [groupQuantity, setGroupQuantity] = useState("1");
 
   function set<K extends keyof typeof values>(key: K, v: (typeof values)[K]) {
     setValues((prev) => ({ ...prev, [key]: v }));
@@ -96,6 +118,68 @@ export function QuoteForm({
 
   function removeItem(i: number) {
     setItems((prev) => prev.filter((_, idx) => idx !== i));
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.delete(i);
+      return next;
+    });
+  }
+
+  function toggleSelect(i: number) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
+  }
+
+  function startGrouping() {
+    const sum = Array.from(selected).reduce((s, i) => s + (items[i]?.amount || 0), 0);
+    setGroupName("");
+    setGroupUnit("");
+    setGroupFeePct("0");
+    setGroupUnitPrice(String(sum));
+    setGroupQuantity("1");
+    setGrouping(true);
+  }
+
+  function cancelGrouping() {
+    setGrouping(false);
+    setSelected(new Set());
+  }
+
+  function confirmGrouping() {
+    if (!groupName.trim() || selected.size < 2) return;
+    const groupId = newGroupId();
+    const unitPriceNum = Number(groupUnitPrice) || 0;
+    const quantityNum = Number(groupQuantity) || 1;
+    setItems((prev) => {
+      const next = prev.map((it, idx) => (selected.has(idx) ? { ...it, group_label: groupId } : it));
+      next.push({
+        item_name: groupName,
+        spec: "",
+        quantity: quantityNum,
+        unit_price: unitPriceNum,
+        amount: unitPriceNum * quantityNum,
+        handling_fee_pct: Number(groupFeePct) || 0,
+        note: "",
+        unit: groupUnit,
+        group_label: groupId,
+        is_group_summary: true,
+      });
+      return next;
+    });
+    setGrouping(false);
+    setSelected(new Set());
+  }
+
+  function ungroup(groupLabel: string) {
+    setItems((prev) =>
+      prev
+        .filter((it) => !(it.group_label === groupLabel && it.is_group_summary))
+        .map((it) => (it.group_label === groupLabel ? { ...it, group_label: null } : it))
+    );
   }
 
   async function loadFromProject() {
@@ -109,9 +193,12 @@ export function QuoteForm({
       return;
     }
     setItems(loaded);
+    setSelected(new Set());
   }
 
-  const total = items.reduce((s, it) => s + computeConfirmedAmount(it.amount || 0, it.handling_fee_pct || 0), 0);
+  const total = items
+    .filter(isVisibleQuoteItem)
+    .reduce((s, it) => s + computeConfirmedAmount(it.amount || 0, it.handling_fee_pct || 0), 0);
   const targetAmountNum = values.target_amount ? Number(values.target_amount) : null;
   const diff = targetAmountNum !== null ? targetAmountNum - total : null;
 
@@ -264,6 +351,11 @@ export function QuoteForm({
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-semibold text-slate-900">품목</h2>
           <div className="flex items-center gap-2">
+            {selected.size >= 2 && (
+              <Button type="button" size="sm" onClick={startGrouping}>
+                선택 {selected.size}개 묶기
+              </Button>
+            )}
             {values.project_id && (
               <Button type="button" variant="secondary" size="sm" disabled={loadingFromProject} onClick={loadFromProject}>
                 {loadingFromProject ? "불러오는 중..." : "이 프로젝트 매입내역 불러오기"}
@@ -279,8 +371,59 @@ export function QuoteForm({
           </div>
         </div>
 
+        {grouping && (
+          <div className="mb-3 space-y-2 rounded-lg border border-dashed border-brand bg-brand-soft p-3">
+            <p className="text-xs font-semibold text-slate-700">선택한 {selected.size}개 품목을 하나로 묶기</p>
+            <div className="flex flex-wrap gap-2">
+              <input
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                placeholder="그룹 품명 (예: 자재비용)"
+                className={`${inputClass} w-48`}
+              />
+              <input value={groupUnit} onChange={(e) => setGroupUnit(e.target.value)} placeholder="단위 (예: lot)" className={`${inputClass} w-28`} />
+              <input
+                type="number"
+                value={groupQuantity}
+                onChange={(e) => setGroupQuantity(e.target.value)}
+                placeholder="수량"
+                className={`${inputClass} w-24`}
+              />
+              <input
+                type="number"
+                value={groupUnitPrice}
+                onChange={(e) => setGroupUnitPrice(e.target.value)}
+                placeholder="단가 (기본: 선택 항목 금액 합)"
+                className={`${inputClass} w-40`}
+              />
+              <input
+                type="number"
+                value={groupFeePct}
+                onChange={(e) => setGroupFeePct(e.target.value)}
+                placeholder="fee%"
+                className={`${inputClass} w-20`}
+              />
+            </div>
+            <p className="text-xs text-slate-500">
+              확정금액 미리보기{" "}
+              <span className="font-mono font-semibold text-slate-900">
+                {formatWon(computeConfirmedAmount((Number(groupUnitPrice) || 0) * (Number(groupQuantity) || 1), Number(groupFeePct) || 0))}
+              </span>
+            </p>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" disabled={!groupName.trim()} onClick={confirmGrouping}>
+                묶기 확정
+              </Button>
+              <Button type="button" variant="secondary" size="sm" onClick={cancelGrouping}>
+                취소
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-1.5 overflow-x-auto">
           <div className="hidden items-center gap-1.5 whitespace-nowrap px-1 text-[11px] font-medium text-slate-500 sm:flex">
+            <span className="w-4" />
             <span className="w-[3ch] text-center">No</span>
             <span className="w-[20ch]">품명</span>
             <span className="w-[5ch]">규격</span>
@@ -294,8 +437,19 @@ export function QuoteForm({
           </div>
           {items.map((it, i) => {
             const confirmed = computeConfirmedAmount(it.amount || 0, it.handling_fee_pct || 0);
+            const isHiddenMember = Boolean(it.group_label) && !it.is_group_summary;
             return (
-              <div key={i} className="flex flex-wrap items-center gap-1.5">
+              <div
+                key={i}
+                className={`flex flex-wrap items-center gap-1.5 ${isHiddenMember ? "opacity-50" : ""} ${
+                  it.is_group_summary ? "rounded-lg bg-brand-soft p-1" : ""
+                }`}
+              >
+                <span className="w-4 shrink-0">
+                  {!it.group_label && (
+                    <input type="checkbox" checked={selected.has(i)} onChange={() => toggleSelect(i)} className="h-3.5 w-3.5" />
+                  )}
+                </span>
                 <span className="w-[3ch] shrink-0 text-center text-xs text-slate-400">{i + 1}</span>
                 <input
                   value={it.item_name}
@@ -345,6 +499,16 @@ export function QuoteForm({
                   placeholder="비고"
                   className={`${compactInputClass} min-w-[10ch] flex-1`}
                 />
+                {isHiddenMember && <span className="shrink-0 text-[10px] text-slate-400">묶임</span>}
+                {it.is_group_summary && it.group_label && (
+                  <button
+                    type="button"
+                    onClick={() => ungroup(it.group_label as string)}
+                    className="shrink-0 text-xs text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
+                  >
+                    묶음 해제
+                  </button>
+                )}
                 {items.length > 1 && (
                   <button type="button" onClick={() => removeItem(i)} className="shrink-0 text-xs text-red-500 hover:text-red-700">
                     삭제
@@ -356,6 +520,8 @@ export function QuoteForm({
         </div>
         <p className="mt-1 text-xs text-slate-400">
           fee%(핸들링fee)는 견적 작성 화면에서만 보이고 인쇄·엑셀·PDF에는 나타나지 않아요 — 확정금액에만 반영됩니다.
+          체크박스로 여러 품목을 선택해 하나로 묶으면, 묶인 원본 항목은 이 화면에서만 참고용으로 보이고 인쇄·엑셀·PDF엔
+          묶음 대표 행 하나만 나가요.
         </p>
 
         <p className="mt-3 text-right text-sm font-semibold text-slate-900">

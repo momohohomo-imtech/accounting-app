@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
-import { computeConfirmedAmount } from "@/lib/quoteCalc";
+import { computeConfirmedAmount, isVisibleQuoteItem } from "@/lib/quoteCalc";
 import { QuotesTable } from "@/components/QuotesTable";
 import { LinkButton } from "@/components/ui/Button";
 
@@ -11,11 +11,11 @@ export async function QuotesSection() {
       .from("quotes")
       .select("id, quote_number, title, status, created_at, client_id, client_name_raw, clients(name), projects(name, project_code)")
       .order("created_at", { ascending: false }),
-    supabase.from("quote_items").select("quote_id, amount, handling_fee_pct"),
+    supabase.from("quote_items").select("quote_id, amount, handling_fee_pct, group_label, is_group_summary"),
   ]);
 
   const totalByQuote = new Map<string, number>();
-  for (const it of items ?? []) {
+  for (const it of (items ?? []).filter(isVisibleQuoteItem)) {
     const confirmed = computeConfirmedAmount(it.amount, it.handling_fee_pct ?? 0);
     totalByQuote.set(it.quote_id, (totalByQuote.get(it.quote_id) ?? 0) + confirmed);
   }
