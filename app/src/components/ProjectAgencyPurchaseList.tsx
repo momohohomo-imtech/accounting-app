@@ -169,7 +169,7 @@ function AgencyRow({
   }
 
   return (
-    <tr className="border-b border-slate-100 last:border-0 text-sm">
+    <tr className="border-b border-slate-100 last:border-0">
       <td className="py-2 pr-4 text-slate-600 print:py-0.5"></td>
       <td className="py-2 pr-4 text-slate-700 print:py-0.5">{item.client_name ?? "-"}</td>
       <td className="py-2 pr-4 text-slate-700 print:py-0.5">
