@@ -76,7 +76,11 @@ export function PieChart({ data, total }: { data: CategoryAmount[]; total: numbe
 }
 
 export function BarChart({ data, max: maxOverride }: { data: CategoryAmount[]; max?: number }) {
-  const max = Math.max(1, maxOverride ?? 0, ...data.map((d) => d.amount));
+  // 막대 길이는 오버플로 방지를 위해 실제 최댓값까지 늘어날 수 있지만, %는 항상 호출부가
+  // 넘긴 기준(발주액 등) 대비로 계산 — 파이 차트의 total 기준 계산과 동일한 방식.
+  const totalSum = data.reduce((s, d) => s + d.amount, 0);
+  const base = maxOverride ?? totalSum;
+  const barMax = Math.max(1, maxOverride ?? 0, ...data.map((d) => d.amount));
   return (
     <div className="space-y-2.5">
       {data.map((d, i) => (
@@ -87,10 +91,13 @@ export function BarChart({ data, max: maxOverride }: { data: CategoryAmount[]; m
           >
             {d.name}
           </span>
+          <span className="w-12 shrink-0 text-right font-mono text-xs text-slate-500">
+            {(base > 0 ? (d.amount / base) * 100 : 0).toFixed(1)}%
+          </span>
           <div className="h-5 flex-1 overflow-hidden rounded bg-slate-100">
             <div
               className="h-full rounded"
-              style={{ width: `${(d.amount / max) * 100}%`, backgroundColor: sliceColor(d.name) }}
+              style={{ width: `${(d.amount / barMax) * 100}%`, backgroundColor: sliceColor(d.name) }}
             />
           </div>
           <span className="w-24 shrink-0 text-right font-mono text-sm font-semibold text-slate-900">
