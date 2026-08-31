@@ -169,18 +169,18 @@ function AgencyRow({
 
   return (
     <tr className="border-b border-slate-100 last:border-0 text-sm">
-      <td className="py-2 pr-4 text-slate-700">{item.client_name ?? "-"}</td>
-      <td className="py-2 pr-4 text-slate-700">
+      <td className="py-2 pr-4 text-slate-700 print:py-0.5">{item.client_name ?? "-"}</td>
+      <td className="py-2 pr-4 text-slate-700 print:py-0.5">
         <div>{item.item_name ?? "-"}</div>
-        {item.memo && <div className="text-xs text-slate-500">{item.memo}</div>}
+        {item.memo && <div className="text-xs text-slate-500 print:text-[9px]">{item.memo}</div>}
       </td>
       <td
-        className={`py-2 pr-4 ${item.category_name ? "" : "text-red-600"}`}
+        className={`py-2 pr-4 print:py-0.5 ${item.category_name ? "" : "text-red-600"}`}
         style={item.category_name ? { color: item.category_color } : undefined}
       >
         {item.category_name ?? "미분류"}
       </td>
-      <td className="py-2 pr-4 text-right font-mono text-slate-900">{formatWon(item.amount)}</td>
+      <td className="py-2 pr-4 text-right font-mono text-slate-900 print:py-0.5">{formatWon(item.amount)}</td>
       <td className="py-2 pl-2 text-right print:hidden">
         {confirmDelete ? (
           <div className="flex justify-end gap-1">
@@ -279,13 +279,13 @@ export function ProjectAgencyPurchaseList({
 
       {items.length > 0 ? (
         <div className="mb-2 overflow-x-auto">
-          <table className="w-full min-w-[500px] text-sm">
+          <table className="w-full min-w-[500px] text-sm print:text-[10px]">
             <thead>
               <tr className="border-b border-slate-200 text-left text-slate-500">
-                <th className="pb-2 pr-4">{headerButton("client", "거래처")}</th>
-                <th className="pb-2 pr-4">{headerButton("item", "품목")}</th>
-                <th className="pb-2 pr-4">{headerButton("category", "카테고리")}</th>
-                <th className="pb-2 pr-4 text-right">{headerButton("amount", "금액")}</th>
+                <th className="pb-2 pr-4 print:pb-1">{headerButton("client", "거래처")}</th>
+                <th className="pb-2 pr-4 print:pb-1">{headerButton("item", "품목")}</th>
+                <th className="pb-2 pr-4 print:pb-1">{headerButton("category", "카테고리")}</th>
+                <th className="pb-2 pr-4 text-right print:pb-1">{headerButton("amount", "금액")}</th>
                 <th className="pb-2 text-right print:hidden">관리</th>
               </tr>
             </thead>

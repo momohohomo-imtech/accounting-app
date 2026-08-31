@@ -12,6 +12,7 @@ import { resolveCategoryColor } from "@/lib/categoryColor";
 import { ProjectAgencyPurchaseList } from "@/components/ProjectAgencyPurchaseList";
 import { AttachmentList } from "@/components/AttachmentList";
 import { SettlementFinalizedCheckbox } from "@/components/SettlementFinalizedCheckbox";
+import { ReportPrintChart } from "@/components/ReportPrintChart";
 
 export async function ProjectProfitReport({ projectId, closeHref }: { projectId: string; closeHref: string }) {
   const supabase = await createClient();
@@ -133,11 +134,11 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
 
   return (
     <ProjectMemoProvider projectId={project.id} initialMemo={project.memo ?? ""} closeHref={closeHref}>
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-2">
+    <div className="flex flex-col gap-4 print:gap-2 print:text-[11px] print:leading-snug">
+      <div className="order-1 flex flex-wrap items-start justify-between gap-2">
         <div>
-          <p className="font-mono text-sm text-slate-400">{project.project_code ?? "-"}</p>
-          <h2 className="text-lg font-semibold text-slate-900">
+          <p className="font-mono text-sm text-slate-400 print:text-xs">{project.project_code ?? "-"}</p>
+          <h2 className="text-lg font-semibold text-slate-900 print:text-base">
             {project.name}
             {children && children.length > 0 && (
               <span className="ml-2 text-sm font-normal text-slate-500">
@@ -145,13 +146,13 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
               </span>
             )}
           </h2>
-          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500 print:text-[10px]">
             {infoLines.map((line) => (
               <span key={line}>{line}</span>
             ))}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 print:hidden">
           <ProjectPurchaseChartButton
             data={categoryBreakdown}
             title={`${project.project_code ?? ""} ${project.name}`.trim()}
@@ -172,63 +173,27 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
         </div>
       </div>
 
-      <ProjectPurchaseTable
-        rows={rows.map((t) => {
-          const category = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
-          return {
-            id: t.id,
-            date: t.trans_date,
-            vendor: t.clients?.name ?? t.client_name_raw ?? "-",
-            item: t.item_name ?? "-",
-            category: category?.name ?? "미분류",
-            categoryColor: category ? resolveCategoryColor(category) : undefined,
-            amount: t.purchase_amount + t.purchase_vat,
-          };
-        })}
-      />
-
-      <ProjectAgencyPurchaseList
-        projectId={project.id}
-        categories={expenseCategories ?? []}
-        clientNames={clientNames}
-        items={(agencyRows ?? []).map((a) => {
-          const category = one(a.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
-          return {
-            id: a.id,
-            item_name: a.item_name,
-            amount: a.amount,
-            category_id: a.category_id,
-            category_name: category?.name ?? null,
-            category_color: category ? resolveCategoryColor(category) : undefined,
-            memo: a.memo,
-            client_name: a.client_name,
-          };
-        })}
-      />
-
-      <AttachmentList projectId={project.id} items={attachments} />
-
-      <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
+      <div className="order-5 print:order-2 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 print:grid-cols-4 print:gap-2 print:border-b print:pt-2 print:pb-2 print:break-inside-avoid">
         <div>
-          <p className="text-xs text-slate-500">발주액 (원청 발주금액)</p>
-          <p className="font-mono text-base font-bold whitespace-nowrap text-slate-900">{formatWon(quoteTotal)}</p>
+          <p className="text-xs text-slate-500 print:text-[9px]">발주액 (원청 발주금액)</p>
+          <p className="font-mono text-base font-bold whitespace-nowrap text-slate-900 print:text-xs">{formatWon(quoteTotal)}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500">대행구매액</p>
-          <p className="font-mono text-base font-bold whitespace-nowrap text-slate-500">-{formatWon(agencyTotal)}</p>
+          <p className="text-xs text-slate-500 print:text-[9px]">대행구매액</p>
+          <p className="font-mono text-base font-bold whitespace-nowrap text-slate-500 print:text-xs">-{formatWon(agencyTotal)}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500">기타 공제 (수수료 등)</p>
-          <p className="font-mono text-base font-bold whitespace-nowrap text-slate-500">-{formatWon(otherDeduction)}</p>
+          <p className="text-xs text-slate-500 print:text-[9px]">기타 공제 (수수료 등)</p>
+          <p className="font-mono text-base font-bold whitespace-nowrap text-slate-500 print:text-xs">-{formatWon(otherDeduction)}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 print:text-[9px]">
             수주액 (실수령액)
             {project.contract_amount_estimated && <span className="ml-1 text-red-600">예상</span>}
             {project.contract_amount_minimum && <span className="ml-1 text-green-600">최소</span>}
           </p>
           <p
-            className={`font-mono text-base font-bold whitespace-nowrap ${
+            className={`font-mono text-base font-bold whitespace-nowrap print:text-xs ${
               project.contract_amount_estimated
                 ? "text-red-600"
                 : project.contract_amount_minimum
@@ -239,32 +204,78 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
             {formatWon(contractTotal)}
           </p>
           {contractTotal > 0 && otherDeduction !== 0 && (
-            <p className="mt-0.5 text-[11px] text-amber-600">
+            <p className="mt-0.5 text-[11px] text-amber-600 print:text-[8px]">
               발주액-대행구매액 기준 예상 {formatWon(quoteTotal - agencyTotal)} (차이 {formatWon(Math.abs(otherDeduction))})
             </p>
           )}
         </div>
         <div>
-          <p className="text-xs text-slate-500">매입 합계</p>
-          <p className="font-mono text-base font-bold whitespace-nowrap text-slate-500">-{formatWon(purchaseTotal)}</p>
+          <p className="text-xs text-slate-500 print:text-[9px]">매입 합계</p>
+          <p className="font-mono text-base font-bold whitespace-nowrap text-slate-500 print:text-xs">-{formatWon(purchaseTotal)}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500">이익금</p>
-          <p className={`font-mono text-base font-bold whitespace-nowrap ${profit === null ? "text-slate-400" : profit >= 0 ? "text-slate-900" : "text-red-600"}`}>
+          <p className="text-xs text-slate-500 print:text-[9px]">이익금</p>
+          <p className={`font-mono text-base font-bold whitespace-nowrap print:text-xs ${profit === null ? "text-slate-400" : profit >= 0 ? "text-slate-900" : "text-red-600"}`}>
             {profit === null ? "발주액 미입력" : formatWon(profit)}
           </p>
         </div>
         <div>
-          <p className="text-xs text-slate-500">이익율</p>
-          <p className={`font-mono text-base font-bold whitespace-nowrap ${margin === null ? "text-slate-400" : margin >= 0 ? "text-slate-900" : "text-red-600"}`}>
+          <p className="text-xs text-slate-500 print:text-[9px]">이익율</p>
+          <p className={`font-mono text-base font-bold whitespace-nowrap print:text-xs ${margin === null ? "text-slate-400" : margin >= 0 ? "text-slate-900" : "text-red-600"}`}>
             {margin === null ? "-" : `${margin.toFixed(2)}%`}
           </p>
         </div>
       </div>
 
-      <div className="border-t border-slate-100 pt-4 space-y-3">
+      <div className="order-2 print:order-3 space-y-4">
+        <ProjectPurchaseTable
+          rows={rows.map((t) => {
+            const category = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
+            return {
+              id: t.id,
+              date: t.trans_date,
+              vendor: t.clients?.name ?? t.client_name_raw ?? "-",
+              item: t.item_name ?? "-",
+              category: category?.name ?? "미분류",
+              categoryColor: category ? resolveCategoryColor(category) : undefined,
+              amount: t.purchase_amount + t.purchase_vat,
+            };
+          })}
+        />
+
+        <div className="print:mt-2 print:border-t print:border-slate-400 print:pt-2">
+          <ProjectAgencyPurchaseList
+            projectId={project.id}
+            categories={expenseCategories ?? []}
+            clientNames={clientNames}
+            items={(agencyRows ?? []).map((a) => {
+              const category = one(a.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
+              return {
+                id: a.id,
+                item_name: a.item_name,
+                amount: a.amount,
+                category_id: a.category_id,
+                category_name: category?.name ?? null,
+                category_color: category ? resolveCategoryColor(category) : undefined,
+                memo: a.memo,
+                client_name: a.client_name,
+              };
+            })}
+          />
+        </div>
+      </div>
+
+      <div className="order-6 print:order-5 border-t border-slate-100 pt-4 space-y-3 print:break-inside-avoid">
         <SettlementFinalizedCheckbox projectId={project.id} initialChecked={Boolean(project.settlement_finalized)} />
         <ReportMemoField />
+      </div>
+
+      <div className="order-7 print:order-6 print:break-inside-avoid">
+        <ReportPrintChart data={categoryBreakdown} quoteTotal={quoteTotal} />
+      </div>
+
+      <div className="order-4 print:order-7">
+        <AttachmentList projectId={project.id} items={attachments} />
       </div>
     </div>
     </ProjectMemoProvider>

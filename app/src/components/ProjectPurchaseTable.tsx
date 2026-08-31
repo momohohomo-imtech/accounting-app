@@ -66,29 +66,29 @@ export function ProjectPurchaseTable({ rows }: { rows: PurchaseRow[] }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[600px] text-sm">
+      <table className="w-full min-w-[600px] text-sm print:text-[10px]">
         <thead>
           <tr className="border-b border-slate-200 text-left text-slate-500">
-            <th className="pb-2 pr-4">{headerButton("date", "날짜")}</th>
-            <th className="pb-2 pr-4">{headerButton("vendor", "거래처")}</th>
-            <th className="pb-2 pr-4">{headerButton("item", "품목")}</th>
-            <th className="pb-2 pr-4">{headerButton("category", "카테고리")}</th>
-            <th className="pb-2 text-right">{headerButton("amount", "금액")}</th>
+            <th className="pb-2 pr-4 print:pb-1">{headerButton("date", "날짜")}</th>
+            <th className="pb-2 pr-4 print:pb-1">{headerButton("vendor", "거래처")}</th>
+            <th className="pb-2 pr-4 print:pb-1">{headerButton("item", "품목")}</th>
+            <th className="pb-2 pr-4 print:pb-1">{headerButton("category", "카테고리")}</th>
+            <th className="pb-2 text-right print:pb-1">{headerButton("amount", "금액")}</th>
           </tr>
         </thead>
         <tbody>
           {sorted.map((r) => (
             <tr key={r.id} className="border-b border-slate-100 last:border-0">
-              <td className="py-2 pr-4 text-slate-600">{formatDate(r.date)}</td>
-              <td className="py-2 pr-4 text-slate-700">{r.vendor}</td>
-              <td className="py-2 pr-4 text-slate-700">{r.item}</td>
+              <td className="py-2 pr-4 text-slate-600 print:py-0.5">{formatDate(r.date)}</td>
+              <td className="py-2 pr-4 text-slate-700 print:py-0.5">{r.vendor}</td>
+              <td className="py-2 pr-4 text-slate-700 print:py-0.5">{r.item}</td>
               <td
-                className={`py-2 pr-4 ${r.category === "미분류" ? "text-red-600" : "text-slate-700"}`}
+                className={`py-2 pr-4 print:py-0.5 ${r.category === "미분류" ? "text-red-600" : "text-slate-700"}`}
                 style={r.category === "미분류" ? undefined : { color: r.categoryColor }}
               >
                 {r.category}
               </td>
-              <td className="py-2 text-right font-mono text-slate-900">{formatWon(r.amount)}</td>
+              <td className="py-2 text-right font-mono text-slate-900 print:py-0.5">{formatWon(r.amount)}</td>
             </tr>
           ))}
           {sorted.length === 0 && (

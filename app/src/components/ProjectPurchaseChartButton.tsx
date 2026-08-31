@@ -6,9 +6,9 @@ import { autoSiteColorHex } from "@/lib/siteColor";
 import { ModalPortal } from "@/components/ModalPortal";
 import { ModalPrintButton } from "@/components/ModalPrintButton";
 
-type CategoryAmount = { name: string; amount: number };
+export type CategoryAmount = { name: string; amount: number };
 
-const REMAINDER_LABEL = "잔여 (발주액 중 미지출분)";
+export const REMAINDER_LABEL = "잔여 (발주액 중 미지출분)";
 
 function sliceColor(name: string) {
   return name === REMAINDER_LABEL ? "#cbd5e1" : autoSiteColorHex(name);
@@ -26,7 +26,7 @@ function arcPath(cx: number, cy: number, r: number, startAngle: number, endAngle
   return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} 0 ${end.x} ${end.y} Z`;
 }
 
-function PieChart({ data, total }: { data: CategoryAmount[]; total: number }) {
+export function PieChart({ data, total }: { data: CategoryAmount[]; total: number }) {
   const size = 220;
   const r = 90;
   const cx = size / 2;
@@ -75,7 +75,7 @@ function PieChart({ data, total }: { data: CategoryAmount[]; total: number }) {
   );
 }
 
-function BarChart({ data, max: maxOverride }: { data: CategoryAmount[]; max?: number }) {
+export function BarChart({ data, max: maxOverride }: { data: CategoryAmount[]; max?: number }) {
   const max = Math.max(1, maxOverride ?? 0, ...data.map((d) => d.amount));
   return (
     <div className="space-y-2.5">
