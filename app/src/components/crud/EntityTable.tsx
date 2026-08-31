@@ -59,7 +59,7 @@ export function EntityTable({
 }: {
   fields: FieldConfig[];
   rows: Row[];
-  updateAction: (formData: FormData) => void;
+  updateAction: (formData: FormData) => void | Promise<void>;
   deleteAction: (formData: FormData) => void;
   extraActions?: Record<string, ReactNode>;
   /** Show the edit form in a modal instead of expanding the row inline. */
@@ -141,7 +141,7 @@ export function EntityTable({
                   onSubmit={async (e) => {
                     e.preventDefault();
                     if (!(await confirm("수정 내용을 저장하시겠습니까?"))) return;
-                    updateAction(new FormData(e.currentTarget));
+                    await updateAction(new FormData(e.currentTarget));
                     setEditingId(null);
                   }}
                   className="space-y-3"
@@ -215,7 +215,7 @@ export function EntityTable({
             onSubmit={async (e) => {
               e.preventDefault();
               if (!(await confirm("수정 내용을 저장하시겠습니까?"))) return;
-              updateAction(new FormData(e.currentTarget));
+              await updateAction(new FormData(e.currentTarget));
               setEditingId(null);
             }}
             className="space-y-3"

@@ -92,7 +92,7 @@ export function PayrollForm({
   onCancel,
 }: {
   employees: EmployeeOption[];
-  action: (formData: FormData) => void;
+  action: (formData: FormData) => void | Promise<void>;
   initial?: PayrollInitial;
   submitLabel?: string;
   onCancel?: () => void;
@@ -129,7 +129,7 @@ export function PayrollForm({
       onSubmit={async (e) => {
         e.preventDefault();
         if (!(await confirm(initial ? "수정 내용을 저장하시겠습니까?" : "이 급여를 등록하시겠습니까?"))) return;
-        action(new FormData(e.currentTarget));
+        await action(new FormData(e.currentTarget));
       }}
       className="space-y-3"
     >

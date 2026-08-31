@@ -14,7 +14,7 @@ export function CreatePanel({
 }: {
   title: string;
   fields: FieldConfig[];
-  createAction: (formData: FormData) => void;
+  createAction: (formData: FormData) => void | Promise<void>;
 }) {
   const confirm = useConfirm();
   const [open, setOpen] = useState(false);
@@ -37,7 +37,7 @@ export function CreatePanel({
         onSubmit={async (e) => {
           e.preventDefault();
           if (!(await confirm(`${title}을(를) 추가하시겠습니까?`))) return;
-          createAction(new FormData(e.currentTarget));
+          await createAction(new FormData(e.currentTarget));
           setOpen(false);
         }}
         className="space-y-3"

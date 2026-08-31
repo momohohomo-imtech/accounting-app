@@ -33,7 +33,7 @@ export function PayrollTable({
   payroll: PayrollRow[];
   employees: EmployeeOption[];
   year: number;
-  updateAction: (formData: FormData) => void;
+  updateAction: (formData: FormData) => void | Promise<void>;
   deleteAction: (formData: FormData) => void;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -97,8 +97,8 @@ export function PayrollTable({
                 <td colSpan={6} className="py-3 pr-4">
                   <PayrollForm
                     employees={employees}
-                    action={(fd) => {
-                      updateAction(fd);
+                    action={async (fd) => {
+                      await updateAction(fd);
                       setEditingId(null);
                     }}
                     initial={p}
