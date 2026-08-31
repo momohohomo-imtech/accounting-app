@@ -37,11 +37,12 @@ export function QuotePrintView({
 }) {
   const [companyName, setCompanyName] = useState("아이엠테크");
   const [representativeName, setRepresentativeName] = useState("");
-  const [bizRegNo, setBizRegNo] = useState("");
-  const [address, setAddress] = useState("");
+  const [bizRegNo, setBizRegNo] = useState("521-32-01642");
+  const [address, setAddress] = useState("인천 남동구 호구포로 44번길 77");
   const [bizType, setBizType] = useState("제조업");
-  const [bizItem, setBizItem] = useState("산업기계 제작·설치");
+  const [bizItem, setBizItem] = useState("컨베이어 장치 제조업");
   const [phone, setPhone] = useState("");
+  const [fax, setFax] = useState("032-232-0914");
 
   const rows = items.map((it) => {
     const confirmed = computeConfirmedAmount(it.amount, it.handling_fee_pct);
@@ -80,6 +81,10 @@ export function QuotePrintView({
         <div>
           <label className={labelClass}>전화</label>
           <input value={phone} onChange={(e) => setPhone(e.target.value)} className={fieldClass} placeholder="선택 입력" />
+        </div>
+        <div>
+          <label className={labelClass}>팩스</label>
+          <input value={fax} onChange={(e) => setFax(e.target.value)} className={fieldClass} placeholder="선택 입력" />
         </div>
         <div className="sm:col-span-2">
           <label className={labelClass}>사업장 소재지</label>
@@ -174,8 +179,10 @@ export function QuotePrintView({
                   </td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-1.5 text-slate-500">전화</td>
-                  <td className="px-3 py-1.5 text-slate-900">{phone || "-"}</td>
+                  <td className="px-3 py-1.5 text-slate-500">전화/팩스</td>
+                  <td className="px-3 py-1.5 text-slate-900">
+                    {phone || "-"} / {fax || "-"}
+                  </td>
                 </tr>
               </tbody>
             </table>
