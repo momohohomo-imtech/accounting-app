@@ -55,6 +55,8 @@ export default async function EditQuotePage({ params }: { params: Promise<{ id: 
             quantity: it.quantity,
             unit_price: it.unit_price,
             amount: it.amount,
+            handling_fee_pct: it.handling_fee_pct ?? 0,
+            note: it.note ?? "",
           }))}
         />
       </div>

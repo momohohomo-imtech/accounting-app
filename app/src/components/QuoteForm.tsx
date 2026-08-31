@@ -6,6 +6,7 @@ import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components
 import { createQuote, updateQuote, fetchProjectPurchaseItems, type QuoteInput, type QuoteItemInput } from "@/lib/actions/quotes";
 import { QUOTE_STATUS_OPTIONS } from "@/lib/quoteStatus";
 import { formatWon } from "@/lib/format";
+import { computeConfirmedAmount } from "@/lib/quoteCalc";
 import { Button } from "@/components/ui/Button";
 import { labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -13,7 +14,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 type ClientOption = { id: string; name: string };
 
 function emptyItem(): QuoteItemInput {
-  return { item_name: "", spec: "", quantity: null, unit_price: null, amount: 0 };
+  return { item_name: "", spec: "", quantity: null, unit_price: null, amount: 0, handling_fee_pct: 0, note: "" };
 }
 
 export function QuoteForm({
@@ -108,7 +109,7 @@ export function QuoteForm({
     setItems(loaded);
   }
 
-  const total = items.reduce((s, it) => s + (it.amount || 0), 0);
+  const total = items.reduce((s, it) => s + computeConfirmedAmount(it.amount || 0, it.handling_fee_pct || 0), 0);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -244,42 +245,72 @@ export function QuoteForm({
             <span>금액</span>
             <span />
           </div>
-          {items.map((it, i) => (
-            <div key={i} className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-2 sm:grid-cols-[1fr_1fr_5rem_7rem_8rem_3rem] sm:border-0 sm:p-0">
-              <input value={it.item_name} onChange={(e) => updateItem(i, { item_name: e.target.value })} placeholder="품목명" className={inputClass} />
-              <input value={it.spec} onChange={(e) => updateItem(i, { spec: e.target.value })} placeholder="규격" className={inputClass} />
-              <input
-                type="number"
-                value={it.quantity ?? ""}
-                onChange={(e) => handleQuantity(i, e.target.value)}
-                placeholder="수량"
-                className={inputClass}
-              />
-              <input
-                type="number"
-                value={it.unit_price ?? ""}
-                onChange={(e) => handleUnitPrice(i, e.target.value)}
-                placeholder="단가"
-                className={inputClass}
-              />
-              <input
-                type="number"
-                value={it.amount || ""}
-                onChange={(e) => updateItem(i, { amount: Number(e.target.value) || 0 })}
-                placeholder="금액"
-                className={inputClass}
-              />
-              {items.length > 1 && (
-                <button type="button" onClick={() => removeItem(i)} className="text-xs text-red-500 hover:text-red-700">
-                  삭제
-                </button>
-              )}
-            </div>
-          ))}
+          {items.map((it, i) => {
+            const confirmed = computeConfirmedAmount(it.amount || 0, it.handling_fee_pct || 0);
+            return (
+              <div key={i} className="space-y-1.5 rounded-lg border border-slate-200 p-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_5rem_7rem_8rem_3rem]">
+                  <input value={it.item_name} onChange={(e) => updateItem(i, { item_name: e.target.value })} placeholder="품목명" className={inputClass} />
+                  <input value={it.spec} onChange={(e) => updateItem(i, { spec: e.target.value })} placeholder="규격" className={inputClass} />
+                  <input
+                    type="number"
+                    value={it.quantity ?? ""}
+                    onChange={(e) => handleQuantity(i, e.target.value)}
+                    placeholder="수량"
+                    className={inputClass}
+                  />
+                  <input
+                    type="number"
+                    value={it.unit_price ?? ""}
+                    onChange={(e) => handleUnitPrice(i, e.target.value)}
+                    placeholder="단가"
+                    className={inputClass}
+                  />
+                  <input
+                    type="number"
+                    value={it.amount || ""}
+                    onChange={(e) => updateItem(i, { amount: Number(e.target.value) || 0 })}
+                    placeholder="금액"
+                    className={inputClass}
+                  />
+                  {items.length > 1 && (
+                    <button type="button" onClick={() => removeItem(i)} className="text-xs text-red-500 hover:text-red-700">
+                      삭제
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 items-center gap-2 border-t border-dashed border-slate-200 pt-1.5 sm:grid-cols-[8rem_1fr_10rem]">
+                  <label className="flex items-center gap-1 text-xs text-slate-500">
+                    핸들링fee
+                    <input
+                      type="number"
+                      value={it.handling_fee_pct || ""}
+                      onChange={(e) => updateItem(i, { handling_fee_pct: Number(e.target.value) || 0 })}
+                      placeholder="0"
+                      className={`${inputClass} w-16`}
+                    />
+                    %
+                  </label>
+                  <input
+                    value={it.note}
+                    onChange={(e) => updateItem(i, { note: e.target.value })}
+                    placeholder="비고 (인쇄·엑셀에 표시됨)"
+                    className={inputClass}
+                  />
+                  <p className="text-right text-xs text-slate-600">
+                    확정금액 <span className="font-mono font-semibold text-slate-900">{formatWon(confirmed)}</span>
+                  </p>
+                </div>
+              </div>
+            );
+          })}
         </div>
+        <p className="mt-1 text-xs text-slate-400">
+          핸들링fee는 견적 작성 화면에서만 보이고 인쇄·엑셀·PDF에는 나타나지 않아요 — 확정금액에만 반영됩니다.
+        </p>
 
         <p className="mt-3 text-right text-sm font-semibold text-slate-900">
-          합계 <span className="ml-1 font-mono text-base">{formatWon(total)}</span>
+          합계(확정금액) <span className="ml-1 font-mono text-base">{formatWon(total)}</span>
         </p>
       </div>
 

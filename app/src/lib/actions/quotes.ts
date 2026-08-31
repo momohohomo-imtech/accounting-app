@@ -9,6 +9,8 @@ export type QuoteItemInput = {
   quantity: number | null;
   unit_price: number | null;
   amount: number;
+  handling_fee_pct: number;
+  note: string;
 };
 
 export type QuoteInput = {
@@ -37,6 +39,8 @@ async function saveItems(
       quantity: it.quantity,
       unit_price: it.unit_price,
       amount: it.amount,
+      handling_fee_pct: it.handling_fee_pct || 0,
+      note: it.note || null,
       sort_order: i,
     }));
   if (rows.length > 0) {
@@ -124,5 +128,7 @@ export async function fetchProjectPurchaseItems(projectId: string): Promise<Quot
     quantity: t.quantity,
     unit_price: t.unit_price,
     amount: t.purchase_amount + t.purchase_vat,
+    handling_fee_pct: 0,
+    note: "",
   }));
 }

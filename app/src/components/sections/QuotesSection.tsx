@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
+import { computeConfirmedAmount } from "@/lib/quoteCalc";
 import { QuotesTable } from "@/components/QuotesTable";
 import { LinkButton } from "@/components/ui/Button";
 
@@ -10,12 +11,13 @@ export async function QuotesSection() {
       .from("quotes")
       .select("id, quote_number, title, status, created_at, client_id, client_name_raw, clients(name), projects(name, project_code)")
       .order("created_at", { ascending: false }),
-    supabase.from("quote_items").select("quote_id, amount"),
+    supabase.from("quote_items").select("quote_id, amount, handling_fee_pct"),
   ]);
 
   const totalByQuote = new Map<string, number>();
   for (const it of items ?? []) {
-    totalByQuote.set(it.quote_id, (totalByQuote.get(it.quote_id) ?? 0) + it.amount);
+    const confirmed = computeConfirmedAmount(it.amount, it.handling_fee_pct ?? 0);
+    totalByQuote.set(it.quote_id, (totalByQuote.get(it.quote_id) ?? 0) + confirmed);
   }
 
   const rows = (quotes ?? []).map((q) => {

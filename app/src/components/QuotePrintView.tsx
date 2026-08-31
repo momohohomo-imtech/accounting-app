@@ -4,7 +4,9 @@ import { useState } from "react";
 import Image from "next/image";
 import { formatWon, formatDate } from "@/lib/format";
 import { numberToKoreanAmount } from "@/lib/numberToKorean";
+import { computeConfirmedAmount, splitVat } from "@/lib/quoteCalc";
 import { PrintButton } from "@/components/PrintButton";
+import { QuoteExportButton } from "@/components/QuoteExportButton";
 import { fieldClass, labelClass } from "@/components/ui/field";
 
 type QuoteItemRow = {
@@ -14,6 +16,8 @@ type QuoteItemRow = {
   quantity: number | null;
   unit_price: number | null;
   amount: number;
+  handling_fee_pct: number;
+  note: string | null;
 };
 
 export function QuotePrintView({
@@ -39,9 +43,14 @@ export function QuotePrintView({
   const [bizItem, setBizItem] = useState("산업기계 제작·설치");
   const [phone, setPhone] = useState("");
 
-  const total = items.reduce((s, it) => s + it.amount, 0);
-  const supplyAmount = Math.round(total / 1.1);
-  const vatAmount = total - supplyAmount;
+  const rows = items.map((it) => {
+    const confirmed = computeConfirmedAmount(it.amount, it.handling_fee_pct);
+    const { supply, vat } = splitVat(confirmed);
+    return { ...it, confirmed, supply, vat };
+  });
+  const total = rows.reduce((s, r) => s + r.confirmed, 0);
+  const supplyAmount = rows.reduce((s, r) => s + r.supply, 0);
+  const vatAmount = rows.reduce((s, r) => s + r.vat, 0);
 
   return (
     <div className="space-y-4">
@@ -86,7 +95,11 @@ export function QuotePrintView({
         </div>
       </div>
 
-      <div className="flex justify-end print:hidden">
+      <div className="flex flex-wrap items-center justify-end gap-2 print:hidden">
+        <p className="mr-auto text-xs text-slate-400">
+          PDF로 저장하려면 인쇄 대화상자의 대상(프린터)에서 &ldquo;PDF로 저장&rdquo;을 선택하세요.
+        </p>
+        <QuoteExportButton quote={quote} rows={rows} total={total} supplyAmount={supplyAmount} vatAmount={vatAmount} />
         <PrintButton />
       </div>
 
@@ -185,49 +198,44 @@ export function QuotePrintView({
               <th className="py-2 pr-2">품명</th>
               <th className="py-2 pr-2">규격</th>
               <th className="py-2 pr-2 text-right">수량</th>
-              <th className="py-2 pr-2 text-right">단가</th>
-              <th className="py-2 text-right">금액</th>
+              <th className="py-2 pr-2 text-right">공급가액</th>
+              <th className="py-2 pr-2 text-right">세액</th>
+              <th className="py-2">비고</th>
             </tr>
           </thead>
           <tbody>
-            {items.map((it, i) => (
+            {rows.map((it, i) => (
               <tr key={it.id} className="border-b border-slate-100">
                 <td className="py-2 pr-2 text-center text-slate-500">{i + 1}</td>
                 <td className="py-2 pr-2">{it.item_name ?? "-"}</td>
                 <td className="py-2 pr-2 text-slate-500">{it.spec ?? "-"}</td>
                 <td className="py-2 pr-2 text-right font-mono">{it.quantity ?? "-"}</td>
-                <td className="py-2 pr-2 text-right font-mono">{it.unit_price ? formatWon(it.unit_price) : "-"}</td>
-                <td className="py-2 text-right font-mono">{formatWon(it.amount)}</td>
+                <td className="py-2 pr-2 text-right font-mono">{formatWon(it.supply)}</td>
+                <td className="py-2 pr-2 text-right font-mono">{formatWon(it.vat)}</td>
+                <td className="py-2 text-slate-500">{it.note ?? "-"}</td>
               </tr>
             ))}
-            {items.length === 0 && (
+            {rows.length === 0 && (
               <tr>
-                <td colSpan={6} className="py-6 text-center text-slate-400">
+                <td colSpan={7} className="py-6 text-center text-slate-400">
                   등록된 품목이 없습니다.
                 </td>
               </tr>
             )}
           </tbody>
-        </table>
-
-        <div className="mt-3 flex justify-end">
-          <table className="w-64 text-sm">
-            <tbody>
-              <tr className="border-b border-slate-200">
-                <td className="py-1.5 text-slate-500">공급가액</td>
-                <td className="py-1.5 text-right font-mono text-slate-900">{formatWon(supplyAmount)}</td>
-              </tr>
-              <tr className="border-b border-slate-200">
-                <td className="py-1.5 text-slate-500">부가세(10%)</td>
-                <td className="py-1.5 text-right font-mono text-slate-900">{formatWon(vatAmount)}</td>
-              </tr>
+          {rows.length > 0 && (
+            <tfoot>
               <tr className="border-t-2 border-slate-300">
-                <td className="py-2 font-semibold text-slate-900">합계금액</td>
-                <td className="py-2 text-right font-mono text-base font-bold text-slate-900">{formatWon(total)}</td>
+                <td colSpan={4} className="py-2 text-right font-semibold text-slate-900">
+                  합계
+                </td>
+                <td className="py-2 text-right font-mono font-bold text-slate-900">{formatWon(supplyAmount)}</td>
+                <td className="py-2 text-right font-mono font-bold text-slate-900">{formatWon(vatAmount)}</td>
+                <td />
               </tr>
-            </tbody>
-          </table>
-        </div>
+            </tfoot>
+          )}
+        </table>
 
         {quote.memo && (
           <div className="mt-6 rounded-lg border border-slate-200 p-3 text-sm">
