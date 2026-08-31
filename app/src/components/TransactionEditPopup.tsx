@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { TransactionForm } from "@/components/TransactionForm";
 import { updateTransactionRecord } from "@/lib/actions/transactions";
+import { EscapeCloseLink } from "@/components/EscapeCloseLink";
 
 // 거래 수정 팝업 — 매입매출 목록, 외상 관리, 보고서(매입처별 집계) 어디서 열든 공통으로 씀.
 export async function TransactionEditPopup({ editTx, redirectTo }: { editTx?: string; redirectTo: string }) {
@@ -32,6 +33,7 @@ export async function TransactionEditPopup({ editTx, redirectTo }: { editTx?: st
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:static print:bg-transparent print:p-0">
+      <EscapeCloseLink href={redirectTo} />
       <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
         <h2 className="mb-4 text-lg font-semibold text-slate-900">거래 수정</h2>
         <TransactionForm

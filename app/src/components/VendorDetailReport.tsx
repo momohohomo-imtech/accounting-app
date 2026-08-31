@@ -2,9 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { formatWon, formatDate } from "@/lib/format";
 import { VendorReportActions } from "@/components/VendorReportActions";
 import { resolveCategoryColor } from "@/lib/categoryColor";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 
 type VendorRow = {
   id: string;
@@ -44,10 +46,12 @@ export function VendorDetailReport({
   rows: VendorRow[];
   closeHref: string;
 }) {
+  const router = useRouter();
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [showProject, setShowProject] = useState(true);
   const [showCategory, setShowCategory] = useState(false);
+  useEscapeKey(true, () => router.push(closeHref));
   const [showItem, setShowItem] = useState(true);
 
   const total = rows.reduce((s, r) => s + r.amount, 0);

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatWon, formatDate } from "@/lib/format";
 import { PrintButton } from "@/components/PrintButton";
+import { EscapeCloseLink } from "@/components/EscapeCloseLink";
 
 export async function PayslipView({ payrollId, closeHref }: { payrollId: string; closeHref: string }) {
   const supabase = await createClient();
@@ -34,6 +35,7 @@ export async function PayslipView({ payrollId, closeHref }: { payrollId: string;
 
   return (
     <div className="space-y-4">
+      <EscapeCloseLink href={closeHref} />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-slate-900">
           {e?.name} 급여명세서 <span className="font-mono text-sm font-normal text-slate-400">{formatDate(p.pay_month).slice(0, 7)}</span>

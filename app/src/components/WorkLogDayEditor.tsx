@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { WorkLogForm } from "@/components/WorkLogForm";
 import { WorkLogDayTripLinks } from "@/components/WorkLogDayTripLinks";
 import { AttachmentList } from "@/components/AttachmentList";
+import { EscapeCloseLink } from "@/components/EscapeCloseLink";
 import type { BusinessTripLog } from "@/lib/types";
 
 export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string; closeHref: string }) {
@@ -52,6 +53,7 @@ export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string
 
   return (
     <div className="space-y-4">
+      <EscapeCloseLink href={closeHref} />
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-900">{dateKey} 작업일지</h2>
         <Link href={closeHref} className="text-sm text-slate-500 hover:text-slate-800">

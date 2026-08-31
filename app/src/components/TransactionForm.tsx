@@ -8,6 +8,7 @@ import { bulkImportTransactions, type BulkTransactionInput } from "@/lib/actions
 import { formatWon } from "@/lib/format";
 import { VAT_EXEMPT_CATEGORIES } from "@/lib/vatExempt";
 import { resolveCategoryColor } from "@/lib/categoryColor";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 
 type Option = { id: string; name: string };
 type ClientOption = Option & { default_item_name?: string | null; default_category_id?: string | null };
@@ -97,6 +98,7 @@ export function TransactionForm({
   const [ocrLoading, setOcrLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [projectPopupIndex, setProjectPopupIndex] = useState<number | null>(null);
+  useEscapeKey(projectPopupIndex !== null, () => setProjectPopupIndex(null));
   const inputClass = "rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none";
   const selectedCategoryName = expenseCategories.find((c) => c.id === values.category_id)?.name;
   const vatExempt = selectedCategoryName ? VAT_EXEMPT_CATEGORIES.includes(selectedCategoryName) : false;

@@ -6,6 +6,7 @@ import { EntityForm } from "./EntityForm";
 import { Table, THead, Tr, Td } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
 import { formatNumber } from "@/lib/format";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 
 type Row = Record<string, unknown> & { id: string };
 
@@ -98,11 +99,12 @@ export function EntityTable({
     return copy;
   }, [rows, sortField, sortDir]);
 
+  const editingRow = editPopup ? sortedRows.find((r) => r.id === editingId) : undefined;
+  useEscapeKey(Boolean(editingRow), () => setEditingId(null));
+
   if (rows.length === 0) {
     return <p className="py-8 text-center text-sm text-slate-400">등록된 항목이 없습니다.</p>;
   }
-
-  const editingRow = editPopup ? sortedRows.find((r) => r.id === editingId) : undefined;
 
   return (
     <>

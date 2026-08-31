@@ -3,10 +3,12 @@
 import { BLANK_EQUIPMENT_ROWS, BLANK_EXPENSE_ROWS, BLANK_WORKER_ROWS, WORK_TYPE_OPTIONS } from "@/lib/businessTrip";
 import { ModalPortal } from "@/components/ModalPortal";
 import { ModalPrintButton } from "@/components/ModalPrintButton";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 
 const cell = "border border-slate-300 px-1 py-1 h-6";
 
 export function BusinessTripBlankFormPopup({ onClose }: { onClose: () => void }) {
+  useEscapeKey(true, onClose);
   return (
     <ModalPortal>
       <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:static print:block print:h-auto print:overflow-visible print:bg-white print:p-0">

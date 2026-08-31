@@ -13,6 +13,7 @@ import { fieldClass } from "@/components/ui/field";
 import { ModalPrintButton } from "@/components/ModalPrintButton";
 import { ModalPortal } from "@/components/ModalPortal";
 import { downloadXlsx } from "@/lib/xlsxExport";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 
 function formatMonthDay(dateKey: string) {
   const [, m, d] = dateKey.split("-");
@@ -89,6 +90,7 @@ export function WorkLogGroupDetailPopup({
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(title);
   const [renaming, setRenaming] = useState(false);
+  useEscapeKey(true, () => (editingTitle ? setEditingTitle(false) : onClose()));
 
   useEffect(() => {
     let cancelled = false;

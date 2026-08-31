@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { updateProjectMemo } from "@/lib/actions/projects";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 
 type MemoCtx = {
   memo: string;
@@ -62,6 +63,8 @@ export function ProjectMemoProvider({
       router.push(closeHref);
     });
   };
+
+  useEscapeKey(true, close);
 
   return (
     <MemoContext.Provider value={{ memo, setMemo, dirty, isPending, save, close }}>

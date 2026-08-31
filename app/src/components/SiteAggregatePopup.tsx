@@ -8,6 +8,7 @@ import { fieldClass } from "@/components/ui/field";
 import { Button } from "@/components/ui/Button";
 import { ModalPrintButton } from "@/components/ModalPrintButton";
 import { ModalPortal } from "@/components/ModalPortal";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 
 function formatMonthDay(dateKey: string) {
   const [, m, d] = dateKey.split("-");
@@ -31,6 +32,7 @@ export function SiteAggregatePopup({
   const [monthInput, setMonthInput] = useState("1-12");
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<SiteWorkLogDetail | null>(null);
+  useEscapeKey(true, onClose);
 
   async function load(y: number, monthRange: string) {
     setLoading(true);

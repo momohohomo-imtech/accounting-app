@@ -9,6 +9,7 @@ import { BusinessTripLogViewPopup } from "@/components/BusinessTripLogViewPopup"
 import { BusinessTripBlankFormPopup } from "@/components/BusinessTripBlankFormPopup";
 import { ModalPortal } from "@/components/ModalPortal";
 import { Button } from "@/components/ui/Button";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 
 type SortKey = "work_date" | "site_name" | "project_name" | "client_name" | "work_types";
 
@@ -34,6 +35,9 @@ export function BusinessTripListClient({ logs }: { logs: BusinessTripLog[] }) {
   const [viewing, setViewing] = useState<BusinessTripLog | null>(null);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  useEscapeKey(creating, () => setCreating(false));
+  useEscapeKey(blankForm, () => setBlankForm(false));
+  useEscapeKey(Boolean(viewing), () => setViewing(null));
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {

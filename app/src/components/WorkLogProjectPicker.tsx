@@ -5,6 +5,7 @@ import { ModalPortal } from "@/components/ModalPortal";
 import { Button } from "@/components/ui/Button";
 import { fieldClass } from "@/components/ui/field";
 import { projectStatusLabel } from "@/lib/projectStatus";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 import type { WorkLogProjectOption } from "@/components/WorkLogRowInput";
 
 function projectNumber(code: string | null) {
@@ -26,6 +27,7 @@ export function WorkLogProjectPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [year, setYear] = useState(defaultYear);
+  useEscapeKey(open, () => setOpen(false));
   const selected = projects.find((p) => p.id === value);
   // 이미 완료 프로젝트가 선택돼 있으면 다시 열었을 때도 목록에 계속 보이도록 기본값을 맞춤.
   const [showCompleted, setShowCompleted] = useState(Boolean(selected && selected.status !== "ongoing"));

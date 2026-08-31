@@ -9,6 +9,7 @@ import { BusinessTripLogForm } from "@/components/BusinessTripLogForm";
 import { ModalPortal } from "@/components/ModalPortal";
 import { ModalPrintButton } from "@/components/ModalPrintButton";
 import { Button } from "@/components/ui/Button";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -23,6 +24,8 @@ export function BusinessTripLogViewPopup({ log, onClose }: { log: BusinessTripLo
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // 수정 중이면 ESC로 팝업 전체를 바로 닫지 않고 수정 취소부터 — 실수로 입력 내용을 날리지 않게.
+  useEscapeKey(true, () => (editing ? setEditing(false) : onClose()));
 
   async function handleDelete() {
     const fd = new FormData();

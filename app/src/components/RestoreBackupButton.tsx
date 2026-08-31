@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { restoreBackup } from "@/lib/actions/backups";
 import { Button } from "@/components/ui/Button";
 import { fieldClass, labelClass } from "@/components/ui/field";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 
 export function RestoreBackupButton({ fileName }: { fileName: string }) {
   const [open, setOpen] = useState(false);
@@ -11,6 +12,7 @@ export function RestoreBackupButton({ fileName }: { fileName: string }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  useEscapeKey(open, close);
 
   function handleRestore() {
     setError(null);

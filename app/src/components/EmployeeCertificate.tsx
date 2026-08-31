@@ -2,10 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { formatDate } from "@/lib/format";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { PrintButton } from "@/components/PrintButton";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 
 type EmployeeInfo = {
   name: string;
@@ -18,10 +20,12 @@ type EmployeeInfo = {
 };
 
 export function EmployeeCertificate({ employee, closeHref }: { employee: EmployeeInfo; closeHref: string }) {
+  const router = useRouter();
   const [companyName, setCompanyName] = useState("아이엠테크");
   const [representativeName, setRepresentativeName] = useState("");
   const [purpose, setPurpose] = useState("제출용");
   const [submitTo, setSubmitTo] = useState("");
+  useEscapeKey(true, () => router.push(closeHref));
 
   const today = new Date();
   const todayLabel = `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`;
