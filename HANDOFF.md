@@ -560,6 +560,41 @@ HANDOFF에 실행 여부 기록이 없어서 사용자에게 확인 — **사용
 - **미검증**: 로그인 세션이 없어서 화면에서 직접 눌러보지 못함 — 빌드/린트만
   통과 확인됨. 다음에 실제로 카테고리 클릭 → 팝업 → 인쇄/엑셀까지 확인할 것.
 
+**일용직 관리 — 사용내역에 거래처 필터 추가**: `daily-workers?tab=usage`에
+`client` 쿼리 파라미터 추가, `DailyWorkerUsageFilter.tsx`에 거래처 select 추가.
+필터링된 결과가 표/인쇄/엑셀 다운로드 전부에 반영됨(섹션 서버 컴포넌트에서
+필터링 후 두 곳에 같은 배열을 내려줌). DB 스키마 변경 없음.
+
+**신규: 품질관리·공사관리·공구리스트** (사이드바 "보고서" 아래 새 메뉴,
+`/quality-construction`, 사용자 요청으로 3개 탭 구성):
+- `supabase/045_quality_construction_tools.sql` — 5개 테이블 신설
+  (`construction_stages`, `quality_checklist_items`, `tools`, `tool_checklists`,
+  `tool_checklist_items`), 전부 019번과 동일한 admin_staff RLS 정책.
+  **실행 여부 확인할 것.**
+- **품질관리** (`QualityChecklistSection.tsx`): 프로젝트 선택(`ProjectTreeFilter`
+  재사용) 후 공정/공사명별 점검 항목(결과: 보류/합격/불합격) 관리.
+  `CreatePanel`+`EntityTable`(제네릭 CRUD)로 구현 — 새 표 코드를 거의 안 짜도
+  헤더클릭 정렬이 자동으로 적용됨.
+- **공사관리** (`ConstructionStageSection.tsx`): 같은 프로젝트 선택 UI +
+  공정 단계(순서/단계명/상태: 대기·진행중·완료/예정일/완료일) 관리, 완료 단계
+  비율로 진행률 바 표시(이 진행률은 `projects.progress_pct`와는 별개 — 기존
+  필드는 건드리지 않음, 계산해서 이 페이지에서만 보여줌).
+- **공구리스트** (`ToolListSection.tsx` + `ToolChecklistCreateForm.tsx`/
+  `ToolChecklistHistoryTable.tsx`/`ToolChecklistDetailReport.tsx`): 공구
+  마스터 목록(제네릭 CRUD) → 출장 준비물 체크(제목/프로젝트 선택/출장일 +
+  마스터 목록 체크박스) → 저장 시 `tool_checklists`+`tool_checklist_items`로
+  스냅샷 저장(공구 이름도 같이 저장해서 나중에 마스터에서 이름이 바뀌거나
+  삭제돼도 이력은 안 변함). 이력 목록에서 "복사해서 새로 만들기"를 누르면
+  그 체크리스트에 체크됐던 공구들이 미리 체크된 채로 새 체크리스트 작성 폼이
+  뜸(`?copyFrom=id`), 이력 항목 클릭하면 팝업으로 인쇄 가능.
+- 프로젝트 연결이 필요한 품질관리/공사관리는 `project_id`를 필수로 받되,
+  화면에는 노출 안 하고 서버 컴포넌트 안에서 클로저로 캡처한 인라인
+  `"use server"` 액션으로 바인딩함(Next.js 공식 패턴 — CreatePanel의
+  `createAction` prop이 그대로 서버 액션 레퍼런스를 받게).
+- **미검증**: 로그인 세션이 없어서 실제 화면에서 못 눌러봄 — 빌드/린트만
+  통과 확인됨. 마이그레이션 045 실행 여부도 확인 필요. 다음에 프로젝트 선택 →
+  품질/공사 항목 등록 → 공구 체크리스트 저장/복사/인쇄까지 실사용 테스트할 것.
+
 ## 작업 방식 (계속 유지)
 
 - 코드 수정 → `npx next build`(타입체크 포함) → `npx eslint .` → 문제 없으면
