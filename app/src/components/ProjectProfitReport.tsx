@@ -36,6 +36,23 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
   const { data: workLogDateRows } = await supabase.from("work_logs").select("log_date").in("project_id", groupIds);
   const workDayCount = new Set((workLogDateRows ?? []).map((r) => r.log_date)).size;
 
+  // 이 프로젝트가 속한 현장에서 현장은 골랐지만 프로젝트를 연결 안 한 작업일지 항목 —
+  // 위 근무일수 집계에서 빠진 후보들을 화면에서 검토해서 나중에 연결할 수 있게 보여줌.
+  const siteIds = Array.from(new Set(group.map((p) => p.site_id).filter((id): id is string => Boolean(id))));
+  const { data: unassignedLogRows } = siteIds.length
+    ? await supabase
+        .from("work_logs")
+        .select("id, log_date, site_id, title")
+        .in("site_id", siteIds)
+        .is("project_id", null)
+        .order("log_date", { ascending: true })
+    : { data: [] };
+  const { data: unassignedSiteRows } = siteIds.length
+    ? await supabase.from("sites").select("id, name").in("id", siteIds)
+    : { data: [] };
+  const unassignedSiteNameById = new Map((unassignedSiteRows ?? []).map((s) => [s.id, s.name]));
+  const unassignedDayCount = new Set((unassignedLogRows ?? []).map((r) => r.log_date)).size;
+
   const { data: purchaseRows } = await supabase
     .from("transactions")
     .select("*, clients(name), expense_categories(name, project_only, color)")
@@ -286,6 +303,36 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
 
       <div className="order-4 print:order-7">
         <AttachmentList projectId={project.id} items={attachments} />
+      </div>
+
+      <div className="order-8 print:hidden border-t border-slate-100 pt-4">
+        <p className="mb-2 text-sm font-semibold text-slate-900">
+          작업일지내 프로젝트 미선정 <span className="font-normal text-slate-500">(총 {unassignedDayCount}일)</span>
+        </p>
+        {unassignedLogRows && unassignedLogRows.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[400px] text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-slate-500">
+                  <th className="pb-2 pr-4">날짜</th>
+                  <th className="pb-2 pr-4">현장</th>
+                  <th className="pb-2">내용</th>
+                </tr>
+              </thead>
+              <tbody>
+                {unassignedLogRows.map((r) => (
+                  <tr key={r.id} className="border-b border-slate-100 last:border-0">
+                    <td className="py-2 pr-4 text-slate-600">{formatDate(r.log_date)}</td>
+                    <td className="py-2 pr-4 text-slate-700">{unassignedSiteNameById.get(r.site_id ?? "") ?? "-"}</td>
+                    <td className="py-2 text-slate-700">{r.title || "(내용 없음)"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-slate-400">미선정 항목이 없습니다.</p>
+        )}
       </div>
     </div>
     </ReportChartProvider>
