@@ -271,10 +271,10 @@ export function ProjectAgencyPurchaseList({
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <p className="text-sm font-semibold text-slate-900">대행구매액 (원청이 대신 구매해 공제한 품목)</p>
-        <span className="font-mono text-sm text-slate-700">합계 {formatWon(total)}</span>
+    <div className="rounded-xl border border-slate-200 p-3 print:rounded-none print:border-0 print:p-0">
+      <div className="mb-2 flex items-center justify-between print:mb-1">
+        <p className="text-sm font-semibold text-slate-900 print:text-[10px]">대행구매액 (원청이 대신 구매해 공제한 품목)</p>
+        <span className="font-mono text-sm text-slate-700 print:text-[10px]">합계 {formatWon(total)}</span>
       </div>
 
       {items.length > 0 ? (

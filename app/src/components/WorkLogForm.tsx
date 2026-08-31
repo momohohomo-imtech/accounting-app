@@ -1,21 +1,23 @@
 "use client";
 
 import { saveDayWorkLogs } from "@/lib/actions/worklogs";
-import { WorkLogRowInput } from "@/components/WorkLogRowInput";
+import { WorkLogRowInput, type WorkLogProjectOption } from "@/components/WorkLogRowInput";
 import { Button } from "@/components/ui/Button";
 
-type Row = { title: string | null; site_id: string | null } | null;
+type Row = { title: string | null; site_id: string | null; project_id: string | null } | null;
 type SiteOption = { id: string; name: string; color: string | null };
 
 export function WorkLogForm({
   dateKey,
   rows,
   sites,
+  projects,
   contentSuggestions,
 }: {
   dateKey: string;
   rows: Row[];
   sites: SiteOption[];
+  projects: WorkLogProjectOption[];
   contentSuggestions: string[];
 }) {
   const contentListId = "worklog-content-suggestions";
@@ -35,7 +37,9 @@ export function WorkLogForm({
           index={i}
           defaultTitle={row?.title ?? ""}
           defaultSiteId={row?.site_id ?? ""}
+          defaultProjectId={row?.project_id ?? ""}
           sites={sites}
+          projects={projects}
           contentListId={contentListId}
         />
       ))}

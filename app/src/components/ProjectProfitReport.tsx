@@ -13,6 +13,8 @@ import { ProjectAgencyPurchaseList } from "@/components/ProjectAgencyPurchaseLis
 import { AttachmentList } from "@/components/AttachmentList";
 import { SettlementFinalizedCheckbox } from "@/components/SettlementFinalizedCheckbox";
 import { ReportPrintChart } from "@/components/ReportPrintChart";
+import { ReportChartProvider } from "@/components/ReportChartProvider";
+import { ReportChartToggle } from "@/components/ReportChartToggle";
 
 export async function ProjectProfitReport({ projectId, closeHref }: { projectId: string; closeHref: string }) {
   const supabase = await createClient();
@@ -27,6 +29,12 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
   const { data: children } = await supabase.from("projects").select("*").eq("parent_project_id", projectId);
   const group = [project, ...(children ?? [])];
   const groupIds = group.map((p) => p.id);
+
+  // 작업일지(달력)에서 이 프로젝트(+귀속 하위 프로젝트)가 직접 선택된 날짜 수만 집계.
+  // 작업일지 줄마다 현장뿐 아니라 프로젝트도 선택하게 바뀌기 전에 입력된 과거 항목은
+  // project_id가 비어있어서 잡히지 않음 — 프로젝트를 선택하며 입력한 날부터 정확해짐.
+  const { data: workLogDateRows } = await supabase.from("work_logs").select("log_date").in("project_id", groupIds);
+  const workDayCount = new Set((workLogDateRows ?? []).map((r) => r.log_date)).size;
 
   const { data: purchaseRows } = await supabase
     .from("transactions")
@@ -128,12 +136,13 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
 
   const infoLines = [
     `현장: ${siteName ?? "-"}    상태: ${projectStatusLabel(project.status)}`,
-    `기간: ${formatDate(project.start_date)} ~ ${formatDate(project.end_date)}    발주서일자: ${formatDate(project.order_date)}`,
+    `기간: ${formatDate(project.start_date)} ~ ${formatDate(project.end_date)}    발주서일자: ${formatDate(project.order_date)}    근무일수: ${workDayCount}일`,
     ...(parentLabel ? [`귀속 프로젝트: ${parentLabel}`] : []),
   ];
 
   return (
     <ProjectMemoProvider projectId={project.id} initialMemo={project.memo ?? ""} closeHref={closeHref}>
+    <ReportChartProvider>
     <div className="flex flex-col gap-4 print:gap-2 print:text-[11px] print:leading-snug">
       <div className="order-1 flex flex-wrap items-start justify-between gap-2">
         <div>
@@ -161,6 +170,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
             profit={profit}
             margin={margin}
           />
+          <ReportChartToggle />
           <ProjectReportActions
             filename={`${project.project_code ?? project.name}_손익보고서`}
             title={`${project.project_code ?? ""} ${project.name}`.trim()}
@@ -278,6 +288,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
         <AttachmentList projectId={project.id} items={attachments} />
       </div>
     </div>
+    </ReportChartProvider>
     </ProjectMemoProvider>
   );
 }

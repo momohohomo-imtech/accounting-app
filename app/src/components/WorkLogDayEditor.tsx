@@ -13,10 +13,11 @@ export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string
   const lastDay = new Date(year, month, 0).getDate();
   const monthEnd = `${year}-${pad(month)}-${pad(lastDay)}`;
 
-  const [{ data: logs }, { data: sites }, { data: monthLogs }, { data: tripLogs }, { data: attachmentRows }] =
+  const [{ data: logs }, { data: sites }, { data: projects }, { data: monthLogs }, { data: tripLogs }, { data: attachmentRows }] =
     await Promise.all([
       supabase.from("work_logs").select("*").eq("log_date", dateKey).order("sort_order", { ascending: true }),
       supabase.from("sites").select("id, name, color").order("name"),
+      supabase.from("projects").select("id, name, site_id, year, project_code").order("year", { ascending: false }),
       supabase.from("work_logs").select("title").gte("log_date", monthStart).lte("log_date", monthEnd),
       supabase.from("business_trip_logs").select("*"),
       supabase
@@ -60,7 +61,7 @@ export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string
 
       <WorkLogDayTripLinks logs={dayTripLogs} />
 
-      <WorkLogForm dateKey={dateKey} rows={rows} sites={sites ?? []} contentSuggestions={contentSuggestions} />
+      <WorkLogForm dateKey={dateKey} rows={rows} sites={sites ?? []} projects={projects ?? []} contentSuggestions={contentSuggestions} />
 
       <AttachmentList workDate={dateKey} items={attachments} title="현장사진·메모 첨부" />
     </div>
