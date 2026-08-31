@@ -204,15 +204,15 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
       <div className="order-5 print:order-2 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 print:grid-cols-4 print:gap-2 print:border-b print:pt-2 print:pb-2 print:break-inside-avoid">
         <div>
           <p className="text-xs text-slate-500 print:text-[9px]">발주액 (원청 발주금액)</p>
-          <p className="font-mono text-base font-bold whitespace-nowrap text-slate-900 print:text-xs">{formatWon(quoteTotal)}</p>
+          <p className="font-mono text-sm font-bold whitespace-nowrap text-slate-900 print:text-xs">{formatWon(quoteTotal)}</p>
         </div>
         <div>
           <p className="text-xs text-slate-500 print:text-[9px]">대행구매액</p>
-          <p className="font-mono text-base font-bold whitespace-nowrap text-slate-500 print:text-xs">-{formatWon(agencyTotal)}</p>
+          <p className="font-mono text-sm font-bold whitespace-nowrap text-slate-500 print:text-xs">-{formatWon(agencyTotal)}</p>
         </div>
         <div>
           <p className="text-xs text-slate-500 print:text-[9px]">기타 공제 (수수료 등)</p>
-          <p className="font-mono text-base font-bold whitespace-nowrap text-slate-500 print:text-xs">-{formatWon(otherDeduction)}</p>
+          <p className="font-mono text-sm font-bold whitespace-nowrap text-slate-500 print:text-xs">-{formatWon(otherDeduction)}</p>
         </div>
         <div>
           <p className="text-xs text-slate-500 print:text-[9px]">
@@ -221,7 +221,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
             {project.contract_amount_minimum && <span className="ml-1 text-green-600">최소</span>}
           </p>
           <p
-            className={`font-mono text-base font-bold whitespace-nowrap print:text-xs ${
+            className={`font-mono text-sm font-bold whitespace-nowrap print:text-xs ${
               project.contract_amount_estimated
                 ? "text-red-600"
                 : project.contract_amount_minimum
@@ -239,17 +239,17 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
         </div>
         <div>
           <p className="text-xs text-slate-500 print:text-[9px]">매입 합계</p>
-          <p className="font-mono text-base font-bold whitespace-nowrap text-slate-500 print:text-xs">-{formatWon(purchaseTotal)}</p>
+          <p className="font-mono text-sm font-bold whitespace-nowrap text-slate-500 print:text-xs">-{formatWon(purchaseTotal)}</p>
         </div>
         <div>
           <p className="text-xs text-slate-500 print:text-[9px]">이익금</p>
-          <p className={`font-mono text-base font-bold whitespace-nowrap print:text-xs ${profit === null ? "text-slate-400" : profit >= 0 ? "text-slate-900" : "text-red-600"}`}>
+          <p className={`font-mono text-sm font-bold whitespace-nowrap print:text-xs ${profit === null ? "text-slate-400" : profit >= 0 ? "text-slate-900" : "text-red-600"}`}>
             {profit === null ? "발주액 미입력" : formatWon(profit)}
           </p>
         </div>
         <div>
           <p className="text-xs text-slate-500 print:text-[9px]">이익율</p>
-          <p className={`font-mono text-base font-bold whitespace-nowrap print:text-xs ${margin === null ? "text-slate-400" : margin >= 0 ? "text-slate-900" : "text-red-600"}`}>
+          <p className={`font-mono text-sm font-bold whitespace-nowrap print:text-xs ${margin === null ? "text-slate-400" : margin >= 0 ? "text-slate-900" : "text-red-600"}`}>
             {margin === null ? "-" : `${margin.toFixed(2)}%`}
           </p>
         </div>
