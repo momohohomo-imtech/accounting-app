@@ -24,7 +24,9 @@ function isActive(pathname: string, href: string) {
 }
 
 function navFor(role: string | null) {
-  return role === "tax_agent" ? NAV.filter((item) => item.href === "/transactions") : NAV;
+  return role === "tax_agent"
+    ? NAV.filter((item) => item.href === "/transactions" || item.href === "/dashboard")
+    : NAV;
 }
 
 export function SidebarNav({ role }: { role: string | null }) {

@@ -67,8 +67,14 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // tax_agent(세무사 사무실 계정)는 매입매출·외상 화면만 볼 수 있음 — 그 외 경로는 강제 이동.
-  if (user && role === "tax_agent" && !request.nextUrl.pathname.startsWith("/transactions")) {
+  // tax_agent(세무사 사무실 계정)는 매입매출·외상 화면 + 대시보드(전반적인 수익현황)만 볼 수
+  // 있음 — 그 외 경로는 강제 이동.
+  if (
+    user &&
+    role === "tax_agent" &&
+    !request.nextUrl.pathname.startsWith("/transactions") &&
+    !request.nextUrl.pathname.startsWith("/dashboard")
+  ) {
     const url = request.nextUrl.clone();
     url.pathname = "/transactions";
     return NextResponse.redirect(url);
