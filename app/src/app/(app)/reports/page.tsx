@@ -46,6 +46,7 @@ type Row = {
     | { name: string; project_only: boolean; color: string | null }
     | { name: string; project_only: boolean; color: string | null }[]
     | null;
+  payment_methods: { name: string } | { name: string }[] | null;
 };
 
 function one<T>(v: T | T[] | null): T | null {
@@ -84,7 +85,9 @@ export default async function ReportsPage({
   ] = await Promise.all([
       supabase
         .from("transactions")
-        .select("*, clients(name), projects(name, sites(name)), expense_categories(name, project_only, color)")
+        .select(
+          "*, clients(name), projects(name, sites(name)), expense_categories(name, project_only, color), payment_methods(name)"
+        )
         .gte("trans_date", `${selectedYear}-01-01`)
         .lte("trans_date", `${selectedYear}-12-31`),
       supabase
@@ -343,6 +346,7 @@ export default async function ReportsPage({
             category_name: category?.name ?? null,
             category_project_only: category?.project_only ?? false,
             category_color: category?.color ?? null,
+            payment_method_name: (one(t.payment_methods) as { name: string } | null)?.name ?? null,
           };
         })
     : [];
@@ -365,6 +369,7 @@ export default async function ReportsPage({
               category_name: category?.name ?? null,
               category_project_only: category?.project_only ?? false,
               category_color: category?.color ?? null,
+              payment_method_name: null,
             };
           })
       : [];
