@@ -10,6 +10,7 @@ import { TransactionTable } from "@/components/TransactionTable";
 import { TransactionColumnToggles } from "@/components/TransactionColumnToggles";
 import { TransactionExportButtons } from "@/components/TransactionExportButtons";
 import { ProjectTreeFilter } from "@/components/ProjectTreeFilter";
+import { PaymentMethodFilter } from "@/components/PaymentMethodFilter";
 import { TransactionBulkImport } from "@/components/TransactionBulkImport";
 import { TransactionEditPopup } from "@/components/TransactionEditPopup";
 import { Card } from "@/components/ui/Card";
@@ -38,13 +39,15 @@ export default async function TransactionsPage({
     month?: string;
     type?: string;
     project_id?: string;
+    payment_method_id?: string;
     editTx?: string;
     showProject?: string;
     showCategory?: string;
     showItem?: string;
   }>;
 }) {
-  const { tab, year, month, type, project_id, editTx, showProject, showCategory, showItem } = await searchParams;
+  const { tab, year, month, type, project_id, payment_method_id, editTx, showProject, showCategory, showItem } =
+    await searchParams;
   const active = tab ?? "list";
 
   const redirectTo = (() => {
@@ -54,12 +57,13 @@ export default async function TransactionsPage({
     if (month) p.set("month", month);
     if (type) p.set("type", type);
     if (project_id) p.set("project_id", project_id);
+    if (payment_method_id) p.set("payment_method_id", payment_method_id);
     const qs = p.toString();
     return qs ? `/transactions?${qs}` : "/transactions";
   })();
 
   const totals =
-    active === "list" ? await fetchTransactionTotals({ year, month, type, project_id }) : null;
+    active === "list" ? await fetchTransactionTotals({ year, month, type, project_id, payment_method_id }) : null;
 
   return (
     <div className="space-y-6">
@@ -94,6 +98,7 @@ export default async function TransactionsPage({
           month={month}
           type={type}
           project_id={project_id}
+          payment_method_id={payment_method_id}
           showProject={showProject}
           showCategory={showCategory}
           showItem={showItem}
@@ -110,11 +115,13 @@ async function fetchTransactionTotals({
   month,
   type,
   project_id,
+  payment_method_id,
 }: {
   year?: string;
   month?: string;
   type?: string;
   project_id?: string;
+  payment_method_id?: string;
 }) {
   const supabase = await createClient();
   const now = new Date();
@@ -131,6 +138,7 @@ async function fetchTransactionTotals({
     .lte("trans_date", end);
   if (type) query = query.eq("type", type);
   if (project_id) query = query.eq("project_id", project_id);
+  if (payment_method_id) query = query.eq("payment_method_id", payment_method_id);
 
   const { data } = await query;
   const rows = data ?? [];
@@ -161,6 +169,7 @@ async function TransactionListSection({
   month,
   type,
   project_id,
+  payment_method_id,
   showProject,
   showCategory,
   showItem,
@@ -169,6 +178,7 @@ async function TransactionListSection({
   month?: string;
   type?: string;
   project_id?: string;
+  payment_method_id?: string;
   showProject?: string;
   showCategory?: string;
   showItem?: string;
@@ -196,6 +206,7 @@ async function TransactionListSection({
 
   if (type) query = query.eq("type", type);
   if (project_id) query = query.eq("project_id", project_id);
+  if (payment_method_id) query = query.eq("payment_method_id", payment_method_id);
 
   const [
     { data: rawTransactions },
@@ -246,6 +257,7 @@ async function TransactionListSection({
       month: selectedMonth,
       type: type ?? "",
       project_id: project_id ?? "",
+      payment_method_id: payment_method_id ?? "",
     });
     if (value) p.set(key, value);
     else p.delete(key);
@@ -281,6 +293,7 @@ async function TransactionListSection({
               </Pill>
             ))}
           </div>
+          <PaymentMethodFilter paymentMethods={importPaymentMethods ?? []} />
           <TransactionExportButtons transactions={transactions as Transaction[]} />
         </div>
       </div>
