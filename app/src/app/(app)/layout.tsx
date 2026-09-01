@@ -37,9 +37,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </aside>
 
       <div className="flex flex-1 flex-col">
-        <header className="flex items-center gap-2 border-b border-slate-800 bg-slate-900 px-4 py-3 md:hidden print:hidden">
-          <Image src="/logo-icon.png" alt="" width={22} height={22} className="rounded-md" />
-          <p className="text-sm font-bold text-white">현장관리 시스템</p>
+        <header className="flex items-center justify-between gap-2 border-b border-slate-800 bg-slate-900 px-4 py-3 md:hidden print:hidden">
+          <div className="flex items-center gap-2">
+            <Image src="/logo-icon.png" alt="" width={22} height={22} className="rounded-md" />
+            <p className="text-sm font-bold text-white">현장관리 시스템</p>
+          </div>
+          <form action={signOut}>
+            <button className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs text-slate-400 transition-colors hover:bg-slate-800 hover:text-white">
+              로그아웃
+            </button>
+          </form>
         </header>
         <MobileNav role={role} />
         <main className="flex-1 p-4 md:p-8">{children}</main>
