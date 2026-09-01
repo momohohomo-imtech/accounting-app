@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 function parse(formData: FormData) {
   return {
     name: String(formData.get("name") ?? "").trim(),
+    category: String(formData.get("category") ?? "") || null,
     note: String(formData.get("note") ?? "") || null,
   };
 }

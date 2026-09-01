@@ -12,10 +12,18 @@ import { createKnowHowNote, updateKnowHowNote, deleteKnowHowNote } from "@/lib/a
 
 const toolFields: FieldConfig[] = [
   { name: "name", label: "공구명", required: true },
+  { name: "category", label: "분류", placeholder: "예: 소공구, 대공구·장비, 아시바, 안전·기타" },
   { name: "note", label: "메모", hideInTable: true },
 ];
 
-type ChecklistItemRow = { id: string; checklist_id: string; tool_id: string | null; tool_name: string; checked: boolean };
+type ChecklistItemRow = {
+  id: string;
+  checklist_id: string;
+  tool_id: string | null;
+  tool_name: string;
+  checked: boolean;
+  quantity: number;
+};
 
 export async function ToolListSection({ copyFrom, checklist }: { copyFrom?: string; checklist?: string }) {
   const supabase = await createClient();
@@ -55,15 +63,21 @@ export async function ToolListSection({ copyFrom, checklist }: { copyFrom?: stri
     return { value: p.id as string, label: `${p.year} · ${site?.name ?? "미지정"} · ${p.name}` };
   });
 
-  const toolOptions = (tools ?? []).map((t) => ({ id: t.id as string, name: t.name as string }));
+  const toolOptions = (tools ?? []).map((t) => ({
+    id: t.id as string,
+    name: t.name as string,
+    category: (t.category as string | null) ?? null,
+  }));
 
   const copySource = copyFrom ? (checklists ?? []).find((c) => c.id === copyFrom) : null;
   const copyItems = copyFrom ? itemsByChecklist.get(copyFrom) ?? [] : [];
-  const initialCheckedIds = copyItems.filter((i) => i.tool_id).map((i) => i.tool_id as string);
+  const initialQuantities = Object.fromEntries(
+    copyItems.filter((i) => i.tool_id).map((i) => [i.tool_id as string, i.quantity || 1])
+  );
   const initialTitle = copySource ? `${copySource.title} (복사)` : "";
 
   const detailChecklist = checklist ? (checklists ?? []).find((c) => c.id === checklist) : null;
-  const detailItems = checklist ? (itemsByChecklist.get(checklist) ?? []).filter((i) => i.checked) : [];
+  const detailItems = checklist ? (itemsByChecklist.get(checklist) ?? []).filter((i) => i.quantity > 0) : [];
   const popupOpen = Boolean(detailChecklist);
 
   return (
@@ -82,11 +96,11 @@ export async function ToolListSection({ copyFrom, checklist }: { copyFrom?: stri
           tools={toolOptions}
           projectOptions={projectOptions}
           initialTitle={initialTitle}
-          initialCheckedIds={initialCheckedIds}
+          initialQuantities={initialQuantities}
         />
 
         <div>
-          <h2 className="mb-3 text-lg font-semibold text-slate-900">저장된 체크리스트 (이력)</h2>
+          <h2 className="mb-3 text-lg font-semibold text-slate-900">저장된 공구명세서 (이력)</h2>
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <ToolChecklistHistoryTable rows={historyRows} />
           </div>

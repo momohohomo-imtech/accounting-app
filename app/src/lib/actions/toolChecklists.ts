@@ -13,8 +13,9 @@ export async function createToolChecklist(formData: FormData) {
   const tripDate = String(formData.get("trip_date") ?? "") || null;
   const toolIds = formData.getAll("tool_id").map(String);
   const toolNames = formData.getAll("tool_name").map(String);
+  const quantities = formData.getAll("quantity").map((v) => Number(v) || 0);
   if (!title) return { error: "제목을 입력해주세요." };
-  if (toolIds.length === 0) return { error: "공구를 1개 이상 선택해주세요." };
+  if (toolIds.length === 0) return { error: "공구를 1개 이상 입력해주세요(수량 1 이상)." };
 
   const { data: checklist, error } = await supabase
     .from("tool_checklists")
@@ -27,6 +28,7 @@ export async function createToolChecklist(formData: FormData) {
     checklist_id: checklist.id,
     tool_id: id || null,
     tool_name: toolNames[i] ?? "",
+    quantity: quantities[i] || 1,
     checked: true,
   }));
   const { error: itemsError } = await supabase.from("tool_checklist_items").insert(items);

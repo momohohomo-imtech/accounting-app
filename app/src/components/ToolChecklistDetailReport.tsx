@@ -6,7 +6,7 @@ import { formatDate } from "@/lib/format";
 import { PrintButton } from "@/components/PrintButton";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 
-type Item = { id: string; tool_name: string };
+type Item = { id: string; tool_name: string; quantity: number };
 
 export function ToolChecklistDetailReport({
   title,
@@ -49,16 +49,22 @@ export function ToolChecklistDetailReport({
 
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {items.map((it) => (
-          <li key={it.id} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
-            ☑ {it.tool_name}
+          <li
+            key={it.id}
+            className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
+          >
+            <span className="truncate">☑ {it.tool_name}</span>
+            <span className="shrink-0 font-mono font-semibold text-slate-900">{it.quantity}개</span>
           </li>
         ))}
         {items.length === 0 && (
-          <li className="col-span-full py-6 text-center text-slate-400">체크된 공구가 없습니다.</li>
+          <li className="col-span-full py-6 text-center text-slate-400">등록된 품목이 없습니다.</li>
         )}
       </ul>
 
-      <p className="text-right text-xs text-slate-400">총 {items.length}개</p>
+      <p className="text-right text-xs text-slate-400">
+        총 {items.length}개 품목 · {items.reduce((s, it) => s + it.quantity, 0)}개
+      </p>
     </div>
   );
 }
