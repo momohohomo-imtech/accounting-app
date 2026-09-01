@@ -17,7 +17,7 @@ export async function PendingPaymentProfitSection() {
 
   const [{ data: pendingProjects }, { data: yearProjects }, { data: yearTx }] = await Promise.all([
     supabase.from("projects").select("id, contract_amount, quote_amount").eq("status", "done_awaiting_payment"),
-    supabase.from("projects").select("id, quote_amount").eq("year", currentYear),
+    supabase.from("projects").select("id, quote_amount, status").eq("year", currentYear),
     supabase
       .from("transactions")
       .select("sales_amount, sales_vat, purchase_amount, purchase_vat")
@@ -54,23 +54,27 @@ export async function PendingPaymentProfitSection() {
   for (const a of agencyTx ?? []) {
     agencyByProject.set(a.project_id, (agencyByProject.get(a.project_id) ?? 0) + a.amount);
   }
-  const yearProfits = yearRows
-    .filter((p) => p.quote_amount != null)
-    .map((p) => p.quote_amount! - (purchaseByProject.get(p.id) ?? 0) - (agencyByProject.get(p.id) ?? 0));
+  const yearProjectsWithProfit = yearRows.filter((p) => p.quote_amount != null);
+  const yearProfits = yearProjectsWithProfit.map(
+    (p) => p.quote_amount! - (purchaseByProject.get(p.id) ?? 0) - (agencyByProject.get(p.id) ?? 0)
+  );
   const yearProfitSum = yearProfits.reduce((s, v) => s + v, 0);
   const yearTax = taxLine(yearProfitSum);
+  const hasIncompleteProjects = yearProjectsWithProfit.some(
+    (p) => p.status !== "done" && p.status !== "done_awaiting_payment"
+  );
 
   return (
     <div className="space-y-1 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-900">
       {pendingRows.length > 0 && (
         <p>
-          <span className="font-semibold">미수금 포함 내역</span>
+          <span className="font-semibold">완료 미수 합산</span>
           {" — "}
-          {currentYear}년 실제 이익금(매출-매입) 약{" "}
-          <span className="font-mono font-semibold">{formatWon(companyProfit)}</span>
-          {" + "}완료 수금대기 {pendingRows.length}건 미수 합계금 약{" "}
-          <span className="font-mono font-semibold">{formatWon(pendingReceivable)}</span>
-          {" → "}예상세금 약 <span className="font-mono font-semibold">{formatWon(pendingTax.totalTax)}</span>
+          이익 예상액{" "}
+          <span className="font-mono font-semibold">{formatWon(companyProfit + pendingReceivable)}</span>
+          {"(이익금 + 완료 수금대기) / "}
+          {pendingRows.length}건 예상세액{" "}
+          <span className="font-mono font-semibold">{formatWon(pendingTax.totalTax)}</span>
           {" (세율 "}
           <span className="font-mono font-semibold">{pendingTax.ratePct}%</span>
           {" 구간)"}
@@ -78,14 +82,17 @@ export async function PendingPaymentProfitSection() {
       )}
       {yearProfits.length > 0 && (
         <p>
-          <span className="font-semibold">전체 프로젝트 이익금 예상액</span>
+          <span className="font-semibold">전체 예상 합산</span>
           {" — "}
-          {currentYear}년 프로젝트 중 이익금 산정 가능한 {yearProfits.length}건 합계 약{" "}
+          이익 예상액{" "}
           <span className="font-mono font-semibold">{formatWon(yearProfitSum)}</span>
-          {" → "}예상세금 약 <span className="font-mono font-semibold">{formatWon(yearTax.totalTax)}</span>
+          {"(전체 프로젝트 이익금) / "}
+          {yearProfits.length}건 예상세액{" "}
+          <span className="font-mono font-semibold">{formatWon(yearTax.totalTax)}</span>
           {" (세율 "}
           <span className="font-mono font-semibold">{yearTax.ratePct}%</span>
           {" 구간)"}
+          {hasIncompleteProjects && <span className="font-semibold text-red-600"> **** 추가 지출 있음</span>}
         </p>
       )}
     </div>
