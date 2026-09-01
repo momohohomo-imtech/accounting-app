@@ -92,7 +92,9 @@ export async function PendingPaymentProfitSection() {
           {" (세율 "}
           <span className="font-mono font-semibold">{yearTax.ratePct}%</span>
           {" 구간)"}
-          {hasIncompleteProjects && <span className="font-semibold text-red-600"> **** 추가 지출 있음</span>}
+          {hasIncompleteProjects && (
+            <span className="font-semibold text-red-600"> ### 추가 매입/매출 있을 수 있음 ###</span>
+          )}
         </p>
       )}
     </div>
