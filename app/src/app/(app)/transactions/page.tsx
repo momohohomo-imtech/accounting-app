@@ -276,26 +276,22 @@ async function TransactionListSection({
         />
       </Card>
 
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex flex-wrap items-end gap-3">
-          <YearMonthFilter years={years} selectedYear={selectedYear} selectedMonth={selectedMonth} />
-          <TransactionColumnToggles {...columnVisibility} />
+      <div className="flex flex-wrap items-end gap-3">
+        <YearMonthFilter years={years} selectedYear={selectedYear} selectedMonth={selectedMonth} />
+        <TransactionColumnToggles {...columnVisibility} />
+        <PaymentMethodFilter paymentMethods={importPaymentMethods ?? []} />
+        <div className="flex gap-1 print:hidden">
+          {[
+            { v: "", label: "전체" },
+            { v: "매입", label: "매입" },
+            { v: "매출", label: "매출" },
+          ].map((t) => (
+            <Pill key={t.v} href={withParam("type", t.v)} active={(type ?? "") === t.v}>
+              {t.label}
+            </Pill>
+          ))}
         </div>
-        <div className="flex flex-wrap items-center gap-3 print:hidden">
-          <div className="flex gap-1">
-            {[
-              { v: "", label: "전체" },
-              { v: "매입", label: "매입" },
-              { v: "매출", label: "매출" },
-            ].map((t) => (
-              <Pill key={t.v} href={withParam("type", t.v)} active={(type ?? "") === t.v}>
-                {t.label}
-              </Pill>
-            ))}
-          </div>
-          <PaymentMethodFilter paymentMethods={importPaymentMethods ?? []} />
-          <TransactionExportButtons transactions={transactions as Transaction[]} />
-        </div>
+        <TransactionExportButtons transactions={transactions as Transaction[]} />
       </div>
 
       <Card>
