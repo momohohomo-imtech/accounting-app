@@ -7,17 +7,21 @@ import { Button } from "@/components/ui/Button";
 export function VendorReportActions({
   vendorName,
   year,
+  headers,
   rows,
   total,
 }: {
   vendorName: string;
   year: number;
+  headers: string[];
   rows: (string | number)[][];
   total: number;
 }) {
   async function handleExport() {
-    const data: (string | number)[][] = [...rows, ["", "", "", ""], ["", "", "합계", total]];
-    await downloadXlsx(`${vendorName}_매입내역_${year}.xlsx`, ["구분", "날짜", "품목", "금액"], data, `${vendorName} ${year}년`);
+    const blankRow = headers.map(() => "");
+    const totalRow = headers.map((_, i) => (i === headers.length - 2 ? "합계" : i === headers.length - 1 ? total : ""));
+    const data: (string | number)[][] = [...rows, blankRow, totalRow];
+    await downloadXlsx(`${vendorName}_매입내역_${year}.xlsx`, headers, data, `${vendorName} ${year}년`);
   }
 
   return (

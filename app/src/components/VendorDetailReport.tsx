@@ -59,7 +59,6 @@ export function VendorDetailReport({
 
   const total = rows.reduce((s, r) => s + r.amount, 0);
   const hasAgency = rows.some((r) => r.kind === "대행구매");
-  const exportRows = rows.map((r) => [r.kind, r.trans_date ? formatDate(r.trans_date) : "-", r.item_name ?? "-", r.amount]);
 
   function editHrefFor(id: string) {
     return `/reports?year=${year}${vendorAgency ? "&vendorAgency=1" : ""}&vendor=${encodeURIComponent(vendorName)}&editTx=${id}`;
@@ -85,6 +84,25 @@ export function VendorDetailReport({
     });
     return copy;
   }, [rows, sortKey, sortDir]);
+
+  // 엑셀 다운로드가 화면에 보이는(정렬·구분/프로젝트/카테고리/품목 토글 반영) 내용과 항상 똑같게,
+  // 인쇄 테이블과 동일한 컬럼 구성 + 정렬 순서(sortedRows)로 내보낸다.
+  const exportHeaders = [
+    ...(hasAgency ? ["구분"] : []),
+    "날짜",
+    ...(showProject ? ["프로젝트"] : []),
+    ...(showCategory ? ["카테고리"] : []),
+    ...(showItem ? ["품목"] : []),
+    "금액",
+  ];
+  const exportRows = sortedRows.map((r) => [
+    ...(hasAgency ? [r.kind] : []),
+    r.trans_date ? formatDate(r.trans_date) : "-",
+    ...(showProject ? [r.needs_classification ? "분류 대기 중" : (r.project_name ?? "일반경비")] : []),
+    ...(showCategory ? [r.category_name ?? "-"] : []),
+    ...(showItem ? [r.item_name ?? "-"] : []),
+    r.amount,
+  ]);
 
   function headerButton(key: SortKey, label: string) {
     return (
@@ -115,7 +133,7 @@ export function VendorDetailReport({
             <input type="checkbox" checked={showItem} onChange={(e) => setShowItem(e.target.checked)} className="h-3.5 w-3.5" />
             품목
           </label>
-          <VendorReportActions vendorName={vendorName} year={year} rows={exportRows} total={total} />
+          <VendorReportActions vendorName={vendorName} year={year} headers={exportHeaders} rows={exportRows} total={total} />
           <Link href={closeHref} className="text-sm text-slate-500 hover:text-slate-800">
             닫기
           </Link>
