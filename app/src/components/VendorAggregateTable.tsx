@@ -7,7 +7,15 @@ import { formatWon } from "@/lib/format";
 type VendorAgg = { name: string; count: number; amount: number };
 type SortKey = "name" | "count" | "amount";
 
-export function VendorAggregateTable({ rows, year }: { rows: VendorAgg[]; year: number }) {
+export function VendorAggregateTable({
+  rows,
+  year,
+  vendorAgency,
+}: {
+  rows: VendorAgg[];
+  year: number;
+  vendorAgency?: boolean;
+}) {
   const [sortKey, setSortKey] = useState<SortKey>("amount");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [query, setQuery] = useState("");
@@ -58,7 +66,7 @@ export function VendorAggregateTable({ rows, year }: { rows: VendorAgg[]; year: 
           <tr className="border-b border-slate-200 text-left text-slate-500">
             <th className="pb-2 pr-4">{headerButton("name", "거래처")}</th>
             <th className="pb-2 pr-4 text-right">{headerButton("count", "건수")}</th>
-            <th className="pb-2 text-right">{headerButton("amount", "매입 합계")}</th>
+            <th className="pb-2 text-right">{headerButton("amount", vendorAgency ? "매입+대행구매 합계" : "매입 합계")}</th>
           </tr>
         </thead>
         <tbody>
@@ -66,7 +74,7 @@ export function VendorAggregateTable({ rows, year }: { rows: VendorAgg[]; year: 
             <tr key={v.name} className="border-b border-slate-100 last:border-0">
               <td className="py-2 pr-4">
                 <Link
-                  href={`/reports?year=${year}&vendor=${encodeURIComponent(v.name)}`}
+                  href={`/reports?year=${year}${vendorAgency ? "&vendorAgency=1" : ""}&vendor=${encodeURIComponent(v.name)}`}
                   className="text-slate-700 underline decoration-slate-300 underline-offset-2 hover:text-slate-900 print:no-underline"
                 >
                   {v.name}

@@ -13,6 +13,7 @@ import { isLedgerVisible } from "@/lib/credit";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import type { ReportAiInsight, CreditPayment } from "@/lib/types";
 import { VendorAggregateTable } from "@/components/VendorAggregateTable";
+import { VendorAgencyToggle } from "@/components/VendorAgencyToggle";
 import { CategoryAggregateTable } from "@/components/CategoryAggregateTable";
 import { CategoryDetailReport } from "@/components/CategoryDetailReport";
 import { ProjectProfitTable } from "@/components/ProjectProfitTable";
@@ -59,6 +60,7 @@ export default async function ReportsPage({
     year?: string;
     project?: string;
     vendor?: string;
+    vendorAgency?: string;
     category?: string;
     site?: string;
     printProjects?: string;
@@ -66,7 +68,8 @@ export default async function ReportsPage({
     wlMonths?: string;
   }>;
 }) {
-  const { year, project, vendor, category, site, printProjects, editTx, wlMonths } = await searchParams;
+  const { year, project, vendor, vendorAgency, category, site, printProjects, editTx, wlMonths } = await searchParams;
+  const includeVendorAgency = vendorAgency === "1";
   const currentYear = new Date().getFullYear();
   const selectedYear = year ? Number(year) : currentYear;
 
@@ -211,8 +214,35 @@ export default async function ReportsPage({
     }
     return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
   }
-  const byVendor = clientBreakdown("매입");
   const byCustomer = clientBreakdown("매출");
+
+  // 매입처별 대행구매 집계 (거래처명 기준 — 체크박스로 매입 집계와 합산해서 보여줄 때 씀)
+  const agencyByVendorMap = new Map<string, { name: string; count: number; amount: number }>();
+  for (const a of agencyPurchases ?? []) {
+    const name = a.client_name ?? "미지정";
+    const entry = agencyByVendorMap.get(name) ?? { name, count: 0, amount: 0 };
+    entry.count += 1;
+    entry.amount += a.amount;
+    agencyByVendorMap.set(name, entry);
+  }
+
+  const byVendorPurchaseOnly = clientBreakdown("매입");
+  const byVendor = includeVendorAgency
+    ? (() => {
+        const merged = new Map<string, { name: string; count: number; amount: number }>();
+        for (const v of byVendorPurchaseOnly) merged.set(v.name, { ...v });
+        for (const a of agencyByVendorMap.values()) {
+          const existing = merged.get(a.name);
+          if (existing) {
+            existing.count += a.count;
+            existing.amount += a.amount;
+          } else {
+            merged.set(a.name, { ...a });
+          }
+        }
+        return Array.from(merged.values()).sort((x, y) => y.amount - x.amount);
+      })()
+    : byVendorPurchaseOnly;
 
   // 카테고리별 매입 집계
   const byCategory = (() => {
@@ -304,7 +334,8 @@ export default async function ReportsPage({
           const category = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
           return {
             id: t.id,
-            trans_date: t.trans_date,
+            kind: "매입" as const,
+            trans_date: t.trans_date as string | null,
             item_name: t.item_name,
             amount: t.purchase_amount + t.purchase_vat,
             project_name: (one(t.projects) as { name: string } | null)?.name ?? null,
@@ -315,6 +346,30 @@ export default async function ReportsPage({
           };
         })
     : [];
+
+  const vendorAgencyRows =
+    vendor && includeVendorAgency
+      ? (agencyPurchases ?? [])
+          .filter((a) => (a.client_name ?? "미지정") === vendor)
+          .map((a) => {
+            const category = one(a.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
+            const proj = one(a.projects) as { name: string } | null;
+            return {
+              id: a.id,
+              kind: "대행구매" as const,
+              trans_date: null as string | null,
+              item_name: a.item_name,
+              amount: a.amount,
+              project_name: proj?.name ?? null,
+              needs_classification: false,
+              category_name: category?.name ?? null,
+              category_project_only: category?.project_only ?? false,
+              category_color: category?.color ?? null,
+            };
+          })
+      : [];
+
+  const vendorAllRows = [...vendorRows, ...vendorAgencyRows];
 
   const popupOpen = Boolean(project || vendor || category);
   const isolateProjects = printProjects === "1";
@@ -422,8 +477,11 @@ export default async function ReportsPage({
       </CollapsibleSection>
 
       <div className={popupOpen || isolateProjects ? "space-y-6 print:hidden" : "space-y-6"}>
-        <CollapsibleSection title="매입처별 집계 — 어느 업체에서 얼마를 매입했는지">
-          <VendorAggregateTable rows={byVendor} year={selectedYear} />
+        <CollapsibleSection
+          title="매입처별 집계 — 어느 업체에서 얼마를 매입했는지"
+          headerExtra={<VendorAgencyToggle checked={includeVendorAgency} />}
+        >
+          <VendorAggregateTable rows={byVendor} year={selectedYear} vendorAgency={includeVendorAgency} />
         </CollapsibleSection>
 
         <CollapsibleSection title="카테고리별 집계 — 어느 카테고리에 얼마를 매입했는지">
@@ -468,8 +526,9 @@ export default async function ReportsPage({
             <VendorDetailReport
               vendorName={vendor}
               year={selectedYear}
-              rows={vendorRows}
-              closeHref={`/reports?year=${selectedYear}`}
+              rows={vendorAllRows}
+              closeHref={`/reports?year=${selectedYear}${includeVendorAgency ? "&vendorAgency=1" : ""}`}
+              vendorAgency={includeVendorAgency}
             />
           </div>
         </div>
@@ -491,7 +550,7 @@ export default async function ReportsPage({
 
       <TransactionEditPopup
         editTx={editTx}
-        redirectTo={`/reports?year=${selectedYear}&vendor=${encodeURIComponent(vendor ?? "")}`}
+        redirectTo={`/reports?year=${selectedYear}${includeVendorAgency ? "&vendorAgency=1" : ""}&vendor=${encodeURIComponent(vendor ?? "")}`}
       />
     </div>
   );

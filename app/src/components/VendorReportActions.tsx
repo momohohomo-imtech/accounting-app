@@ -16,8 +16,8 @@ export function VendorReportActions({
   total: number;
 }) {
   async function handleExport() {
-    const data: (string | number)[][] = [...rows, ["", "", ""], ["", "합계", total]];
-    await downloadXlsx(`${vendorName}_매입내역_${year}.xlsx`, ["날짜", "품목", "금액"], data, `${vendorName} ${year}년`);
+    const data: (string | number)[][] = [...rows, ["", "", "", ""], ["", "", "합계", total]];
+    await downloadXlsx(`${vendorName}_매입내역_${year}.xlsx`, ["구분", "날짜", "품목", "금액"], data, `${vendorName} ${year}년`);
   }
 
   return (
