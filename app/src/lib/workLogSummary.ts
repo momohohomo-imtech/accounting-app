@@ -7,6 +7,7 @@ export type WorkLogSummaryRow = {
   siteColor: string;
   title: string;
   days: number;
+  dates: string[];
   isSpecial: boolean;
 };
 export type SiteAggregateRow = {
@@ -71,6 +72,7 @@ export function buildWorkLogSummary(rows: WorkLog[], sites: SiteInfo[]): WorkLog
       siteColor: resolveSiteColor(g.siteId, siteById.get(g.siteId)?.color),
       title: g.title,
       days: g.dates.size,
+      dates: Array.from(g.dates).sort(),
       isSpecial: false,
     }))
     .sort((a, b) => b.days - a.days);
@@ -82,6 +84,7 @@ export function buildWorkLogSummary(rows: WorkLog[], sites: SiteInfo[]): WorkLog
     siteColor: SPECIAL_COLOR,
     title: t,
     days: specialDates.get(t)?.size ?? 0,
+    dates: Array.from(specialDates.get(t) ?? []).sort(),
     isSpecial: true,
   }));
 

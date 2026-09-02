@@ -17,6 +17,11 @@ function sortValue(r: WorkLogSummaryRow, key: SortKey): string | number {
   }
 }
 
+function formatMonthDay(dateKey: string) {
+  const [, m, d] = dateKey.split("-");
+  return `${Number(m)}/${Number(d)}`;
+}
+
 export function WorkLogSummaryTable({
   rows,
   emptyMessage,
@@ -65,12 +70,13 @@ export function WorkLogSummaryTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[500px] text-sm">
+      <table className="w-full min-w-[650px] text-sm">
         <thead>
           <tr className="border-b border-slate-200 text-left text-slate-500">
             <th className="pb-2 pr-4">{headerButton("siteName", "현장")}</th>
             <th className="pb-2 pr-4">{headerButton("title", "내용")}</th>
-            <th className="pb-2 text-right">{headerButton("days", "일수")}</th>
+            <th className="pb-2 pr-4 text-right">{headerButton("days", "일수")}</th>
+            <th className="pb-2">날짜</th>
           </tr>
         </thead>
         <tbody>
@@ -91,12 +97,13 @@ export function WorkLogSummaryTable({
                   {r.title}
                 </button>
               </td>
-              <td className="py-2 text-right font-mono text-slate-900">{r.days}일</td>
+              <td className="py-2 pr-4 text-right font-mono text-slate-900">{r.days}일</td>
+              <td className="py-2 text-xs text-slate-500">{r.dates.map(formatMonthDay).join(", ")}</td>
             </tr>
           ))}
           {sorted.length === 0 && (
             <tr>
-              <td colSpan={3} className="py-6 text-center text-slate-400">
+              <td colSpan={4} className="py-6 text-center text-slate-400">
                 {emptyMessage}
               </td>
             </tr>
