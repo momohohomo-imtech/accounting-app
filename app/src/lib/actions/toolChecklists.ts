@@ -38,6 +38,45 @@ export async function createToolChecklist(formData: FormData) {
   return { id: checklist.id as string };
 }
 
+// 기존 체크리스트의 제목/프로젝트/출장일/품목을 수정 — 작업일지 날짜별 저장과 동일하게
+// 품목은 항상 "전부 지우고 다시 insert" 방식(부분 수정보다 단순하고, 그룹 묶기/순서
+// 문제도 없음).
+export async function updateToolChecklist(formData: FormData) {
+  const supabase = await createClient();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { error: "잘못된 요청입니다." };
+  const title = String(formData.get("title") ?? "").trim();
+  const projectId = String(formData.get("project_id") ?? "") || null;
+  const tripDate = String(formData.get("trip_date") ?? "") || null;
+  const toolIds = formData.getAll("tool_id").map(String);
+  const toolNames = formData.getAll("tool_name").map(String);
+  const quantities = formData.getAll("quantity").map(String);
+  if (!title) return { error: "제목을 입력해주세요." };
+  if (toolIds.length === 0) return { error: "품목을 1개 이상 입력해주세요." };
+
+  const { error: updateError } = await supabase
+    .from("tool_checklists")
+    .update({ title, project_id: projectId, trip_date: tripDate })
+    .eq("id", id);
+  if (updateError) return { error: updateError.message };
+
+  const { error: deleteError } = await supabase.from("tool_checklist_items").delete().eq("checklist_id", id);
+  if (deleteError) return { error: deleteError.message };
+
+  const items = toolIds.map((toolId, i) => ({
+    checklist_id: id,
+    tool_id: toolId || null,
+    tool_name: toolNames[i] ?? "",
+    quantity: quantities[i] || "1",
+    checked: true,
+  }));
+  const { error: itemsError } = await supabase.from("tool_checklist_items").insert(items);
+  if (itemsError) return { error: itemsError.message };
+
+  revalidatePath("/quality-construction");
+  return { id };
+}
+
 export async function deleteToolChecklist(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id") ?? "");

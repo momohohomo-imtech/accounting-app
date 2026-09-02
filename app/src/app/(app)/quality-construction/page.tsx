@@ -12,9 +12,9 @@ const TABS = [
 export default async function QualityConstructionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; project_id?: string; copyFrom?: string; checklist?: string }>;
+  searchParams: Promise<{ tab?: string; project_id?: string; copyFrom?: string; editFrom?: string; checklist?: string }>;
 }) {
-  const { tab, project_id, copyFrom, checklist } = await searchParams;
+  const { tab, project_id, copyFrom, editFrom, checklist } = await searchParams;
   const active = tab ?? "quality";
 
   return (
@@ -25,7 +25,7 @@ export default async function QualityConstructionPage({
       </div>
       {active === "quality" && <QualityChecklistSection projectId={project_id} />}
       {active === "construction" && <ConstructionStageSection projectId={project_id} />}
-      {active === "tools" && <ToolListSection copyFrom={copyFrom} checklist={checklist} />}
+      {active === "tools" && <ToolListSection copyFrom={copyFrom} editFrom={editFrom} checklist={checklist} />}
     </div>
   );
 }

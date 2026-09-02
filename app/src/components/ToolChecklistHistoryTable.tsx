@@ -106,6 +106,12 @@ export function ToolChecklistHistoryTable({ rows }: { rows: HistoryRow[] }) {
               <td className="py-2 text-right print:hidden">
                 <div className="flex justify-end gap-2">
                   <Link
+                    href={`/quality-construction?tab=tools&editFrom=${r.id}`}
+                    className="text-xs text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
+                  >
+                    수정
+                  </Link>
+                  <Link
                     href={`/quality-construction?tab=tools&copyFrom=${r.id}`}
                     className="text-xs text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
                   >

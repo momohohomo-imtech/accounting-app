@@ -26,7 +26,27 @@ type ChecklistItemRow = {
   quantity: string;
 };
 
-export async function ToolListSection({ copyFrom, checklist }: { copyFrom?: string; checklist?: string }) {
+function buildInitialFormState(items: ChecklistItemRow[]) {
+  const initialQuantities: Record<string, string> = {};
+  const initialAdhocItems: { name: string; quantity: string }[] = [];
+  for (const i of items) {
+    const qty = String(i.quantity ?? "").trim();
+    if (!qty) continue;
+    if (i.tool_id) initialQuantities[i.tool_id] = qty;
+    else initialAdhocItems.push({ name: i.tool_name, quantity: qty });
+  }
+  return { initialQuantities, initialAdhocItems };
+}
+
+export async function ToolListSection({
+  copyFrom,
+  editFrom,
+  checklist,
+}: {
+  copyFrom?: string;
+  editFrom?: string;
+  checklist?: string;
+}) {
   const supabase = await createClient();
   const [{ data: tools }, { data: projects }, { data: checklists }, { data: items }, { data: knowHowNotes }] =
     await Promise.all([
@@ -82,11 +102,29 @@ export async function ToolListSection({ copyFrom, checklist }: { copyFrom?: stri
   }));
 
   const copySource = copyFrom ? (checklists ?? []).find((c) => c.id === copyFrom) : null;
-  const copyItems = copyFrom ? itemsByChecklist.get(copyFrom) ?? [] : [];
-  const initialQuantities = Object.fromEntries(
-    copyItems.filter((i) => i.tool_id).map((i) => [i.tool_id as string, i.quantity || "1"])
-  );
-  const initialTitle = copySource ? `${copySource.title} (복사)` : "";
+  const editSource = editFrom ? (checklists ?? []).find((c) => c.id === editFrom) : null;
+
+  const { initialQuantities, initialAdhocItems, initialTitle, initialProjectId, initialTripDate } = editSource
+    ? {
+        ...buildInitialFormState(itemsByChecklist.get(editSource.id) ?? []),
+        initialTitle: editSource.title as string,
+        initialProjectId: (editSource.project_id as string | null) ?? "",
+        initialTripDate: (editSource.trip_date as string | null) ?? undefined,
+      }
+    : copySource
+      ? {
+          ...buildInitialFormState(itemsByChecklist.get(copySource.id) ?? []),
+          initialTitle: `${copySource.title} (복사)`,
+          initialProjectId: "",
+          initialTripDate: undefined as string | undefined,
+        }
+      : {
+          initialQuantities: {},
+          initialAdhocItems: [],
+          initialTitle: "",
+          initialProjectId: "",
+          initialTripDate: undefined as string | undefined,
+        };
 
   const detailChecklist = checklist ? (checklists ?? []).find((c) => c.id === checklist) : null;
   const detailItems = checklist
@@ -105,11 +143,15 @@ export async function ToolListSection({ copyFrom, checklist }: { copyFrom?: stri
         </CollapsibleSection>
 
         <ToolChecklistCreateForm
-          key={copyFrom ?? "new"}
+          key={editFrom ?? copyFrom ?? "new"}
           tools={toolOptions}
           projectOptions={projectOptions}
+          checklistId={editSource?.id as string | undefined}
           initialTitle={initialTitle}
+          initialProjectId={initialProjectId}
+          initialTripDate={initialTripDate}
           initialQuantities={initialQuantities}
+          initialAdhocItems={initialAdhocItems}
         />
 
         <CollapsibleSection title="저장된 공구명세서 (이력)">
@@ -135,6 +177,7 @@ export async function ToolListSection({ copyFrom, checklist }: { copyFrom?: stri
               items={detailItems}
               closeHref="/quality-construction?tab=tools"
               copyHref={`/quality-construction?tab=tools&copyFrom=${detailChecklist.id}`}
+              editHref={`/quality-construction?tab=tools&editFrom=${detailChecklist.id}`}
             />
           </div>
         </div>

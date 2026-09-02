@@ -15,6 +15,7 @@ export function ToolChecklistDetailReport({
   items,
   closeHref,
   copyHref,
+  editHref,
 }: {
   title: string;
   projectName: string | null;
@@ -22,6 +23,7 @@ export function ToolChecklistDetailReport({
   items: Item[];
   closeHref: string;
   copyHref: string;
+  editHref: string;
 }) {
   const router = useRouter();
   useEscapeKey(true, () => router.push(closeHref));
@@ -38,6 +40,9 @@ export function ToolChecklistDetailReport({
         </div>
         <div className="flex items-center gap-3 print:hidden">
           <PrintButton />
+          <Link href={editHref} className="text-sm text-slate-500 hover:text-slate-800">
+            수정
+          </Link>
           <Link href={copyHref} className="text-sm text-slate-500 hover:text-slate-800">
             복사해서 새로 만들기
           </Link>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createToolChecklist } from "@/lib/actions/toolChecklists";
+import { createToolChecklist, updateToolChecklist } from "@/lib/actions/toolChecklists";
 import { Button } from "@/components/ui/Button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -19,21 +19,33 @@ function todayIso() {
 export function ToolChecklistCreateForm({
   tools,
   projectOptions,
+  checklistId,
   initialTitle = "",
+  initialProjectId = "",
+  initialTripDate,
   initialQuantities = {},
+  initialAdhocItems = [],
 }: {
   tools: Tool[];
   projectOptions: ProjectOption[];
+  /** 지정하면 새로 만드는 대신 이 id의 체크리스트를 수정(항목 전체 교체)함. */
+  checklistId?: string;
   initialTitle?: string;
+  initialProjectId?: string;
+  initialTripDate?: string;
   initialQuantities?: Record<string, string>;
+  initialAdhocItems?: { name: string; quantity: string }[];
 }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const isEdit = Boolean(checklistId);
   const [title, setTitle] = useState(initialTitle);
-  const [projectId, setProjectId] = useState("");
-  const [tripDate, setTripDate] = useState(todayIso);
+  const [projectId, setProjectId] = useState(initialProjectId);
+  const [tripDate, setTripDate] = useState(initialTripDate ?? todayIso);
   const [quantities, setQuantities] = useState<Record<string, string>>(initialQuantities);
-  const [adhocItems, setAdhocItems] = useState<AdhocItem[]>([]);
+  const [adhocItems, setAdhocItems] = useState<AdhocItem[]>(
+    initialAdhocItems.map((a) => ({ key: crypto.randomUUID(), ...a }))
+  );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,10 +82,11 @@ export function ToolChecklistCreateForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!(await confirm("체크리스트를 저장하시겠습니까?"))) return;
+    if (!(await confirm(isEdit ? "수정 내용을 저장하시겠습니까?" : "체크리스트를 저장하시겠습니까?"))) return;
     setPending(true);
     setError(null);
     const fd = new FormData();
+    if (checklistId) fd.append("id", checklistId);
     fd.append("title", title);
     fd.append("project_id", projectId);
     fd.append("trip_date", tripDate);
@@ -93,10 +106,14 @@ export function ToolChecklistCreateForm({
         fd.append("quantity", a.quantity.trim() || "1");
       }
     }
-    const result = await createToolChecklist(fd);
+    const result = await (isEdit ? updateToolChecklist(fd) : createToolChecklist(fd));
     setPending(false);
     if (result?.error) {
       setError(result.error);
+      return;
+    }
+    if (isEdit) {
+      router.push("/quality-construction?tab=tools");
       return;
     }
     setTitle("");
@@ -108,7 +125,18 @@ export function ToolChecklistCreateForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm print:hidden">
-      <h3 className="font-semibold text-slate-900">새 공구명세서 만들기</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-slate-900">{isEdit ? "공구명세서 수정" : "새 공구명세서 만들기"}</h3>
+        {isEdit && (
+          <button
+            type="button"
+            onClick={() => router.push("/quality-construction?tab=tools")}
+            className="text-xs text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
+          >
+            수정 취소
+          </button>
+        )}
+      </div>
       <div className="flex flex-wrap gap-3">
         <div className="flex flex-col gap-1">
           <label className={labelClass}>제목</label>
@@ -220,7 +248,7 @@ export function ToolChecklistCreateForm({
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={pending || selectedCount === 0}>
-          저장
+          {isEdit ? "수정 저장" : "저장"}
         </Button>
         <span className="text-xs text-slate-400">{selectedCount}개 품목 선택됨</span>
       </div>
