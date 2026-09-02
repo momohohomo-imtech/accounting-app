@@ -6,7 +6,14 @@ import { reorderTools } from "@/lib/actions/tools";
 import { ToolEditPopup } from "@/components/ToolEditPopup";
 import { groupToolsBySortOrder, toolGroupLabel } from "@/lib/tools";
 
-type Tool = { id: string; name: string; sort_order: number; note: string | null };
+type Tool = {
+  id: string;
+  name: string;
+  sort_order: number;
+  note: string | null;
+  linked_tool_ids: string[];
+  text_color: string | null;
+};
 
 export function ToolMasterGrid({ tools }: { tools: Tool[] }) {
   const router = useRouter();
@@ -43,7 +50,8 @@ export function ToolMasterGrid({ tools }: { tools: Tool[] }) {
                 <button
                   type="button"
                   onClick={() => setEditing(t)}
-                  className="truncate text-left text-slate-700 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
+                  className="truncate text-left text-slate-700 underline decoration-slate-300 underline-offset-2 hover:opacity-70"
+                  style={{ color: t.text_color ?? undefined }}
                   title={t.name}
                 >
                   {t.name}
@@ -72,7 +80,13 @@ export function ToolMasterGrid({ tools }: { tools: Tool[] }) {
         </div>
       ))}
 
-      {editing && <ToolEditPopup tool={editing} onClose={() => setEditing(null)} />}
+      {editing && (
+        <ToolEditPopup
+          tool={editing}
+          allTools={tools.map((t) => ({ id: t.id, name: t.name }))}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </div>
   );
 }

@@ -8,19 +8,52 @@ import { Button } from "@/components/ui/Button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { TOOL_TEXT_COLORS } from "@/lib/toolColors";
 
-type Tool = { id: string; name: string; sort_order: number; note: string | null };
+type Tool = {
+  id: string;
+  name: string;
+  sort_order: number;
+  note: string | null;
+  linked_tool_ids: string[];
+  text_color: string | null;
+};
+type ToolOption = { id: string; name: string };
 
-export function ToolEditPopup({ tool, onClose }: { tool: Tool; onClose: () => void }) {
+export function ToolEditPopup({
+  tool,
+  allTools,
+  onClose,
+}: {
+  tool: Tool;
+  allTools: ToolOption[];
+  onClose: () => void;
+}) {
   const router = useRouter();
   const confirm = useConfirm();
   const [name, setName] = useState(tool.name);
   const [sortOrder, setSortOrder] = useState(String(tool.sort_order));
   const [note, setNote] = useState(tool.note ?? "");
+  const [linkedIds, setLinkedIds] = useState<Set<string>>(new Set(tool.linked_tool_ids));
+  const [textColor, setTextColor] = useState<string | null>(tool.text_color);
+  const [linkFilter, setLinkFilter] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEscapeKey(true, onClose);
+
+  function toggleLinked(id: string) {
+    setLinkedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const linkableTools = allTools.filter(
+    (t) => t.id !== tool.id && t.name.toLowerCase().includes(linkFilter.trim().toLowerCase())
+  );
 
   async function handleSave() {
     if (!(await confirm("수정 내용을 저장하시겠습니까?"))) return;
@@ -31,6 +64,8 @@ export function ToolEditPopup({ tool, onClose }: { tool: Tool; onClose: () => vo
     fd.append("name", name);
     fd.append("sort_order", sortOrder);
     fd.append("note", note);
+    fd.append("text_color", textColor ?? "");
+    linkedIds.forEach((id) => fd.append("linked_tool_id", id));
     const result = await updateTool(fd);
     setSaving(false);
     if (result?.error) {
@@ -58,7 +93,7 @@ export function ToolEditPopup({ tool, onClose }: { tool: Tool; onClose: () => vo
   return (
     <ModalPortal>
       <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10">
-        <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+        <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
           <h2 className="mb-4 text-lg font-semibold text-slate-900">공구 수정</h2>
           <div className="space-y-3">
             <div className="flex flex-col gap-1">
@@ -77,6 +112,65 @@ export function ToolEditPopup({ tool, onClose }: { tool: Tool; onClose: () => vo
             <div className="flex flex-col gap-1">
               <label className={labelClass}>메모</label>
               <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className={fieldClass} />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className={labelClass}>글씨색</label>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTextColor(null)}
+                  className={`rounded-full border px-2.5 py-1 text-xs ${
+                    textColor === null ? "border-slate-900 font-semibold text-slate-900" : "border-slate-300 text-slate-500"
+                  }`}
+                >
+                  없음
+                </button>
+                {TOOL_TEXT_COLORS.map((c) => (
+                  <button
+                    key={c.hex}
+                    type="button"
+                    onClick={() => setTextColor(c.hex)}
+                    className={`h-6 w-6 rounded-full border-2 ${
+                      textColor === c.hex ? "border-slate-900" : "border-transparent"
+                    }`}
+                    style={{ backgroundColor: c.hex }}
+                    title={c.label}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className={labelClass}>연결 공구 (이 공구를 고르면 같이 자동 선택됨)</label>
+              <input
+                value={linkFilter}
+                onChange={(e) => setLinkFilter(e.target.value)}
+                placeholder="공구명 검색"
+                className={fieldClass}
+              />
+              <div className="mt-1 max-h-40 overflow-y-auto rounded-lg border border-slate-200 p-2">
+                {linkableTools.length === 0 ? (
+                  <p className="py-2 text-center text-xs text-slate-400">검색 결과가 없습니다.</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-1">
+                    {linkableTools.map((t) => (
+                      <label key={t.id} className="flex items-center gap-1.5 truncate text-xs text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={linkedIds.has(t.id)}
+                          onChange={() => toggleLinked(t.id)}
+                          className="h-3.5 w-3.5 shrink-0"
+                        />
+                        <span className="truncate">{t.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {linkedIds.size > 0 && (
+                <p className="text-xs text-slate-400">{linkedIds.size}개 선택됨</p>
+              )}
             </div>
           </div>
 

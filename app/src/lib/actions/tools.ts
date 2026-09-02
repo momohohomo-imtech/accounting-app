@@ -9,6 +9,8 @@ function parse(formData: FormData) {
     name: String(formData.get("name") ?? "").trim(),
     sort_order: sortOrderRaw === "" ? 0 : Number(sortOrderRaw) || 0,
     note: String(formData.get("note") ?? "") || null,
+    linked_tool_ids: formData.getAll("linked_tool_id").map(String).filter(Boolean),
+    text_color: String(formData.get("text_color") ?? "").trim() || null,
   };
 }
 

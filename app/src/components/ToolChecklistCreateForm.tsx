@@ -8,7 +8,7 @@ import { fieldClass, labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { groupToolsBySortOrder, toolGroupLabel } from "@/lib/tools";
 
-type Tool = { id: string; name: string; sort_order: number };
+type Tool = { id: string; name: string; sort_order: number; linked_tool_ids: string[]; text_color: string | null };
 type ProjectOption = { value: string; label: string };
 type AdhocItem = { key: string; name: string; quantity: string };
 
@@ -43,7 +43,19 @@ export function ToolChecklistCreateForm({
     adhocItems.filter((a) => a.name.trim() !== "").length;
 
   function setQuantity(id: string, value: string) {
-    setQuantities((prev) => ({ ...prev, [id]: value }));
+    setQuantities((prev) => {
+      const wasEmpty = !(prev[id] ?? "").trim();
+      const next = { ...prev, [id]: value };
+      // 비어있다가 처음 선택된 순간에만, 연결된 공구들을 비어있는 경우에 한해 자동으로 같이 채움
+      // (이미 값이 있는 연결 공구는 덮어쓰지 않음).
+      if (wasEmpty && value.trim()) {
+        const tool = tools.find((t) => t.id === id);
+        for (const linkedId of tool?.linked_tool_ids ?? []) {
+          if (!(next[linkedId] ?? "").trim()) next[linkedId] = "1";
+        }
+      }
+      return next;
+    });
   }
 
   function addAdhocItem() {
@@ -143,7 +155,9 @@ export function ToolChecklistCreateForm({
                     key={t.id}
                     className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm hover:bg-slate-50"
                   >
-                    <span className="truncate">{t.name}</span>
+                    <span className="truncate" style={{ color: t.text_color ?? undefined }}>
+                      {t.name}
+                    </span>
                     <input
                       type="text"
                       value={quantities[t.id] ?? ""}
