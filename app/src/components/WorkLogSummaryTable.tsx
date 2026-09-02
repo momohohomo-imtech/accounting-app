@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { WorkLogSummaryRow } from "@/lib/workLogSummary";
 import { WorkLogGroupDetailPopup } from "@/components/WorkLogGroupDetailPopup";
 
-type SortKey = "siteName" | "title" | "days";
+type SortKey = "siteName" | "title" | "days" | "dates";
 
 function sortValue(r: WorkLogSummaryRow, key: SortKey): string | number {
   switch (key) {
@@ -14,6 +14,8 @@ function sortValue(r: WorkLogSummaryRow, key: SortKey): string | number {
       return r.title;
     case "days":
       return r.days;
+    case "dates":
+      return r.dates[0] ?? "";
   }
 }
 
@@ -76,7 +78,7 @@ export function WorkLogSummaryTable({
             <th className="pb-2 pr-4">{headerButton("siteName", "현장")}</th>
             <th className="pb-2 pr-4">{headerButton("title", "내용")}</th>
             <th className="pb-2 pr-4 text-right">{headerButton("days", "일수")}</th>
-            <th className="pb-2">날짜</th>
+            <th className="pb-2">{headerButton("dates", "날짜")}</th>
           </tr>
         </thead>
         <tbody>
