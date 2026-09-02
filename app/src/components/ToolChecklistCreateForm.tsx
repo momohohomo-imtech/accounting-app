@@ -8,7 +8,14 @@ import { fieldClass, labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { groupToolsBySortOrder, toolGroupLabel } from "@/lib/tools";
 
-type Tool = { id: string; name: string; sort_order: number; linked_tool_ids: string[]; text_color: string | null };
+type Tool = {
+  id: string;
+  name: string;
+  sort_order: number;
+  linked_tool_ids: string[];
+  text_color: string | null;
+  background_color: string | null;
+};
 type ProjectOption = { value: string; label: string };
 type AdhocItem = { key: string; name: string; quantity: string };
 
@@ -182,6 +189,7 @@ export function ToolChecklistCreateForm({
                   <label
                     key={t.id}
                     className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm hover:bg-slate-50"
+                    style={{ backgroundColor: t.background_color ?? undefined }}
                   >
                     <span className="truncate" style={{ color: t.text_color ?? undefined }}>
                       {t.name}

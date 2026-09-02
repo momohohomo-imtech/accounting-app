@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 import { useConfirm } from "@/components/ConfirmProvider";
-import { TOOL_TEXT_COLORS } from "@/lib/toolColors";
+import { TOOL_COLORS } from "@/lib/toolColors";
 
 type Tool = {
   id: string;
@@ -17,8 +17,46 @@ type Tool = {
   note: string | null;
   linked_tool_ids: string[];
   text_color: string | null;
+  background_color: string | null;
 };
 type ToolOption = { id: string; name: string };
+
+function ColorSwatchPicker({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string | null;
+  onChange: (hex: string | null) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className={labelClass}>{label}</label>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onChange(null)}
+          className={`rounded-full border px-2.5 py-1 text-xs ${
+            value === null ? "border-slate-900 font-semibold text-slate-900" : "border-slate-300 text-slate-500"
+          }`}
+        >
+          없음
+        </button>
+        {TOOL_COLORS.map((c) => (
+          <button
+            key={c.hex}
+            type="button"
+            onClick={() => onChange(c.hex)}
+            className={`h-6 w-6 rounded-full border ${value === c.hex ? "border-2 border-slate-900" : "border-slate-300"}`}
+            style={{ backgroundColor: c.hex }}
+            title={c.label}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function ToolEditPopup({
   tool,
@@ -36,6 +74,7 @@ export function ToolEditPopup({
   const [note, setNote] = useState(tool.note ?? "");
   const [linkedIds, setLinkedIds] = useState<Set<string>>(new Set(tool.linked_tool_ids));
   const [textColor, setTextColor] = useState<string | null>(tool.text_color);
+  const [backgroundColor, setBackgroundColor] = useState<string | null>(tool.background_color);
   const [linkFilter, setLinkFilter] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -65,6 +104,7 @@ export function ToolEditPopup({
     fd.append("sort_order", sortOrder);
     fd.append("note", note);
     fd.append("text_color", textColor ?? "");
+    fd.append("background_color", backgroundColor ?? "");
     linkedIds.forEach((id) => fd.append("linked_tool_id", id));
     const result = await updateTool(fd);
     setSaving(false);
@@ -114,32 +154,8 @@ export function ToolEditPopup({
               <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className={fieldClass} />
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className={labelClass}>글씨색</label>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setTextColor(null)}
-                  className={`rounded-full border px-2.5 py-1 text-xs ${
-                    textColor === null ? "border-slate-900 font-semibold text-slate-900" : "border-slate-300 text-slate-500"
-                  }`}
-                >
-                  없음
-                </button>
-                {TOOL_TEXT_COLORS.map((c) => (
-                  <button
-                    key={c.hex}
-                    type="button"
-                    onClick={() => setTextColor(c.hex)}
-                    className={`h-6 w-6 rounded-full border-2 ${
-                      textColor === c.hex ? "border-slate-900" : "border-transparent"
-                    }`}
-                    style={{ backgroundColor: c.hex }}
-                    title={c.label}
-                  />
-                ))}
-              </div>
-            </div>
+            <ColorSwatchPicker label="글씨색" value={textColor} onChange={setTextColor} />
+            <ColorSwatchPicker label="배경색" value={backgroundColor} onChange={setBackgroundColor} />
 
             <div className="flex flex-col gap-1">
               <label className={labelClass}>연결 공구 (이 공구를 고르면 같이 자동 선택됨)</label>

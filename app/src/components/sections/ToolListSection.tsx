@@ -90,6 +90,7 @@ export async function ToolListSection({
     sort_order: (t.sort_order as number | null) ?? 0,
     linked_tool_ids: (t.linked_tool_ids as string[] | null) ?? [],
     text_color: (t.text_color as string | null) ?? null,
+    background_color: (t.background_color as string | null) ?? null,
   }));
 
   const toolMasterRows = (tools ?? []).map((t) => ({
@@ -99,6 +100,7 @@ export async function ToolListSection({
     note: (t.note as string | null) ?? null,
     linked_tool_ids: (t.linked_tool_ids as string[] | null) ?? [],
     text_color: (t.text_color as string | null) ?? null,
+    background_color: (t.background_color as string | null) ?? null,
   }));
 
   const copySource = copyFrom ? (checklists ?? []).find((c) => c.id === copyFrom) : null;

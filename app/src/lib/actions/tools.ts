@@ -11,6 +11,7 @@ function parse(formData: FormData) {
     note: String(formData.get("note") ?? "") || null,
     linked_tool_ids: formData.getAll("linked_tool_id").map(String).filter(Boolean),
     text_color: String(formData.get("text_color") ?? "").trim() || null,
+    background_color: String(formData.get("background_color") ?? "").trim() || null,
   };
 }
 

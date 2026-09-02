@@ -13,6 +13,7 @@ type Tool = {
   note: string | null;
   linked_tool_ids: string[];
   text_color: string | null;
+  background_color: string | null;
 };
 
 export function ToolMasterGrid({ tools }: { tools: Tool[] }) {
@@ -46,6 +47,7 @@ export function ToolMasterGrid({ tools }: { tools: Tool[] }) {
               <div
                 key={t.id}
                 className="flex items-center justify-between gap-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm hover:bg-slate-50"
+                style={{ backgroundColor: t.background_color ?? undefined }}
               >
                 <button
                   type="button"
