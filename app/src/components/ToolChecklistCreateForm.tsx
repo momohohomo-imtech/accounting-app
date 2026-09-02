@@ -6,23 +6,14 @@ import { createToolChecklist } from "@/lib/actions/toolChecklists";
 import { Button } from "@/components/ui/Button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { groupToolsBySortOrder, toolGroupLabel } from "@/lib/tools";
 
-type Tool = { id: string; name: string; category: string | null };
+type Tool = { id: string; name: string; sort_order: number };
 type ProjectOption = { value: string; label: string };
+type AdhocItem = { key: string; name: string; quantity: string };
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
-}
-
-function groupByCategory(tools: Tool[]): [string, Tool[]][] {
-  const map = new Map<string, Tool[]>();
-  for (const t of tools) {
-    const key = t.category ?? "미분류";
-    const list = map.get(key) ?? [];
-    list.push(t);
-    map.set(key, list);
-  }
-  return Array.from(map.entries());
 }
 
 export function ToolChecklistCreateForm({
@@ -34,24 +25,35 @@ export function ToolChecklistCreateForm({
   tools: Tool[];
   projectOptions: ProjectOption[];
   initialTitle?: string;
-  initialQuantities?: Record<string, number>;
+  initialQuantities?: Record<string, string>;
 }) {
   const router = useRouter();
   const confirm = useConfirm();
   const [title, setTitle] = useState(initialTitle);
   const [projectId, setProjectId] = useState("");
   const [tripDate, setTripDate] = useState(todayIso);
-  const [quantities, setQuantities] = useState<Record<string, string>>(
-    Object.fromEntries(Object.entries(initialQuantities).map(([id, q]) => [id, String(q)]))
-  );
+  const [quantities, setQuantities] = useState<Record<string, string>>(initialQuantities);
+  const [adhocItems, setAdhocItems] = useState<AdhocItem[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const groups = groupByCategory(tools);
-  const selectedCount = Object.values(quantities).filter((v) => Number(v) > 0).length;
+  const groups = groupToolsBySortOrder(tools);
+  const selectedCount =
+    Object.values(quantities).filter((v) => v.trim() !== "").length +
+    adhocItems.filter((a) => a.name.trim() !== "").length;
 
   function setQuantity(id: string, value: string) {
     setQuantities((prev) => ({ ...prev, [id]: value }));
+  }
+
+  function addAdhocItem() {
+    setAdhocItems((prev) => [...prev, { key: crypto.randomUUID(), name: "", quantity: "" }]);
+  }
+  function updateAdhocItem(key: string, patch: Partial<AdhocItem>) {
+    setAdhocItems((prev) => prev.map((a) => (a.key === key ? { ...a, ...patch } : a)));
+  }
+  function removeAdhocItem(key: string) {
+    setAdhocItems((prev) => prev.filter((a) => a.key !== key));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -64,11 +66,19 @@ export function ToolChecklistCreateForm({
     fd.append("project_id", projectId);
     fd.append("trip_date", tripDate);
     for (const t of tools) {
-      const qty = Number(quantities[t.id]) || 0;
-      if (qty > 0) {
+      const qty = (quantities[t.id] ?? "").trim();
+      if (qty) {
         fd.append("tool_id", t.id);
         fd.append("tool_name", t.name);
-        fd.append("quantity", String(qty));
+        fd.append("quantity", qty);
+      }
+    }
+    for (const a of adhocItems) {
+      const name = a.name.trim();
+      if (name) {
+        fd.append("tool_id", "");
+        fd.append("tool_name", name);
+        fd.append("quantity", a.quantity.trim() || "1");
       }
     }
     const result = await createToolChecklist(fd);
@@ -80,6 +90,7 @@ export function ToolChecklistCreateForm({
     setTitle("");
     setProjectId("");
     setQuantities({});
+    setAdhocItems([]);
     router.refresh();
   }
 
@@ -120,13 +131,13 @@ export function ToolChecklistCreateForm({
       </div>
 
       {tools.length === 0 ? (
-        <p className="text-sm text-slate-400">먼저 위에서 공구를 등록해주세요.</p>
+        <p className="text-sm text-slate-400">등록된 공구가 없습니다 — 아래에서 직접 추가해도 됩니다.</p>
       ) : (
         <div className="space-y-4">
-          {groups.map(([category, groupTools]) => (
-            <div key={category}>
-              <p className="mb-1.5 text-xs font-semibold text-slate-500">{category}</p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+          {groups.map(([sortOrder, groupTools]) => (
+            <div key={sortOrder}>
+              <p className="mb-1.5 text-xs font-semibold text-slate-500">{toolGroupLabel(sortOrder)}</p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {groupTools.map((t) => (
                   <label
                     key={t.id}
@@ -134,12 +145,11 @@ export function ToolChecklistCreateForm({
                   >
                     <span className="truncate">{t.name}</span>
                     <input
-                      type="number"
-                      min={0}
+                      type="text"
                       value={quantities[t.id] ?? ""}
                       onChange={(e) => setQuantity(t.id, e.target.value)}
-                      placeholder="0"
-                      className="w-14 shrink-0 rounded border border-slate-300 px-1.5 py-1 text-right text-sm focus:border-slate-500 focus:outline-none"
+                      placeholder="수량"
+                      className="w-16 shrink-0 rounded border border-slate-300 px-1.5 py-1 text-right text-sm focus:border-slate-500 focus:outline-none"
                     />
                   </label>
                 ))}
@@ -149,9 +159,53 @@ export function ToolChecklistCreateForm({
         </div>
       )}
 
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-xs font-semibold text-slate-500">임의 추가 (수동 기입 공구 또는 메모)</p>
+          <button
+            type="button"
+            onClick={addAdhocItem}
+            className="text-xs font-medium text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
+          >
+            + 항목 추가
+          </button>
+        </div>
+        {adhocItems.length > 0 && (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {adhocItems.map((a) => (
+              <div
+                key={a.key}
+                className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+              >
+                <input
+                  value={a.name}
+                  onChange={(e) => updateAdhocItem(a.key, { name: e.target.value })}
+                  placeholder="품명/메모"
+                  className="min-w-0 flex-1 border-none p-0 text-sm focus:outline-none"
+                />
+                <input
+                  type="text"
+                  value={a.quantity}
+                  onChange={(e) => updateAdhocItem(a.key, { quantity: e.target.value })}
+                  placeholder="수량"
+                  className="w-14 shrink-0 rounded border border-slate-300 px-1.5 py-1 text-right text-sm focus:border-slate-500 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeAdhocItem(a.key)}
+                  className="shrink-0 text-xs text-red-500 hover:text-red-700"
+                >
+                  삭제
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex items-center gap-3">
-        <Button type="submit" disabled={pending || tools.length === 0 || selectedCount === 0}>
+        <Button type="submit" disabled={pending || selectedCount === 0}>
           저장
         </Button>
         <span className="text-xs text-slate-400">{selectedCount}개 품목 선택됨</span>

@@ -6,7 +6,7 @@ import { formatDate } from "@/lib/format";
 import { PrintButton } from "@/components/PrintButton";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 
-type Item = { id: string; tool_name: string; quantity: number };
+type Item = { id: string; tool_name: string; quantity: string };
 
 export function ToolChecklistDetailReport({
   title,
@@ -54,7 +54,7 @@ export function ToolChecklistDetailReport({
             className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
           >
             <span className="truncate">☑ {it.tool_name}</span>
-            <span className="shrink-0 font-mono font-semibold text-slate-900">{it.quantity}개</span>
+            <span className="shrink-0 font-mono font-semibold text-slate-900">{it.quantity}</span>
           </li>
         ))}
         {items.length === 0 && (
@@ -62,9 +62,7 @@ export function ToolChecklistDetailReport({
         )}
       </ul>
 
-      <p className="text-right text-xs text-slate-400">
-        총 {items.length}개 품목 · {items.reduce((s, it) => s + it.quantity, 0)}개
-      </p>
+      <p className="text-right text-xs text-slate-400">총 {items.length}개 품목</p>
     </div>
   );
 }
