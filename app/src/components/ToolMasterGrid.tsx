@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { reorderTools } from "@/lib/actions/tools";
+import { swapToolPosition } from "@/lib/actions/tools";
 import { ToolEditPopup } from "@/components/ToolEditPopup";
 import { groupToolsBySortOrder, toolGroupLabel } from "@/lib/tools";
 
@@ -25,11 +25,10 @@ export function ToolMasterGrid({ tools }: { tools: Tool[] }) {
     const idx = groupTools.findIndex((t) => t.id === id);
     const swapIdx = idx + dir;
     if (idx === -1 || swapIdx < 0 || swapIdx >= groupTools.length) return;
-    const reordered = [...groupTools];
-    [reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]];
     const fd = new FormData();
-    reordered.forEach((t) => fd.append("id", t.id));
-    await reorderTools(fd);
+    fd.append("id_a", groupTools[idx].id);
+    fd.append("id_b", groupTools[swapIdx].id);
+    await swapToolPosition(fd);
     router.refresh();
   }
 
