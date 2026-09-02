@@ -11,9 +11,13 @@ import { ModalPortal } from "@/components/ModalPortal";
 import { Button } from "@/components/ui/Button";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 
-type SortKey = "work_date" | "site_name" | "project_name" | "client_name" | "work_types";
+type SortKey = "work_date" | "site_name" | "project_name" | "client_name" | "work_types" | "day_count";
 
-function sortValue(log: BusinessTripLog, key: SortKey): string {
+function tripDayCount(log: BusinessTripLog): number {
+  return new Set(log.projects.map((p) => p.work_date)).size;
+}
+
+function sortValue(log: BusinessTripLog, key: SortKey): string | number {
   switch (key) {
     case "work_date":
       return log.work_date;
@@ -25,6 +29,8 @@ function sortValue(log: BusinessTripLog, key: SortKey): string {
       return log.client_name ?? "";
     case "work_types":
       return log.work_types.join(", ");
+    case "day_count":
+      return tripDayCount(log);
   }
 }
 
@@ -52,7 +58,9 @@ export function BusinessTripListClient({ logs }: { logs: BusinessTripLog[] }) {
     if (!sortKey) return logs;
     const copy = [...logs];
     copy.sort((a, b) => {
-      const cmp = sortValue(a, sortKey).localeCompare(sortValue(b, sortKey));
+      const va = sortValue(a, sortKey);
+      const vb = sortValue(b, sortKey);
+      const cmp = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb));
       return sortDir === "asc" ? cmp : -cmp;
     });
     return copy;
@@ -87,6 +95,7 @@ export function BusinessTripListClient({ logs }: { logs: BusinessTripLog[] }) {
               <th className="p-3">{headerButton("project_name", "프로젝트명")}</th>
               <th className="p-3">{headerButton("client_name", "원청사")}</th>
               <th className="p-3">{headerButton("work_types", "작업구분")}</th>
+              <th className="p-3 text-right">{headerButton("day_count", "공사일수")}</th>
               <th className="p-3 text-right">관리</th>
             </tr>
           </thead>
@@ -100,6 +109,7 @@ export function BusinessTripListClient({ logs }: { logs: BusinessTripLog[] }) {
                 </td>
                 <td className="p-3 text-slate-700">{log.client_name ?? "-"}</td>
                 <td className="p-3 text-slate-700">{log.work_types.join(", ") || "-"}</td>
+                <td className="p-3 text-right font-mono text-slate-900">{tripDayCount(log)}일</td>
                 <td className="p-3 text-right">
                   <Button type="button" variant="secondary" size="xs" onClick={() => setViewing(log)}>
                     보기
@@ -109,7 +119,7 @@ export function BusinessTripListClient({ logs }: { logs: BusinessTripLog[] }) {
             ))}
             {logs.length === 0 && (
               <tr>
-                <td colSpan={6} className="p-8 text-center text-slate-400">
+                <td colSpan={7} className="p-8 text-center text-slate-400">
                   작성된 출장일지가 없습니다.
                 </td>
               </tr>
