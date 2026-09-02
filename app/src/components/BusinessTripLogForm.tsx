@@ -327,6 +327,8 @@ export function BusinessTripLogForm({
   const [createdDate, setCreatedDate] = useState(initial?.created_date ?? today);
   const [workTypes, setWorkTypes] = useState<Set<string>>(new Set(initial?.work_types ?? []));
   const [note, setNote] = useState(initial?.note ?? "");
+  const [dayCountTouched, setDayCountTouched] = useState(initial?.day_count != null);
+  const [dayCount, setDayCount] = useState(initial?.day_count != null ? String(initial.day_count) : "");
   const [projects, setProjects] = useState<BusinessTripProject[]>(
     initial?.projects?.length
       ? initial.projects.map((p) => {
@@ -341,6 +343,9 @@ export function BusinessTripLogForm({
       : [emptyProject(workDate)]
   );
   const [saving, setSaving] = useState(false);
+
+  const autoDayCount = useMemo(() => new Set(projects.map((p) => p.work_date)).size, [projects]);
+  const dayCountDisplay = dayCountTouched ? dayCount : String(autoDayCount);
 
   function toggleWorkType(t: string) {
     setWorkTypes((prev) => {
@@ -365,6 +370,7 @@ export function BusinessTripLogForm({
     fd.append("created_date", createdDate);
     workTypes.forEach((t) => fd.append("work_types", t));
     fd.append("note", note);
+    fd.append("day_count", dayCountDisplay);
     const cleanedProjects = projects.map((p) => ({
       ...p,
       workers: p.workers.filter((w) => w.name.trim() || w.note.trim()),
@@ -391,6 +397,19 @@ export function BusinessTripLogForm({
         <div className="flex flex-col gap-1">
           <label className={labelClass}>작성일</label>
           <input type="date" value={createdDate} onChange={(e) => setCreatedDate(e.target.value)} className={fieldClass} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className={labelClass}>공사일수</label>
+          <input
+            type="number"
+            min={0}
+            value={dayCountDisplay}
+            onChange={(e) => {
+              setDayCountTouched(true);
+              setDayCount(e.target.value);
+            }}
+            className={fieldClass}
+          />
         </div>
         <div className="flex flex-col gap-1 sm:col-span-2">
           <label className={labelClass}>작업구분</label>

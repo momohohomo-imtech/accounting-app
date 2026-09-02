@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { BusinessTripLog } from "@/lib/types";
+import { tripDayCount } from "@/lib/businessTrip";
 import { createBusinessTripLog } from "@/lib/actions/businessTripLogs";
 import { BusinessTripLogForm } from "@/components/BusinessTripLogForm";
 import { BusinessTripLogViewPopup } from "@/components/BusinessTripLogViewPopup";
@@ -12,10 +13,6 @@ import { Button } from "@/components/ui/Button";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 
 type SortKey = "work_date" | "site_name" | "project_name" | "client_name" | "work_types" | "day_count";
-
-function tripDayCount(log: BusinessTripLog): number {
-  return new Set(log.projects.map((p) => p.work_date)).size;
-}
 
 function sortValue(log: BusinessTripLog, key: SortKey): string | number {
   switch (key) {

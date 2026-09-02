@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import type { BusinessTripLog } from "@/lib/types";
+import { tripDayCount } from "@/lib/businessTrip";
 
 function triggerDownload(buffer: ExcelJS.Buffer, filename: string) {
   const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -21,6 +22,7 @@ export async function downloadBusinessTripLogXlsx(log: BusinessTripLog) {
 
   ws.addRow(["원청사", log.client_name ?? "", "현장명", log.site_name ?? ""]);
   ws.addRow(["작성일", log.created_date]);
+  ws.addRow(["공사일수", `${tripDayCount(log)}일`]);
   ws.addRow(["작업구분", log.work_types.join(", ")]);
   ws.addRow(["비고", log.note ?? ""]);
 

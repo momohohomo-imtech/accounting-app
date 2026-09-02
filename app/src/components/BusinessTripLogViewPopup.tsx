@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { BusinessTripLog } from "@/lib/types";
+import { tripDayCount } from "@/lib/businessTrip";
 import { updateBusinessTripLog, deleteBusinessTripLog } from "@/lib/actions/businessTripLogs";
 import { downloadBusinessTripLogXlsx } from "@/lib/businessTripXlsx";
 import { BusinessTripLogForm } from "@/components/BusinessTripLogForm";
@@ -86,6 +87,7 @@ export function BusinessTripLogViewPopup({ log, onClose }: { log: BusinessTripLo
                 <Field label="원청사" value={log.client_name ?? ""} />
                 <Field label="현장명" value={log.site_name ?? ""} />
                 <Field label="작성일" value={log.created_date} />
+                <Field label="공사일수" value={`${tripDayCount(log)}일`} />
                 <Field label="작업구분" value={log.work_types.join(", ")} />
                 <div className="sm:col-span-3">
                   <Field label="비고" value={log.note ?? ""} />

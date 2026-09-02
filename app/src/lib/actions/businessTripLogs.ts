@@ -18,6 +18,9 @@ function parse(formData: FormData) {
   const dates = projects.map((p) => p.work_date).filter((d): d is string => Boolean(d)).sort();
   const workDate = dates[0] ?? new Date().toISOString().slice(0, 10);
 
+  const dayCountRaw = String(formData.get("day_count") ?? "").trim();
+  const dayCount = dayCountRaw === "" ? null : Number(dayCountRaw);
+
   return {
     work_date: workDate,
     created_date: String(formData.get("created_date") ?? ""),
@@ -25,6 +28,7 @@ function parse(formData: FormData) {
     site_name: String(formData.get("site_name") ?? "") || null,
     work_types: formData.getAll("work_types").map(String),
     note: String(formData.get("note") ?? "") || null,
+    day_count: dayCount !== null && Number.isFinite(dayCount) ? dayCount : null,
     projects,
   };
 }

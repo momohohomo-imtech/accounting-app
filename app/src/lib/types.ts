@@ -276,6 +276,8 @@ export type BusinessTripLog = {
   site_name: string | null;
   work_types: string[];
   note: string | null;
+  // 자동 계산값(프로젝트별 공사일 중 서로 다른 날짜 수) 대신 직접 입력한 값 — null이면 자동 계산값을 씀.
+  day_count: number | null;
   projects: BusinessTripProject[];
   created_at: string;
 };
