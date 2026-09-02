@@ -52,6 +52,10 @@ export function CategoryDetailReport({
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   useEscapeKey(true, () => router.push(closeHref));
 
+  function editHrefFor(id: string) {
+    return `/reports?year=${year}&category=${encodeURIComponent(categoryName)}&editTx=${id}`;
+  }
+
   const combined = useMemo(() => [...purchaseRows, ...agencyRows], [purchaseRows, agencyRows]);
   const purchaseTotal = purchaseRows.reduce((s, r) => s + r.amount, 0);
   const agencyTotal = agencyRows.reduce((s, r) => s + r.amount, 0);
@@ -123,7 +127,8 @@ export function CategoryDetailReport({
               <th className="pb-2 pr-4">{headerButton("client_name", "거래처")}</th>
               <th className="pb-2 pr-4">{headerButton("project_name", "프로젝트")}</th>
               <th className="pb-2 pr-4">{headerButton("item_name", "품목")}</th>
-              <th className="pb-2 text-right">{headerButton("amount", "금액")}</th>
+              <th className="pb-2 pr-4 text-right">{headerButton("amount", "금액")}</th>
+              <th className="pb-2 text-right print:hidden">관리</th>
             </tr>
           </thead>
           <tbody>
@@ -138,12 +143,22 @@ export function CategoryDetailReport({
                   {r.project_name ?? <span className="font-medium text-red-600">일반경비</span>}
                 </td>
                 <td className="py-2 pr-4 text-slate-700">{r.item_name ?? "-"}</td>
-                <td className="py-2 text-right font-mono text-slate-900">{formatWon(r.amount)}</td>
+                <td className="py-2 pr-4 text-right font-mono text-slate-900">{formatWon(r.amount)}</td>
+                <td className="py-2 text-right print:hidden">
+                  {r.kind === "매입" && (
+                    <Link
+                      href={editHrefFor(r.id)}
+                      className="text-xs text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
+                    >
+                      수정
+                    </Link>
+                  )}
+                </td>
               </tr>
             ))}
             {sortedRows.length === 0 && (
               <tr>
-                <td colSpan={6} className="py-6 text-center text-slate-400">
+                <td colSpan={7} className="py-6 text-center text-slate-400">
                   매입 내역이 없습니다.
                 </td>
               </tr>

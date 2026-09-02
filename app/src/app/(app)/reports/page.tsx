@@ -640,7 +640,11 @@ export default async function ReportsPage({
 
       <TransactionEditPopup
         editTx={editTx}
-        redirectTo={`/reports?year=${selectedYear}${includeVendorAgency ? "&vendorAgency=1" : ""}&vendor=${encodeURIComponent(vendor ?? "")}`}
+        redirectTo={
+          category
+            ? `/reports?year=${selectedYear}&category=${encodeURIComponent(category)}`
+            : `/reports?year=${selectedYear}${includeVendorAgency ? "&vendorAgency=1" : ""}&vendor=${encodeURIComponent(vendor ?? "")}`
+        }
       />
     </div>
   );
