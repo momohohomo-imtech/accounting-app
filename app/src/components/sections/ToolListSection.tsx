@@ -97,13 +97,12 @@ export async function ToolListSection({ copyFrom, checklist }: { copyFrom?: stri
   return (
     <div className="space-y-6">
       <div className={popupOpen ? "space-y-6 print:hidden" : "space-y-6"}>
-        <div>
-          <h2 className="mb-3 text-lg font-semibold text-slate-900">공구 마스터 목록</h2>
+        <CollapsibleSection title="공구 마스터 목록" bare>
           <CreatePanel title="공구" fields={toolFields} createAction={createTool} />
           <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <ToolMasterGrid tools={toolMasterRows} />
           </div>
-        </div>
+        </CollapsibleSection>
 
         <ToolChecklistCreateForm
           key={copyFrom ?? "new"}
