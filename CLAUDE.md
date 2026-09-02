@@ -17,7 +17,7 @@
   `VendorDetailReport`, `DailyWorkerUsageTable`, `BackupsTable`,
   `AccessListWorkerPicker`, `SiteAggregateTable`, `BusinessTripListClient`,
   `CategoryAggregateTable`, `CategoryDetailReport`, `ToolChecklistHistoryTable`,
-  `QuotesTable`, `PurchaseOrdersTable`)에
+  `QuotesTable`, `PurchaseOrdersTable`, `UnassignedWorkLogTable`)에
   이 패턴이 적용돼 있음 — 새 표를 추가할 때 이 목록도 같이 업데이트할 것.
 
 프로젝트 진행 상황·이력은 저장소 루트의 `HANDOFF.md`를 참고할 것.

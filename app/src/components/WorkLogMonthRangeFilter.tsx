@@ -1,15 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { fieldClass } from "@/components/ui/field";
 
-export function WorkLogMonthRangeFilter({ year, value }: { year: number; value: string }) {
+export function WorkLogMonthRangeFilter({ value }: { value: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [input, setInput] = useState(value);
 
   function apply() {
-    router.push(`/reports?year=${year}&wlMonths=${encodeURIComponent(input.trim() || "1-12")}`);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("wlMonths", input.trim() || "1-12");
+    router.push(`/reports?${params.toString()}`);
   }
 
   return (

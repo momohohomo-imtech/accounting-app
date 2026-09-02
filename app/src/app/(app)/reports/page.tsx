@@ -20,6 +20,9 @@ import { ProjectProfitTable } from "@/components/ProjectProfitTable";
 import { TransactionEditPopup } from "@/components/TransactionEditPopup";
 import { WorkLogSummaryTable } from "@/components/WorkLogSummaryTable";
 import { WorkLogMonthRangeFilter } from "@/components/WorkLogMonthRangeFilter";
+import { WorkLogSiteFilter } from "@/components/WorkLogSiteFilter";
+import { UnassignedWorkLogTable } from "@/components/UnassignedWorkLogTable";
+import { UnassignedWorkLogMonthFilter } from "@/components/UnassignedWorkLogMonthFilter";
 import { buildWorkLogSummary } from "@/lib/workLogSummary";
 import { parseMonthRange } from "@/lib/monthRange";
 import type { WorkLog } from "@/lib/types";
@@ -67,9 +70,25 @@ export default async function ReportsPage({
     printProjects?: string;
     editTx?: string;
     wlMonths?: string;
+    wlSite?: string;
+    printWorkLog?: string;
+    unassignedMonth?: string;
   }>;
 }) {
-  const { year, project, vendor, vendorAgency, category, site, printProjects, editTx, wlMonths } = await searchParams;
+  const {
+    year,
+    project,
+    vendor,
+    vendorAgency,
+    category,
+    site,
+    printProjects,
+    editTx,
+    wlMonths,
+    wlSite,
+    printWorkLog,
+    unassignedMonth,
+  } = await searchParams;
   const includeVendorAgency = vendorAgency === "1";
   const currentYear = new Date().getFullYear();
   const selectedYear = year ? Number(year) : currentYear;
@@ -281,11 +300,40 @@ export default async function ReportsPage({
   const wlEndLastDay = new Date(selectedYear, wlMonthRange.end, 0).getDate();
   const wlEnd = `${selectedYear}-${pad(wlMonthRange.end)}-${pad(wlEndLastDay)}`;
 
-  const [{ data: wlRows }, { data: wlSites }] = await Promise.all([
+  const unassignedMonthNum = unassignedMonth ? Number(unassignedMonth) : null;
+  const uStart = unassignedMonthNum ? `${selectedYear}-${pad(unassignedMonthNum)}-01` : `${selectedYear}-01-01`;
+  const uEndDay = unassignedMonthNum ? new Date(selectedYear, unassignedMonthNum, 0).getDate() : 31;
+  const uEnd = unassignedMonthNum
+    ? `${selectedYear}-${pad(unassignedMonthNum)}-${pad(uEndDay)}`
+    : `${selectedYear}-12-31`;
+
+  const [{ data: wlRows }, { data: wlSites }, { data: unassignedLogRows }] = await Promise.all([
     supabase.from("work_logs").select("*").gte("log_date", wlStart).lte("log_date", wlEnd),
     supabase.from("sites").select("id, name, color"),
+    supabase
+      .from("work_logs")
+      .select("id, log_date, site_id, title")
+      .not("site_id", "is", null)
+      .is("project_id", null)
+      .gte("log_date", uStart)
+      .lte("log_date", uEnd)
+      .order("log_date", { ascending: true }),
   ]);
-  const workLogSummary = buildWorkLogSummary((wlRows ?? []) as WorkLog[], wlSites ?? []);
+
+  const wlRowsFiltered = wlSite ? (wlRows ?? []).filter((r) => r.site_id === wlSite) : wlRows ?? [];
+  const workLogSummaryRaw = buildWorkLogSummary(wlRowsFiltered as WorkLog[], wlSites ?? []);
+  // 특정 현장으로 좁혀보면 현장에 안 묶이는 휴무/사내/기타 특수 항목은 그 현장 이야기가 아니라서 뺌.
+  const workLogSummary = wlSite ? workLogSummaryRaw.filter((r) => !r.isSpecial) : workLogSummaryRaw;
+  const workLogTotalDays = new Set(wlRowsFiltered.map((r) => r.log_date)).size;
+
+  const siteNameById = new Map((wlSites ?? []).map((s) => [s.id, s.name]));
+  const unassignedRows = (unassignedLogRows ?? []).map((r) => ({
+    id: r.id,
+    date: r.log_date,
+    siteName: siteNameById.get(r.site_id ?? "") ?? "-",
+    title: r.title ?? "",
+  }));
+  const unassignedDayCount = new Set(unassignedRows.map((r) => r.date)).size;
 
   // 카테고리별 집계 팝업 — 매입 내역 + 대행구매 내역을 합쳐서 보여줌
   const categoryPurchaseRows = category
@@ -378,6 +426,8 @@ export default async function ReportsPage({
 
   const popupOpen = Boolean(project || vendor || category);
   const isolateProjects = printProjects === "1";
+  const isolateWorkLog = printWorkLog === "1";
+  const anyIsolate = isolateProjects || isolateWorkLog;
 
   const aiSummary = {
     year: selectedYear,
@@ -395,8 +445,15 @@ export default async function ReportsPage({
       {isolateProjects && (
         <AutoPrint cleanupHref={`/reports?year=${selectedYear}${site ? `&site=${site}` : ""}`} />
       )}
+      {isolateWorkLog && (
+        <AutoPrint
+          cleanupHref={`/reports?year=${selectedYear}&wlMonths=${encodeURIComponent(wlMonths ?? "1-12")}${
+            wlSite ? `&wlSite=${wlSite}` : ""
+          }`}
+        />
+      )}
 
-      <div className={popupOpen || isolateProjects ? "space-y-6 print:hidden" : "space-y-6"}>
+      <div className={popupOpen || anyIsolate ? "space-y-6 print:hidden" : "space-y-6"}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold text-slate-900">보고서</h1>
           <YearFilter basePath="/reports" years={years} selectedYear={selectedYear} />
@@ -451,7 +508,7 @@ export default async function ReportsPage({
       </div>
 
       <CollapsibleSection
-          className={popupOpen ? "print:hidden" : ""}
+          className={popupOpen || isolateWorkLog ? "print:hidden" : ""}
           title="프로젝트별 손익 (클릭하면 발주금 대비 상세 손익)"
           defaultOpen={isolateProjects}
           headerExtra={
@@ -481,7 +538,7 @@ export default async function ReportsPage({
           <ProjectProfitTable rows={byProject} year={selectedYear} site={site} />
       </CollapsibleSection>
 
-      <div className={popupOpen || isolateProjects ? "space-y-6 print:hidden" : "space-y-6"}>
+      <div className={popupOpen || anyIsolate ? "space-y-6 print:hidden" : "space-y-6"}>
         <CollapsibleSection
           title="매입처별 집계 — 어느 업체에서 얼마를 매입했는지"
           headerExtra={<VendorAgencyToggle checked={includeVendorAgency} />}
@@ -500,22 +557,50 @@ export default async function ReportsPage({
             empty="매출 거래가 없습니다."
           />
         </CollapsibleSection>
-
-        <CollapsibleSection
-          title={`작업일지 집계 — ${selectedYear}년 ${wlMonthRange.label} 동안 같은 작업을 몇 일 했는지`}
-          headerExtra={
-            <div className="print:hidden">
-              <WorkLogMonthRangeFilter year={selectedYear} value={wlMonths ?? "1-12"} />
-            </div>
-          }
-        >
-          <WorkLogSummaryTable
-            rows={workLogSummary}
-            emptyMessage="이 기간에 현장이 지정된 작업일지가 없습니다."
-            year={selectedYear}
-          />
-        </CollapsibleSection>
       </div>
+
+      <CollapsibleSection
+        className={popupOpen || isolateProjects ? "print:hidden" : ""}
+        title={`작업일지 집계 — ${selectedYear}년 ${wlMonthRange.label} 동안 같은 작업을 몇 일 했는지`}
+        defaultOpen={isolateWorkLog}
+        headerExtra={
+          <div className="flex items-center gap-2 print:hidden">
+            <span className="text-xs text-slate-500">총 {workLogTotalDays}일</span>
+            {wlSites && wlSites.length > 0 && (
+              <WorkLogSiteFilter siteOptions={wlSites.map((s) => ({ value: s.id, label: s.name }))} selectedSite={wlSite} />
+            )}
+            <WorkLogMonthRangeFilter value={wlMonths ?? "1-12"} />
+            <Link
+              href={`/reports?year=${selectedYear}&wlMonths=${encodeURIComponent(wlMonths ?? "1-12")}${
+                wlSite ? `&wlSite=${wlSite}` : ""
+              }&printWorkLog=1`}
+              className="inline-flex items-center rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100"
+            >
+              인쇄
+            </Link>
+          </div>
+        }
+      >
+        <p className="mb-2 hidden text-xs text-slate-500 print:block">총 {workLogTotalDays}일</p>
+        <WorkLogSummaryTable
+          rows={workLogSummary}
+          emptyMessage="이 기간에 현장이 지정된 작업일지가 없습니다."
+          year={selectedYear}
+        />
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        className={popupOpen || anyIsolate ? "print:hidden" : ""}
+        title="작업일지 - 프로젝트 미선정 (현장은 골랐지만 프로젝트 연결 안 된 항목)"
+        headerExtra={
+          <div className="flex items-center gap-2 print:hidden">
+            <span className="text-xs text-slate-500">총 {unassignedDayCount}일</span>
+            <UnassignedWorkLogMonthFilter value={unassignedMonth} />
+          </div>
+        }
+      >
+        <UnassignedWorkLogTable rows={unassignedRows} emptyMessage="이 기간에 미선정 항목이 없습니다." />
+      </CollapsibleSection>
 
       {project && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:static print:bg-transparent print:p-0">
