@@ -45,6 +45,7 @@ export function EntityForm({
                 required={f.required}
                 placeholder={f.placeholder}
                 rows={2}
+                autoComplete="off"
                 className={fieldClass}
               />
             ) : f.type === "project-search" ? (
@@ -70,6 +71,7 @@ export function EntityForm({
                 defaultValue={value}
                 required={f.required}
                 placeholder={f.placeholder}
+                autoComplete="off"
                 className={fieldClass}
               />
             )}
