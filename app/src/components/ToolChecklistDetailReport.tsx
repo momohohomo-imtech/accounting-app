@@ -7,6 +7,7 @@ import { formatDate } from "@/lib/format";
 import { PrintButton } from "@/components/PrintButton";
 import { Button } from "@/components/ui/Button";
 import { useEscapeKey } from "@/lib/useEscapeKey";
+import { usePrintFitToPage } from "@/lib/usePrintFitToPage";
 import { downloadToolChecklistXlsx, downloadAccessPassFormXlsx } from "@/lib/xlsxExport";
 import { AccessPassPermitTable } from "@/components/AccessPassPermitTable";
 
@@ -35,6 +36,7 @@ export function ToolChecklistDetailReport({
   const router = useRouter();
   const [accessPassOnly, setAccessPassOnly] = useState(false);
   const [formMode, setFormMode] = useState(false);
+  const printRef = usePrintFitToPage<HTMLDivElement>();
   useEscapeKey(true, () => router.push(closeHref));
 
   const hasAccessPassItems = groups.some((g) => g.items.some((it) => it.for_access_pass));
@@ -65,10 +67,9 @@ export function ToolChecklistDetailReport({
   }
 
   return (
-    <div className="space-y-4 print:space-y-1">
+    <div ref={printRef} className="space-y-4 print:space-y-1">
       {/* 양식 모드에서는 이 표제부가 인쇄에 안 나오게 함 — 아래 AccessPassPermitTable이
-          자체 제목을 갖고 있고, 이 블록까지 같이 나오면 표가 페이지 높이(100vh)만큼
-          늘어나면서 합쳐서 1장을 넘어가 버림. */}
+          자체 제목을 갖고 있어서 같이 나오면 중복됨. */}
       <div className={`flex flex-wrap items-center justify-between gap-2 print:mb-1 ${formMode ? "print:hidden" : ""}`}>
         <div>
           <h2 className="text-lg font-semibold text-slate-900 print:text-sm">
