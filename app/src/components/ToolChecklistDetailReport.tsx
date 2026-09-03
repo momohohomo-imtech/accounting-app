@@ -136,14 +136,14 @@ export function ToolChecklistDetailReport({
           <div className="space-y-4 print:space-y-3">
             {visibleGroups.map((g) => (
               <div key={g.label} className="print:break-inside-avoid">
-                <p className="mb-1.5 text-xs font-semibold text-slate-500 print:mb-1 print:text-[14px]">{g.label}</p>
-                <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 print:grid-cols-3 print:gap-x-[45px] print:gap-y-2">
+                <p className="mb-1.5 text-xs font-semibold text-slate-500 print:mb-1 print:text-[17px]">{g.label}</p>
+                <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 print:grid-cols-4 print:gap-x-[42px] print:gap-y-2.5">
                   {g.items.map((it) => {
                     const filled = it.quantity.trim() !== "";
                     return (
                       <li
                         key={it.id}
-                        className={`flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 print:gap-2 print:rounded-none print:border-0 print:border-b print:border-slate-200 print:px-0 print:py-2 print:text-[15px] ${filled ? "" : "print:opacity-50"}`}
+                        className={`flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 print:gap-2 print:rounded-none print:border-0 print:border-b print:border-slate-200 print:px-0 print:py-2.5 print:text-[19px] ${filled ? "" : "print:opacity-50"}`}
                       >
                         <span className="truncate print:text-slate-900">☐ {it.tool_name}</span>
                         <span
