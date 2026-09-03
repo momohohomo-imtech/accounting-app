@@ -19,6 +19,7 @@ type Tool = {
   linked_tool_ids: string[];
   text_color: string | null;
   background_color: string | null;
+  default_quantity: string | null;
 };
 type ToolOption = { id: string; name: string };
 
@@ -75,6 +76,7 @@ export function ToolEditPopup({
   const [sortOrder, setSortOrder] = useState(String(tool.sort_order));
   const [note, setNote] = useState(tool.note ?? "");
   const [linkedIds, setLinkedIds] = useState<Set<string>>(new Set(tool.linked_tool_ids));
+  const [defaultQuantity, setDefaultQuantity] = useState(tool.default_quantity ?? "");
   const [textColor, setTextColor] = useState<string | null>(tool.text_color);
   const [backgroundColor, setBackgroundColor] = useState<string | null>(tool.background_color);
   const [linkFilter, setLinkFilter] = useState("");
@@ -107,6 +109,7 @@ export function ToolEditPopup({
     fd.append("note", note);
     fd.append("text_color", textColor ?? "");
     fd.append("background_color", backgroundColor ?? "");
+    fd.append("default_quantity", defaultQuantity);
     linkedIds.forEach((id) => fd.append("linked_tool_id", id));
     const result = await globalPending.run(() => updateTool(fd));
     setSaving(false);
@@ -154,6 +157,16 @@ export function ToolEditPopup({
             <div className="flex flex-col gap-1">
               <label className={labelClass}>메모</label>
               <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className={fieldClass} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className={labelClass}>기본 수량 (새 공구명세서 작성 시 자동으로 채워짐)</label>
+              <input
+                value={defaultQuantity}
+                onChange={(e) => setDefaultQuantity(e.target.value)}
+                placeholder="예: 1, 기본"
+                autoComplete="off"
+                className={fieldClass}
+              />
             </div>
 
             <ColorSwatchPicker label="글씨색" value={textColor} onChange={setTextColor} />

@@ -14,6 +14,7 @@ type Tool = {
   linked_tool_ids: string[];
   text_color: string | null;
   background_color: string | null;
+  default_quantity: string | null;
 };
 
 export function ToolMasterGrid({ tools }: { tools: Tool[] }) {

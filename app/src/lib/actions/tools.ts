@@ -12,6 +12,7 @@ function parse(formData: FormData) {
     linked_tool_ids: formData.getAll("linked_tool_id").map(String).filter(Boolean),
     text_color: String(formData.get("text_color") ?? "").trim() || null,
     background_color: String(formData.get("background_color") ?? "").trim() || null,
+    default_quantity: String(formData.get("default_quantity") ?? "").trim() || null,
   };
 }
 

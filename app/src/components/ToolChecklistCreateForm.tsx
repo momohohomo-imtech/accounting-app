@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createToolChecklist, updateToolChecklist } from "@/lib/actions/toolChecklists";
 import { Button } from "@/components/ui/Button";
@@ -8,6 +8,7 @@ import { fieldClass, labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { groupToolsBySortOrder, toolGroupLabel } from "@/lib/tools";
+import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components/ProjectPicker";
 
 type Tool = {
   id: string;
@@ -16,8 +17,8 @@ type Tool = {
   linked_tool_ids: string[];
   text_color: string | null;
   background_color: string | null;
+  default_quantity: string | null;
 };
-type ProjectOption = { value: string; label: string };
 type AdhocItem = { key: string; name: string; quantity: string };
 
 function todayIso() {
@@ -26,7 +27,8 @@ function todayIso() {
 
 export function ToolChecklistCreateForm({
   tools,
-  projectOptions,
+  sites,
+  projects,
   checklistId,
   initialTitle = "",
   initialProjectId = "",
@@ -35,7 +37,8 @@ export function ToolChecklistCreateForm({
   initialAdhocItems = [],
 }: {
   tools: Tool[];
-  projectOptions: ProjectOption[];
+  sites: SiteOption[];
+  projects: ProjectOption[];
   /** 지정하면 새로 만드는 대신 이 id의 체크리스트를 수정(항목 전체 교체)함. */
   checklistId?: string;
   initialTitle?: string;
@@ -48,10 +51,16 @@ export function ToolChecklistCreateForm({
   const confirm = useConfirm();
   const globalPending = useGlobalPending();
   const isEdit = Boolean(checklistId);
+  const toolDefaultQuantities = useMemo(
+    () => Object.fromEntries(tools.filter((t) => t.default_quantity).map((t) => [t.id, t.default_quantity as string])),
+    [tools]
+  );
   const [title, setTitle] = useState(initialTitle);
   const [projectId, setProjectId] = useState(initialProjectId);
   const [tripDate, setTripDate] = useState(initialTripDate ?? todayIso);
-  const [quantities, setQuantities] = useState<Record<string, string>>(initialQuantities);
+  const [quantities, setQuantities] = useState<Record<string, string>>(
+    Object.keys(initialQuantities).length > 0 || isEdit ? initialQuantities : toolDefaultQuantities
+  );
   const [adhocItems, setAdhocItems] = useState<AdhocItem[]>(
     initialAdhocItems.map((a) => ({ key: crypto.randomUUID(), ...a }))
   );
@@ -127,7 +136,7 @@ export function ToolChecklistCreateForm({
     }
     setTitle("");
     setProjectId("");
-    setQuantities({});
+    setQuantities(toolDefaultQuantities);
     setAdhocItems([]);
     router.refresh();
   }
@@ -157,16 +166,15 @@ export function ToolChecklistCreateForm({
             required
           />
         </div>
-        <div className="flex flex-col gap-1">
-          <label className={labelClass}>프로젝트 (선택)</label>
-          <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className={`${fieldClass} w-56`}>
-            <option value="">선택 안 함</option>
-            {projectOptions.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
-            ))}
-          </select>
+        <div className="w-72">
+          <ProjectPicker
+            sites={sites}
+            projects={projects}
+            value={projectId}
+            onChange={setProjectId}
+            label="프로젝트 (선택)"
+            emptyLabel="선택 안 함"
+          />
         </div>
         <div className="flex flex-col gap-1">
           <label className={labelClass}>출장일 (선택)</label>

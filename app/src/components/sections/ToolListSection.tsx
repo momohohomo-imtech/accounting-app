@@ -48,14 +48,21 @@ export async function ToolListSection({
   checklist?: string;
 }) {
   const supabase = await createClient();
-  const [{ data: tools }, { data: projects }, { data: checklists }, { data: items }, { data: knowHowNotes }] =
+  const [{ data: tools }, { data: sites }, { data: projects }, { data: checklists }, { data: items }, { data: knowHowNotes }] =
     await Promise.all([
       supabase.from("tools").select("*").order("sort_order").order("position").order("name"),
-      supabase.from("projects").select("id, name, year, sites(name)").order("year", { ascending: false }).order("name"),
+      supabase.from("sites").select("id, name, clients(name)").order("name"),
+      supabase.from("projects").select("id, name, site_id, status, year, project_code").order("name"),
       supabase.from("tool_checklists").select("*, projects(name)").order("created_at", { ascending: false }),
       supabase.from("tool_checklist_items").select("*"),
       supabase.from("know_how_notes").select("*").eq("category", "tools").order("created_at", { ascending: false }),
     ]);
+
+  const siteOptions = (sites ?? []).map((s) => ({
+    id: s.id as string,
+    name: s.name as string,
+    client_name: (one(s.clients) as { name: string } | undefined)?.name ?? null,
+  }));
 
   async function createKnowHowBound(formData: FormData) {
     "use server";
@@ -79,11 +86,6 @@ export async function ToolListSection({
     created_at: c.created_at as string,
   }));
 
-  const projectOptions = (projects ?? []).map((p) => {
-    const site = one(p.sites) as { name: string } | undefined;
-    return { value: p.id as string, label: `${p.year} · ${site?.name ?? "미지정"} · ${p.name}` };
-  });
-
   const toolOptions = (tools ?? []).map((t) => ({
     id: t.id as string,
     name: t.name as string,
@@ -91,6 +93,7 @@ export async function ToolListSection({
     linked_tool_ids: (t.linked_tool_ids as string[] | null) ?? [],
     text_color: (t.text_color as string | null) ?? null,
     background_color: (t.background_color as string | null) ?? null,
+    default_quantity: (t.default_quantity as string | null) ?? null,
   }));
 
   const toolMasterRows = (tools ?? []).map((t) => ({
@@ -101,6 +104,7 @@ export async function ToolListSection({
     linked_tool_ids: (t.linked_tool_ids as string[] | null) ?? [],
     text_color: (t.text_color as string | null) ?? null,
     background_color: (t.background_color as string | null) ?? null,
+    default_quantity: (t.default_quantity as string | null) ?? null,
   }));
 
   const copySource = copyFrom ? (checklists ?? []).find((c) => c.id === copyFrom) : null;
@@ -147,7 +151,8 @@ export async function ToolListSection({
         <ToolChecklistCreateForm
           key={editFrom ?? copyFrom ?? "new"}
           tools={toolOptions}
-          projectOptions={projectOptions}
+          sites={siteOptions}
+          projects={projects ?? []}
           checklistId={editSource?.id as string | undefined}
           initialTitle={initialTitle}
           initialProjectId={initialProjectId}
