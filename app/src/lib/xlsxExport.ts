@@ -3,6 +3,7 @@ import type { MonthCell } from "@/lib/calendar";
 import { WEEKDAY_LABELS } from "@/lib/calendar";
 import { workLogColorExcelArgb } from "@/lib/workLogColors";
 import { siteColorExcelArgb } from "@/lib/siteColor";
+import { formatPermitQuantity } from "@/lib/koreanNumber";
 
 function triggerDownload(buffer: ExcelJS.Buffer, filename: string) {
   const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -223,9 +224,12 @@ export async function downloadAccessPassFormXlsx(
     nameCell.value = item?.tool_name ?? "";
     nameCell.font = { name: FONT, size: 11 };
     const qtyCell = ws.getCell(`C${r}`);
-    qtyCell.value = item?.quantity ?? "";
+    qtyCell.value = item ? formatPermitQuantity(item.quantity) : "";
     qtyCell.font = { name: FONT, size: 11 };
     qtyCell.alignment = { horizontal: "center" };
+    const unitCell = ws.getCell(`E${r}`);
+    unitCell.value = item ? "EA" : "";
+    unitCell.alignment = { horizontal: "center" };
     for (let c = 1; c <= 7; c++) ws.getCell(r, c).font = { name: FONT, size: 11 };
   }
   // 표 안쪽 가로줄(행 사이)과 세로줄(열 사이), 바깥 굵은 테두리.

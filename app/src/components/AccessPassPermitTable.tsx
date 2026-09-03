@@ -1,3 +1,5 @@
+import { formatPermitQuantity } from "@/lib/koreanNumber";
+
 // 원청(기아 화성공장)이 요구하는 "반입/반출 확인증" 양식을 셀 단위로 그대로 재현한
 // 표. 사용자가 제공한 원본 엑셀(화성 공구 명세서.xlsx)의 셀 구성·병합·테두리·문구를
 // 그대로 옮긴 것 — 서명/인장이 필요한 칸(반입자, 전화번호, 경비실 확인자 등)은
@@ -6,6 +8,11 @@
 const THIN = "1px solid #000";
 const MEDIUM = "2px solid #000";
 const ROW_COUNT = 31; // 원본 서식의 품목 기재란 줄 수(5~35행)
+// 인쇄 시 공구가 몇 개든 항상 용지 한 장을 거의 꽉 채우도록 고정 높이로 계산한 값
+// (vh/auto-stretch 방식은 브라우저 인쇄 렌더링에서 줄 높이가 깨지고 페이지가
+// 넘어가는 문제가 있어서 안 씀 — 대신 원본 서식과 같은 비율로 행 높이를 조금 키워
+// 고정값으로 둠).
+const ROW_HEIGHT = 24;
 
 export type PermitItem = { tool_name: string; quantity: string };
 
@@ -14,16 +21,10 @@ export function AccessPassPermitTable({ items }: { items: PermitItem[] }) {
   const rows = Array.from({ length: rowCount }, (_, i) => items[i]);
 
   return (
-    // 인쇄 시 공구가 몇 개든 항상 용지 한 장을 꽉 채우도록, 이 래퍼를 인쇄 페이지
-    // 높이(100vh)로 고정하고 표 높이를 100%로 맞춤 — 그러면 높이를 지정하지 않은
-    // 품목 기재란(아래 rows)들이 남는 공간만큼 자동으로 늘어나 빈칸도 페이지 끝까지
-    // 이어짐. 제목·안내문구·서명란처럼 크기가 고정이어야 하는 행에는 높이를 명시함.
-    <div className="print:h-screen">
     <table
       style={{
         borderCollapse: "collapse",
         width: "100%",
-        height: "100%",
         tableLayout: "fixed",
         fontFamily: "'맑은 고딕', 'Malgun Gothic', sans-serif",
         fontSize: 11,
@@ -86,7 +87,7 @@ export function AccessPassPermitTable({ items }: { items: PermitItem[] }) {
           const isLast = i === rowCount - 1;
           const bottom = isLast ? MEDIUM : THIN;
           return (
-            <tr key={i} className="h-5 print:h-auto">
+            <tr key={i} style={{ height: ROW_HEIGHT }}>
               <td style={{ borderLeft: MEDIUM, borderRight: THIN, borderTop: THIN, borderBottom: bottom }} />
               <td style={{ borderRight: THIN, borderTop: THIN, borderBottom: bottom, paddingLeft: 4 }}>
                 {item?.tool_name ?? ""}
@@ -101,9 +102,11 @@ export function AccessPassPermitTable({ items }: { items: PermitItem[] }) {
                   fontFamily: "monospace",
                 }}
               >
-                {item?.quantity ?? ""}
+                {item ? formatPermitQuantity(item.quantity) : ""}
               </td>
-              <td style={{ borderRight: THIN, borderTop: THIN, borderBottom: bottom }} />
+              <td style={{ borderRight: THIN, borderTop: THIN, borderBottom: bottom, textAlign: "center" }}>
+                {item ? "EA" : ""}
+              </td>
               <td style={{ borderRight: THIN, borderTop: THIN, borderBottom: bottom }} />
               <td style={{ borderRight: MEDIUM, borderTop: THIN, borderBottom: bottom }} />
             </tr>
@@ -164,6 +167,5 @@ export function AccessPassPermitTable({ items }: { items: PermitItem[] }) {
         </tr>
       </tbody>
     </table>
-    </div>
   );
 }
