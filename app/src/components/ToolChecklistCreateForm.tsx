@@ -34,6 +34,7 @@ export function ToolChecklistCreateForm({
   initialTitle = "",
   initialProjectId = "",
   initialTripDate,
+  initialHelperCount = "",
   initialQuantities = {},
   initialAdhocItems = [],
 }: {
@@ -45,6 +46,7 @@ export function ToolChecklistCreateForm({
   initialTitle?: string;
   initialProjectId?: string;
   initialTripDate?: string;
+  initialHelperCount?: string;
   initialQuantities?: Record<string, string>;
   initialAdhocItems?: { name: string; quantity: string; forAccessPass: boolean }[];
 }) {
@@ -57,11 +59,13 @@ export function ToolChecklistCreateForm({
     [tools]
   );
   const [title, setTitle] = useState(initialTitle);
+  const [helperCount, setHelperCount] = useState(initialHelperCount);
   const [projectId, setProjectId] = useState(initialProjectId);
   const [tripDate, setTripDate] = useState(initialTripDate ?? todayIso);
   const [quantities, setQuantities] = useState<Record<string, string>>(
     Object.keys(initialQuantities).length > 0 || isEdit ? initialQuantities : toolDefaultQuantities
   );
+  const [toolNames, setToolNames] = useState<Record<string, string>>({});
   const [adhocItems, setAdhocItems] = useState<AdhocItem[]>(
     initialAdhocItems.map((a) => ({ key: crypto.randomUUID(), ...a }))
   );
@@ -107,13 +111,14 @@ export function ToolChecklistCreateForm({
     const fd = new FormData();
     if (checklistId) fd.append("id", checklistId);
     fd.append("title", title);
+    fd.append("helper_count", helperCount.trim());
     fd.append("project_id", projectId);
     fd.append("trip_date", tripDate);
     for (const t of tools) {
       const qty = (quantities[t.id] ?? "").trim();
       if (qty) {
         fd.append("tool_id", t.id);
-        fd.append("tool_name", t.name);
+        fd.append("tool_name", (toolNames[t.id] ?? t.name).trim() || t.name);
         fd.append("quantity", qty);
         fd.append("for_access_pass", String(t.for_access_pass));
       }
@@ -138,8 +143,10 @@ export function ToolChecklistCreateForm({
       return;
     }
     setTitle("");
+    setHelperCount("");
     setProjectId("");
     setQuantities(toolDefaultQuantities);
+    setToolNames({});
     setAdhocItems([]);
     router.refresh();
   }
@@ -168,6 +175,20 @@ export function ToolChecklistCreateForm({
             className={`${fieldClass} w-64`}
             required
           />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className={labelClass}>조공 (선택)</label>
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm text-slate-900">조공</span>
+            <input
+              type="number"
+              min={0}
+              value={helperCount}
+              onChange={(e) => setHelperCount(e.target.value)}
+              placeholder="0"
+              className={`${fieldClass} w-16`}
+            />
+          </div>
         </div>
         <div className="w-72">
           <ProjectPicker
@@ -199,21 +220,25 @@ export function ToolChecklistCreateForm({
               <p className="mb-1.5 text-xs font-semibold text-slate-500">{toolGroupLabel(sortOrder)}</p>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {groupTools.map((t) => (
-                  <label
+                  <div
                     key={t.id}
                     className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm hover:bg-slate-50"
                     style={{ backgroundColor: t.background_color ?? undefined }}
                   >
-                    <span className="truncate" style={{ color: t.text_color ?? undefined }}>
-                      {t.name}
-                    </span>
+                    <input
+                      value={toolNames[t.id] ?? t.name}
+                      onChange={(e) => setToolNames((prev) => ({ ...prev, [t.id]: e.target.value }))}
+                      title="이 명세서에서만 표시될 이름 — 공구 마스터의 이름은 바뀌지 않음"
+                      className="min-w-0 flex-1 truncate border-none bg-transparent p-0 text-sm focus:outline-none"
+                      style={{ color: t.text_color ?? undefined }}
+                    />
                     <input
                       type="text"
                       value={quantities[t.id] ?? ""}
                       onChange={(e) => setQuantity(t.id, e.target.value)}
                       className="w-16 shrink-0 rounded border border-slate-300 px-1.5 py-1 text-right text-sm focus:border-slate-500 focus:outline-none"
                     />
-                  </label>
+                  </div>
                 ))}
               </div>
             </div>

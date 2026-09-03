@@ -15,6 +15,7 @@ type Group = { label: string; items: GroupItem[] };
 
 export function ToolChecklistDetailReport({
   title,
+  helperCount,
   projectName,
   tripDate,
   groups,
@@ -23,6 +24,7 @@ export function ToolChecklistDetailReport({
   editHref,
 }: {
   title: string;
+  helperCount?: number | null;
   projectName: string | null;
   tripDate: string | null;
   groups: Group[];
@@ -71,6 +73,7 @@ export function ToolChecklistDetailReport({
         <div>
           <h2 className="text-lg font-semibold text-slate-900 print:text-sm">
             {title}
+            {helperCount != null && <span className="ml-2 text-lg font-semibold text-slate-900 print:text-sm">조공 {helperCount}</span>}
             {formMode && <span className="ml-2 text-sm font-normal text-slate-500 print:text-xs">(반입반출확인증 양식)</span>}
             {!formMode && accessPassOnly && (
               <span className="ml-2 text-sm font-normal text-slate-500 print:text-xs">(반입반출증용만)</span>
@@ -130,14 +133,14 @@ export function ToolChecklistDetailReport({
           <div className="space-y-4 print:space-y-1">
             {visibleGroups.map((g) => (
               <div key={g.label} className="print:break-inside-avoid">
-                <p className="mb-1.5 text-xs font-semibold text-slate-500 print:mb-0.5 print:text-[9px]">{g.label}</p>
-                <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 print:grid-cols-4 print:gap-x-8 print:gap-y-0">
+                <p className="mb-1.5 text-xs font-semibold text-slate-500 print:mb-0.5 print:text-[10.5px]">{g.label}</p>
+                <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 print:grid-cols-4 print:gap-x-[45px] print:gap-y-0">
                   {g.items.map((it) => {
                     const filled = it.quantity.trim() !== "";
                     return (
                       <li
                         key={it.id}
-                        className={`flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 print:gap-2 print:rounded-none print:border-0 print:border-b print:border-slate-200 print:px-0 print:py-0.5 print:text-[9px] ${filled ? "" : "print:opacity-50"}`}
+                        className={`flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 print:gap-2 print:rounded-none print:border-0 print:border-b print:border-slate-200 print:px-0 print:py-0.5 print:text-[11px] ${filled ? "" : "print:opacity-50"}`}
                       >
                         <span className="truncate print:text-slate-900">☐ {it.tool_name}</span>
                         <span
@@ -158,7 +161,7 @@ export function ToolChecklistDetailReport({
             )}
           </div>
 
-          <p className="text-right text-xs text-slate-400 print:text-[8px]">총 {selectedCount}개 품목 선택됨</p>
+          <p className="text-right text-xs text-slate-400 print:text-[9px]">총 {selectedCount}개 품목 선택됨</p>
         </>
       )}
     </div>

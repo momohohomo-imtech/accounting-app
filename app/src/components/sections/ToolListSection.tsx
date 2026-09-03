@@ -114,27 +114,31 @@ export async function ToolListSection({
   const copySource = copyFrom ? (checklists ?? []).find((c) => c.id === copyFrom) : null;
   const editSource = editFrom ? (checklists ?? []).find((c) => c.id === editFrom) : null;
 
-  const { initialQuantities, initialAdhocItems, initialTitle, initialProjectId, initialTripDate } = editSource
-    ? {
-        ...buildInitialFormState(itemsByChecklist.get(editSource.id) ?? []),
-        initialTitle: editSource.title as string,
-        initialProjectId: (editSource.project_id as string | null) ?? "",
-        initialTripDate: (editSource.trip_date as string | null) ?? undefined,
-      }
-    : copySource
+  const { initialQuantities, initialAdhocItems, initialTitle, initialProjectId, initialTripDate, initialHelperCount } =
+    editSource
       ? {
-          ...buildInitialFormState(itemsByChecklist.get(copySource.id) ?? []),
-          initialTitle: `${copySource.title} (복사)`,
-          initialProjectId: "",
-          initialTripDate: undefined as string | undefined,
+          ...buildInitialFormState(itemsByChecklist.get(editSource.id) ?? []),
+          initialTitle: editSource.title as string,
+          initialProjectId: (editSource.project_id as string | null) ?? "",
+          initialTripDate: (editSource.trip_date as string | null) ?? undefined,
+          initialHelperCount: editSource.helper_count != null ? String(editSource.helper_count) : "",
         }
-      : {
-          initialQuantities: {},
-          initialAdhocItems: [],
-          initialTitle: "",
-          initialProjectId: "",
-          initialTripDate: undefined as string | undefined,
-        };
+      : copySource
+        ? {
+            ...buildInitialFormState(itemsByChecklist.get(copySource.id) ?? []),
+            initialTitle: `${copySource.title} (복사)`,
+            initialProjectId: "",
+            initialTripDate: undefined as string | undefined,
+            initialHelperCount: copySource.helper_count != null ? String(copySource.helper_count) : "",
+          }
+        : {
+            initialQuantities: {},
+            initialAdhocItems: [],
+            initialTitle: "",
+            initialProjectId: "",
+            initialTripDate: undefined as string | undefined,
+            initialHelperCount: "",
+          };
 
   const detailChecklist = checklist ? (checklists ?? []).find((c) => c.id === checklist) : null;
 
@@ -196,6 +200,7 @@ export async function ToolListSection({
           initialTitle={initialTitle}
           initialProjectId={initialProjectId}
           initialTripDate={initialTripDate}
+          initialHelperCount={initialHelperCount}
           initialQuantities={initialQuantities}
           initialAdhocItems={initialAdhocItems}
         />
@@ -218,6 +223,7 @@ export async function ToolListSection({
           <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
             <ToolChecklistDetailReport
               title={detailChecklist.title}
+              helperCount={detailChecklist.helper_count ?? null}
               projectName={(one(detailChecklist.projects) as { name: string } | null)?.name ?? null}
               tripDate={detailChecklist.trip_date}
               groups={detailGroups}

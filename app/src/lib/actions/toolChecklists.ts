@@ -11,6 +11,8 @@ export async function createToolChecklist(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   const projectId = String(formData.get("project_id") ?? "") || null;
   const tripDate = String(formData.get("trip_date") ?? "") || null;
+  const helperCountRaw = String(formData.get("helper_count") ?? "").trim();
+  const helperCount = helperCountRaw ? Number(helperCountRaw) : null;
   const toolIds = formData.getAll("tool_id").map(String);
   const toolNames = formData.getAll("tool_name").map(String);
   const quantities = formData.getAll("quantity").map(String);
@@ -20,7 +22,7 @@ export async function createToolChecklist(formData: FormData) {
 
   const { data: checklist, error } = await supabase
     .from("tool_checklists")
-    .insert({ title, project_id: projectId, trip_date: tripDate, created_by: user?.id ?? null })
+    .insert({ title, project_id: projectId, trip_date: tripDate, helper_count: helperCount, created_by: user?.id ?? null })
     .select("id")
     .single();
   if (error || !checklist) return { error: error?.message ?? "저장 중 오류가 발생했습니다." };
@@ -50,6 +52,8 @@ export async function updateToolChecklist(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   const projectId = String(formData.get("project_id") ?? "") || null;
   const tripDate = String(formData.get("trip_date") ?? "") || null;
+  const helperCountRaw = String(formData.get("helper_count") ?? "").trim();
+  const helperCount = helperCountRaw ? Number(helperCountRaw) : null;
   const toolIds = formData.getAll("tool_id").map(String);
   const toolNames = formData.getAll("tool_name").map(String);
   const quantities = formData.getAll("quantity").map(String);
@@ -59,7 +63,7 @@ export async function updateToolChecklist(formData: FormData) {
 
   const { error: updateError } = await supabase
     .from("tool_checklists")
-    .update({ title, project_id: projectId, trip_date: tripDate })
+    .update({ title, project_id: projectId, trip_date: tripDate, helper_count: helperCount })
     .eq("id", id);
   if (updateError) return { error: updateError.message };
 

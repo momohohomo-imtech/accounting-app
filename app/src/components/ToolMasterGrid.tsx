@@ -53,11 +53,14 @@ export function ToolMasterGrid({ tools }: { tools: Tool[] }) {
                 <button
                   type="button"
                   onClick={() => setEditing(t)}
-                  className="truncate text-left text-slate-700 underline decoration-slate-300 underline-offset-2 hover:opacity-70"
+                  className="flex min-w-0 items-center gap-1 truncate text-left text-slate-700 underline decoration-slate-300 underline-offset-2 hover:opacity-70"
                   style={{ color: t.text_color ?? undefined }}
-                  title={t.name}
+                  title={t.for_access_pass ? `${t.name} (반입반출증용)` : t.name}
                 >
-                  {t.name}
+                  <span className="truncate">{t.name}</span>
+                  {t.for_access_pass && (
+                    <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-red-600" />
+                  )}
                 </button>
                 <div className="flex shrink-0 flex-col">
                   <button
