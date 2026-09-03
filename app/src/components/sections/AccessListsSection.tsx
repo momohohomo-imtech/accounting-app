@@ -77,9 +77,11 @@ export async function AccessListsSection() {
           const members = (links ?? [])
             .filter((lk) => lk.access_list_id === l.id)
             .map((lk) => {
+              const isEmployee = Boolean(lk.employee_id);
               const source = lk.daily_worker_id ? one(lk.daily_workers) : one(lk.employees);
               return source
                 ? {
+                    isEmployee,
                     name: source.name as string,
                     phone: (source.phone as string | null) ?? null,
                     nationality: (source.nationality as string | null) ?? null,
@@ -88,7 +90,9 @@ export async function AccessListsSection() {
                   }
                 : null;
             })
-            .filter((m): m is NonNullable<typeof m> => m !== null);
+            .filter((m): m is NonNullable<typeof m> => m !== null)
+            // 직원을 항상 위쪽에, 그다음 일용직 인력 순으로.
+            .sort((a, b) => Number(b.isEmployee) - Number(a.isEmployee));
 
           return (
             <AccessListCard

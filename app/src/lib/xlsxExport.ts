@@ -71,59 +71,60 @@ export async function downloadAccessListXlsx(
     orientation: "portrait",
     fitToPage: true,
     fitToWidth: 1,
-    fitToHeight: 1,
+    fitToHeight: 0, // 세로는 제한 없이 여러 페이지로 자연스럽게 넘어가게 둠(사람 수만큼 행이 늘어나므로).
     horizontalCentered: true,
     margins: { left: 0.35, right: 0.35, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 },
+    // 페이지가 넘어가도 매 페이지 상단에 제목~헤더(1~4행)가 그대로 반복되게(인쇄 제목).
+    printTitlesRow: "1:4",
   };
+  // 바닥글: 안내문 두 줄(가운데) + 페이지 번호(오른쪽). Excel 바닥글의 줄바꿈은 _x000A_로 표기.
+  ws.headerFooter.oddFooter =
+    "&C&12인원수 대로 신분증 제출 요망_x000A_(명단 제출 → 선 출입 후 명단으로 출입보안승인 / 출입보안 미등록시  공사 진행 불가&R&12&P / &N";
 
-  const titleRow = ws.addRow(["공사자 출입자 명부"]);
+  const titleRow = ws.addRow([
+    { richText: [
+      { font: { name: FONT, size: 14 }, text: "공사자 출입자 명부" },
+      { font: { name: FONT, size: 12 }, text: " sjc0143@gmail.com" },
+    ] },
+  ]);
   titleRow.height = 30.75;
-  titleRow.font = { name: FONT, size: 12 };
   titleRow.alignment = { horizontal: "center", vertical: "middle" };
   ws.mergeCells(1, 1, 1, 6);
 
   const row2 = ws.addRow(["업체명:", info.companyName, "", "출입일자:", info.accessPeriod, ""]);
   row2.height = 30.75;
   ws.mergeCells(2, 5, 2, 6);
-  [1, 2].forEach((c) => {
+  [1, 2, 4, 5].forEach((c) => {
     row2.getCell(c).font = { name: FONT, size: 12 };
-    row2.getCell(c).alignment = { horizontal: c === 1 ? "right" : "center", vertical: "middle" };
-  });
-  [4, 5].forEach((c) => {
-    row2.getCell(c).font = { name: FONT, size: 14 };
-    row2.getCell(c).alignment = { horizontal: c === 4 ? "right" : "center", vertical: "middle" };
+    row2.getCell(c).alignment = { horizontal: c === 1 || c === 4 ? "right" : "center", vertical: "middle" };
   });
 
   const row3 = ws.addRow(["감독자:", info.supervisorName, "", "인원수:", members.length, ""]);
   row3.height = 39.0;
   ws.mergeCells(3, 5, 3, 6);
-  [1, 2].forEach((c) => {
+  [1, 2, 4, 5].forEach((c) => {
     row3.getCell(c).font = { name: FONT, size: 12 };
-    row3.getCell(c).alignment = { horizontal: c === 1 ? "right" : "center", vertical: "middle" };
-  });
-  [4, 5].forEach((c) => {
-    row3.getCell(c).font = { name: FONT, size: 14 };
-    row3.getCell(c).alignment = { horizontal: c === 4 ? "right" : "center", vertical: "middle" };
+    row3.getCell(c).alignment = { horizontal: c === 1 || c === 4 ? "right" : "center", vertical: "middle" };
   });
 
   const headerRow = ws.addRow(["구분", "성 명", "생년월일", "연락처", "국적", "비고"]);
   headerRow.height = 26.25;
-  headerRow.eachCell((cell, colNumber) => {
-    cell.font = { name: FONT, size: colNumber <= 2 ? 12 : 14 };
+  headerRow.eachCell((cell) => {
+    cell.font = { name: FONT, size: 12 };
     cell.alignment = { horizontal: "center", vertical: "middle" };
     cell.border = { bottom: { style: "thin" } };
   });
 
-  const totalSlots = Math.max(21, members.length);
-  for (let i = 0; i < totalSlots; i++) {
-    const m: (typeof members)[number] | undefined = members[i];
-    const row = ws.addRow([i + 1, m?.name ?? "", m?.birthDate ?? "", m?.phone ?? "", m?.nationality ?? "", m?.note ?? ""]);
+  // 사람 수만큼만 행을 만듦(예: 4명이면 번호 1~4까지만) — 예전처럼 21행까지 빈 줄로 채우지 않음.
+  members.forEach((m, i) => {
+    const row = ws.addRow([i + 1, m.name, m.birthDate, m.phone, m.nationality, m.note]);
     row.height = 26.25;
     row.eachCell({ includeEmpty: true }, (cell) => {
       cell.font = { name: FONT, size: 12 };
       cell.alignment = { horizontal: "center", vertical: "middle" };
+      cell.border = { bottom: { style: "thin" } };
     });
-  }
+  });
 
   ws.getColumn(1).width = 9;
   ws.getColumn(2).width = 14.375;
