@@ -3,7 +3,7 @@
 import { downloadAccessListXlsx } from "@/lib/xlsxExport";
 import { Button } from "@/components/ui/Button";
 
-type Member = { name: string; birthDate: string | null; phone: string | null; nationality: string | null };
+type Member = { name: string; birthDate: string | null; phone: string | null; nationality: string | null; note?: string };
 
 function toYymmdd(date: string | null) {
   if (!date) return "";
@@ -30,7 +30,7 @@ export function AccessListExportButton({
         birthDate: toYymmdd(m.birthDate),
         phone: m.phone ?? "",
         nationality: m.nationality ?? "",
-        note: "",
+        note: m.note ?? "",
       }))
     );
   }

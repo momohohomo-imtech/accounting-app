@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
-import { createAccessListRecord, deleteAccessListRecord } from "@/lib/actions/access-lists";
+import { createAccessListRecord, updateAccessListRecord, deleteAccessListRecord } from "@/lib/actions/access-lists";
 import { sortByEmployeeNo } from "@/lib/format";
 import { AccessListWorkerPicker } from "@/components/AccessListWorkerPicker";
 import { AccessListCard } from "@/components/AccessListCard";
@@ -17,7 +17,7 @@ export async function AccessListsSection() {
       supabase
         .from("access_list_workers")
         .select(
-          "access_list_id, daily_worker_id, employee_id, daily_workers(name, phone, nationality, birth_date, grade), employees(name, phone, nationality, birth_date)"
+          "id, access_list_id, daily_worker_id, employee_id, note, daily_workers(name, phone, nationality, birth_date, grade), employees(name, phone, nationality, birth_date)"
         ),
     ]);
 
@@ -81,12 +81,14 @@ export async function AccessListsSection() {
               const source = lk.daily_worker_id ? one(lk.daily_workers) : one(lk.employees);
               return source
                 ? {
+                    id: lk.id as string,
                     isEmployee,
                     name: source.name as string,
                     phone: (source.phone as string | null) ?? null,
                     nationality: (source.nationality as string | null) ?? null,
                     birthDate: (source.birth_date as string | null) ?? null,
                     grade: (source as { grade?: string | null }).grade ?? null,
+                    note: (lk.note as string | null) ?? "",
                   }
                 : null;
             })
@@ -99,11 +101,14 @@ export async function AccessListsSection() {
               key={l.id}
               id={l.id}
               companyName={l.company_name}
+              siteId={l.site_id}
               siteName={l.sites?.name ?? null}
               supervisorName={l.supervisor_name}
               accessPeriod={l.access_period}
               createdAt={l.created_at}
               members={members}
+              siteOptions={sites ?? []}
+              updateAction={updateAccessListRecord}
               deleteAction={deleteAccessListRecord}
             />
           );
