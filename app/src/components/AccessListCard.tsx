@@ -102,7 +102,12 @@ export function AccessListCard({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="flex flex-col gap-1">
             <label className={labelClass}>원청 회사명</label>
-            <input value={draftCompanyName} onChange={(e) => setDraftCompanyName(e.target.value)} className={fieldClass} />
+            <input
+              value={draftCompanyName}
+              onChange={(e) => setDraftCompanyName(e.target.value)}
+              autoComplete="off"
+              className={fieldClass}
+            />
           </div>
           <div className="flex flex-col gap-1">
             <label className={labelClass}>현장</label>
@@ -120,6 +125,7 @@ export function AccessListCard({
             <input
               value={draftSupervisorName}
               onChange={(e) => setDraftSupervisorName(e.target.value)}
+              autoComplete="off"
               className={fieldClass}
             />
           </div>
@@ -129,6 +135,7 @@ export function AccessListCard({
               value={draftAccessPeriod}
               onChange={(e) => setDraftAccessPeriod(e.target.value)}
               placeholder="예: 2026-08-23~24"
+              autoComplete="off"
               className={fieldClass}
             />
           </div>
@@ -143,6 +150,7 @@ export function AccessListCard({
                 value={draftNotes[m.id] ?? ""}
                 onChange={(e) => setDraftNotes((prev) => ({ ...prev, [m.id]: e.target.value }))}
                 placeholder="비고"
+                autoComplete="off"
                 className={`${fieldClass} flex-1`}
               />
             </div>

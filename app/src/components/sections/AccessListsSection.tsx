@@ -33,7 +33,12 @@ export async function AccessListsSection() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-slate-500">원청 회사명</label>
-              <input name="company_name" required className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+              <input
+                name="company_name"
+                required
+                autoComplete="off"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-slate-500">현장</label>
@@ -48,13 +53,18 @@ export async function AccessListsSection() {
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-slate-500">감독관</label>
-              <input name="supervisor_name" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+              <input
+                name="supervisor_name"
+                autoComplete="off"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-slate-500">출입 기간</label>
               <input
                 name="access_period"
                 placeholder="예: 2026-08-23~24"
+                autoComplete="off"
                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
               />
             </div>
