@@ -96,13 +96,13 @@ export function ToolChecklistDetailReport({
         {visibleGroups.map((g) => (
           <div key={g.label} className="print:break-inside-avoid">
             <p className="mb-1.5 text-xs font-semibold text-slate-500 print:mb-0.5 print:text-[9px]">{g.label}</p>
-            <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 print:grid-cols-4 print:gap-x-2 print:gap-y-0">
+            <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 print:grid-cols-4 print:gap-x-8 print:gap-y-0">
               {g.items.map((it) => {
                 const filled = it.quantity.trim() !== "";
                 return (
                   <li
                     key={it.id}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 print:gap-1 print:rounded-none print:border-0 print:border-b print:border-slate-200 print:px-0 print:py-0.5 print:text-[9px]"
+                    className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 print:gap-2 print:rounded-none print:border-0 print:border-b print:border-slate-200 print:px-0 print:py-0.5 print:text-[9px]"
                   >
                     <span className="truncate">☑ {it.tool_name}</span>
                     <span className={`shrink-0 font-mono font-semibold ${filled ? "text-slate-900" : "text-slate-400"}`}>
