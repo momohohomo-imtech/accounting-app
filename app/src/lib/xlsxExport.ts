@@ -214,7 +214,7 @@ export async function downloadAccessPassFormXlsx(
     cell.alignment = { horizontal: "center", vertical: "middle" };
   }
 
-  const ROW_COUNT = 31; // 원본 서식의 품목 기재란 줄 수
+  const ROW_COUNT = 38; // 원본 서식은 31줄이지만 실제 인쇄 여백 기준으로 늘림(AccessPassPermitTable과 동일)
   const rowCount = Math.max(ROW_COUNT, items.length);
   for (let i = 0; i < rowCount; i++) {
     const r = 5 + i;

@@ -7,11 +7,10 @@ import { formatPermitQuantity } from "@/lib/koreanNumber";
 // 채운다.
 const THIN = "1px solid #000";
 const MEDIUM = "2px solid #000";
-const ROW_COUNT = 31; // 원본 서식의 품목 기재란 줄 수(5~35행)
-// 인쇄 시 공구가 몇 개든 항상 용지 한 장을 거의 꽉 채우도록 고정 높이로 계산한 값
-// (vh/auto-stretch 방식은 브라우저 인쇄 렌더링에서 줄 높이가 깨지고 페이지가
-// 넘어가는 문제가 있어서 안 씀 — 대신 원본 서식과 같은 비율로 행 높이를 조금 키워
-// 고정값으로 둠).
+// 원본 서식은 31줄(5~35행)이지만, 실제 인쇄 여백 기준으로 보면 아래쪽에 빈 공간이
+// 많이 남아서 줄 수를 늘림 — usePrintFitToPage가 그래도 넘치면 알아서 축소해주므로
+// 안전함.
+const ROW_COUNT = 38;
 const ROW_HEIGHT = 24;
 
 export type PermitItem = { tool_name: string; quantity: string };
