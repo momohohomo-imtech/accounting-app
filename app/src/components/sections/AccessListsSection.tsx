@@ -3,6 +3,7 @@ import { one } from "@/lib/relations";
 import { createAccessListRecord, updateAccessListRecord, deleteAccessListRecord } from "@/lib/actions/access-lists";
 import { sortByEmployeeNo } from "@/lib/format";
 import { AccessListWorkerPicker } from "@/components/AccessListWorkerPicker";
+import { AccessListSubmitButton } from "@/components/AccessListSubmitButton";
 import { AccessListCard } from "@/components/AccessListCard";
 
 export async function AccessListsSection() {
@@ -76,9 +77,7 @@ export async function AccessListsSection() {
             employees={employees}
           />
 
-          <button className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
-            출입명단 생성
-          </button>
+          <AccessListSubmitButton />
         </form>
       </div>
 
