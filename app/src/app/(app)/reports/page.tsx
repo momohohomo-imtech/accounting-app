@@ -44,7 +44,10 @@ type Row = {
   purchase_vat: number;
   needs_classification: boolean;
   clients: { name: string } | { name: string }[] | null;
-  projects: { name: string; sites: { name: string } | { name: string }[] | null } | { name: string; sites: { name: string } | { name: string }[] | null }[] | null;
+  projects:
+    | { name: string; status: string | null; sites: { name: string } | { name: string }[] | null }
+    | { name: string; status: string | null; sites: { name: string } | { name: string }[] | null }[]
+    | null;
   expense_categories:
     | { name: string; project_only: boolean; color: string | null }
     | { name: string; project_only: boolean; color: string | null }[]
@@ -105,7 +108,7 @@ export default async function ReportsPage({
       supabase
         .from("transactions")
         .select(
-          "*, clients(name), projects(name, sites(name)), expense_categories(name, project_only, color), payment_methods(name)"
+          "*, clients(name), projects(name, status, sites(name)), expense_categories(name, project_only, color), payment_methods(name)"
         )
         .gte("trans_date", `${selectedYear}-01-01`)
         .lte("trans_date", `${selectedYear}-12-31`),
@@ -123,7 +126,7 @@ export default async function ReportsPage({
       supabase
         .from("project_agency_purchases")
         .select(
-          "id, project_id, item_name, amount, client_name, memo, expense_categories(name, project_only, color), projects!inner(year, name)"
+          "id, project_id, item_name, amount, client_name, memo, expense_categories(name, project_only, color), projects!inner(year, name, status)"
         )
         .eq("projects.year", selectedYear),
     ]);
@@ -345,13 +348,14 @@ export default async function ReportsPage({
         })
         .map((t) => {
           const client = one(t.clients) as { name: string } | null;
-          const proj = one(t.projects) as { name: string } | null;
+          const proj = one(t.projects) as { name: string; status: string | null } | null;
           return {
             id: t.id,
             kind: "매입" as const,
             trans_date: t.trans_date as string | null,
             client_name: client?.name ?? t.client_name_raw ?? "미지정",
             project_name: proj?.name ?? null,
+            project_status: proj?.status ?? null,
             item_name: t.item_name,
             amount: t.purchase_amount + t.purchase_vat,
           };
@@ -365,13 +369,14 @@ export default async function ReportsPage({
           return (c?.name ?? "미분류") === category;
         })
         .map((a) => {
-          const proj = one(a.projects) as { name: string } | null;
+          const proj = one(a.projects) as { name: string; status: string | null } | null;
           return {
             id: a.id,
             kind: "대행구매" as const,
             trans_date: null as string | null,
             client_name: a.client_name,
             project_name: proj?.name ?? null,
+            project_status: proj?.status ?? null,
             item_name: a.item_name,
             amount: a.amount,
           };
@@ -383,13 +388,15 @@ export default async function ReportsPage({
         .filter((t) => t.type === "매입" && ((one(t.clients) as { name: string } | null)?.name ?? t.client_name_raw ?? "미지정") === vendor)
         .map((t) => {
           const category = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
+          const proj = one(t.projects) as { name: string; status: string | null } | null;
           return {
             id: t.id,
             kind: "매입" as const,
             trans_date: t.trans_date as string | null,
             item_name: t.item_name,
             amount: t.purchase_amount + t.purchase_vat,
-            project_name: (one(t.projects) as { name: string } | null)?.name ?? null,
+            project_name: proj?.name ?? null,
+            project_status: proj?.status ?? null,
             needs_classification: t.needs_classification,
             category_name: category?.name ?? null,
             category_project_only: category?.project_only ?? false,
@@ -405,7 +412,7 @@ export default async function ReportsPage({
           .filter((a) => (a.client_name ?? "미지정") === vendor)
           .map((a) => {
             const category = one(a.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
-            const proj = one(a.projects) as { name: string } | null;
+            const proj = one(a.projects) as { name: string; status: string | null } | null;
             return {
               id: a.id,
               kind: "대행구매" as const,
@@ -413,6 +420,7 @@ export default async function ReportsPage({
               item_name: a.item_name,
               amount: a.amount,
               project_name: proj?.name ?? null,
+              project_status: proj?.status ?? null,
               needs_classification: false,
               category_name: category?.name ?? null,
               category_project_only: category?.project_only ?? false,

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { formatWon, formatDate } from "@/lib/format";
 import { CategoryReportActions } from "@/components/CategoryReportActions";
 import { useEscapeKey } from "@/lib/useEscapeKey";
+import { projectStatusLabel } from "@/lib/projectStatus";
 
 type DetailRow = {
   id: string;
@@ -13,6 +14,7 @@ type DetailRow = {
   trans_date: string | null;
   client_name: string | null;
   project_name: string | null;
+  project_status: string | null;
   item_name: string | null;
   amount: number;
 };
@@ -50,15 +52,34 @@ export function CategoryDetailReport({
   const router = useRouter();
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [statusFilter, setStatusFilter] = useState("");
   useEscapeKey(true, () => router.push(closeHref));
 
   function editHrefFor(id: string) {
     return `/reports?year=${year}&category=${encodeURIComponent(categoryName)}&editTx=${id}`;
   }
 
-  const combined = useMemo(() => [...purchaseRows, ...agencyRows], [purchaseRows, agencyRows]);
-  const purchaseTotal = purchaseRows.reduce((s, r) => s + r.amount, 0);
-  const agencyTotal = agencyRows.reduce((s, r) => s + r.amount, 0);
+  const statusOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([...purchaseRows, ...agencyRows].map((r) => r.project_status).filter((v): v is string => Boolean(v)))
+      ).sort((a, b) => a.localeCompare(b)),
+    [purchaseRows, agencyRows]
+  );
+  const filteredPurchaseRows = useMemo(
+    () => (statusFilter ? purchaseRows.filter((r) => r.project_status === statusFilter) : purchaseRows),
+    [purchaseRows, statusFilter]
+  );
+  const filteredAgencyRows = useMemo(
+    () => (statusFilter ? agencyRows.filter((r) => r.project_status === statusFilter) : agencyRows),
+    [agencyRows, statusFilter]
+  );
+  const combined = useMemo(
+    () => [...filteredPurchaseRows, ...filteredAgencyRows],
+    [filteredPurchaseRows, filteredAgencyRows]
+  );
+  const purchaseTotal = filteredPurchaseRows.reduce((s, r) => s + r.amount, 0);
+  const agencyTotal = filteredAgencyRows.reduce((s, r) => s + r.amount, 0);
   const exportRows = combined.map((r) => [
     r.kind,
     r.trans_date ? formatDate(r.trans_date) : "-",
@@ -105,6 +126,20 @@ export function CategoryDetailReport({
           {categoryName} 총 매입내역 <span className="font-mono text-sm font-normal text-slate-400">{year}년</span>
         </h2>
         <div className="flex items-center gap-3 print:hidden">
+          {statusOptions.length > 0 && (
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="rounded-lg border border-slate-300 px-2 py-1 text-xs focus:border-slate-500 focus:outline-none"
+            >
+              <option value="">프로젝트 상태 전체</option>
+              {statusOptions.map((s) => (
+                <option key={s} value={s}>
+                  {projectStatusLabel(s)}
+                </option>
+              ))}
+            </select>
+          )}
           <CategoryReportActions
             categoryName={categoryName}
             year={year}

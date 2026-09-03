@@ -7,6 +7,7 @@ import { formatWon, formatDate } from "@/lib/format";
 import { VendorReportActions } from "@/components/VendorReportActions";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import { useEscapeKey } from "@/lib/useEscapeKey";
+import { projectStatusLabel } from "@/lib/projectStatus";
 
 type VendorRow = {
   id: string;
@@ -15,6 +16,7 @@ type VendorRow = {
   item_name: string | null;
   amount: number;
   project_name: string | null;
+  project_status: string | null;
   needs_classification: boolean;
   category_name: string | null;
   category_project_only: boolean;
@@ -57,6 +59,7 @@ export function VendorDetailReport({
   const [showCategory, setShowCategory] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [paymentFilter, setPaymentFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   useEscapeKey(true, () => router.push(closeHref));
   const [showItem, setShowItem] = useState(true);
 
@@ -68,10 +71,22 @@ export function VendorDetailReport({
       ),
     [rows]
   );
+  const statusOptions = useMemo(
+    () =>
+      Array.from(new Set(rows.map((r) => r.project_status).filter((v): v is string => Boolean(v)))).sort((a, b) =>
+        a.localeCompare(b)
+      ),
+    [rows]
+  );
 
   const filteredRows = useMemo(
-    () => (paymentFilter ? rows.filter((r) => r.payment_method_name === paymentFilter) : rows),
-    [rows, paymentFilter]
+    () =>
+      rows.filter(
+        (r) =>
+          (!paymentFilter || r.payment_method_name === paymentFilter) &&
+          (!statusFilter || r.project_status === statusFilter)
+      ),
+    [rows, paymentFilter, statusFilter]
   );
   const total = filteredRows.reduce((s, r) => s + r.amount, 0);
 
@@ -164,6 +179,20 @@ export function VendorDetailReport({
               {paymentMethodOptions.map((name) => (
                 <option key={name} value={name}>
                   {name}
+                </option>
+              ))}
+            </select>
+          )}
+          {statusOptions.length > 0 && (
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="rounded-lg border border-slate-300 px-2 py-1 text-xs focus:border-slate-500 focus:outline-none"
+            >
+              <option value="">프로젝트 상태 전체</option>
+              {statusOptions.map((s) => (
+                <option key={s} value={s}>
+                  {projectStatusLabel(s)}
                 </option>
               ))}
             </select>
