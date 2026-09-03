@@ -6,6 +6,7 @@ import { createToolChecklist, updateToolChecklist } from "@/lib/actions/toolChec
 import { Button } from "@/components/ui/Button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { groupToolsBySortOrder, toolGroupLabel } from "@/lib/tools";
 
 type Tool = {
@@ -45,6 +46,7 @@ export function ToolChecklistCreateForm({
 }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const globalPending = useGlobalPending();
   const isEdit = Boolean(checklistId);
   const [title, setTitle] = useState(initialTitle);
   const [projectId, setProjectId] = useState(initialProjectId);
@@ -113,7 +115,7 @@ export function ToolChecklistCreateForm({
         fd.append("quantity", a.quantity.trim() || "1");
       }
     }
-    const result = await (isEdit ? updateToolChecklist(fd) : createToolChecklist(fd));
+    const result = await globalPending.run(() => (isEdit ? updateToolChecklist(fd) : createToolChecklist(fd)));
     setPending(false);
     if (result?.error) {
       setError(result.error);

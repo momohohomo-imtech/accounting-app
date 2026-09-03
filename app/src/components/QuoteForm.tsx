@@ -10,6 +10,7 @@ import { computeConfirmedAmount, isVisibleQuoteItem } from "@/lib/quoteCalc";
 import { Button } from "@/components/ui/Button";
 import { labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 type ClientOption = { id: string; name: string };
 
@@ -58,6 +59,7 @@ export function QuoteForm({
 }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const globalPending = useGlobalPending();
   const [values, setValues] = useState({
     title: initial?.title ?? "",
     client_id: initial?.client_id ?? "",
@@ -225,14 +227,14 @@ export function QuoteForm({
     };
     let targetId = quoteId;
     if (quoteId) {
-      const result = await updateQuote(quoteId, input);
+      const result = await globalPending.run(() => updateQuote(quoteId, input));
       setPending(false);
       if (result?.error) {
         setError(result.error);
         return;
       }
     } else {
-      const result = await createQuote(input);
+      const result = await globalPending.run(() => createQuote(input));
       setPending(false);
       if (result?.error) {
         setError(result.error);

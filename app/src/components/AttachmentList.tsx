@@ -6,6 +6,7 @@ import { uploadAttachment, deleteAttachment } from "@/lib/actions/attachments";
 import { formatFileSize } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { fieldClass } from "@/components/ui/field";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 export type AttachmentItem = {
   id: string;
@@ -29,6 +30,7 @@ function AttachmentRow({ item, onChanged }: { item: AttachmentItem; onChanged: (
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const globalPending = useGlobalPending();
   const isImage = item.mime_type?.startsWith("image/");
 
   async function remove() {
@@ -36,7 +38,7 @@ function AttachmentRow({ item, onChanged }: { item: AttachmentItem; onChanged: (
     setError(null);
     const fd = new FormData();
     fd.append("id", item.id);
-    const result = await deleteAttachment(fd);
+    const result = await globalPending.run(() => deleteAttachment(fd));
     setPending(false);
     if (result?.error) {
       setError(result.error);
@@ -96,13 +98,14 @@ export function AttachmentList({
   title?: string;
 }) {
   const router = useRouter();
+  const globalPending = useGlobalPending();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleUpload(formData: FormData) {
     setPending(true);
     setError(null);
-    const result = await uploadAttachment(formData);
+    const result = await globalPending.run(() => uploadAttachment(formData));
     setPending(false);
     if (result?.error) {
       setError(result.error);

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { TOOL_COLORS } from "@/lib/toolColors";
 
 type Tool = {
@@ -69,6 +70,7 @@ export function ToolEditPopup({
 }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const globalPending = useGlobalPending();
   const [name, setName] = useState(tool.name);
   const [sortOrder, setSortOrder] = useState(String(tool.sort_order));
   const [note, setNote] = useState(tool.note ?? "");
@@ -106,7 +108,7 @@ export function ToolEditPopup({
     fd.append("text_color", textColor ?? "");
     fd.append("background_color", backgroundColor ?? "");
     linkedIds.forEach((id) => fd.append("linked_tool_id", id));
-    const result = await updateTool(fd);
+    const result = await globalPending.run(() => updateTool(fd));
     setSaving(false);
     if (result?.error) {
       setError(result.error);
@@ -120,7 +122,7 @@ export function ToolEditPopup({
     setSaving(true);
     const fd = new FormData();
     fd.append("id", tool.id);
-    const result = await deleteTool(fd);
+    const result = await globalPending.run(() => deleteTool(fd));
     setSaving(false);
     if (result?.error) {
       setError(result.error);

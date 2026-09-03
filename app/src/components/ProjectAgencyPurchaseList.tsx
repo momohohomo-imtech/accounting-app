@@ -7,6 +7,7 @@ import { formatWon } from "@/lib/format";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import { Button } from "@/components/ui/Button";
 import { fieldClass } from "@/components/ui/field";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 type Category = { id: string; name: string; project_only: boolean; color: string | null };
 type AgencyPurchase = {
@@ -78,6 +79,7 @@ function AgencyRow({
   const [clientName, setClientName] = useState(item.client_name ?? "");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const globalPending = useGlobalPending();
 
   async function save() {
     setPending(true);
@@ -89,7 +91,7 @@ function AgencyRow({
     fd.append("category_id", categoryId);
     fd.append("memo", memo);
     fd.append("client_name", clientName);
-    const result = await updateAgencyPurchase(fd);
+    const result = await globalPending.run(() => updateAgencyPurchase(fd));
     setPending(false);
     if (result?.error) {
       setError(result.error);
@@ -104,7 +106,7 @@ function AgencyRow({
     setError(null);
     const fd = new FormData();
     fd.append("id", item.id);
-    const result = await deleteAgencyPurchase(fd);
+    const result = await globalPending.run(() => deleteAgencyPurchase(fd));
     setPending(false);
     if (result?.error) {
       setError(result.error);
@@ -221,6 +223,7 @@ export function ProjectAgencyPurchaseList({
   clientNames: string[];
 }) {
   const router = useRouter();
+  const globalPending = useGlobalPending();
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [pending, setPending] = useState(false);
@@ -262,7 +265,7 @@ export function ProjectAgencyPurchaseList({
   async function handleAdd(formData: FormData) {
     setPending(true);
     setError(null);
-    const result = await addAgencyPurchase(formData);
+    const result = await globalPending.run(() => addAgencyPurchase(formData));
     setPending(false);
     if (result?.error) {
       setError(result.error);

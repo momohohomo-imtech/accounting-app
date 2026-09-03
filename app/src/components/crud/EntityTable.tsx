@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { formatNumber } from "@/lib/format";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 type Row = Record<string, unknown> & { id: string };
 
@@ -66,6 +67,7 @@ export function EntityTable({
   editPopup?: boolean;
 }) {
   const confirm = useConfirm();
+  const pending = useGlobalPending();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -144,7 +146,7 @@ export function EntityTable({
                     const form = e.currentTarget;
                     if (!(await confirm("수정 내용을 저장하시겠습니까?"))) return;
                     try {
-                      const result = await updateAction(new FormData(form));
+                      const result = await pending.run(() => Promise.resolve(updateAction(new FormData(form))));
                       if (result && typeof result === "object" && "error" in result && result.error) {
                         setFormError(String(result.error));
                         return;
@@ -204,16 +206,25 @@ export function EntityTable({
                     수정
                   </Button>
                   {confirmDeleteId === row.id ? (
-                    <form action={deleteAction} className="flex items-center gap-1">
-                      <input type="hidden" name="id" value={row.id} />
+                    <div className="flex items-center gap-1">
                       <span className="text-xs font-medium text-red-600">정말 삭제?</span>
-                      <Button variant="danger" size="xs" type="submit">
+                      <Button
+                        variant="danger"
+                        size="xs"
+                        type="button"
+                        onClick={async () => {
+                          const fd = new FormData();
+                          fd.append("id", row.id);
+                          await pending.run(() => Promise.resolve(deleteAction(fd)));
+                          setConfirmDeleteId(null);
+                        }}
+                      >
                         확인
                       </Button>
                       <Button variant="secondary" size="xs" type="button" onClick={() => setConfirmDeleteId(null)}>
                         취소
                       </Button>
-                    </form>
+                    </div>
                   ) : (
                     <Button variant="danger" size="xs" type="button" onClick={() => setConfirmDeleteId(row.id)}>
                       삭제

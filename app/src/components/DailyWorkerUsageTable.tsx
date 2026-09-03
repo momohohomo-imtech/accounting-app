@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { formatWon, formatDate } from "@/lib/format";
 import { Table, THead, Tr, Td, EmptyRow } from "@/components/ui/Table";
 import { updateTransactionNote } from "@/lib/actions/transactions";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 type UsageRow = { id: string; trans_date: string; client_name: string; amount: number; project_name: string; note: string };
 
@@ -12,6 +13,7 @@ type SortKey = "trans_date" | "client_name" | "amount";
 function NoteCell({ id, initialNote }: { id: string; initialNote: string }) {
   const [value, setValue] = useState(initialNote);
   const [saving, setSaving] = useState(false);
+  const pending = useGlobalPending();
 
   async function handleBlur() {
     if (value === initialNote) return;
@@ -19,7 +21,7 @@ function NoteCell({ id, initialNote }: { id: string; initialNote: string }) {
     const fd = new FormData();
     fd.append("id", id);
     fd.append("note1", value);
-    await updateTransactionNote(fd);
+    await pending.run(() => updateTransactionNote(fd));
     setSaving(false);
   }
 

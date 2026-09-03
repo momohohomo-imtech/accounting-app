@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { resolveSiteColor, autoSiteColorHex } from "@/lib/siteColor";
 import { updateSiteColor } from "@/lib/actions/sites";
 import { Button } from "@/components/ui/Button";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 type SiteWithColor = { id: string; name: string; color: string | null };
 
@@ -13,13 +14,14 @@ function SiteRow({ site }: { site: SiteWithColor }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(resolveSiteColor(site.id, site.color));
   const [pending, setPending] = useState(false);
+  const globalPending = useGlobalPending();
 
   async function save(color: string | null) {
     setPending(true);
     const fd = new FormData();
     fd.append("id", site.id);
     fd.append("color", color ?? "");
-    await updateSiteColor(fd);
+    await globalPending.run(() => updateSiteColor(fd));
     setPending(false);
     setEditing(false);
     router.refresh();

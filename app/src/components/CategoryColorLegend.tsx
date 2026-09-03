@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import { updateExpenseCategoryColor } from "@/lib/actions/expense-categories";
 import { Button } from "@/components/ui/Button";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 type CategoryWithColor = { id: string; name: string; color: string | null; project_only: boolean };
 
@@ -13,13 +14,14 @@ function CategoryRow({ category }: { category: CategoryWithColor }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(resolveCategoryColor(category) ?? "#64748b");
   const [pending, setPending] = useState(false);
+  const globalPending = useGlobalPending();
 
   async function save(color: string | null) {
     setPending(true);
     const fd = new FormData();
     fd.append("id", category.id);
     fd.append("color", color ?? "");
-    await updateExpenseCategoryColor(fd);
+    await globalPending.run(() => updateExpenseCategoryColor(fd));
     setPending(false);
     setEditing(false);
     router.refresh();

@@ -6,6 +6,7 @@ import { EntityForm } from "./EntityForm";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 export function CreatePanel({
   title,
@@ -17,6 +18,7 @@ export function CreatePanel({
   createAction: (formData: FormData) => unknown;
 }) {
   const confirm = useConfirm();
+  const pending = useGlobalPending();
   const [open, setOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -40,7 +42,7 @@ export function CreatePanel({
           const form = e.currentTarget;
           if (!(await confirm(`${title}을(를) 추가하시겠습니까?`))) return;
           try {
-            const result = await createAction(new FormData(form));
+            const result = await pending.run(() => Promise.resolve(createAction(new FormData(form))));
             if (result && typeof result === "object" && "error" in result && result.error) {
               setFormError(String(result.error));
               return;

@@ -15,6 +15,7 @@ import { ModalPortal } from "@/components/ModalPortal";
 import { downloadXlsx } from "@/lib/xlsxExport";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 function formatMonthDay(dateKey: string) {
   const [, m, d] = dateKey.split("-");
@@ -25,13 +26,14 @@ function MemoRow({ entry }: { entry: WorkLogDetailEntry }) {
   const [editing, setEditing] = useState(false);
   const [memo, setMemo] = useState(entry.content ?? "");
   const [saving, setSaving] = useState(false);
+  const pending = useGlobalPending();
 
   async function save() {
     setSaving(true);
     const fd = new FormData();
     fd.append("id", entry.id);
     fd.append("content", memo);
-    await updateWorkLogMemo(fd);
+    await pending.run(() => updateWorkLogMemo(fd));
     setSaving(false);
     setEditing(false);
   }
@@ -88,6 +90,7 @@ export function WorkLogGroupDetailPopup({
 }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const pending = useGlobalPending();
   const [entries, setEntries] = useState<WorkLogDetailEntry[] | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(title);
@@ -123,7 +126,7 @@ export function WorkLogGroupDetailPopup({
     fd.append("old_title", title);
     fd.append("new_title", newTitle);
     fd.append("year", String(year));
-    await renameWorkLogTitle(fd);
+    await pending.run(() => renameWorkLogTitle(fd));
     setRenaming(false);
     router.refresh();
     onClose();

@@ -14,6 +14,7 @@ import { formatWon } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 type ClientOption = { id: string; name: string };
 
@@ -46,6 +47,7 @@ export function PurchaseOrderForm({
 }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const globalPending = useGlobalPending();
   const [values, setValues] = useState({
     title: initial?.title ?? "",
     client_id: initial?.client_id ?? "",
@@ -123,14 +125,14 @@ export function PurchaseOrderForm({
     };
     let targetId = purchaseOrderId;
     if (purchaseOrderId) {
-      const result = await updatePurchaseOrder(purchaseOrderId, input);
+      const result = await globalPending.run(() => updatePurchaseOrder(purchaseOrderId, input));
       setPending(false);
       if (result?.error) {
         setError(result.error);
         return;
       }
     } else {
-      const result = await createPurchaseOrder(input);
+      const result = await globalPending.run(() => createPurchaseOrder(input));
       setPending(false);
       if (result?.error) {
         setError(result.error);

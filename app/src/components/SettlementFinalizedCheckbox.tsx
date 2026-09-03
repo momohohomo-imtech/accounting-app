@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateProjectSettlementFinalized } from "@/lib/actions/projects";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 export function SettlementFinalizedCheckbox({
   projectId,
@@ -14,6 +15,7 @@ export function SettlementFinalizedCheckbox({
   const router = useRouter();
   const [checked, setChecked] = useState(initialChecked);
   const [pending, setPending] = useState(false);
+  const globalPending = useGlobalPending();
 
   async function toggle(next: boolean) {
     setChecked(next);
@@ -21,7 +23,7 @@ export function SettlementFinalizedCheckbox({
     const fd = new FormData();
     fd.set("id", projectId);
     if (next) fd.set("settlement_finalized", "on");
-    await updateProjectSettlementFinalized(fd);
+    await globalPending.run(() => updateProjectSettlementFinalized(fd));
     setPending(false);
     router.refresh();
   }

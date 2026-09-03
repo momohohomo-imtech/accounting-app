@@ -3,15 +3,17 @@
 import { useState, useTransition } from "react";
 import { createManualBackup } from "@/lib/actions/backups";
 import { Button } from "@/components/ui/Button";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 export function BackupNowButton() {
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const pending = useGlobalPending();
 
   function handleClick() {
     setMessage(null);
     startTransition(async () => {
-      const result = await createManualBackup();
+      const result = await pending.run(() => createManualBackup());
       if (result.error) {
         setMessage({ type: "error", text: result.error });
       } else {

@@ -12,6 +12,7 @@ import { WORK_TYPE_OPTIONS } from "@/lib/businessTrip";
 import { getWorkLogsForDate, type WorkLogDateEntry } from "@/lib/actions/worklogs";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { Button } from "@/components/ui/Button";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 function emptyWorker(workDate: string): BusinessTripWorker {
   return { work_date: workDate, name: "", overtime: false, note: "" };
@@ -319,6 +320,7 @@ export function BusinessTripLogForm({
   onSaved: () => void;
   onCancel: () => void;
 }) {
+  const pending = useGlobalPending();
   const today = new Date().toISOString().slice(0, 10);
   const workDate = initial?.work_date ?? defaultWorkDate ?? today;
 
@@ -378,7 +380,7 @@ export function BusinessTripLogForm({
       expenses: p.expenses.filter((e) => e.vendor.trim() || e.amount.trim() || e.note.trim()),
     }));
     fd.append("projects_json", JSON.stringify(cleanedProjects));
-    await action(fd);
+    await pending.run(() => Promise.resolve(action(fd)));
     setSaving(false);
     onSaved();
   }

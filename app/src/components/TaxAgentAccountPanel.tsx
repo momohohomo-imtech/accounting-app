@@ -12,6 +12,7 @@ import {
   type TaxAgentAccount,
 } from "@/lib/actions/tax-agent";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 function formatDateTime(iso: string) {
   const d = new Date(iso);
@@ -21,6 +22,7 @@ function formatDateTime(iso: string) {
 function AccountRow({ account }: { account: TaxAgentAccount }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const globalPending = useGlobalPending();
   const [changingPassword, setChangingPassword] = useState(false);
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
@@ -38,7 +40,7 @@ function AccountRow({ account }: { account: TaxAgentAccount }) {
     const fd = new FormData();
     fd.append("user_id", account.id);
     fd.append("new_password", password);
-    const result = await setTaxAgentPassword(fd);
+    const result = await globalPending.run(() => setTaxAgentPassword(fd));
     setPending(false);
     if (result?.error) {
       setMessage(result.error);
@@ -59,7 +61,9 @@ function AccountRow({ account }: { account: TaxAgentAccount }) {
     const fd = new FormData();
     fd.append("user_id", account.id);
     if (account.suspended && hoursNum > 0) fd.append("hours", String(hoursNum));
-    const result = await (account.suspended ? unsuspendTaxAgentAccount(fd) : suspendTaxAgentAccount(fd));
+    const result = await globalPending.run(() =>
+      account.suspended ? unsuspendTaxAgentAccount(fd) : suspendTaxAgentAccount(fd)
+    );
     setPending(false);
     if (result?.error) {
       setMessage(result.error);

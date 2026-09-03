@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { formatDate } from "@/lib/format";
 
 type Note = { id: string; title: string; content: string | null; memo: string | null; created_at: string };
@@ -24,6 +25,7 @@ function NoteForm({
 }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const globalPending = useGlobalPending();
   const [title, setTitle] = useState(defaultValues?.title ?? "");
   const [content, setContent] = useState(defaultValues?.content ?? "");
   const [memo, setMemo] = useState(defaultValues?.memo ?? "");
@@ -39,7 +41,7 @@ function NoteForm({
     fd.append("title", title);
     fd.append("content", content ?? "");
     fd.append("memo", memo ?? "");
-    const result = await onSubmit(fd);
+    const result = await globalPending.run(() => onSubmit(fd));
     setPending(false);
     if (result && "error" in result && result.error) {
       setError(result.error);
@@ -87,6 +89,7 @@ function KnowHowItem({
 }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const globalPending = useGlobalPending();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [pending, setPending] = useState(false);
@@ -96,7 +99,7 @@ function KnowHowItem({
     setPending(true);
     const fd = new FormData();
     fd.append("id", note.id);
-    await deleteAction(fd);
+    await globalPending.run(() => deleteAction(fd));
     setPending(false);
     router.refresh();
   }

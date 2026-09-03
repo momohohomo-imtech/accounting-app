@@ -7,6 +7,7 @@ import { formatDate } from "@/lib/format";
 import { deleteToolChecklist } from "@/lib/actions/toolChecklists";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 type HistoryRow = {
   id: string;
@@ -22,6 +23,7 @@ type SortKey = "title" | "project_name" | "trip_date" | "item_count" | "created_
 function DeleteButton({ id }: { id: string }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const globalPending = useGlobalPending();
   const [pending, setPending] = useState(false);
 
   async function handleDelete() {
@@ -29,7 +31,7 @@ function DeleteButton({ id }: { id: string }) {
     setPending(true);
     const fd = new FormData();
     fd.append("id", id);
-    await deleteToolChecklist(fd);
+    await globalPending.run(() => deleteToolChecklist(fd));
     setPending(false);
     router.refresh();
   }

@@ -8,6 +8,7 @@ import { AccessListPrintPopup } from "@/components/AccessListPrintPopup";
 import { Button } from "@/components/ui/Button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 type Member = {
   id: string;
@@ -48,6 +49,7 @@ export function AccessListCard({
 }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const globalPending = useGlobalPending();
   const [confirming, setConfirming] = useState(false);
   const [editing, setEditing] = useState(false);
   const [printing, setPrinting] = useState(false);
@@ -86,7 +88,7 @@ export function AccessListCard({
       fd.append("worker_id", m.id);
       fd.append("worker_note", draftNotes[m.id] ?? "");
     });
-    const result = await updateAction(fd);
+    const result = await globalPending.run(() => updateAction(fd));
     setSaving(false);
     if (result?.error) {
       setError(result.error);

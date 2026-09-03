@@ -5,6 +5,7 @@ import { fieldClass, labelClass } from "@/components/ui/field";
 import { formatWon } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 export type EmployeeOption = {
   id: string;
@@ -98,6 +99,7 @@ export function PayrollForm({
   onCancel?: () => void;
 }) {
   const confirm = useConfirm();
+  const pending = useGlobalPending();
   const [employeeId, setEmployeeId] = useState(initial?.employee_id ?? employees[0]?.id ?? "");
   const [values, setValues] = useState<Values>(() =>
     initial ? valuesFromInitial(initial) : defaultsFor(employees[0])
@@ -130,7 +132,7 @@ export function PayrollForm({
         e.preventDefault();
         const form = e.currentTarget;
         if (!(await confirm(initial ? "수정 내용을 저장하시겠습니까?" : "이 급여를 등록하시겠습니까?"))) return;
-        await action(new FormData(form));
+        await pending.run(() => Promise.resolve(action(new FormData(form))));
       }}
       className="space-y-3"
     >

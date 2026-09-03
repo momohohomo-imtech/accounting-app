@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { cx } from "@/lib/cx";
 import { formatDate } from "@/lib/format";
 import type { ReportAiInsight, ReportAiInsightMessage } from "@/lib/types";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 type ChatMessage = ReportAiInsightMessage;
 
@@ -21,6 +22,7 @@ export function ReportAIInsights({
   deleteAction: (formData: FormData) => Promise<void>;
 }) {
   const router = useRouter();
+  const pending = useGlobalPending();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -62,7 +64,7 @@ export function ReportAIInsights({
       fd.append("year", String(summary.year));
       fd.append("title", messages[0].text.slice(0, 60));
       fd.append("messages", JSON.stringify(messages));
-      await saveAction(fd);
+      await pending.run(() => saveAction(fd));
       router.refresh();
     } finally {
       setSaving(false);
@@ -72,7 +74,7 @@ export function ReportAIInsights({
   async function handleDelete(id: string) {
     const fd = new FormData();
     fd.append("id", id);
-    await deleteAction(fd);
+    await pending.run(() => deleteAction(fd));
     setConfirmDeleteId(null);
     router.refresh();
   }

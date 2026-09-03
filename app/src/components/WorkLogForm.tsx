@@ -6,6 +6,7 @@ import { saveDayWorkLogs } from "@/lib/actions/worklogs";
 import { WorkLogRowInput, type WorkLogProjectOption } from "@/components/WorkLogRowInput";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 type Row = { title: string | null; site_id: string | null; project_id: string | null } | null;
 type SiteOption = { id: string; name: string; color: string | null };
@@ -25,6 +26,7 @@ export function WorkLogForm({
 }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const globalPending = useGlobalPending();
   const [pending, setPending] = useState(false);
   const contentListId = "worklog-content-suggestions";
   const logYear = Number(dateKey.slice(0, 4));
@@ -36,7 +38,7 @@ export function WorkLogForm({
         const form = e.currentTarget;
         if (!(await confirm("저장하시겠습니까?"))) return;
         setPending(true);
-        const { redirectTo } = await saveDayWorkLogs(new FormData(form));
+        const { redirectTo } = await globalPending.run(() => saveDayWorkLogs(new FormData(form)));
         router.push(redirectTo);
       }}
       className="space-y-4"

@@ -7,6 +7,7 @@ import { cx } from "@/lib/cx";
 import { Button } from "@/components/ui/Button";
 import { bulkImportPayroll } from "@/lib/actions/employees";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 type EmployeeRef = { id: string; employee_no: string | null; name: string };
 
@@ -58,6 +59,7 @@ function netOf(r: EditableRow) {
 export function PayrollImport({ employees }: { employees: EmployeeRef[] }) {
   const [payMonth, setPayMonth] = useState("");
   const confirm = useConfirm();
+  const pending = useGlobalPending();
   const [rows, setRows] = useState<EditableRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -111,21 +113,23 @@ export function PayrollImport({ employees }: { employees: EmployeeRef[] }) {
     setSaving(true);
     setError(null);
     try {
-      await bulkImportPayroll(
-        rows.map((r) => ({
-          employee_id: r.employeeId,
-          pay_month: payMonth,
-          amount: r.amount,
-          bonus: r.bonus,
-          national_pension: r.national_pension,
-          health_insurance: r.health_insurance,
-          long_term_care_insurance: r.long_term_care_insurance,
-          employment_insurance: r.employment_insurance,
-          employment_insurance_refund: r.employment_insurance_refund,
-          income_tax: r.income_tax,
-          local_income_tax: r.local_income_tax,
-          rural_tax: r.rural_tax,
-        }))
+      await pending.run(() =>
+        bulkImportPayroll(
+          rows.map((r) => ({
+            employee_id: r.employeeId,
+            pay_month: payMonth,
+            amount: r.amount,
+            bonus: r.bonus,
+            national_pension: r.national_pension,
+            health_insurance: r.health_insurance,
+            long_term_care_insurance: r.long_term_care_insurance,
+            employment_insurance: r.employment_insurance,
+            employment_insurance_refund: r.employment_insurance_refund,
+            income_tax: r.income_tax,
+            local_income_tax: r.local_income_tax,
+            rural_tax: r.rural_tax,
+          }))
+        )
       );
       setRows(null);
       setPayMonth("");

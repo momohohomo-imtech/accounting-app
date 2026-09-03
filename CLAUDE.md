@@ -20,4 +20,19 @@
   `QuotesTable`, `PurchaseOrdersTable`, `UnassignedWorkLogTable`)에
   이 패턴이 적용돼 있음 — 새 표를 추가할 때 이 목록도 같이 업데이트할 것.
 
+- **저장/수정/삭제 등 서버 액션을 호출하는 폼·팝업은 항상 화면 전체를
+  잠그는 처리 중 표시를 띄울 것.** 새로 만들거나 수정하는 폼/팝업도 예외
+  없이 적용. 저장 중에 다른 곳을 눌러 페이지를 이동하거나 중복 요청을
+  보내는 것 때문에 화면이 멈춘 것처럼 보이는 문제가 있었음 — 이를 막기
+  위한 조치. `app/src/components/GlobalPendingProvider.tsx`의
+  `useGlobalPending().run(...)`로 실제 create/update/delete 서버 액션
+  호출부만 감싸면 됨(미리보기·조회·OCR·AI 생성처럼 자체 로딩 상태가 있는
+  부수적인 호출은 감싸지 않음):
+  ```ts
+  const pending = useGlobalPending();
+  await pending.run(() => someAsyncServerActionCall(...));
+  ```
+  `app/src/components/crud/EntityTable.tsx`와
+  `app/src/components/crud/CreatePanel.tsx`가 정석 예시.
+
 프로젝트 진행 상황·이력은 저장소 루트의 `HANDOFF.md`를 참고할 것.

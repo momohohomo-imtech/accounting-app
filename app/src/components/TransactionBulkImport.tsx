@@ -7,6 +7,7 @@ import { cx } from "@/lib/cx";
 import { Button } from "@/components/ui/Button";
 import { bulkImportTransactions, type BulkTransactionInput } from "@/lib/actions/transactions";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 type Option = { id: string; name: string };
 
@@ -46,6 +47,7 @@ export function TransactionBulkImport({
   expenseCategories: Option[];
 }) {
   const confirm = useConfirm();
+  const pending = useGlobalPending();
   const [rows, setRows] = useState<EditableRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -118,7 +120,7 @@ export function TransactionBulkImport({
     setError(null);
     try {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars -- client_name_display is UI-only, strip it before sending
-      const result = await bulkImportTransactions(rows.map(({ client_name_display, ...r }) => r));
+      const result = await pending.run(() => bulkImportTransactions(rows.map(({ client_name_display, ...r }) => r)));
       if (result?.error) {
         setError(result.error);
         return;

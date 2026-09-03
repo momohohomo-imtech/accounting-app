@@ -10,6 +10,7 @@ import { VAT_EXEMPT_CATEGORIES } from "@/lib/vatExempt";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 type Option = { id: string; name: string };
 type ClientOption = Option & { default_item_name?: string | null; default_category_id?: string | null };
@@ -71,6 +72,7 @@ export function TransactionForm({
 }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const pending = useGlobalPending();
   const clientNameSuggestions = Array.from(new Set([...clients.map((c) => c.name), ...rawClientNames])).sort((a, b) =>
     a.localeCompare(b, "ko")
   );
@@ -377,7 +379,7 @@ export function TransactionForm({
       fd.append("amount", li.subtotal);
       fd.append("is_verified_ai", "on");
       fd.append("ocr_extracted_raw", ocrExtracted ? JSON.stringify(ocrExtracted) : "");
-      return action(fd);
+      return pending.run(() => action(fd));
     }
 
     if (validItems.length === 1) {
@@ -388,7 +390,7 @@ export function TransactionForm({
       }
     } else if (!initial) {
       // 신규 등록, 여러 줄 → 전부 새 거래로 일괄 등록.
-      const result = await bulkImportTransactions(validItems.map(buildRow));
+      const result = await pending.run(() => bulkImportTransactions(validItems.map(buildRow)));
       if (result?.error) {
         setError(result.error);
         return;
@@ -403,7 +405,7 @@ export function TransactionForm({
         return;
       }
       if (rest.length > 0) {
-        const bulkResult = await bulkImportTransactions(rest.map(buildRow));
+        const bulkResult = await pending.run(() => bulkImportTransactions(rest.map(buildRow)));
         if (bulkResult?.error) {
           setError(bulkResult.error);
           return;
