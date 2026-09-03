@@ -229,8 +229,8 @@ export function ToolChecklistCreateForm({
                       value={toolNames[t.id] ?? t.name}
                       onChange={(e) => setToolNames((prev) => ({ ...prev, [t.id]: e.target.value }))}
                       title="이 명세서에서만 표시될 이름 — 공구 마스터의 이름은 바뀌지 않음"
-                      className="min-w-0 flex-1 truncate border-none bg-transparent p-0 text-sm focus:outline-none"
-                      style={{ color: t.text_color ?? undefined }}
+                      className="min-w-0 flex-1 truncate border-none p-0 text-sm focus:outline-none"
+                      style={{ backgroundColor: "transparent", color: t.text_color ?? undefined }}
                     />
                     <input
                       type="text"
