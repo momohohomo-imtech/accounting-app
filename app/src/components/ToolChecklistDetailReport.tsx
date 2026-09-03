@@ -70,17 +70,19 @@ export function ToolChecklistDetailReport({
     <div ref={printRef} className="space-y-4 print:space-y-1">
       {/* 양식 모드에서는 이 표제부가 인쇄에 안 나오게 함 — 아래 AccessPassPermitTable이
           자체 제목을 갖고 있어서 같이 나오면 중복됨. */}
-      <div className={`flex flex-wrap items-center justify-between gap-2 print:mb-1 ${formMode ? "print:hidden" : ""}`}>
+      <div className={`flex flex-wrap items-center justify-between gap-2 print:mb-0.5 ${formMode ? "print:hidden" : ""}`}>
         <div>
-          <h2 className="text-lg font-semibold text-slate-900 print:text-sm">
+          {/* 인쇄 시 제목/조공 인원을 작은 머리글처럼 위쪽에 작게만 붙임 — 본문(품목
+              그리드)이 쓸 수 있는 세로 공간을 최대한 남겨두기 위함. */}
+          <h2 className="text-lg font-semibold text-slate-900 print:text-[9px] print:font-medium print:text-slate-500">
             {title}
-            {helperCount != null && <span className="ml-2 text-lg font-semibold text-slate-900 print:text-sm">조공 {helperCount}</span>}
+            {helperCount != null && <span className="ml-2 text-lg font-semibold text-slate-900 print:ml-1.5 print:text-[9px] print:font-medium print:text-slate-500">조공 {helperCount}</span>}
             {formMode && <span className="ml-2 text-sm font-normal text-slate-500 print:text-xs">(반입반출확인증 양식)</span>}
             {!formMode && accessPassOnly && (
               <span className="ml-2 text-sm font-normal text-slate-500 print:text-xs">(반입반출증용만)</span>
             )}
           </h2>
-          {!formMode && <p className="text-xs text-slate-500 print:text-[9px]">{metaLine}</p>}
+          {!formMode && <p className="text-xs text-slate-500 print:text-[8px]">{metaLine}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-3 print:hidden">
           {hasAccessPassItems && !formMode && (
@@ -133,17 +135,17 @@ export function ToolChecklistDetailReport({
               여유 있게 잡음 — 실제 품목이 더 많아 넘치면 usePrintFitToPage가 알아서
               1장에 맞게 축소하므로, 적을 때 빈 공간이 남는 문제와 많을 때 넘치는
               문제를 동시에 해결함. */}
-          <div className="space-y-4 print:space-y-3">
+          <div className="space-y-4 print:space-y-1">
             {visibleGroups.map((g) => (
               <div key={g.label} className="print:break-inside-avoid">
-                <p className="mb-1.5 text-xs font-semibold text-slate-500 print:mb-1 print:text-[17px]">{g.label}</p>
-                <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 print:grid-cols-4 print:gap-x-[42px] print:gap-y-2.5">
+                <p className="mb-1.5 text-xs font-semibold text-slate-500 print:mb-0.5 print:text-[15px]">{g.label}</p>
+                <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 print:grid-cols-5 print:gap-x-[50px] print:gap-y-0.5">
                   {g.items.map((it) => {
                     const filled = it.quantity.trim() !== "";
                     return (
                       <li
                         key={it.id}
-                        className={`flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 print:gap-2 print:rounded-none print:border-0 print:border-b print:border-slate-200 print:px-0 print:py-2.5 print:text-[19px] ${filled ? "" : "print:opacity-50"}`}
+                        className={`flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 print:gap-2 print:rounded-none print:border-0 print:border-b print:border-slate-200 print:px-0 print:py-0.5 print:text-[21px] ${filled ? "" : "print:opacity-50"}`}
                       >
                         <span className="truncate print:text-slate-900">☐ {it.tool_name}</span>
                         <span
