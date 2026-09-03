@@ -214,9 +214,9 @@ export async function downloadAccessPassFormXlsx(
     cell.alignment = { horizontal: "center", vertical: "middle" };
   }
 
-  // 글씨를 1.5배로 키운 만큼 줄 수를 줄임(AccessPassPermitTable과 동일 이유) — 실제
-  // 품목이 더 많으면 Math.max로 자동으로 늘어남.
-  const ROW_COUNT = 18;
+  // 작성 줄 수 30개 고정(실제 품목이 더 많으면 Math.max로 자동으로 늘어남) —
+  // 워크시트의 fitToPage 설정이 1페이지에 맞게 알아서 축소해줌.
+  const ROW_COUNT = 30;
   const rowCount = Math.max(ROW_COUNT, items.length);
   for (let i = 0; i < rowCount; i++) {
     const r = 5 + i;

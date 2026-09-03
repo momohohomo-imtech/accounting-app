@@ -7,11 +7,10 @@ import { formatPermitQuantity } from "@/lib/koreanNumber";
 // 채운다.
 const THIN = "1px solid #000";
 const MEDIUM = "2px solid #000";
-// 전체 글씨를 1.5배로 키운 만큼(아래 fontSize들 참고), 원본 31줄을 그대로 두면
-// 한 줄당 높이도 같이 커져서 1페이지 기준 줄 수가 줄어듦 — usePrintFitToPage가
-// 넘치면 축소해주긴 하지만, 그러면 커진 글씨가 다시 작아지므로 여기서 줄 수를
-// 페이지에 맞게 미리 줄여둠(실제 품목이 더 많으면 자동으로 늘어남).
-const ROW_COUNT = 18;
+// 작성 줄 수 30개 고정(실제 품목이 더 많으면 자동으로 늘어남) — 이 줄 수 기준으로
+// 인쇄 시 usePrintFitToPage가 1페이지에 꽉 차는 한도 내에서 최대 크기로 자동
+// 축소·확정해줌.
+const ROW_COUNT = 30;
 const ROW_HEIGHT = 36;
 
 export type PermitItem = { tool_name: string; quantity: string };
