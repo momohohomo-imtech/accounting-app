@@ -14,9 +14,6 @@ import { AccessPassPermitTable } from "@/components/AccessPassPermitTable";
 type GroupItem = { id: string; tool_name: string; quantity: string; for_access_pass: boolean };
 type Group = { label: string; items: GroupItem[] };
 
-// 인쇄물에 현장에서 손으로 바로 적어 넣을 수 있는 빈 줄을 항상 12개 고정으로 둠.
-const BLANK_ADHOC_SLOTS = Array.from({ length: 12 }, (_, i) => i);
-
 export function ToolChecklistDetailReport({
   title,
   helperCount,
@@ -164,21 +161,6 @@ export function ToolChecklistDetailReport({
               <p className="py-6 text-center text-slate-400">
                 {accessPassOnly ? "반입반출증용으로 표시된 품목이 없습니다." : "등록된 품목이 없습니다."}
               </p>
-            )}
-            {!accessPassOnly && (
-              <div className="print:break-inside-avoid">
-                <p className="mb-1.5 text-xs font-semibold text-slate-500 print:mb-1 print:text-[14px]">임의 추가</p>
-                <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 print:grid-cols-3 print:gap-x-[45px] print:gap-y-2">
-                  {BLANK_ADHOC_SLOTS.map((i) => (
-                    <li
-                      key={i}
-                      className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-400 print:gap-2 print:rounded-none print:border-0 print:border-b print:border-slate-200 print:px-0 print:py-2 print:text-[15px]"
-                    >
-                      <span>☐</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
             )}
           </div>
 
