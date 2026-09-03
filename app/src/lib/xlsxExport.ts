@@ -179,7 +179,7 @@ export async function downloadAccessPassFormXlsx(
     const res = await fetch("/kia-logo.png");
     const buffer = await res.arrayBuffer();
     const imageId = wb.addImage({ buffer, extension: "png" });
-    ws.addImage(imageId, { tl: { col: 0.15, row: 0.05 }, ext: { width: 180, height: 118 } });
+    ws.addImage(imageId, { tl: { col: 0.15, row: 0.05 }, ext: { width: 162, height: 106 } });
   } catch {
     // 로고 이미지를 못 불러와도 나머지 양식은 그대로 다운로드되게 둠.
   }

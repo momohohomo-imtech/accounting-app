@@ -43,7 +43,7 @@ export function AccessPassPermitTable({ items }: { items: PermitItem[] }) {
         <tr style={{ height: 36 }}>
           <td rowSpan={2} style={{ textAlign: "center", verticalAlign: "middle" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/kia-logo.png" alt="KIA" style={{ width: 132, height: "auto", margin: "0 auto" }} />
+            <img src="/kia-logo.png" alt="KIA" style={{ width: 119, height: "auto", margin: "0 auto" }} />
           </td>
           <td style={{ verticalAlign: "middle", fontSize: 15 }}>KIA MOTORS</td>
           <td
