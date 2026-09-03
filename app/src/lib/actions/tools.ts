@@ -47,8 +47,12 @@ export async function updateTool(formData: FormData) {
   const values = parse(formData);
   if (!id || !values.name) return { error: "공구명을 입력해주세요." };
 
-  const { error } = await supabase.from("tools").update(values).eq("id", id);
+  // update()만 쓰면 조건에 맞는 행이 0개여도 에러 없이 "성공"으로 끝나서, 저장이
+  // 조용히 안 먹힌 것처럼 보일 수 있었음(권한 문제 등으로 실제로는 0행 수정) —
+  // select()로 실제 수정된 행을 받아서 없으면 에러로 알려줌.
+  const { data, error } = await supabase.from("tools").update(values).eq("id", id).select("id");
   if (error) return { error: error.message };
+  if (!data || data.length === 0) return { error: "수정 대상을 찾을 수 없거나 권한이 없습니다." };
 
   revalidatePath("/quality-construction");
 }
