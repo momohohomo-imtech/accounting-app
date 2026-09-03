@@ -8,7 +8,7 @@ export type FieldConfig = {
   type?: "text" | "textarea" | "date" | "tel" | "number" | "select" | "checkbox" | "time" | "project-search";
   required?: boolean;
   /** `color` on an option renders that option's text in that color in the table view. */
-  options?: { value: string; label: string; color?: "red" | "blue" }[];
+  options?: { value: string; label: string; color?: "red" | "blue" | "green" }[];
   /** Options for type "project-search", grouped/filterable by year + site. */
   projectSearchOptions?: ProjectSearchOption[];
   step?: string;
@@ -31,4 +31,6 @@ export type FieldConfig = {
   redValue?: string;
   /** For type "checkbox": checking this field unchecks the named sibling checkbox field in the form (mutual exclusivity). */
   exclusiveWith?: string;
+  /** When this field's value is not equal to this string, render the whole row with a light red background (table view only). */
+  rowBackgroundUnless?: string;
 };

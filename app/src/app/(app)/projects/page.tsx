@@ -11,7 +11,7 @@ import { PurchaseOrdersSection } from "@/components/sections/PurchaseOrdersSecti
 import { YearFilter } from "@/components/YearFilter";
 import { ProjectProfitReport } from "@/components/ProjectProfitReport";
 import { LinkButton } from "@/components/ui/Button";
-import { PROJECT_STATUS_OPTIONS } from "@/lib/projectStatus";
+import { PROJECT_STATUS_OPTIONS, PROJECT_STATUS_COLLECTED } from "@/lib/projectStatus";
 import { formatWon } from "@/lib/format";
 import { ProjectListExportButtons } from "@/components/ProjectListExportButtons";
 
@@ -144,6 +144,7 @@ async function ProjectListSection({
       type: "select",
       options: PROJECT_STATUS_OPTIONS,
       width: "6%",
+      rowBackgroundUnless: PROJECT_STATUS_COLLECTED,
     },
     { name: "is_service", label: "서비스(무상) 작업", tableLabel: "무상", type: "checkbox", width: "5%" },
     { name: "start_date", label: "시작일", type: "date", hideInTable: true },

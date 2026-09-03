@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { FieldConfig } from "./types";
 import { EntityForm } from "./EntityForm";
 import { Table, THead, Tr, Td } from "@/components/ui/Table";
@@ -34,8 +34,19 @@ function cellColorClass(row: Row, f: FieldConfig): string | undefined {
     const color = f.options?.find((o) => o.value === row[f.name])?.color;
     if (color === "red") return "text-red-600";
     if (color === "blue") return "text-blue-600";
+    if (color === "green") return "text-green-600";
   }
   return undefined;
+}
+
+function rowBgClass(row: Row, fields: FieldConfig[]): string | undefined {
+  const f = fields.find((f) => f.rowBackgroundUnless !== undefined);
+  if (f && row[f.name] !== f.rowBackgroundUnless) return "bg-red-50";
+  return undefined;
+}
+
+function tableStorageKey(fields: FieldConfig[]) {
+  return `entityTableColWidths:${fields.map((f) => f.name).join(",")}`;
 }
 
 function ProgressCell({ value }: { value: number }) {
@@ -78,6 +89,58 @@ export function EntityTable({
   const hasWidths = visibleFields.some((f) => f.width);
   const sortField = fields.find((f) => f.name === sortKey);
 
+  // 폭이 지정된(hasWidths) 표에 한해 헤더 오른쪽 끝을 드래그해서 열 너비를 직접
+  // 조절할 수 있게 함 — 조절한 값은 표 구성(필드명 목록)별로 로컬에 저장해서
+  // 다음 방문에도 유지됨.
+  const storageKey = useMemo(() => tableStorageKey(visibleFields), [visibleFields]);
+  const [colWidths, setColWidths] = useState<Record<string, number>>({});
+  const thRefs = useRef<Record<string, HTMLTableCellElement | null>>({});
+  const resizingRef = useRef<{ name: string; startX: number; startWidth: number } | null>(null);
+
+  useEffect(() => {
+    if (!hasWidths) return;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 후 localStorage에서 저장된 폭을 1회 불러옴(SSR 시엔 값이 없어 하이드레이션 불일치 없음)
+      if (raw) setColWidths(JSON.parse(raw));
+    } catch {
+      // 저장된 값이 없거나 손상된 경우 기본 폭을 그대로 씀.
+    }
+  }, [storageKey, hasWidths]);
+
+  function startResize(e: React.MouseEvent, name: string) {
+    e.preventDefault();
+    const startWidth = thRefs.current[name]?.offsetWidth ?? 100;
+    resizingRef.current = { name, startX: e.clientX, startWidth };
+
+    function onMove(ev: MouseEvent) {
+      const r = resizingRef.current;
+      if (!r) return;
+      const next = Math.max(48, r.startWidth + (ev.clientX - r.startX));
+      setColWidths((prev) => ({ ...prev, [r.name]: next }));
+    }
+    function onUp() {
+      resizingRef.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      setColWidths((prev) => {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(prev));
+        } catch {
+          // 로컬 저장에 실패해도 화면상의 조절 결과는 그대로 유지됨.
+        }
+        return prev;
+      });
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
+  function colStyle(f: FieldConfig) {
+    const px = colWidths[f.name];
+    return px ? { width: `${px}px` } : f.width ? { width: f.width } : undefined;
+  }
+
   function handleSort(name: string) {
     if (name === sortKey) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -118,8 +181,11 @@ export function EntityTable({
         {visibleFields.map((f) => (
           <th
             key={f.name}
-            style={f.width ? { width: f.width } : undefined}
-            className="whitespace-nowrap pb-2 pr-4 font-medium"
+            ref={(el) => {
+              thRefs.current[f.name] = el;
+            }}
+            style={colStyle(f)}
+            className="relative whitespace-nowrap pb-2 pr-4 font-medium"
           >
             <button
               type="button"
@@ -129,6 +195,13 @@ export function EntityTable({
               {f.tableLabel ?? f.label}
               {sortKey === f.name && <span className="text-[10px]">{sortDir === "asc" ? "▲" : "▼"}</span>}
             </button>
+            {hasWidths && f.width && (
+              <span
+                onMouseDown={(e) => startResize(e, f.name)}
+                className="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none hover:bg-slate-300 print:hidden"
+                title="드래그하여 폭 조절"
+              />
+            )}
           </th>
         ))}
         <th className="pb-2 text-right font-medium print:hidden" style={hasWidths ? { width: "8%" } : undefined}>
@@ -182,11 +255,11 @@ export function EntityTable({
               </td>
             </Tr>
           ) : (
-            <Tr key={row.id}>
+            <Tr key={row.id} className={rowBgClass(row, fields)}>
               {visibleFields.map((f) => (
                 <Td
                   key={f.name}
-                  style={f.width ? { width: f.width } : undefined}
+                  style={colStyle(f)}
                   title={f.display === "progress" ? undefined : displayValue(row, f)}
                   className="max-w-[220px] truncate pr-4 print:whitespace-normal print:overflow-visible"
                 >
