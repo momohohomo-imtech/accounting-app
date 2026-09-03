@@ -104,7 +104,7 @@ export function ToolChecklistDetailReport({
                     key={it.id}
                     className={`flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 print:gap-2 print:rounded-none print:border-0 print:border-b print:border-slate-200 print:px-0 print:py-0.5 print:text-[9px] ${filled ? "" : "print:opacity-50"}`}
                   >
-                    <span className="truncate print:text-slate-900">☑ {it.tool_name}</span>
+                    <span className="truncate print:text-slate-900">☐ {it.tool_name}</span>
                     <span
                       className={`shrink-0 font-mono font-semibold print:text-slate-900 ${filled ? "text-slate-900" : "text-slate-400"}`}
                     >
