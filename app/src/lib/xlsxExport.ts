@@ -109,6 +109,192 @@ export async function downloadToolChecklistXlsx(
   triggerDownload(await wb.xlsx.writeBuffer(), filename);
 }
 
+// 원청(기아 화성공장)이 요구하는 "반입/반출 확인증" 양식을 셀 단위로 그대로 재현.
+// 사용자가 제공한 원본 엑셀(화성 공구 명세서.xlsx)의 셀 값·병합·테두리·문구를 그대로
+// 옮긴 것 — 서명/인장이 필요한 칸은 원본처럼 빈칸으로 두고, 품명·수량 칸만 채운다.
+function boxBorder(ws: ExcelJS.Worksheet, range: string, style: "thin" | "medium") {
+  const border: ExcelJS.Border = { style, color: { argb: "FF000000" } };
+  const [startRef, endRef] = range.split(":");
+  const start = ws.getCell(startRef).fullAddress;
+  const end = ws.getCell(endRef ?? startRef).fullAddress;
+  for (let r = start.row; r <= end.row; r++) {
+    for (let c = start.col; c <= end.col; c++) {
+      const cell = ws.getCell(r, c);
+      const next = { ...cell.border } as ExcelJS.Borders;
+      if (r === start.row) next.top = border;
+      if (r === end.row) next.bottom = border;
+      if (c === start.col) next.left = border;
+      if (c === end.col) next.right = border;
+      cell.border = next;
+    }
+  }
+}
+
+export async function downloadAccessPassFormXlsx(
+  filename: string,
+  items: { tool_name: string; quantity: string }[]
+) {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("반입반출확인증");
+  const FONT = "맑은 고딕";
+  ws.properties.defaultRowHeight = 16.5;
+
+  ws.pageSetup = {
+    paperSize: 9, // A4
+    orientation: "portrait",
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 1,
+    margins: { left: 0.7, right: 0.7, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 },
+  };
+
+  ws.columns = [
+    { width: 8.43 },
+    { width: 16 },
+    { width: 8.43 },
+    { width: 8.43 },
+    { width: 16 },
+    { width: 8.43 },
+    { width: 8.43 },
+  ];
+  ws.getRow(1).height = 16.5;
+  ws.getRow(2).height = 17.25;
+  ws.getRow(3).height = 17.25;
+
+  ws.mergeCells("C1:G2");
+  ws.getCell("B1").value = "KIA MOTORS";
+  ws.getCell("B1").font = { name: FONT, size: 11 };
+  ws.getCell("B1").alignment = { vertical: "middle" };
+  ws.getCell("B2").value = "HAWSUNG PLANT";
+  ws.getCell("B2").font = { name: FONT, size: 11 };
+  ws.getCell("B2").alignment = { vertical: "middle" };
+  const titleCell = ws.getCell("C1");
+  titleCell.value = "반입 /반출 확인증(부품,공구,기타)";
+  titleCell.font = { name: FONT, size: 16, bold: true };
+  titleCell.alignment = { horizontal: "center", vertical: "middle" };
+  titleCell.border = { bottom: { style: "medium", color: { argb: "FF000000" } } };
+
+  try {
+    const res = await fetch("/kia-logo.png");
+    const buffer = await res.arrayBuffer();
+    const imageId = wb.addImage({ buffer, extension: "png" });
+    ws.addImage(imageId, { tl: { col: 0.15, row: 0.05 }, ext: { width: 60, height: 39 } });
+  } catch {
+    // 로고 이미지를 못 불러와도 나머지 양식은 그대로 다운로드되게 둠.
+  }
+
+  const infoRow: [string, string][] = [
+    ["A3:B3", "반입자 : "],
+    ["C3:E3", " 전화번호 : "],
+    ["F3:G3", "반입 목적: "],
+  ];
+  for (const [range, text] of infoRow) {
+    ws.mergeCells(range);
+    const cell = ws.getCell(range.split(":")[0]);
+    cell.value = text;
+    cell.font = { name: FONT, size: 11 };
+    cell.alignment = { horizontal: "left", vertical: "middle" };
+    boxBorder(ws, range, "medium");
+  }
+
+  const headers: [string, string][] = [
+    ["A4", "차종"],
+    ["B4", "품명"],
+    ["C4:D4", "수량"],
+    ["E4", "단위"],
+    ["F4", "부품상태"],
+    ["G4", "반출수량"],
+  ];
+  for (const [range, text] of headers) {
+    if (range.includes(":")) ws.mergeCells(range);
+    const cell = ws.getCell(range.split(":")[0]);
+    cell.value = text;
+    cell.font = { name: FONT, size: 11 };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+  }
+
+  const ROW_COUNT = 31; // 원본 서식의 품목 기재란 줄 수
+  const rowCount = Math.max(ROW_COUNT, items.length);
+  for (let i = 0; i < rowCount; i++) {
+    const r = 5 + i;
+    const item = items[i];
+    ws.mergeCells(`C${r}:D${r}`);
+    const nameCell = ws.getCell(`B${r}`);
+    nameCell.value = item?.tool_name ?? "";
+    nameCell.font = { name: FONT, size: 11 };
+    const qtyCell = ws.getCell(`C${r}`);
+    qtyCell.value = item?.quantity ?? "";
+    qtyCell.font = { name: FONT, size: 11 };
+    qtyCell.alignment = { horizontal: "center" };
+    for (let c = 1; c <= 7; c++) ws.getCell(r, c).font = { name: FONT, size: 11 };
+  }
+  // 표 안쪽 가로줄(행 사이)과 세로줄(열 사이), 바깥 굵은 테두리.
+  for (let r = 5; r <= 4 + rowCount; r++) {
+    for (let c = 1; c <= 7; c++) {
+      const cell = ws.getCell(r, c);
+      cell.border = { ...cell.border, top: { style: "thin", color: { argb: "FF000000" } } };
+    }
+  }
+  for (let r = 4; r <= 4 + rowCount; r++) {
+    for (const c of [1, 2, 4, 5, 6]) {
+      const cell = ws.getCell(r, c);
+      cell.border = { ...cell.border, right: { style: "thin", color: { argb: "FF000000" } } };
+    }
+  }
+  boxBorder(ws, `A4:G${4 + rowCount}`, "medium");
+
+  const noteRow = 5 + rowCount;
+  ws.mergeCells(`A${noteRow}:G${noteRow}`);
+  const noteCell = ws.getCell(`A${noteRow}`);
+  noteCell.value = "#이 반입증은 부서{팀} 확인자 서명및 출문승인 (통제부서) 통제틸후 출문 가능함.";
+  noteCell.font = { name: FONT, size: 11, bold: true };
+  noteCell.alignment = { horizontal: "center", vertical: "middle" };
+
+  const r1 = noteRow + 1; // "상기물품이 화성공장으로 반입됨을 확인함"
+  const r2 = r1 + 1; // 월/일
+  const r3 = r2 + 1; // 경비실 확인자
+  const r4 = r3 + 1; // "상기물품은 화성공장 물품이아님을 확인함"
+  const r5 = r4 + 1; // 월/일
+  const r6 = r5 + 1; // 부서(팀)명
+  const r7 = r6 + 1; // 부서(팀) 확인자
+
+  ws.getCell(`A${r1}`).value = "상기물품이 화성공장으로 반입됨을 확인함";
+  ws.getCell(`C${r2}`).value = "월";
+  ws.getCell(`D${r2}`).value = "일";
+  ws.mergeCells(`A${r3}:D${r3}`);
+  ws.getCell(`A${r3}`).value = "경비실 확인자:                                (서명)";
+  ws.getCell(`A${r4}`).value = "상기물품은 화성공장 물품이아님을 확인함";
+  ws.getCell(`C${r5}`).value = "월";
+  ws.getCell(`D${r5}`).value = "일";
+  ws.mergeCells(`A${r6}:D${r6}`);
+  ws.getCell(`A${r6}`).value = "부서(팀)명:                            ";
+  ws.mergeCells(`A${r7}:D${r7}`);
+  ws.getCell(`A${r7}`).value = "부서(팀) 확인자:                              (인)";
+
+  ws.mergeCells(`E${r1}:E${r7}`);
+  ws.getCell(`E${r1}`).value = "반입확인(경비실)";
+  ws.mergeCells(`F${r1}:G${r1}`);
+  ws.getCell(`F${r1}`).value = "출문승인(통제부서)";
+  ws.mergeCells(`F${r2}:G${r7}`);
+
+  for (let r = r1; r <= r7; r++) {
+    for (let c = 1; c <= 7; c++) {
+      const cell = ws.getCell(r, c);
+      cell.font = { name: FONT, size: 11 };
+      if (c === 1) cell.alignment = { horizontal: r === r3 || r === r6 || r === r7 ? "center" : "left", vertical: "middle" };
+      else cell.alignment = { horizontal: "center", vertical: "middle" };
+    }
+  }
+
+  boxBorder(ws, `A${r1}:D${r3}`, "thin");
+  boxBorder(ws, `A${r4}:D${r7}`, "thin");
+  boxBorder(ws, `E${r1}:E${r7}`, "thin");
+  boxBorder(ws, `F${r1}:G${r1}`, "thin");
+  boxBorder(ws, `F${r2}:G${r7}`, "thin");
+
+  triggerDownload(await wb.xlsx.writeBuffer(), filename);
+}
+
 export async function downloadAccessListXlsx(
   filename: string,
   info: { companyName: string; accessPeriod: string; supervisorName: string },
