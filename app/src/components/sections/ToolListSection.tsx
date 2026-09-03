@@ -10,6 +10,7 @@ import { ToolChecklistDetailReport } from "@/components/ToolChecklistDetailRepor
 import { KnowHowSection } from "@/components/KnowHowSection";
 import { createKnowHowNote, updateKnowHowNote, deleteKnowHowNote } from "@/lib/actions/knowHow";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
+import { groupToolsBySortOrder, toolGroupLabel } from "@/lib/tools";
 
 const toolFields: FieldConfig[] = [
   { name: "name", label: "공구명", required: true },
@@ -136,9 +137,44 @@ export async function ToolListSection({
         };
 
   const detailChecklist = checklist ? (checklists ?? []).find((c) => c.id === checklist) : null;
-  const detailItems = checklist
-    ? (itemsByChecklist.get(checklist) ?? []).filter((i) => String(i.quantity ?? "").trim() !== "")
-    : [];
+
+  // 인쇄/엑셀용 상세 목록은 (선택된 품목만이 아니라) 마스터 공구 전체를 순번별로
+  // 보여주되, 이 명세서에 실제 담긴 품목만 수량을 채워서 표시함(나머지는 빈칸/회색).
+  // 반입반출증 여부는 명세서 저장 시점 스냅샷(체크리스트 항목)이 있으면 그걸 쓰고,
+  // 없으면(= 이 명세서에 안 담긴 공구) 공구 마스터의 현재 값을 씀.
+  const detailGroups = (() => {
+    if (!checklist) return [];
+    const checklistItems = itemsByChecklist.get(checklist) ?? [];
+    const itemByTool = new Map<string, ChecklistItemRow>();
+    for (const it of checklistItems) if (it.tool_id) itemByTool.set(it.tool_id, it);
+
+    const groups = groupToolsBySortOrder(toolMasterRows).map(([sortOrder, groupTools]) => ({
+      label: toolGroupLabel(sortOrder),
+      items: groupTools.map((t) => {
+        const item = itemByTool.get(t.id);
+        return {
+          id: t.id,
+          tool_name: t.name,
+          quantity: item ? item.quantity : "",
+          for_access_pass: item ? item.for_access_pass : t.for_access_pass,
+        };
+      }),
+    }));
+
+    const adhoc = checklistItems.filter((it) => !it.tool_id);
+    if (adhoc.length > 0) {
+      groups.push({
+        label: "임의 추가",
+        items: adhoc.map((it) => ({
+          id: it.id,
+          tool_name: it.tool_name,
+          quantity: it.quantity,
+          for_access_pass: it.for_access_pass,
+        })),
+      });
+    }
+    return groups;
+  })();
   const popupOpen = Boolean(detailChecklist);
 
   return (
@@ -184,7 +220,7 @@ export async function ToolListSection({
               title={detailChecklist.title}
               projectName={(one(detailChecklist.projects) as { name: string } | null)?.name ?? null}
               tripDate={detailChecklist.trip_date}
-              items={detailItems}
+              groups={detailGroups}
               closeHref="/quality-construction?tab=tools"
               copyHref={`/quality-construction?tab=tools&copyFrom=${detailChecklist.id}`}
               editHref={`/quality-construction?tab=tools&editFrom=${detailChecklist.id}`}

@@ -57,6 +57,58 @@ export async function downloadXlsx(
   triggerDownload(await wb.xlsx.writeBuffer(), filename);
 }
 
+export async function downloadToolChecklistXlsx(
+  filename: string,
+  title: string,
+  metaLine: string,
+  groups: { label: string; items: { tool_name: string; quantity: string }[] }[]
+) {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("공구명세서");
+  const border = { style: "thin" as const, color: { argb: "FF64748B" } };
+
+  const titleRow = ws.addRow([title]);
+  titleRow.font = { bold: true, size: 14 };
+  ws.mergeCells(titleRow.number, 1, titleRow.number, 2);
+
+  const metaRow = ws.addRow([metaLine]);
+  metaRow.font = { color: { argb: "FF64748B" } };
+  ws.mergeCells(metaRow.number, 1, metaRow.number, 2);
+
+  const nonEmptyGroups = groups.filter((g) => g.items.length > 0);
+  nonEmptyGroups.forEach((g) => {
+    ws.addRow([]);
+
+    const labelRow = ws.addRow([g.label]);
+    labelRow.font = { bold: true, size: 11, color: { argb: "FF334155" } };
+
+    const headerRow = ws.addRow(["품목", "수량"]);
+    headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E293B" } };
+    headerRow.alignment = { vertical: "middle", horizontal: "center" };
+    headerRow.eachCell((cell) => {
+      cell.border = { top: border, left: border, bottom: border, right: border };
+    });
+
+    for (const item of g.items) {
+      const filled = item.quantity.trim() !== "";
+      const row = ws.addRow([item.tool_name, filled ? item.quantity : "-"]);
+      row.eachCell((cell, colNumber) => {
+        cell.border = { top: border, left: border, bottom: border, right: border };
+        if (colNumber === 2) {
+          cell.alignment = { horizontal: "center" };
+          if (!filled) cell.font = { color: { argb: "FF94A3B8" } };
+        }
+      });
+    }
+  });
+
+  ws.getColumn(1).width = 26;
+  ws.getColumn(2).width = 14;
+
+  triggerDownload(await wb.xlsx.writeBuffer(), filename);
+}
+
 export async function downloadAccessListXlsx(
   filename: string,
   info: { companyName: string; accessPeriod: string; supervisorName: string },

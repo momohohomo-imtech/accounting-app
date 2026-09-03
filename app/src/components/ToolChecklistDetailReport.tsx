@@ -7,15 +7,16 @@ import { formatDate } from "@/lib/format";
 import { PrintButton } from "@/components/PrintButton";
 import { Button } from "@/components/ui/Button";
 import { useEscapeKey } from "@/lib/useEscapeKey";
-import { downloadXlsx } from "@/lib/xlsxExport";
+import { downloadToolChecklistXlsx } from "@/lib/xlsxExport";
 
-type Item = { id: string; tool_name: string; quantity: string; for_access_pass: boolean };
+type GroupItem = { id: string; tool_name: string; quantity: string; for_access_pass: boolean };
+type Group = { label: string; items: GroupItem[] };
 
 export function ToolChecklistDetailReport({
   title,
   projectName,
   tripDate,
-  items,
+  groups,
   closeHref,
   copyHref,
   editHref,
@@ -23,7 +24,7 @@ export function ToolChecklistDetailReport({
   title: string;
   projectName: string | null;
   tripDate: string | null;
-  items: Item[];
+  groups: Group[];
   closeHref: string;
   copyHref: string;
   editHref: string;
@@ -32,17 +33,22 @@ export function ToolChecklistDetailReport({
   const [accessPassOnly, setAccessPassOnly] = useState(false);
   useEscapeKey(true, () => router.push(closeHref));
 
-  const hasAccessPassItems = items.some((it) => it.for_access_pass);
-  const visibleItems = accessPassOnly ? items.filter((it) => it.for_access_pass) : items;
+  const hasAccessPassItems = groups.some((g) => g.items.some((it) => it.for_access_pass));
+  const visibleGroups = groups
+    .map((g) => ({ label: g.label, items: accessPassOnly ? g.items.filter((it) => it.for_access_pass) : g.items }))
+    .filter((g) => g.items.length > 0);
+  const selectedCount = visibleGroups.reduce(
+    (sum, g) => sum + g.items.filter((it) => it.quantity.trim() !== "").length,
+    0
+  );
   const metaLine = `${projectName ? `${projectName} · ` : ""}${tripDate ? formatDate(tripDate) : "출장일 미지정"}`;
 
   async function handleExcel() {
-    await downloadXlsx(
+    await downloadToolChecklistXlsx(
       `${title}_${accessPassOnly ? "반입반출증" : "공구명세서"}.xlsx`,
-      ["공구명", "수량"],
-      visibleItems.map((it) => [it.tool_name, it.quantity]),
-      accessPassOnly ? "반입반출증" : "공구명세서",
-      [[accessPassOnly ? `${title} (반입반출증)` : title], [metaLine], [`총 ${visibleItems.length}개 품목`]]
+      accessPassOnly ? `${title} (반입반출증)` : title,
+      metaLine,
+      visibleGroups
     );
   }
 
@@ -84,24 +90,36 @@ export function ToolChecklistDetailReport({
         </div>
       </div>
 
-      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {visibleItems.map((it) => (
-          <li
-            key={it.id}
-            className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
-          >
-            <span className="truncate">☑ {it.tool_name}</span>
-            <span className="shrink-0 font-mono font-semibold text-slate-900">{it.quantity}</span>
-          </li>
+      <div className="space-y-4">
+        {visibleGroups.map((g) => (
+          <div key={g.label}>
+            <p className="mb-1.5 text-xs font-semibold text-slate-500">{g.label}</p>
+            <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {g.items.map((it) => {
+                const filled = it.quantity.trim() !== "";
+                return (
+                  <li
+                    key={it.id}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                  >
+                    <span className="truncate">☑ {it.tool_name}</span>
+                    <span className={`shrink-0 font-mono font-semibold ${filled ? "text-slate-900" : "text-slate-400"}`}>
+                      {filled ? it.quantity : "-"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         ))}
-        {visibleItems.length === 0 && (
-          <li className="col-span-full py-6 text-center text-slate-400">
+        {visibleGroups.length === 0 && (
+          <p className="py-6 text-center text-slate-400">
             {accessPassOnly ? "반입반출증용으로 표시된 품목이 없습니다." : "등록된 품목이 없습니다."}
-          </li>
+          </p>
         )}
-      </ul>
+      </div>
 
-      <p className="text-right text-xs text-slate-400">총 {visibleItems.length}개 품목</p>
+      <p className="text-right text-xs text-slate-400">총 {selectedCount}개 품목 선택됨</p>
     </div>
   );
 }
