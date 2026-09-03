@@ -14,6 +14,7 @@ export async function createToolChecklist(formData: FormData) {
   const toolIds = formData.getAll("tool_id").map(String);
   const toolNames = formData.getAll("tool_name").map(String);
   const quantities = formData.getAll("quantity").map(String);
+  const forAccessPass = formData.getAll("for_access_pass").map((v) => v === "true");
   if (!title) return { error: "제목을 입력해주세요." };
   if (toolIds.length === 0) return { error: "품목을 1개 이상 입력해주세요." };
 
@@ -30,6 +31,7 @@ export async function createToolChecklist(formData: FormData) {
     tool_name: toolNames[i] ?? "",
     quantity: quantities[i] || "1",
     checked: true,
+    for_access_pass: forAccessPass[i] ?? false,
   }));
   const { error: itemsError } = await supabase.from("tool_checklist_items").insert(items);
   if (itemsError) return { error: itemsError.message };
@@ -51,6 +53,7 @@ export async function updateToolChecklist(formData: FormData) {
   const toolIds = formData.getAll("tool_id").map(String);
   const toolNames = formData.getAll("tool_name").map(String);
   const quantities = formData.getAll("quantity").map(String);
+  const forAccessPass = formData.getAll("for_access_pass").map((v) => v === "true");
   if (!title) return { error: "제목을 입력해주세요." };
   if (toolIds.length === 0) return { error: "품목을 1개 이상 입력해주세요." };
 
@@ -69,6 +72,7 @@ export async function updateToolChecklist(formData: FormData) {
     tool_name: toolNames[i] ?? "",
     quantity: quantities[i] || "1",
     checked: true,
+    for_access_pass: forAccessPass[i] ?? false,
   }));
   const { error: itemsError } = await supabase.from("tool_checklist_items").insert(items);
   if (itemsError) return { error: itemsError.message };

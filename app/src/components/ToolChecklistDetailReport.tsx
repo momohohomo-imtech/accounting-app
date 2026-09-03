@@ -1,12 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatDate } from "@/lib/format";
 import { PrintButton } from "@/components/PrintButton";
+import { Button } from "@/components/ui/Button";
 import { useEscapeKey } from "@/lib/useEscapeKey";
+import { downloadXlsx } from "@/lib/xlsxExport";
 
-type Item = { id: string; tool_name: string; quantity: string };
+type Item = { id: string; tool_name: string; quantity: string; for_access_pass: boolean };
 
 export function ToolChecklistDetailReport({
   title,
@@ -26,20 +29,49 @@ export function ToolChecklistDetailReport({
   editHref: string;
 }) {
   const router = useRouter();
+  const [accessPassOnly, setAccessPassOnly] = useState(false);
   useEscapeKey(true, () => router.push(closeHref));
+
+  const hasAccessPassItems = items.some((it) => it.for_access_pass);
+  const visibleItems = accessPassOnly ? items.filter((it) => it.for_access_pass) : items;
+  const metaLine = `${projectName ? `${projectName} · ` : ""}${tripDate ? formatDate(tripDate) : "출장일 미지정"}`;
+
+  async function handleExcel() {
+    await downloadXlsx(
+      `${title}_${accessPassOnly ? "반입반출증" : "공구명세서"}.xlsx`,
+      ["공구명", "수량"],
+      visibleItems.map((it) => [it.tool_name, it.quantity]),
+      accessPassOnly ? "반입반출증" : "공구명세서",
+      [[accessPassOnly ? `${title} (반입반출증)` : title], [metaLine], [`총 ${visibleItems.length}개 품목`]]
+    );
+  }
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-          <p className="text-xs text-slate-500">
-            {projectName ? `${projectName} · ` : ""}
-            {tripDate ? formatDate(tripDate) : "출장일 미지정"}
-          </p>
+          <h2 className="text-lg font-semibold text-slate-900">
+            {title}
+            {accessPassOnly && <span className="ml-2 text-sm font-normal text-slate-500">(반입반출증용만)</span>}
+          </h2>
+          <p className="text-xs text-slate-500">{metaLine}</p>
         </div>
-        <div className="flex items-center gap-3 print:hidden">
+        <div className="flex flex-wrap items-center gap-3 print:hidden">
+          {hasAccessPassItems && (
+            <label className="flex items-center gap-1.5 text-xs text-slate-600">
+              <input
+                type="checkbox"
+                checked={accessPassOnly}
+                onChange={(e) => setAccessPassOnly(e.target.checked)}
+                className="h-3.5 w-3.5"
+              />
+              반입반출증용만 표시
+            </label>
+          )}
           <PrintButton />
+          <Button variant="secondary" size="xs" onClick={handleExcel}>
+            엑셀 다운로드
+          </Button>
           <Link href={editHref} className="text-sm text-slate-500 hover:text-slate-800">
             수정
           </Link>
@@ -53,7 +85,7 @@ export function ToolChecklistDetailReport({
       </div>
 
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {items.map((it) => (
+        {visibleItems.map((it) => (
           <li
             key={it.id}
             className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
@@ -62,12 +94,14 @@ export function ToolChecklistDetailReport({
             <span className="shrink-0 font-mono font-semibold text-slate-900">{it.quantity}</span>
           </li>
         ))}
-        {items.length === 0 && (
-          <li className="col-span-full py-6 text-center text-slate-400">등록된 품목이 없습니다.</li>
+        {visibleItems.length === 0 && (
+          <li className="col-span-full py-6 text-center text-slate-400">
+            {accessPassOnly ? "반입반출증용으로 표시된 품목이 없습니다." : "등록된 품목이 없습니다."}
+          </li>
         )}
       </ul>
 
-      <p className="text-right text-xs text-slate-400">총 {items.length}개 품목</p>
+      <p className="text-right text-xs text-slate-400">총 {visibleItems.length}개 품목</p>
     </div>
   );
 }

@@ -18,8 +18,9 @@ type Tool = {
   text_color: string | null;
   background_color: string | null;
   default_quantity: string | null;
+  for_access_pass: boolean;
 };
-type AdhocItem = { key: string; name: string; quantity: string };
+type AdhocItem = { key: string; name: string; quantity: string; forAccessPass: boolean };
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -45,7 +46,7 @@ export function ToolChecklistCreateForm({
   initialProjectId?: string;
   initialTripDate?: string;
   initialQuantities?: Record<string, string>;
-  initialAdhocItems?: { name: string; quantity: string }[];
+  initialAdhocItems?: { name: string; quantity: string; forAccessPass: boolean }[];
 }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -89,7 +90,7 @@ export function ToolChecklistCreateForm({
   }
 
   function addAdhocItem() {
-    setAdhocItems((prev) => [...prev, { key: crypto.randomUUID(), name: "", quantity: "" }]);
+    setAdhocItems((prev) => [...prev, { key: crypto.randomUUID(), name: "", quantity: "", forAccessPass: false }]);
   }
   function updateAdhocItem(key: string, patch: Partial<AdhocItem>) {
     setAdhocItems((prev) => prev.map((a) => (a.key === key ? { ...a, ...patch } : a)));
@@ -114,6 +115,7 @@ export function ToolChecklistCreateForm({
         fd.append("tool_id", t.id);
         fd.append("tool_name", t.name);
         fd.append("quantity", qty);
+        fd.append("for_access_pass", String(t.for_access_pass));
       }
     }
     for (const a of adhocItems) {
@@ -122,6 +124,7 @@ export function ToolChecklistCreateForm({
         fd.append("tool_id", "");
         fd.append("tool_name", name);
         fd.append("quantity", a.quantity.trim() || "1");
+        fd.append("for_access_pass", String(a.forAccessPass));
       }
     }
     const result = await globalPending.run(() => (isEdit ? updateToolChecklist(fd) : createToolChecklist(fd)));
@@ -248,6 +251,15 @@ export function ToolChecklistCreateForm({
                   onChange={(e) => updateAdhocItem(a.key, { quantity: e.target.value })}
                   className="w-14 shrink-0 rounded border border-slate-300 px-1.5 py-1 text-right text-sm focus:border-slate-500 focus:outline-none"
                 />
+                <label className="flex shrink-0 items-center gap-1 text-[11px] text-slate-500" title="반입반출증용">
+                  <input
+                    type="checkbox"
+                    checked={a.forAccessPass}
+                    onChange={(e) => updateAdhocItem(a.key, { forAccessPass: e.target.checked })}
+                    className="h-3.5 w-3.5"
+                  />
+                  반입반출
+                </label>
                 <button
                   type="button"
                   onClick={() => removeAdhocItem(a.key)}

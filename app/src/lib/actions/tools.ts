@@ -13,6 +13,7 @@ function parse(formData: FormData) {
     text_color: String(formData.get("text_color") ?? "").trim() || null,
     background_color: String(formData.get("background_color") ?? "").trim() || null,
     default_quantity: String(formData.get("default_quantity") ?? "").trim() || null,
+    for_access_pass: formData.get("for_access_pass") === "true",
   };
 }
 

@@ -15,6 +15,7 @@ type Tool = {
   text_color: string | null;
   background_color: string | null;
   default_quantity: string | null;
+  for_access_pass: boolean;
 };
 
 export function ToolMasterGrid({ tools }: { tools: Tool[] }) {

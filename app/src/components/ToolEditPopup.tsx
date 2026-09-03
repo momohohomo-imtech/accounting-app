@@ -20,6 +20,7 @@ type Tool = {
   text_color: string | null;
   background_color: string | null;
   default_quantity: string | null;
+  for_access_pass: boolean;
 };
 type ToolOption = { id: string; name: string };
 
@@ -77,6 +78,7 @@ export function ToolEditPopup({
   const [note, setNote] = useState(tool.note ?? "");
   const [linkedIds, setLinkedIds] = useState<Set<string>>(new Set(tool.linked_tool_ids));
   const [defaultQuantity, setDefaultQuantity] = useState(tool.default_quantity ?? "");
+  const [forAccessPass, setForAccessPass] = useState(tool.for_access_pass);
   const [textColor, setTextColor] = useState<string | null>(tool.text_color);
   const [backgroundColor, setBackgroundColor] = useState<string | null>(tool.background_color);
   const [linkFilter, setLinkFilter] = useState("");
@@ -110,6 +112,7 @@ export function ToolEditPopup({
     fd.append("text_color", textColor ?? "");
     fd.append("background_color", backgroundColor ?? "");
     fd.append("default_quantity", defaultQuantity);
+    fd.append("for_access_pass", String(forAccessPass));
     linkedIds.forEach((id) => fd.append("linked_tool_id", id));
     const result = await globalPending.run(() => updateTool(fd));
     setSaving(false);
@@ -168,6 +171,16 @@ export function ToolEditPopup({
                 className={fieldClass}
               />
             </div>
+
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={forAccessPass}
+                onChange={(e) => setForAccessPass(e.target.checked)}
+                className="h-4 w-4"
+              />
+              반입반출증용 (반입반출증 인쇄 시 이 공구만 포함)
+            </label>
 
             <ColorSwatchPicker label="글씨색" value={textColor} onChange={setTextColor} />
             <ColorSwatchPicker label="배경색" value={backgroundColor} onChange={setBackgroundColor} />

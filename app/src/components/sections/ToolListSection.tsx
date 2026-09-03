@@ -24,16 +24,17 @@ type ChecklistItemRow = {
   tool_name: string;
   checked: boolean;
   quantity: string;
+  for_access_pass: boolean;
 };
 
 function buildInitialFormState(items: ChecklistItemRow[]) {
   const initialQuantities: Record<string, string> = {};
-  const initialAdhocItems: { name: string; quantity: string }[] = [];
+  const initialAdhocItems: { name: string; quantity: string; forAccessPass: boolean }[] = [];
   for (const i of items) {
     const qty = String(i.quantity ?? "").trim();
     if (!qty) continue;
     if (i.tool_id) initialQuantities[i.tool_id] = qty;
-    else initialAdhocItems.push({ name: i.tool_name, quantity: qty });
+    else initialAdhocItems.push({ name: i.tool_name, quantity: qty, forAccessPass: Boolean(i.for_access_pass) });
   }
   return { initialQuantities, initialAdhocItems };
 }
@@ -94,6 +95,7 @@ export async function ToolListSection({
     text_color: (t.text_color as string | null) ?? null,
     background_color: (t.background_color as string | null) ?? null,
     default_quantity: (t.default_quantity as string | null) ?? null,
+    for_access_pass: Boolean(t.for_access_pass),
   }));
 
   const toolMasterRows = (tools ?? []).map((t) => ({
@@ -105,6 +107,7 @@ export async function ToolListSection({
     text_color: (t.text_color as string | null) ?? null,
     background_color: (t.background_color as string | null) ?? null,
     default_quantity: (t.default_quantity as string | null) ?? null,
+    for_access_pass: Boolean(t.for_access_pass),
   }));
 
   const copySource = copyFrom ? (checklists ?? []).find((c) => c.id === copyFrom) : null;
