@@ -53,14 +53,14 @@ export function ToolChecklistDetailReport({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="space-y-4 print:space-y-1">
+      <div className="flex flex-wrap items-center justify-between gap-2 print:mb-1">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">
+          <h2 className="text-lg font-semibold text-slate-900 print:text-sm">
             {title}
-            {accessPassOnly && <span className="ml-2 text-sm font-normal text-slate-500">(반입반출증용만)</span>}
+            {accessPassOnly && <span className="ml-2 text-sm font-normal text-slate-500 print:text-xs">(반입반출증용만)</span>}
           </h2>
-          <p className="text-xs text-slate-500">{metaLine}</p>
+          <p className="text-xs text-slate-500 print:text-[9px]">{metaLine}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3 print:hidden">
           {hasAccessPassItems && (
@@ -90,17 +90,19 @@ export function ToolChecklistDetailReport({
         </div>
       </div>
 
-      <div className="space-y-4">
+      {/* 인쇄 시 항목이 아무리 많아도 1장에 다 들어가도록, 화면보다 글씨를 훨씬 작게
+          하고 열을 늘려 촘촘하게 배치함(테두리도 인쇄에서는 뺌). */}
+      <div className="space-y-4 print:space-y-1">
         {visibleGroups.map((g) => (
-          <div key={g.label}>
-            <p className="mb-1.5 text-xs font-semibold text-slate-500">{g.label}</p>
-            <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div key={g.label} className="print:break-inside-avoid">
+            <p className="mb-1.5 text-xs font-semibold text-slate-500 print:mb-0.5 print:text-[9px]">{g.label}</p>
+            <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 print:grid-cols-4 print:gap-x-2 print:gap-y-0">
               {g.items.map((it) => {
                 const filled = it.quantity.trim() !== "";
                 return (
                   <li
                     key={it.id}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                    className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 print:gap-1 print:rounded-none print:border-0 print:border-b print:border-slate-200 print:px-0 print:py-0.5 print:text-[9px]"
                   >
                     <span className="truncate">☑ {it.tool_name}</span>
                     <span className={`shrink-0 font-mono font-semibold ${filled ? "text-slate-900" : "text-slate-400"}`}>
@@ -119,7 +121,7 @@ export function ToolChecklistDetailReport({
         )}
       </div>
 
-      <p className="text-right text-xs text-slate-400">총 {selectedCount}개 품목 선택됨</p>
+      <p className="text-right text-xs text-slate-400 print:text-[8px]">총 {selectedCount}개 품목 선택됨</p>
     </div>
   );
 }
