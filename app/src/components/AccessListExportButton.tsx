@@ -22,8 +22,11 @@ export function AccessListExportButton({
   members: Member[];
 }) {
   async function handleExport() {
+    // 파일명에 못 쓰는 문자(/ 등)가 출입기간에 섞여 있을 수 있어 "-"로 바꿔줌.
+    const safePeriod = accessPeriod.trim().replace(/[/\\]/g, "-");
+    const filename = safePeriod ? `${companyName}_출입명단_${safePeriod}.xlsx` : `${companyName}_출입명단.xlsx`;
     await downloadAccessListXlsx(
-      `${companyName}_출입명단.xlsx`,
+      filename,
       { companyName, accessPeriod, supervisorName },
       members.map((m) => ({
         name: m.name,
