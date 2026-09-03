@@ -158,20 +158,20 @@ export async function downloadAccessPassFormXlsx(
     { width: 8.43 },
     { width: 8.43 },
   ];
-  ws.getRow(1).height = 16.5;
-  ws.getRow(2).height = 17.25;
-  ws.getRow(3).height = 17.25;
+  ws.getRow(1).height = 24.75;
+  ws.getRow(2).height = 25.9;
+  ws.getRow(3).height = 25.9;
 
   ws.mergeCells("C1:G2");
   ws.getCell("B1").value = "KIA MOTORS";
-  ws.getCell("B1").font = { name: FONT, size: 11 };
+  ws.getCell("B1").font = { name: FONT, size: 16.5 };
   ws.getCell("B1").alignment = { vertical: "middle" };
   ws.getCell("B2").value = "HAWSUNG PLANT";
-  ws.getCell("B2").font = { name: FONT, size: 11 };
+  ws.getCell("B2").font = { name: FONT, size: 16.5 };
   ws.getCell("B2").alignment = { vertical: "middle" };
   const titleCell = ws.getCell("C1");
   titleCell.value = "반입 /반출 확인증(부품,공구,기타)";
-  titleCell.font = { name: FONT, size: 16, bold: true };
+  titleCell.font = { name: FONT, size: 24, bold: true };
   titleCell.alignment = { horizontal: "center", vertical: "middle" };
   titleCell.border = { bottom: { style: "medium", color: { argb: "FF000000" } } };
 
@@ -179,7 +179,7 @@ export async function downloadAccessPassFormXlsx(
     const res = await fetch("/kia-logo.png");
     const buffer = await res.arrayBuffer();
     const imageId = wb.addImage({ buffer, extension: "png" });
-    ws.addImage(imageId, { tl: { col: 0.15, row: 0.05 }, ext: { width: 60, height: 39 } });
+    ws.addImage(imageId, { tl: { col: 0.15, row: 0.05 }, ext: { width: 90, height: 59 } });
   } catch {
     // 로고 이미지를 못 불러와도 나머지 양식은 그대로 다운로드되게 둠.
   }
@@ -193,7 +193,7 @@ export async function downloadAccessPassFormXlsx(
     ws.mergeCells(range);
     const cell = ws.getCell(range.split(":")[0]);
     cell.value = text;
-    cell.font = { name: FONT, size: 11 };
+    cell.font = { name: FONT, size: 16.5 };
     cell.alignment = { horizontal: "left", vertical: "middle" };
     boxBorder(ws, range, "medium");
   }
@@ -210,27 +210,30 @@ export async function downloadAccessPassFormXlsx(
     if (range.includes(":")) ws.mergeCells(range);
     const cell = ws.getCell(range.split(":")[0]);
     cell.value = text;
-    cell.font = { name: FONT, size: 11 };
+    cell.font = { name: FONT, size: 16.5 };
     cell.alignment = { horizontal: "center", vertical: "middle" };
   }
 
-  const ROW_COUNT = 38; // 원본 서식은 31줄이지만 실제 인쇄 여백 기준으로 늘림(AccessPassPermitTable과 동일)
+  // 글씨를 1.5배로 키운 만큼 줄 수를 줄임(AccessPassPermitTable과 동일 이유) — 실제
+  // 품목이 더 많으면 Math.max로 자동으로 늘어남.
+  const ROW_COUNT = 18;
   const rowCount = Math.max(ROW_COUNT, items.length);
   for (let i = 0; i < rowCount; i++) {
     const r = 5 + i;
     const item = items[i];
+    ws.getRow(r).height = 27;
     ws.mergeCells(`C${r}:D${r}`);
     const nameCell = ws.getCell(`B${r}`);
     nameCell.value = item?.tool_name ?? "";
-    nameCell.font = { name: FONT, size: 11 };
+    nameCell.font = { name: FONT, size: 16.5 };
     const qtyCell = ws.getCell(`C${r}`);
     qtyCell.value = item ? formatPermitQuantity(item.quantity) : "";
-    qtyCell.font = { name: FONT, size: 11 };
+    qtyCell.font = { name: FONT, size: 16.5 };
     qtyCell.alignment = { horizontal: "center" };
     const unitCell = ws.getCell(`E${r}`);
     unitCell.value = item ? "EA" : "";
     unitCell.alignment = { horizontal: "center" };
-    for (let c = 1; c <= 7; c++) ws.getCell(r, c).font = { name: FONT, size: 11 };
+    for (let c = 1; c <= 7; c++) ws.getCell(r, c).font = { name: FONT, size: 16.5 };
   }
   // 표 안쪽 가로줄(행 사이)과 세로줄(열 사이), 바깥 굵은 테두리.
   for (let r = 5; r <= 4 + rowCount; r++) {
@@ -251,7 +254,7 @@ export async function downloadAccessPassFormXlsx(
   ws.mergeCells(`A${noteRow}:G${noteRow}`);
   const noteCell = ws.getCell(`A${noteRow}`);
   noteCell.value = "#이 반입증은 부서{팀} 확인자 서명및 출문승인 (통제부서) 통제틸후 출문 가능함.";
-  noteCell.font = { name: FONT, size: 11, bold: true };
+  noteCell.font = { name: FONT, size: 16.5, bold: true };
   noteCell.alignment = { horizontal: "center", vertical: "middle" };
 
   const r1 = noteRow + 1; // "상기물품이 화성공장으로 반입됨을 확인함"
@@ -282,9 +285,10 @@ export async function downloadAccessPassFormXlsx(
   ws.mergeCells(`F${r2}:G${r7}`);
 
   for (let r = r1; r <= r7; r++) {
+    ws.getRow(r).height = r === r2 || r === r5 ? 25 : 29;
     for (let c = 1; c <= 7; c++) {
       const cell = ws.getCell(r, c);
-      cell.font = { name: FONT, size: 11 };
+      cell.font = { name: FONT, size: 16.5 };
       if (c === 1) cell.alignment = { horizontal: r === r3 || r === r6 || r === r7 ? "center" : "left", vertical: "middle" };
       else cell.alignment = { horizontal: "center", vertical: "middle" };
     }

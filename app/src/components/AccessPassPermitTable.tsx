@@ -7,11 +7,12 @@ import { formatPermitQuantity } from "@/lib/koreanNumber";
 // 채운다.
 const THIN = "1px solid #000";
 const MEDIUM = "2px solid #000";
-// 원본 서식은 31줄(5~35행)이지만, 실제 인쇄 여백 기준으로 보면 아래쪽에 빈 공간이
-// 많이 남아서 줄 수를 늘림 — usePrintFitToPage가 그래도 넘치면 알아서 축소해주므로
-// 안전함.
-const ROW_COUNT = 38;
-const ROW_HEIGHT = 24;
+// 전체 글씨를 1.5배로 키운 만큼(아래 fontSize들 참고), 원본 31줄을 그대로 두면
+// 한 줄당 높이도 같이 커져서 1페이지 기준 줄 수가 줄어듦 — usePrintFitToPage가
+// 넘치면 축소해주긴 하지만, 그러면 커진 글씨가 다시 작아지므로 여기서 줄 수를
+// 페이지에 맞게 미리 줄여둠(실제 품목이 더 많으면 자동으로 늘어남).
+const ROW_COUNT = 18;
+const ROW_HEIGHT = 36;
 
 export type PermitItem = { tool_name: string; quantity: string };
 
@@ -26,7 +27,7 @@ export function AccessPassPermitTable({ items }: { items: PermitItem[] }) {
         width: "100%",
         tableLayout: "fixed",
         fontFamily: "'맑은 고딕', 'Malgun Gothic', sans-serif",
-        fontSize: 11,
+        fontSize: 16.5,
         color: "#000",
       }}
     >
@@ -40,25 +41,25 @@ export function AccessPassPermitTable({ items }: { items: PermitItem[] }) {
         <col style={{ width: "11%" }} />
       </colgroup>
       <tbody>
-        <tr style={{ height: 24 }}>
+        <tr style={{ height: 36 }}>
           <td rowSpan={2} style={{ textAlign: "center", verticalAlign: "middle" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/kia-logo.png" alt="KIA" style={{ width: 44, height: "auto", margin: "0 auto" }} />
+            <img src="/kia-logo.png" alt="KIA" style={{ width: 66, height: "auto", margin: "0 auto" }} />
           </td>
-          <td style={{ verticalAlign: "middle", fontSize: 10 }}>KIA MOTORS</td>
+          <td style={{ verticalAlign: "middle", fontSize: 15 }}>KIA MOTORS</td>
           <td
             colSpan={5}
             rowSpan={2}
-            style={{ borderBottom: MEDIUM, textAlign: "center", verticalAlign: "middle", fontSize: 18, fontWeight: 700 }}
+            style={{ borderBottom: MEDIUM, textAlign: "center", verticalAlign: "middle", fontSize: 27, fontWeight: 700 }}
           >
             반입 /반출 확인증(부품,공구,기타)
           </td>
         </tr>
-        <tr style={{ height: 24 }}>
-          <td style={{ verticalAlign: "middle", fontSize: 10 }}>HAWSUNG PLANT</td>
+        <tr style={{ height: 36 }}>
+          <td style={{ verticalAlign: "middle", fontSize: 15 }}>HAWSUNG PLANT</td>
         </tr>
 
-        <tr style={{ height: 26 }}>
+        <tr style={{ height: 39 }}>
           <td colSpan={2} style={{ border: MEDIUM, paddingLeft: 6 }}>
             반입자 :{" "}
           </td>
@@ -71,7 +72,7 @@ export function AccessPassPermitTable({ items }: { items: PermitItem[] }) {
           </td>
         </tr>
 
-        <tr style={{ height: 24, textAlign: "center", fontWeight: 500 }}>
+        <tr style={{ height: 36, textAlign: "center", fontWeight: 500 }}>
           <td style={{ borderLeft: MEDIUM, borderRight: THIN, borderBottom: THIN }}>차종</td>
           <td style={{ borderRight: THIN, borderBottom: THIN }}>품명</td>
           <td colSpan={2} style={{ borderRight: THIN, borderBottom: THIN }}>
@@ -112,7 +113,7 @@ export function AccessPassPermitTable({ items }: { items: PermitItem[] }) {
           );
         })}
 
-        <tr style={{ height: 28 }}>
+        <tr style={{ height: 42 }}>
           <td colSpan={7} style={{ textAlign: "center", fontWeight: 700, padding: "6px 0" }}>
             #이 반입증은 부서{"{"}팀{"}"} 확인자 서명및 출문승인 (통제부서) 통제틸후 출문 가능함.
           </td>
@@ -120,7 +121,7 @@ export function AccessPassPermitTable({ items }: { items: PermitItem[] }) {
 
         {/* 아래 두 인증란(반입 확인 / 물품 미해당 확인)과 그 오른쪽의 반입확인(경비실)·
             출문승인(통제부서) 칸은 원본처럼 총 7행(37~43행에 해당)에 걸쳐 있음. */}
-        <tr style={{ height: 26 }}>
+        <tr style={{ height: 39 }}>
           <td colSpan={4} style={{ borderTop: THIN, borderLeft: THIN, paddingLeft: 4 }}>
             상기물품이 화성공장으로 반입됨을 확인함
           </td>
@@ -131,35 +132,35 @@ export function AccessPassPermitTable({ items }: { items: PermitItem[] }) {
             출문승인(통제부서)
           </td>
         </tr>
-        <tr style={{ height: 22 }}>
+        <tr style={{ height: 33 }}>
           <td style={{ borderLeft: THIN }} />
           <td />
           <td style={{ textAlign: "center" }}>월</td>
           <td style={{ borderRight: THIN, textAlign: "center" }}>일</td>
           <td colSpan={2} rowSpan={6} style={{ border: THIN }} />
         </tr>
-        <tr style={{ height: 26 }}>
+        <tr style={{ height: 39 }}>
           <td colSpan={4} style={{ borderLeft: THIN, borderRight: THIN, borderBottom: THIN, textAlign: "center" }}>
             경비실 확인자: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (서명)
           </td>
         </tr>
-        <tr style={{ height: 26 }}>
+        <tr style={{ height: 39 }}>
           <td colSpan={4} style={{ borderTop: THIN, borderLeft: THIN, paddingLeft: 4 }}>
             상기물품은 화성공장 물품이아님을 확인함
           </td>
         </tr>
-        <tr style={{ height: 22 }}>
+        <tr style={{ height: 33 }}>
           <td style={{ borderLeft: THIN }} />
           <td />
           <td style={{ textAlign: "center" }}>월</td>
           <td style={{ borderRight: THIN, textAlign: "center" }}>일</td>
         </tr>
-        <tr style={{ height: 26 }}>
+        <tr style={{ height: 39 }}>
           <td colSpan={4} style={{ borderLeft: THIN, borderRight: THIN, textAlign: "center" }}>
             부서(팀)명: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
           </td>
         </tr>
-        <tr style={{ height: 26 }}>
+        <tr style={{ height: 39 }}>
           <td colSpan={4} style={{ borderLeft: THIN, borderRight: THIN, borderBottom: THIN, textAlign: "center" }}>
             부서(팀) 확인자: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (인)
           </td>
