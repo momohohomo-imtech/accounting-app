@@ -132,19 +132,21 @@ export function ToolChecklistDetailReport({
         )
       ) : (
         <>
-          {/* 인쇄 시 항목이 아무리 많아도 1장에 다 들어가도록, 화면보다 글씨를 훨씬 작게
-              하고 열을 늘려 촘촘하게 배치함(테두리도 인쇄에서는 뺌). */}
-          <div className="space-y-4 print:space-y-1">
+          {/* 인쇄 레이아웃은 품목 12개 안팎(그룹당)을 기준으로 페이지가 꽉 차 보이도록
+              여유 있게 잡음 — 실제 품목이 더 많아 넘치면 usePrintFitToPage가 알아서
+              1장에 맞게 축소하므로, 적을 때 빈 공간이 남는 문제와 많을 때 넘치는
+              문제를 동시에 해결함. */}
+          <div className="space-y-4 print:space-y-3">
             {visibleGroups.map((g) => (
               <div key={g.label} className="print:break-inside-avoid">
-                <p className="mb-1.5 text-xs font-semibold text-slate-500 print:mb-0.5 print:text-[10.5px]">{g.label}</p>
-                <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 print:grid-cols-4 print:gap-x-[45px] print:gap-y-0">
+                <p className="mb-1.5 text-xs font-semibold text-slate-500 print:mb-1 print:text-[14px]">{g.label}</p>
+                <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 print:grid-cols-3 print:gap-x-[45px] print:gap-y-2">
                   {g.items.map((it) => {
                     const filled = it.quantity.trim() !== "";
                     return (
                       <li
                         key={it.id}
-                        className={`flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 print:gap-2 print:rounded-none print:border-0 print:border-b print:border-slate-200 print:px-0 print:py-0.5 print:text-[11px] ${filled ? "" : "print:opacity-50"}`}
+                        className={`flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 print:gap-2 print:rounded-none print:border-0 print:border-b print:border-slate-200 print:px-0 print:py-2 print:text-[15px] ${filled ? "" : "print:opacity-50"}`}
                       >
                         <span className="truncate print:text-slate-900">☐ {it.tool_name}</span>
                         <span
@@ -165,12 +167,12 @@ export function ToolChecklistDetailReport({
             )}
             {!accessPassOnly && (
               <div className="print:break-inside-avoid">
-                <p className="mb-1.5 text-xs font-semibold text-slate-500 print:mb-0.5 print:text-[10.5px]">임의 추가</p>
-                <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 print:grid-cols-4 print:gap-x-[45px] print:gap-y-0">
+                <p className="mb-1.5 text-xs font-semibold text-slate-500 print:mb-1 print:text-[14px]">임의 추가</p>
+                <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 print:grid-cols-3 print:gap-x-[45px] print:gap-y-2">
                   {BLANK_ADHOC_SLOTS.map((i) => (
                     <li
                       key={i}
-                      className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-400 print:gap-2 print:rounded-none print:border-0 print:border-b print:border-slate-200 print:px-0 print:py-0.5 print:text-[11px]"
+                      className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-400 print:gap-2 print:rounded-none print:border-0 print:border-b print:border-slate-200 print:px-0 print:py-2 print:text-[15px]"
                     >
                       <span>☐</span>
                     </li>
