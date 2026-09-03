@@ -208,7 +208,6 @@ export function ToolChecklistCreateForm({
                       type="text"
                       value={quantities[t.id] ?? ""}
                       onChange={(e) => setQuantity(t.id, e.target.value)}
-                      placeholder="1"
                       className="w-16 shrink-0 rounded border border-slate-300 px-1.5 py-1 text-right text-sm focus:border-slate-500 focus:outline-none"
                     />
                   </label>
@@ -247,7 +246,6 @@ export function ToolChecklistCreateForm({
                   type="text"
                   value={a.quantity}
                   onChange={(e) => updateAdhocItem(a.key, { quantity: e.target.value })}
-                  placeholder="1"
                   className="w-14 shrink-0 rounded border border-slate-300 px-1.5 py-1 text-right text-sm focus:border-slate-500 focus:outline-none"
                 />
                 <button
