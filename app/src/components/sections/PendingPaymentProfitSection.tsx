@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatWon } from "@/lib/format";
 import { PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
+import { estimateIncomeTax, currentBracketIndex, INCOME_TAX_BRACKETS } from "@/lib/tax";
 
 export async function PendingPaymentProfitSection({ year }: { year: number }) {
   const supabase = await createClient();
@@ -73,6 +74,13 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
   );
   const profitEstimate = yearProfitSum - generalExpense - payrollCost;
 
+  // 개인사업자 종합소득세 기준 세율구간·예상 세액 (TaxEstimateSection과 동일한 방식)
+  const taxBase = Math.max(profitEstimate, 0);
+  const incomeTax = estimateIncomeTax(taxBase);
+  const localTax = Math.round(incomeTax * 0.1);
+  const totalTax = incomeTax + localTax;
+  const bracket = INCOME_TAX_BRACKETS[currentBracketIndex(taxBase)];
+
   return (
     <div className="space-y-1 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-900">
       {pendingRows.length > 0 && (
@@ -88,7 +96,11 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
           <span className="font-semibold">{year}년 이익 예상</span>
           {" — "}
           <span className="font-mono font-semibold">{formatWon(profitEstimate)}</span>
-          {" (프로젝트 총이익금 − 일반경비 − 직원급여/상여/4대보험)"}
+          {" (프로젝트 총이익금 − 일반경비 − 직원급여/상여/4대보험) / "}
+          개인사업자 세율구간{" "}
+          <span className="font-mono font-semibold">{Math.round(bracket.rate * 100)}%</span>
+          {", 예상 세액 약 "}
+          <span className="font-mono font-semibold">{formatWon(totalTax)}</span>
           {hasIncompleteProjects && (
             <span className="font-semibold text-red-600"> ### 추가 매입/매출 있을 수 있음 ###</span>
           )}
