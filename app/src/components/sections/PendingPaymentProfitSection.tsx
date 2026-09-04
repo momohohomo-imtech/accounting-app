@@ -5,14 +5,21 @@ import { PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
 export async function PendingPaymentProfitSection({ year }: { year: number }) {
   const supabase = await createClient();
 
-  const [{ data: pendingProjects }, { data: yearProjects }, { data: generalCategory }, { data: payrollRows }] =
+  const [{ data: pendingProjects }, { data: yearProjects }, { data: generalTx }, { data: payrollRows }] =
     await Promise.all([
       supabase
         .from("projects")
         .select("id, contract_amount, quote_amount")
         .eq("status", PROJECT_STATUS_AWAITING_PAYMENT),
       supabase.from("projects").select("id, quote_amount, status").eq("year", year),
-      supabase.from("expense_categories").select("id").eq("name", "일반경비").maybeSingle(),
+      // "일반경비" = 프로젝트에 귀속되지 않은(project_id가 없는) 매입 거래 (앱 전반의 표시 관례와 동일)
+      supabase
+        .from("transactions")
+        .select("purchase_amount, purchase_vat")
+        .eq("type", "매입")
+        .is("project_id", null)
+        .gte("trans_date", `${year}-01-01`)
+        .lte("trans_date", `${year}-12-31`),
       supabase
         .from("payroll")
         .select("amount, bonus, health_insurance, long_term_care_insurance, employment_insurance, national_pension")
@@ -25,27 +32,16 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
   if (pendingRows.length === 0 && yearRows.length === 0) return null;
 
   const yearProjectIds = yearRows.map((p) => p.id);
-  const [{ data: purchaseTx }, { data: agencyTx }, { data: generalTx }] = await Promise.all([
-    yearProjectIds.length
-      ? supabase
+  const [{ data: purchaseTx }, { data: agencyTx }] = yearProjectIds.length
+    ? await Promise.all([
+        supabase
           .from("transactions")
           .select("project_id, purchase_amount, purchase_vat")
           .eq("type", "매입")
-          .in("project_id", yearProjectIds)
-      : Promise.resolve({ data: [] as { project_id: string | null; purchase_amount: number; purchase_vat: number }[] }),
-    yearProjectIds.length
-      ? supabase.from("project_agency_purchases").select("project_id, amount").in("project_id", yearProjectIds)
-      : Promise.resolve({ data: [] as { project_id: string; amount: number }[] }),
-    generalCategory
-      ? supabase
-          .from("transactions")
-          .select("purchase_amount, purchase_vat")
-          .eq("type", "매입")
-          .eq("category_id", generalCategory.id)
-          .gte("trans_date", `${year}-01-01`)
-          .lte("trans_date", `${year}-12-31`)
-      : Promise.resolve({ data: [] as { purchase_amount: number; purchase_vat: number }[] }),
-  ]);
+          .in("project_id", yearProjectIds),
+        supabase.from("project_agency_purchases").select("project_id, amount").in("project_id", yearProjectIds),
+      ])
+    : [{ data: [] as { project_id: string | null; purchase_amount: number; purchase_vat: number }[] }, { data: [] as { project_id: string; amount: number }[] }];
 
   // --- 현재 공사 완료 수금 대기: 프로젝트 상태가 "완료 수금대기"인 건들의 수주액 합계 ---
   const pendingReceivable = pendingRows.reduce((s, p) => s + (p.contract_amount ?? p.quote_amount ?? 0), 0);
