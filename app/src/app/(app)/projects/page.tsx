@@ -251,6 +251,7 @@ async function ProjectListSection({
   const estimatedProfitSum = estimatedProjects.reduce((sum, p) => sum + (p.profit ?? 0), 0);
 
   const filteredQuoteSum = tableRows.reduce((sum, p) => sum + (p.quote_amount ?? 0), 0);
+  const filteredContractSum = tableRows.reduce((sum, p) => sum + (p.contract_amount ?? 0), 0);
   const filteredProfitSum = tableRows.reduce((sum, p) => sum + (p.profit ?? 0), 0);
 
   return (
@@ -307,6 +308,9 @@ async function ProjectListSection({
             <span className="font-medium text-slate-500">필터된 {tableRows.length}건 합계</span>
             <span>
               발주액 <span className="font-mono font-semibold text-slate-900">{formatWon(filteredQuoteSum)}</span>
+            </span>
+            <span>
+              수주액 <span className="font-mono font-semibold text-slate-900">{formatWon(filteredContractSum)}</span>
             </span>
             <span>
               이익금 <span className="font-mono font-semibold text-slate-900">{formatWon(filteredProfitSum)}</span>
