@@ -115,7 +115,9 @@ export default async function DashboardPage({
           <YearFilter basePath="/dashboard" years={years} selectedYear={selectedYear} />
         </div>
         <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-5 shadow-sm">
-          <p className="text-sm text-slate-500">아이엠테크 {selectedYear}년 총 예상 매출</p>
+          <p className="text-sm text-slate-500">
+            아이엠테크 {selectedYear}년 총 예상 매출 <span className="text-red-600">(진행중)</span>
+          </p>
           <p className="mt-2 font-mono text-2xl font-bold text-slate-900">{formatWon(totalExpectedRevenue)}</p>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
