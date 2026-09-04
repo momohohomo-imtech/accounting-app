@@ -37,7 +37,7 @@ export function SettlementFinalizedCheckbox({
         onChange={(e) => toggle(e.target.checked)}
         className="h-4 w-4 rounded border-slate-300 accent-slate-900"
       />
-      프로젝트 결산 정리완료 (체크 시 목록에서 노란색 경고 표시 해제)
+      결산완료 노란 경고해제
     </label>
   );
 }

@@ -12,6 +12,7 @@ import { resolveCategoryColor } from "@/lib/categoryColor";
 import { ProjectAgencyPurchaseList } from "@/components/ProjectAgencyPurchaseList";
 import { AttachmentList } from "@/components/AttachmentList";
 import { SettlementFinalizedCheckbox } from "@/components/SettlementFinalizedCheckbox";
+import { ContractAmountFlagCheckboxes } from "@/components/ContractAmountFlagCheckboxes";
 import { ReportPrintChart } from "@/components/ReportPrintChart";
 import { ReportChartProvider } from "@/components/ReportChartProvider";
 import { ReportChartToggle } from "@/components/ReportChartToggle";
@@ -312,7 +313,14 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
       </CollapsibleSection>
 
       <div className="order-6 print:order-5 border-t border-slate-100 pt-4 space-y-3 print:break-inside-avoid">
-        <SettlementFinalizedCheckbox projectId={project.id} initialChecked={Boolean(project.settlement_finalized)} />
+        <div className="flex flex-wrap items-center gap-4">
+          <SettlementFinalizedCheckbox projectId={project.id} initialChecked={Boolean(project.settlement_finalized)} />
+          <ContractAmountFlagCheckboxes
+            projectId={project.id}
+            initialEstimated={Boolean(project.contract_amount_estimated)}
+            initialMinimum={Boolean(project.contract_amount_minimum)}
+          />
+        </div>
         <ReportMemoField />
       </div>
 

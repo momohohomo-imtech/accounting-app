@@ -70,6 +70,22 @@ export async function updateProjectSettlementFinalized(formData: FormData) {
   revalidatePath("/reports");
 }
 
+// 수주액 예상금액/최소금액 산정액은 프로젝트 수정 폼과 동일하게 서로 배타적 —
+// 하나를 켜면 다른 하나는 자동으로 꺼짐(보고서 팝업에서 바로 토글할 때도 동일하게 유지).
+export async function updateProjectContractAmountFlag(formData: FormData) {
+  const supabase = await createClient();
+  const id = String(formData.get("id"));
+  const field = String(formData.get("field"));
+  if (field !== "contract_amount_estimated" && field !== "contract_amount_minimum") return;
+  const checked = formData.get("checked") === "on";
+  const other = field === "contract_amount_estimated" ? "contract_amount_minimum" : "contract_amount_estimated";
+  const update: Record<string, boolean> = { [field]: checked };
+  if (checked) update[other] = false;
+  await supabase.from("projects").update(update).eq("id", id);
+  revalidatePath("/projects");
+  revalidatePath("/reports");
+}
+
 export async function deleteProjectRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));

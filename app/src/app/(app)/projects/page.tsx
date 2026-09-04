@@ -256,8 +256,8 @@ async function ProjectListSection({
     };
   });
 
-  const estimatedProjects = tableRows.filter((p) => p.contract_amount_estimated);
-  const estimatedProfitSum = estimatedProjects.reduce((sum, p) => sum + (p.profit ?? 0), 0);
+  const awaitingPaymentProjects = tableRows.filter((p) => p.status === PROJECT_STATUS_AWAITING_PAYMENT);
+  const awaitingPaymentContractSum = awaitingPaymentProjects.reduce((sum, p) => sum + (p.contract_amount ?? 0), 0);
 
   const filteredQuoteSum = tableRows.reduce((sum, p) => sum + (p.quote_amount ?? 0), 0);
   const filteredContractSum = tableRows.reduce((sum, p) => sum + (p.contract_amount ?? 0), 0);
@@ -266,12 +266,12 @@ async function ProjectListSection({
   return (
     <div className="space-y-6">
       <div className={report ? "space-y-6 print:hidden" : "space-y-6"}>
-        {estimatedProjects.length > 0 && (
+        {awaitingPaymentProjects.length > 0 && (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 print:hidden">
             <p className="text-xs text-red-600">
-              공사완료 예상 미수액 (수주액이 예상금액인 {estimatedProjects.length}건의 이익금 합계)
+              공사완료 예상 미수액 (완료 수금대기 {awaitingPaymentProjects.length}건의 수주액 합계)
             </p>
-            <p className="mt-1 font-mono text-xl font-bold text-red-600">{formatWon(estimatedProfitSum)}</p>
+            <p className="mt-1 font-mono text-xl font-bold text-red-600">{formatWon(awaitingPaymentContractSum)}</p>
           </div>
         )}
 
