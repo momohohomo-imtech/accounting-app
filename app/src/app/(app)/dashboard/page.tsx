@@ -31,6 +31,7 @@ export default async function DashboardPage({
     { data: recentTxRaw },
     { data: yearTxRaw },
     { data: firstTx },
+    { data: allProjects },
   ] = await Promise.all([
     supabase.from("transactions").select("*").gte("trans_date", monthStart),
     supabase.from("transactions").select("*").eq("payment_type", "credit"),
@@ -47,6 +48,7 @@ export default async function DashboardPage({
       .gte("trans_date", `${selectedYear}-01-01`)
       .lte("trans_date", `${selectedYear}-12-31`),
     supabase.from("transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
+    supabase.from("projects").select("contract_amount, quote_amount"),
   ]);
 
   const payments = (creditPayments ?? []) as CreditPayment[];
@@ -65,6 +67,13 @@ export default async function DashboardPage({
   const yearSales = yearTx.reduce((s, t) => s + t.sales_amount + t.sales_vat, 0);
   const yearPurchase = yearTx.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
   const yearProfit = yearSales - yearPurchase;
+
+  // 연도 구분 없이 지금까지 등록된 전체 프로젝트의 수주액 합계 — 수주액이 비어있으면
+  // 발주액으로 대신함(예상금액 단계에서 수주액 입력 전인 경우가 있어서).
+  const totalExpectedRevenue = (allProjects ?? []).reduce(
+    (s, p) => s + (p.contract_amount ?? p.quote_amount ?? 0),
+    0
+  );
 
   const firstYear = Math.min(
     firstTx?.[0]?.trans_date ? Number(firstTx[0].trans_date.slice(0, 4)) : currentYear,
@@ -103,6 +112,10 @@ export default async function DashboardPage({
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-slate-600">연도별 실적</h2>
           <YearFilter basePath="/dashboard" years={years} selectedYear={selectedYear} />
+        </div>
+        <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-5 shadow-sm">
+          <p className="text-sm text-slate-500">아이엠테크 현재 총 예상 매출</p>
+          <p className="mt-2 font-mono text-2xl font-bold text-slate-900">{formatWon(totalExpectedRevenue)}</p>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {yearCards.map((c) => (
