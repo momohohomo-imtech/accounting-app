@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDate } from "@/lib/format";
 import { AccessListExportButton } from "@/components/AccessListExportButton";
 import { AccessListPrintPopup } from "@/components/AccessListPrintPopup";
 import { AccessApplicationPopup } from "@/components/AccessApplicationPopup";
+import { AccessListWorkerPicker } from "@/components/AccessListWorkerPicker";
 import { Button } from "@/components/ui/Button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -19,9 +20,15 @@ type Member = {
   birthDate: string | null;
   grade?: string | null;
   note: string;
+  dailyWorkerId?: string | null;
+  employeeId?: string | null;
 };
 
 type SiteOption = { id: string; name: string };
+type OfficeOption = { id: string; name: string };
+type WorkerOption = { id: string; name: string; office_id: string; grade?: string | null };
+type EmployeeOption = { id: string; name: string };
+type ManualEntry = { key: string; name: string; phone: string; birthDate: string; nationality: string };
 
 export function AccessListCard({
   id,
@@ -33,6 +40,9 @@ export function AccessListCard({
   createdAt,
   members,
   siteOptions,
+  offices,
+  workers,
+  employees,
   updateAction,
   deleteAction,
 }: {
@@ -45,6 +55,9 @@ export function AccessListCard({
   createdAt: string;
   members: Member[];
   siteOptions: SiteOption[];
+  offices: OfficeOption[];
+  workers: WorkerOption[];
+  employees: EmployeeOption[];
   updateAction: (formData: FormData) => Promise<{ error?: string } | undefined>;
   deleteAction: (formData: FormData) => void;
 }) {
@@ -65,6 +78,9 @@ export function AccessListCard({
   const [draftNotes, setDraftNotes] = useState<Record<string, string>>(
     Object.fromEntries(members.map((m) => [m.id, m.note]))
   );
+  const [manualEntries, setManualEntries] = useState<ManualEntry[]>([]);
+  const [manualDraft, setManualDraft] = useState({ name: "", phone: "", birthDate: "", nationality: "" });
+  const pickerFormRef = useRef<HTMLFormElement>(null);
 
   function startEditing() {
     setDraftCompanyName(companyName);
@@ -72,8 +88,19 @@ export function AccessListCard({
     setDraftSupervisorName(supervisorName ?? "");
     setDraftAccessPeriod(accessPeriod ?? "");
     setDraftNotes(Object.fromEntries(members.map((m) => [m.id, m.note])));
+    setManualEntries([]);
+    setManualDraft({ name: "", phone: "", birthDate: "", nationality: "" });
     setError(null);
     setEditing(true);
+  }
+
+  function addManualEntry() {
+    if (!manualDraft.name.trim()) return;
+    setManualEntries((prev) => [...prev, { key: crypto.randomUUID(), ...manualDraft }]);
+    setManualDraft({ name: "", phone: "", birthDate: "", nationality: "" });
+  }
+  function removeManualEntry(key: string) {
+    setManualEntries((prev) => prev.filter((m) => m.key !== key));
   }
 
   async function handleSave() {
@@ -90,6 +117,17 @@ export function AccessListCard({
       fd.append("worker_id", m.id);
       fd.append("worker_note", draftNotes[m.id] ?? "");
     });
+    if (pickerFormRef.current) {
+      const pickerFd = new FormData(pickerFormRef.current);
+      for (const v of pickerFd.getAll("daily_worker_ids")) fd.append("new_daily_worker_ids", v);
+      for (const v of pickerFd.getAll("employee_ids")) fd.append("new_employee_ids", v);
+    }
+    for (const m of manualEntries) {
+      fd.append("new_manual_name", m.name);
+      fd.append("new_manual_phone", m.phone);
+      fd.append("new_manual_birth_date", m.birthDate);
+      fd.append("new_manual_nationality", m.nationality);
+    }
     const result = await globalPending.run(() => updateAction(fd));
     setSaving(false);
     if (result?.error) {
@@ -160,6 +198,84 @@ export function AccessListCard({
             </div>
           ))}
           {members.length === 0 && <p className="text-sm text-slate-400">등록된 인원이 없습니다.</p>}
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <p className={labelClass}>인원 추가 — 인력사무소/직원 DB에서 선택</p>
+          <form ref={pickerFormRef} onSubmit={(e) => e.preventDefault()}>
+            <AccessListWorkerPicker
+              offices={offices}
+              workers={workers.filter((w) => !members.some((m) => m.dailyWorkerId === w.id))}
+              employees={employees.filter((e) => !members.some((m) => m.employeeId === e.id))}
+            />
+          </form>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <p className={labelClass}>인원 추가 — 임의(수동 기입)</p>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-500">이름</label>
+              <input
+                value={manualDraft.name}
+                onChange={(e) => setManualDraft((prev) => ({ ...prev, name: e.target.value }))}
+                autoComplete="off"
+                className={`${fieldClass} w-32`}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-500">연락처</label>
+              <input
+                value={manualDraft.phone}
+                onChange={(e) => setManualDraft((prev) => ({ ...prev, phone: e.target.value }))}
+                autoComplete="off"
+                className={`${fieldClass} w-32`}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-500">생년월일</label>
+              <input
+                value={manualDraft.birthDate}
+                onChange={(e) => setManualDraft((prev) => ({ ...prev, birthDate: e.target.value }))}
+                placeholder="YYYY-MM-DD"
+                autoComplete="off"
+                className={`${fieldClass} w-32`}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-500">국적</label>
+              <input
+                value={manualDraft.nationality}
+                onChange={(e) => setManualDraft((prev) => ({ ...prev, nationality: e.target.value }))}
+                autoComplete="off"
+                className={`${fieldClass} w-24`}
+              />
+            </div>
+            <Button type="button" variant="secondary" size="sm" onClick={addManualEntry}>
+              + 추가
+            </Button>
+          </div>
+          {manualEntries.length > 0 && (
+            <ul className="space-y-1">
+              {manualEntries.map((m) => (
+                <li key={m.key} className="flex items-center gap-2 text-sm text-slate-700">
+                  <span className="flex-1">
+                    {m.name}
+                    {m.phone && ` · ${m.phone}`}
+                    {m.birthDate && ` · ${m.birthDate}`}
+                    {m.nationality && ` · ${m.nationality}`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeManualEntry(m.key)}
+                    className="text-xs text-red-500 hover:text-red-700"
+                  >
+                    삭제
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}

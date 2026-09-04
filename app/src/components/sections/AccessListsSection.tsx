@@ -18,7 +18,7 @@ export async function AccessListsSection() {
       supabase
         .from("access_list_workers")
         .select(
-          "id, access_list_id, daily_worker_id, employee_id, note, daily_workers(name, phone, nationality, birth_date, grade), employees(name, phone, nationality, birth_date)"
+          "id, access_list_id, daily_worker_id, employee_id, note, manual_name, manual_phone, manual_birth_date, manual_nationality, daily_workers(name, phone, nationality, birth_date, grade), employees(name, phone, nationality, birth_date)"
         ),
     ]);
 
@@ -87,11 +87,27 @@ export async function AccessListsSection() {
             .filter((lk) => lk.access_list_id === l.id)
             .map((lk) => {
               const isEmployee = Boolean(lk.employee_id);
+              if (lk.manual_name) {
+                return {
+                  id: lk.id as string,
+                  isEmployee: false,
+                  dailyWorkerId: null as string | null,
+                  employeeId: null as string | null,
+                  name: lk.manual_name as string,
+                  phone: (lk.manual_phone as string | null) ?? null,
+                  nationality: (lk.manual_nationality as string | null) ?? null,
+                  birthDate: (lk.manual_birth_date as string | null) ?? null,
+                  grade: null as string | null,
+                  note: (lk.note as string | null) ?? "",
+                };
+              }
               const source = lk.daily_worker_id ? one(lk.daily_workers) : one(lk.employees);
               return source
                 ? {
                     id: lk.id as string,
                     isEmployee,
+                    dailyWorkerId: (lk.daily_worker_id as string | null) ?? null,
+                    employeeId: (lk.employee_id as string | null) ?? null,
                     name: source.name as string,
                     phone: (source.phone as string | null) ?? null,
                     nationality: (source.nationality as string | null) ?? null,
@@ -117,6 +133,9 @@ export async function AccessListsSection() {
               createdAt={l.created_at}
               members={members}
               siteOptions={sites ?? []}
+              offices={offices ?? []}
+              workers={(workers ?? []).map((w) => ({ id: w.id, name: w.name, office_id: w.office_id, grade: w.grade }))}
+              employees={employees}
               updateAction={updateAccessListRecord}
               deleteAction={deleteAccessListRecord}
             />

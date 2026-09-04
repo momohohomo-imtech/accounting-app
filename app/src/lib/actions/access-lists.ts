@@ -33,7 +33,9 @@ export async function createAccessListRecord(formData: FormData) {
 }
 
 // 출입명단 헤더(업체명/현장/감독자/출입기간)와 각 인원의 비고를 한 번에 저장.
-// 명단에 속한 인원 구성(누가 있는지)은 여기서 바꾸지 않음 — 그건 새 명단을 만드는 쪽 영역.
+// 인원 구성 변경은 추가만 지원함(기존 인원 제거는 이 화면의 범위 밖) — 인력사무소/직원
+// DB에서 고른 인원(new_daily_worker_ids/new_employee_ids)과 DB에 없는 사람을 이름만으로
+// 적어 넣는 임의 추가(new_manual_name 등, 같은 인덱스끼리 짝) 둘 다 지원.
 export async function updateAccessListRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id") ?? "");
@@ -57,6 +59,33 @@ export async function updateAccessListRecord(formData: FormData) {
   );
   const failed = results.find((r) => r.error);
   if (failed?.error) return { error: failed.error.message };
+
+  const newWorkerIds = formData.getAll("new_daily_worker_ids").map(String);
+  const newEmployeeIds = formData.getAll("new_employee_ids").map(String);
+  const manualNames = formData.getAll("new_manual_name").map(String);
+  const manualPhones = formData.getAll("new_manual_phone").map(String);
+  const manualBirthDates = formData.getAll("new_manual_birth_date").map(String);
+  const manualNationalities = formData.getAll("new_manual_nationality").map(String);
+
+  const newMembers = [
+    ...newWorkerIds.map((daily_worker_id) => ({ access_list_id: id, daily_worker_id, employee_id: null })),
+    ...newEmployeeIds.map((employee_id) => ({ access_list_id: id, daily_worker_id: null, employee_id })),
+    ...manualNames
+      .map((name, i) => ({
+        access_list_id: id,
+        daily_worker_id: null,
+        employee_id: null,
+        manual_name: name.trim(),
+        manual_phone: manualPhones[i]?.trim() || null,
+        manual_birth_date: manualBirthDates[i]?.trim() || null,
+        manual_nationality: manualNationalities[i]?.trim() || null,
+      }))
+      .filter((m) => m.manual_name !== ""),
+  ];
+  if (newMembers.length > 0) {
+    const { error: insertError } = await supabase.from("access_list_workers").insert(newMembers);
+    if (insertError) return { error: insertError.message };
+  }
 
   revalidatePath("/daily-workers");
 }
