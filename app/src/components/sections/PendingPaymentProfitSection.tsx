@@ -2,31 +2,53 @@ import { createClient } from "@/lib/supabase/server";
 import { formatWon } from "@/lib/format";
 import { PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
 import { estimateIncomeTax, currentBracketIndex, INCOME_TAX_BRACKETS } from "@/lib/tax";
+import { HalfYearSettlementInput } from "@/components/sections/HalfYearSettlementInput";
+
+function taxEstimate(profit: number) {
+  const taxBase = Math.max(profit, 0);
+  const incomeTax = estimateIncomeTax(taxBase);
+  const localTax = Math.round(incomeTax * 0.1);
+  const bracket = INCOME_TAX_BRACKETS[currentBracketIndex(taxBase)];
+  return { totalTax: incomeTax + localTax, ratePct: Math.round(bracket.rate * 100) };
+}
 
 export async function PendingPaymentProfitSection({ year }: { year: number }) {
   const supabase = await createClient();
 
-  const [{ data: pendingProjects }, { data: yearProjects }, { data: generalTx }, { data: payrollRows }] =
-    await Promise.all([
-      supabase
-        .from("projects")
-        .select("id, contract_amount, quote_amount")
-        .eq("status", PROJECT_STATUS_AWAITING_PAYMENT),
-      supabase.from("projects").select("id, quote_amount, status").eq("year", year),
-      // "일반경비" = 프로젝트에 귀속되지 않은(project_id가 없는) 매입 거래 (앱 전반의 표시 관례와 동일)
-      supabase
-        .from("transactions")
-        .select("purchase_amount, purchase_vat")
-        .eq("type", "매입")
-        .is("project_id", null)
-        .gte("trans_date", `${year}-01-01`)
-        .lte("trans_date", `${year}-12-31`),
-      supabase
-        .from("payroll")
-        .select("amount, bonus, health_insurance, long_term_care_insurance, employment_insurance, national_pension")
-        .gte("pay_month", `${year}-01-01`)
-        .lte("pay_month", `${year}-12-31`),
-    ]);
+  const [
+    { data: pendingProjects },
+    { data: yearProjects },
+    { data: generalTx },
+    { data: payrollRows },
+    { data: halfYearRow },
+    { data: h2Tx },
+  ] = await Promise.all([
+    supabase
+      .from("projects")
+      .select("id, contract_amount, quote_amount")
+      .eq("status", PROJECT_STATUS_AWAITING_PAYMENT),
+    supabase.from("projects").select("id, quote_amount, status").eq("year", year),
+    // "일반경비" = 프로젝트에 귀속되지 않은(project_id가 없는) 매입 거래 (앱 전반의 표시 관례와 동일)
+    supabase
+      .from("transactions")
+      .select("purchase_amount, purchase_vat")
+      .eq("type", "매입")
+      .is("project_id", null)
+      .gte("trans_date", `${year}-01-01`)
+      .lte("trans_date", `${year}-12-31`),
+    supabase
+      .from("payroll")
+      .select("amount, bonus, health_insurance, long_term_care_insurance, employment_insurance, national_pension")
+      .gte("pay_month", `${year}-01-01`)
+      .lte("pay_month", `${year}-12-31`),
+    supabase.from("half_year_settlements").select("profit_amount").eq("year", year).eq("half", 1).maybeSingle(),
+    // 하반기 집계 이익금: TaxEstimateSection과 동일하게 부가세 제외한 매출-매입(원장 기준)으로 계산
+    supabase
+      .from("transactions")
+      .select("sales_amount, purchase_amount")
+      .gte("trans_date", `${year}-07-01`)
+      .lte("trans_date", `${year}-12-31`),
+  ]);
 
   const pendingRows = pendingProjects ?? [];
   const yearRows = yearProjects ?? [];
@@ -73,13 +95,13 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
     0
   );
   const profitEstimate = yearProfitSum - generalExpense - payrollCost;
+  const profitTax = taxEstimate(profitEstimate);
 
-  // 개인사업자 종합소득세 기준 세율구간·예상 세액 (TaxEstimateSection과 동일한 방식)
-  const taxBase = Math.max(profitEstimate, 0);
-  const incomeTax = estimateIncomeTax(taxBase);
-  const localTax = Math.round(incomeTax * 0.1);
-  const totalTax = incomeTax + localTax;
-  const bracket = INCOME_TAX_BRACKETS[currentBracketIndex(taxBase)];
+  // --- 하반기(7~12월) 집계 이익금 + 상반기 확정 이익금(세무사 결산) 합산 예상 세액 ---
+  const h2Profit = (h2Tx ?? []).reduce((s, t) => s + t.sales_amount - t.purchase_amount, 0);
+  const half1Profit = halfYearRow?.profit_amount ?? null;
+  const combinedProfit = half1Profit != null ? half1Profit + h2Profit : null;
+  const combinedTax = combinedProfit != null ? taxEstimate(combinedProfit) : null;
 
   return (
     <div className="space-y-1 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-900">
@@ -98,14 +120,52 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
           <span className="font-mono font-semibold">{formatWon(profitEstimate)}</span>
           {" (프로젝트 총이익금 − 일반경비 − 직원급여/상여/4대보험) / "}
           개인사업자 세율구간{" "}
-          <span className="font-mono font-semibold">{Math.round(bracket.rate * 100)}%</span>
+          <span className="font-mono font-semibold">{profitTax.ratePct}%</span>
           {", 예상 세액 약 "}
-          <span className="font-mono font-semibold">{formatWon(totalTax)}</span>
+          <span className="font-mono font-semibold">{formatWon(profitTax.totalTax)}</span>
           {hasIncompleteProjects && (
             <span className="font-semibold text-red-600"> ### 추가 매입/매출 있을 수 있음 ###</span>
           )}
         </p>
       )}
+
+      <div className="mt-1 space-y-1 border-t border-blue-200 pt-2">
+        <p className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold">{year}년 상반기 확정 이익금 (세무사 결산)</span>
+          {half1Profit != null ? (
+            <span className="font-mono font-semibold">{formatWon(half1Profit)}</span>
+          ) : (
+            <span className="text-blue-700">미입력</span>
+          )}
+          <HalfYearSettlementInput year={year} initialAmount={half1Profit} />
+        </p>
+        {half1Profit != null && combinedProfit != null && combinedTax != null && (
+          <>
+            <p>
+              <span className="font-semibold">{year}년 하반기 집계 이익금</span>
+              {" — "}
+              <span className="font-mono font-semibold">{formatWon(h2Profit)}</span>
+              {" (7~12월 매출-매입, 부가세 제외)"}
+            </p>
+            <p>
+              <span className="font-semibold">{year}년 하반기 미수금</span>
+              {" — "}
+              <span className="font-mono font-semibold">{formatWon(pendingReceivable)}</span>
+              {` (완료 수금대기 ${pendingRows.length}건)`}
+            </p>
+            <p>
+              <span className="font-semibold">{year}년 연간 합계 예상 이익금</span>
+              {" — "}
+              <span className="font-mono font-semibold">{formatWon(combinedProfit)}</span>
+              {" (상반기 확정 + 하반기 집계) / 예상 세액 약 "}
+              <span className="font-mono font-semibold">{formatWon(combinedTax.totalTax)}</span>
+              {" (세율 "}
+              <span className="font-mono font-semibold">{combinedTax.ratePct}%</span>
+              {" 구간)"}
+            </p>
+          </>
+        )}
+      </div>
     </div>
   );
 }
