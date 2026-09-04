@@ -14,7 +14,7 @@ export function VendorAgencyToggle({ checked }: { checked: boolean }) {
   }
 
   return (
-    <label className="flex items-center gap-1.5 text-xs text-slate-600 print:hidden">
+    <label className="flex items-center gap-1.5 font-semibold text-slate-900 print:hidden">
       <input type="checkbox" checked={checked} onChange={(e) => toggle(e.target.checked)} className="h-3.5 w-3.5" />
       대행구매 합산
     </label>
