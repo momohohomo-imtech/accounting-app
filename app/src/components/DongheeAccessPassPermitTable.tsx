@@ -10,8 +10,15 @@ import { formatPermitQuantity } from "@/lib/koreanNumber";
 // 인쇄 시 A4를 가로(landscape)로 돌려 왼쪽/오른쪽에 장을 나란히 배치하는데, 각 절반이
 // 실제로는 A5보다 넉넉해서(약 135×190mm) 원본 폰트 크기 그대로 두면 아래쪽에 여백이
 // 크게 남았음 — 스캔 원본처럼 여백 없이 꽉 차 보이도록 폰트·여백을 SCALE배 키움
-// (표 구성·문구는 그대로, 크기만 조정 — 필요하면 이 값만 다시 조절하면 됨).
-const SCALE = 2;
+// (표 구성·문구는 그대로, 크기만 조정). 일부러 페이지보다 넉넉하게(더 큼직하게)
+// 키워두고, 실제로 페이지 밖으로 넘치는 만큼은 ToolChecklistDetailReport의
+// usePrintFitPagesToHeight가 인쇄 직전 실측해서 자동으로 딱 맞게 줄인다 — 그래서
+// 이 값은 "최소 이 정도는 크게" 기준일 뿐, 너무 작지만 않으면 실제 출력 크기에는
+// 영향 없음(줄어드는 배율만 달라질 뿐). 표(HTML table)가 페이지보다 커도 인쇄 시
+// 뒤늦게 잘려서 다음 줄로 밀리며 깨지는 걸 막으려면 반드시 이 축소 훅과 같이 써야
+// 함 — SCALE만 올리고 축소 훅 없이 쓰면 표가 페이지 중간에서 잘려 깨짐(줄 순서가
+// 엉키고 헤더 없이 다음 부분이 이어지는 등).
+const SCALE = 2.4;
 const px = (n: number) => `${n * SCALE}px`;
 const pad = (v: number, h: number) => `${v * SCALE}px ${h * SCALE}px`;
 
@@ -71,7 +78,7 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
           <col style={{ width: "13%" }} />
           <col style={{ width: "29%" }} />
         </colgroup>
-        <tbody>
+        <thead>
           <tr style={{ textAlign: "center" }}>
             <td style={labelCell}>NO</td>
             <td style={labelCell}>품명</td>
@@ -79,6 +86,8 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
             <td style={labelCell}>수량</td>
             <td style={labelCell}>비고(부번/SER.NO)</td>
           </tr>
+        </thead>
+        <tbody>
           {rows.map((item, i) => (
             <tr key={i}>
               <td style={{ ...cell, textAlign: "center" }}>{i + 1}</td>
