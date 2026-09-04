@@ -206,6 +206,7 @@ export default async function ReportsPage({
     count: byProject.length,
     sales: byProject.reduce((s, p) => s + p.sales, 0),
     purchase: byProject.reduce((s, p) => s + p.purchase, 0),
+    quoteAmount: projectSummaryQuoteAmount,
     profit: projectSummaryProfit,
     profitRate: projectSummaryQuoteAmount > 0 ? (projectSummaryProfit / projectSummaryQuoteAmount) * 100 : null,
   };
@@ -544,6 +545,22 @@ export default async function ReportsPage({
             {formatWon(projectSummary.purchase)} · 이익금 {formatWon(projectSummary.profit)} · 이익율{" "}
             {projectSummary.profitRate === null ? "-" : `${projectSummary.profitRate.toFixed(2)}%`}
           </p>
+
+          <div className="mb-4 grid grid-cols-2 gap-4 print:mb-2 print:gap-2 print:break-inside-avoid">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:border-0 print:p-0 print:shadow-none">
+              <p className="text-sm text-slate-500 print:text-xs">총 발주액</p>
+              <p className="mt-1 font-mono text-2xl font-bold text-slate-900 print:text-lg">
+                {formatWon(projectSummary.quoteAmount)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:border-0 print:p-0 print:shadow-none">
+              <p className="text-sm text-slate-500 print:text-xs">총 이익금</p>
+              <p className="mt-1 font-mono text-2xl font-bold text-slate-900 print:text-lg">
+                {formatWon(projectSummary.profit)}
+              </p>
+            </div>
+          </div>
+
           <ProjectProfitTable rows={byProject} year={selectedYear} site={site} />
       </CollapsibleSection>
 
