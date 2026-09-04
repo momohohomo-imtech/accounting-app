@@ -259,7 +259,6 @@ export function AccessListCard({
 
       {applying && (
         <AccessApplicationPopup
-          companyName={companyName}
           supervisorName={supervisorName}
           members={members}
           onClose={() => setApplying(false)}

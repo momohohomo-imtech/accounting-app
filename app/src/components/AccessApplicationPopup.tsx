@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { formatDate } from "@/lib/format";
 import { ModalPortal } from "@/components/ModalPortal";
 import { ModalPrintButton } from "@/components/ModalPrintButton";
 import { useEscapeKey } from "@/lib/useEscapeKey";
@@ -27,6 +26,20 @@ type Row = {
 };
 
 const MIN_ROWS = 20;
+
+// "1979-01-01" -> "79 01 01"
+function formatBirthDateShort(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(-6);
+  if (digits.length !== 6) return raw;
+  return `${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4, 6)}`;
+}
+
+// "010-1234-1334" -> "1234 1334" (앞자리 통신사/지역 번호는 빼고 뒤 8자리만)
+function formatPhoneShort(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(-8);
+  if (digits.length !== 8) return raw;
+  return `${digits.slice(0, 4)} ${digits.slice(4, 8)}`;
+}
 
 function buildRow(partial: Partial<Row> = {}): Row {
   return {
@@ -69,12 +82,10 @@ function ConsentPair({
 }
 
 export function AccessApplicationPopup({
-  companyName,
   supervisorName,
   members,
   onClose,
 }: {
-  companyName: string;
   supervisorName: string | null;
   members: Member[];
   onClose: () => void;
@@ -82,19 +93,24 @@ export function AccessApplicationPopup({
   useEscapeKey(true, onClose);
   const printRef = usePrintFitToPage<HTMLDivElement>();
 
-  const [companyField, setCompanyField] = useState(companyName);
+  const [companyField, setCompanyField] = useState("에스 제이 씨");
   const [permitNumber, setPermitNumber] = useState("");
   const [supervisorField, setSupervisorField] = useState(supervisorName ?? "");
   const [contactField, setContactField] = useState("");
+  const [headcountField, setHeadcountField] = useState("");
   const [rows, setRows] = useState<Row[]>(() => {
     const fromMembers = members.map((m) =>
-      buildRow({ name: m.name, birthDate: m.birthDate ? formatDate(m.birthDate) : "", phone: m.phone ?? "", note: m.note || "" })
+      buildRow({
+        name: m.name,
+        birthDate: m.birthDate ? formatBirthDateShort(m.birthDate) : "",
+        phone: m.phone ? formatPhoneShort(m.phone) : "",
+        // 비고는 출입명단 쪽 메모를 그대로 끌어오지 않고 항상 빈칸으로 시작함.
+        note: "",
+      })
     );
     const blanks = Array.from({ length: Math.max(0, MIN_ROWS - fromMembers.length) }, () => buildRow());
     return [...fromMembers, ...blanks];
   });
-
-  const headcount = rows.filter((r) => r.name.trim() !== "").length;
 
   function updateRow(key: string, patch: Partial<Row>) {
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
@@ -188,7 +204,14 @@ export function AccessApplicationPopup({
                       />
                     </td>
                     <td style={{ border: "1px solid #000", padding: "7px 8px", fontWeight: 600 }}>인원수</td>
-                    <td style={{ border: "1px solid #000", padding: "7px 8px" }}>{headcount}</td>
+                    <td style={{ border: "1px solid #000", padding: "7px 8px" }}>
+                      <input
+                        value={headcountField}
+                        onChange={(e) => setHeadcountField(e.target.value)}
+                        className="w-full border-none bg-transparent p-0 focus:outline-none"
+                        style={{ fontSize: 12 }}
+                      />
+                    </td>
                   </tr>
                 </tbody>
               </table>
