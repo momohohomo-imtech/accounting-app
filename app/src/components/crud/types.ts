@@ -33,4 +33,8 @@ export type FieldConfig = {
   exclusiveWith?: string;
   /** When this field's value is not equal to this string, render the whole row with a light red background (table view only). */
   rowBackgroundUnless?: string;
+  /** Show a checkbox (above the table) letting the user show/hide this column — state is remembered per table. */
+  toggleable?: boolean;
+  /** Initial shown/hidden state for a `toggleable` column before the user changes it. Defaults to true. */
+  defaultVisible?: boolean;
 };

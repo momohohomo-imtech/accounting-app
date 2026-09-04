@@ -49,6 +49,10 @@ function tableStorageKey(fields: FieldConfig[]) {
   return `entityTableColWidths:${fields.map((f) => f.name).join(",")}`;
 }
 
+function visibilityStorageKey(fields: FieldConfig[]) {
+  return `entityTableColVisible:${fields.map((f) => f.name).join(",")}`;
+}
+
 function ProgressCell({ value }: { value: number }) {
   const pct = Math.max(0, Math.min(100, value));
   return (
@@ -85,7 +89,42 @@ export function EntityTable({
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
-  const visibleFields = useMemo(() => fields.filter((f) => !f.hideInTable), [fields]);
+  // 체크박스로 켜고 끌 수 있는(toggleable) 열 — 켜짐/꺼짐 상태는 표 구성별로 로컬에
+  // 저장해서 다음 방문에도 유지됨.
+  const toggleableFields = useMemo(() => fields.filter((f) => f.toggleable), [fields]);
+  const visibilityKey = useMemo(() => visibilityStorageKey(fields), [fields]);
+  const [colVisible, setColVisible] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(toggleableFields.map((f) => [f.name, f.defaultVisible ?? true]))
+  );
+
+  useEffect(() => {
+    if (toggleableFields.length === 0) return;
+    try {
+      const raw = localStorage.getItem(visibilityKey);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 후 localStorage에서 저장된 표시 상태를 1회 불러옴(SSR 시엔 값이 없어 하이드레이션 불일치 없음)
+      if (raw) setColVisible((prev) => ({ ...prev, ...JSON.parse(raw) }));
+    } catch {
+      // 저장된 값이 없거나 손상된 경우 기본 표시 상태를 그대로 씀.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- toggleableFields는 fields에서 매 렌더 새로 만들어지므로 의존성에서 뺌(visibilityKey가 사실상 같은 역할)
+  }, [visibilityKey]);
+
+  function toggleColumn(name: string) {
+    setColVisible((prev) => {
+      const next = { ...prev, [name]: !prev[name] };
+      try {
+        localStorage.setItem(visibilityKey, JSON.stringify(next));
+      } catch {
+        // 로컬 저장에 실패해도 화면상의 표시 상태는 그대로 유지됨.
+      }
+      return next;
+    });
+  }
+
+  const visibleFields = useMemo(
+    () => fields.filter((f) => !f.hideInTable && (!f.toggleable || colVisible[f.name] !== false)),
+    [fields, colVisible]
+  );
   const hasWidths = visibleFields.some((f) => f.width);
   const sortField = fields.find((f) => f.name === sortKey);
 
@@ -176,6 +215,22 @@ export function EntityTable({
 
   return (
     <>
+    {toggleableFields.length > 0 && (
+      <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 print:hidden">
+        <span className="font-medium">표시 항목:</span>
+        {toggleableFields.map((f) => (
+          <label key={f.name} className="flex items-center gap-1">
+            <input
+              type="checkbox"
+              checked={colVisible[f.name] !== false}
+              onChange={() => toggleColumn(f.name)}
+              className="h-3.5 w-3.5"
+            />
+            {f.tableLabel ?? f.label}
+          </label>
+        ))}
+      </div>
+    )}
     <Table className={hasWidths ? "min-w-[700px] table-fixed" : "min-w-[700px]"}>
       <THead>
         {visibleFields.map((f) => (
