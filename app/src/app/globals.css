@@ -38,6 +38,17 @@ textarea {
   margin: 10mm;
 }
 
+/* 동희 반입반출증(A5 양식 2장을 A4 한 장에 좌우로 배치)만 인쇄 시 용지를 가로로
+   돌림 — 이 페이지에 한해서만 적용되도록 이 이름이 붙은 요소에만
+   `page: donghee-landscape`로 연결(.print-donghee-landscape, ToolChecklistDetailReport). */
+@page donghee-landscape {
+  size: A4 landscape;
+  margin: 10mm;
+}
+.print-donghee-landscape {
+  page: donghee-landscape;
+}
+
 @media print {
   aside {
     display: none !important;

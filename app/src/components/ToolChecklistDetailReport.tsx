@@ -10,6 +10,9 @@ import { useEscapeKey } from "@/lib/useEscapeKey";
 import { usePrintFitToPage } from "@/lib/usePrintFitToPage";
 import { downloadToolChecklistXlsx, downloadAccessPassFormXlsx } from "@/lib/xlsxExport";
 import { AccessPassPermitTable } from "@/components/AccessPassPermitTable";
+import { DongheeAccessPassPermitTable } from "@/components/DongheeAccessPassPermitTable";
+
+type FormMode = "none" | "kia" | "donghee";
 
 type GroupItem = { id: string; tool_name: string; quantity: string; for_access_pass: boolean };
 type Group = { label: string; items: GroupItem[] };
@@ -35,7 +38,7 @@ export function ToolChecklistDetailReport({
 }) {
   const router = useRouter();
   const [accessPassOnly, setAccessPassOnly] = useState(false);
-  const [formMode, setFormMode] = useState(false);
+  const [formMode, setFormMode] = useState<FormMode>("none");
   const printRef = usePrintFitToPage<HTMLDivElement>();
   useEscapeKey(true, () => router.push(closeHref));
 
@@ -56,7 +59,7 @@ export function ToolChecklistDetailReport({
   const metaLine = `${projectName ? `${projectName} · ` : ""}${tripDate ? formatDate(tripDate) : "출장일 미지정"}`;
 
   async function handleExcel() {
-    if (formMode) {
+    if (formMode === "kia") {
       await downloadAccessPassFormXlsx(`${title}_반입반출확인증(기아화성).xlsx`, accessPassItems);
       return;
     }
@@ -72,21 +75,22 @@ export function ToolChecklistDetailReport({
     <div ref={printRef} className="space-y-4 print:space-y-1">
       {/* 양식 모드에서는 이 표제부가 인쇄에 안 나오게 함 — 아래 AccessPassPermitTable이
           자체 제목을 갖고 있어서 같이 나오면 중복됨. */}
-      <div className={`flex flex-wrap items-center justify-between gap-2 print:mb-0.5 ${formMode ? "print:hidden" : ""}`}>
+      <div className={`flex flex-wrap items-center justify-between gap-2 print:mb-0.5 ${formMode !== "none" ? "print:hidden" : ""}`}>
         <div>
           {/* 제목/조공 인원 글씨는 품목 글씨(25px)의 2배 크기로 표시. */}
           <h2 className="text-lg font-semibold text-slate-900 print:text-[50px]">
             {title}
             {helperCount != null && <span className="ml-2 text-lg font-semibold text-slate-900 print:ml-1.5 print:text-[50px]">조공 {helperCount}</span>}
-            {formMode && <span className="ml-2 text-sm font-normal text-slate-500 print:text-xs">(반입반출확인증 양식)</span>}
-            {!formMode && accessPassOnly && (
+            {formMode === "kia" && <span className="ml-2 text-sm font-normal text-slate-500 print:text-xs">(화성 반입반출증 양식)</span>}
+            {formMode === "donghee" && <span className="ml-2 text-sm font-normal text-slate-500 print:text-xs">(동희 반입반출증 양식)</span>}
+            {formMode === "none" && accessPassOnly && (
               <span className="ml-2 text-sm font-normal text-slate-500 print:text-xs">(반입반출증용만)</span>
             )}
           </h2>
-          {!formMode && <p className="text-xs text-slate-500 print:text-[8px]">{metaLine}</p>}
+          {formMode === "none" && <p className="text-xs text-slate-500 print:text-[8px]">{metaLine}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-3 print:hidden">
-          {hasAccessPassItems && !formMode && (
+          {hasAccessPassItems && formMode === "none" && (
             <label className="flex items-center gap-1.5 text-xs text-slate-600">
               <input
                 type="checkbox"
@@ -101,11 +105,22 @@ export function ToolChecklistDetailReport({
             <label className="flex items-center gap-1.5 text-xs text-slate-600">
               <input
                 type="checkbox"
-                checked={formMode}
-                onChange={(e) => setFormMode(e.target.checked)}
+                checked={formMode === "kia"}
+                onChange={(e) => setFormMode(e.target.checked ? "kia" : "none")}
                 className="h-3.5 w-3.5"
               />
-              기아 화성공장 반입반출확인증 양식으로 보기
+              화성 반입반출증
+            </label>
+          )}
+          {hasAccessPassItems && (
+            <label className="flex items-center gap-1.5 text-xs text-slate-600">
+              <input
+                type="checkbox"
+                checked={formMode === "donghee"}
+                onChange={(e) => setFormMode(e.target.checked ? "donghee" : "none")}
+                className="h-3.5 w-3.5"
+              />
+              동희 반입반출증
             </label>
           )}
           <PrintButton />
@@ -124,11 +139,29 @@ export function ToolChecklistDetailReport({
         </div>
       </div>
 
-      {formMode ? (
+      {formMode === "kia" ? (
         accessPassItems.length === 0 ? (
           <p className="py-6 text-center text-slate-400">반입반출증용으로 표시된 품목이 없습니다.</p>
         ) : (
           <AccessPassPermitTable items={accessPassItems} />
+        )
+      ) : formMode === "donghee" ? (
+        accessPassItems.length === 0 ? (
+          <p className="py-6 text-center text-slate-400">반입반출증용으로 표시된 품목이 없습니다.</p>
+        ) : (
+          // 동희오토 양식은 원래 A5 규격이라, 인쇄 시 용지를 가로로 돌려 왼쪽/오른쪽에
+          // 2장씩 나란히 들어가도록 같은 내용을 두 번 렌더링함(용지 방향 전환은
+          // globals.css의 .print-donghee-landscape). 가운데 절취선은 화면에서만
+          // 보이고 인쇄 시에는 숨김.
+          <div className="print-donghee-landscape flex gap-4 print:gap-3">
+            <div className="flex-1">
+              <DongheeAccessPassPermitTable items={accessPassItems} />
+            </div>
+            <div className="w-px shrink-0 border-l border-dashed border-slate-300 print:hidden" />
+            <div className="flex-1 print:break-inside-avoid">
+              <DongheeAccessPassPermitTable items={accessPassItems} />
+            </div>
+          </div>
         )
       ) : (
         <>
