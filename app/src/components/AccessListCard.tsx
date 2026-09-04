@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { formatDate } from "@/lib/format";
 import { AccessListExportButton } from "@/components/AccessListExportButton";
 import { AccessListPrintPopup } from "@/components/AccessListPrintPopup";
+import { AccessApplicationPopup } from "@/components/AccessApplicationPopup";
 import { Button } from "@/components/ui/Button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -53,6 +54,7 @@ export function AccessListCard({
   const [confirming, setConfirming] = useState(false);
   const [editing, setEditing] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -205,6 +207,9 @@ export function AccessListCard({
           <Button variant="secondary" size="xs" onClick={() => setPrinting(true)}>
             인쇄
           </Button>
+          <Button variant="secondary" size="xs" onClick={() => setApplying(true)}>
+            출입신청서
+          </Button>
           <AccessListExportButton
             companyName={companyName}
             accessPeriod={accessPeriod ?? ""}
@@ -249,6 +254,15 @@ export function AccessListCard({
           accessPeriod={accessPeriod}
           members={members}
           onClose={() => setPrinting(false)}
+        />
+      )}
+
+      {applying && (
+        <AccessApplicationPopup
+          companyName={companyName}
+          supervisorName={supervisorName}
+          members={members}
+          onClose={() => setApplying(false)}
         />
       )}
     </div>
