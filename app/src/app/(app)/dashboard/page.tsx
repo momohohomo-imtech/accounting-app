@@ -105,7 +105,7 @@ export default async function DashboardPage({
       </div>
 
       <TaxEstimateSection />
-      <PendingPaymentProfitSection />
+      <PendingPaymentProfitSection year={selectedYear} />
 
       <div className="space-y-3">
         <div className="flex items-center justify-between">
