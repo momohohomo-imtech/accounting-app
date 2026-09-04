@@ -85,6 +85,12 @@ export function ProjectPicker({
               setShowCompleted(e.target.checked);
               setYear("");
               setSiteId("");
+              // 완료/진행중 모드를 전환하면 지금 선택된 값이 새 목록에 없는 항목이 될 수
+              // 있음(예: 완료 프로젝트가 선택된 채로 이 체크를 끄면 진행중 목록엔 그 항목이
+              // 없어서 <select>가 "일반경비"로 보이지만 실제 값은 그대로 남아있었음 —
+              // 화면엔 해제된 것처럼 보이는데 저장하면 원래 프로젝트가 그대로 저장되는
+              // 버그의 원인). 전환 시 값도 같이 비워서 화면과 실제 값을 일치시킴.
+              onChange("");
             }}
             className="h-3.5 w-3.5 accent-slate-900"
           />
@@ -113,6 +119,9 @@ export function ProjectPicker({
               onChange={(e) => {
                 setYear(e.target.value);
                 setSiteId("");
+                // 연도를 바꾸면 아래 프로젝트 목록이 통째로 바뀌어서 지금 선택된 값이 더
+                // 이상 목록에 없을 수 있음 — 화면과 실제 값이 어긋나지 않도록 같이 비움.
+                onChange("");
               }}
               className={fieldClass}
             >
@@ -123,7 +132,15 @@ export function ProjectPicker({
                 </option>
               ))}
             </select>
-            <select value={siteId} onChange={(e) => setSiteId(e.target.value)} className={fieldClass} disabled={!year}>
+            <select
+              value={siteId}
+              onChange={(e) => {
+                setSiteId(e.target.value);
+                onChange("");
+              }}
+              className={fieldClass}
+              disabled={!year}
+            >
               <option value="">현장 선택</option>
               {sitesForYear.map((s) => (
                 <option key={s.id} value={s.id}>
