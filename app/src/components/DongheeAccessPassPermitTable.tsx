@@ -88,10 +88,13 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
           </tr>
         </thead>
         <tbody>
+          {/* 품명은 줄바꿈되면 그 행만 키가 커져서, 왼쪽·오른쪽 두 장의 높이가
+              품명 길이 차이만큼 어긋나 보임 — 항상 한 줄로 고정하고 넘치면 말줄임표로
+              잘라서 두 장의 행 높이(따라서 전체 높이)가 항상 정확히 같게 함. */}
           {rows.map((item, i) => (
             <tr key={i}>
               <td style={{ ...cell, textAlign: "center" }}>{i + 1}</td>
-              <td style={cell}>{item?.tool_name ?? ""}</td>
+              <td style={{ ...cell, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item?.tool_name ?? ""}</td>
               <td style={{ ...cell, textAlign: "center" }}>{item ? "EA" : ""}</td>
               <td style={{ ...cell, textAlign: "center", fontFamily: "monospace" }}>
                 {item ? formatPermitQuantity(item.quantity) : ""}

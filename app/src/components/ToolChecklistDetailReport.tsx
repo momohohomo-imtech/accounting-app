@@ -176,21 +176,23 @@ export function ToolChecklistDetailReport({
           // .print-donghee-landscape). 품목이 5개(장당 고정 줄 수)를 넘으면 왼쪽·오른쪽에
           // 서로 다른 품목을 담은 다음 장으로 이어지고, 그래도 남으면 다음 페이지로
           // 계속됨 — 예전처럼 왼쪽·오른쪽에 같은 내용을 복제하지 않음. 오른쪽 자리가
-          // 없는 마지막 홀수 장은 비워둠. 가운데 절취선은 화면에서만 보이고 인쇄 시에는
-          // 숨김.
+          // 없는 마지막 홀수 장은 비워둠. 왼쪽 장은 왼쪽 끝, 오른쪽 장은 오른쪽 끝에
+          // 붙게 폭을 42%로 고정하고(예전엔 flex-1로 서로 딱 붙어 있었음) 가운데
+          // 절취선(화면에서만 보임)이 자연스럽게 가운데 큰 여백에 오도록
+          // `justify-between`으로 배치.
           <div className="space-y-4 print:space-y-0">
             {dongheePages.map((page, pageIdx) => (
               <div
                 key={pageIdx}
-                className={`print-donghee-landscape flex gap-4 print:gap-3 print:break-inside-avoid ${
+                className={`print-donghee-landscape flex justify-between print:break-inside-avoid ${
                   pageIdx < dongheePages.length - 1 ? "print:break-after-page" : ""
                 }`}
               >
-                <div className="flex-1">
+                <div className="w-[42%]">
                   <DongheeAccessPassPermitTable items={page[0]} />
                 </div>
                 <div className="w-px shrink-0 border-l border-dashed border-slate-300 print:hidden" />
-                <div className="flex-1 print:break-inside-avoid">
+                <div className="w-[42%] print:break-inside-avoid">
                   {page[1] && <DongheeAccessPassPermitTable items={page[1]} />}
                 </div>
               </div>
