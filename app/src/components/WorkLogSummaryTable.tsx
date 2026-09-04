@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { WorkLogSummaryRow } from "@/lib/workLogSummary";
 import { WorkLogGroupDetailPopup } from "@/components/WorkLogGroupDetailPopup";
 import { setWorkLogSummaryCheck } from "@/lib/actions/workLogSummaryChecks";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 type SortKey = "siteName" | "title" | "days" | "dates";
 
@@ -40,9 +41,11 @@ export function WorkLogSummaryTable({
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [openGroup, setOpenGroup] = useState<WorkLogSummaryRow | null>(null);
   const [checked, setChecked] = useState<Set<string>>(() => new Set(initialChecked));
+  const pending = useGlobalPending();
 
   // 체크는 화면에 바로 반영(낙관적 업데이트)하고 저장 요청은 뒤에서 보냄 — 실패하면
   // 원래 상태로 되돌림. 서버 저장 덕분에 다음에 다시 열어도 체크 상태가 유지됨.
+  // 저장 요청 중에는 화면 전체를 잠가서 중복 클릭/다른 화면 이동으로 인한 문제를 막음.
   async function toggleChecked(key: string) {
     const willBeChecked = !checked.has(key);
     setChecked((prev) => {
@@ -51,7 +54,7 @@ export function WorkLogSummaryTable({
       else next.delete(key);
       return next;
     });
-    const result = await setWorkLogSummaryCheck(year, key, willBeChecked);
+    const result = await pending.run(() => setWorkLogSummaryCheck(year, key, willBeChecked));
     if (result?.error) {
       setChecked((prev) => {
         const next = new Set(prev);

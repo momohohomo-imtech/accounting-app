@@ -38,6 +38,7 @@ export function ToolChecklistCreateForm({
   initialQuantities = {},
   initialToolNames = {},
   initialAdhocItems = [],
+  hasSource = false,
 }: {
   tools: Tool[];
   sites: SiteOption[];
@@ -52,6 +53,9 @@ export function ToolChecklistCreateForm({
   /** 이 명세서에서만 다르게 저장된 공구 이름(공구 id별) — 수정 화면을 다시 열 때 복원됨. */
   initialToolNames?: Record<string, string>;
   initialAdhocItems?: { name: string; quantity: string; forAccessPass: boolean }[];
+  /** 수정 또는 복사(기존 명세서를 원본으로 시작)인 경우 true — 원본에 실제로 담긴 품목이
+      없더라도(예: 임의 추가만 있던 명세서) 공구별 기본 수량을 자동으로 채우지 않게 함. */
+  hasSource?: boolean;
 }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -66,7 +70,7 @@ export function ToolChecklistCreateForm({
   const [projectId, setProjectId] = useState(initialProjectId);
   const [tripDate, setTripDate] = useState(initialTripDate ?? todayIso);
   const [quantities, setQuantities] = useState<Record<string, string>>(
-    Object.keys(initialQuantities).length > 0 || isEdit ? initialQuantities : toolDefaultQuantities
+    Object.keys(initialQuantities).length > 0 || isEdit || hasSource ? initialQuantities : toolDefaultQuantities
   );
   const [toolNames, setToolNames] = useState<Record<string, string>>(initialToolNames);
   const [adhocItems, setAdhocItems] = useState<AdhocItem[]>(

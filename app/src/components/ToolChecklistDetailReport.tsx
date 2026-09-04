@@ -39,7 +39,9 @@ export function ToolChecklistDetailReport({
   const printRef = usePrintFitToPage<HTMLDivElement>();
   useEscapeKey(true, () => router.push(closeHref));
 
-  const hasAccessPassItems = groups.some((g) => g.items.some((it) => it.for_access_pass));
+  // 마스터 목록 패딩용 항목(이 명세서에 실제로 안 담긴 것)은 제외 — 그렇지 않으면
+  // 반입반출증용 공구가 마스터 어딘가에만 있어도 이 명세서와 무관하게 옵션이 뜸.
+  const hasAccessPassItems = groups.some((g) => g.items.some((it) => it.for_access_pass && it.quantity.trim() !== ""));
   const visibleGroups = groups
     .map((g) => ({ label: g.label, items: accessPassOnly ? g.items.filter((it) => it.for_access_pass) : g.items }))
     .filter((g) => g.items.length > 0);

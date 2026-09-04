@@ -133,9 +133,10 @@ export function EntityTable({
   const sortField = fields.find((f) => f.name === sortKey);
 
   // 폭이 지정된(hasWidths) 표에 한해 헤더 오른쪽 끝을 드래그해서 열 너비를 직접
-  // 조절할 수 있게 함 — 조절한 값은 표 구성(필드명 목록)별로 로컬에 저장해서
-  // 다음 방문에도 유지됨.
-  const storageKey = useMemo(() => tableStorageKey(visibleFields), [visibleFields]);
+  // 조절할 수 있게 함 — 조절한 값은 표 구성(전체 필드명 목록, 켜고 끈 열과 무관하게
+  // 고정)별로 로컬에 저장해서 다음 방문에도 유지됨. visibleFields로 키를 잡으면 열
+  // 표시를 켜고 끌 때마다 키가 바뀌어서 저장해둔 너비를 잃어버리므로 fields를 씀.
+  const storageKey = useMemo(() => tableStorageKey(fields), [fields]);
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
   const thRefs = useRef<Record<string, HTMLTableCellElement | null>>({});
   const resizingRef = useRef<{ name: string; startX: number; startWidth: number } | null>(null);

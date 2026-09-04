@@ -219,6 +219,7 @@ export async function ToolListSection({
           initialQuantities={initialQuantities}
           initialToolNames={initialToolNames}
           initialAdhocItems={initialAdhocItems}
+          hasSource={Boolean(editSource || copySource)}
         />
 
         <CollapsibleSection title="저장된 공구명세서 (이력)">

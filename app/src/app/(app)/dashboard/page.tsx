@@ -48,7 +48,7 @@ export default async function DashboardPage({
       .gte("trans_date", `${selectedYear}-01-01`)
       .lte("trans_date", `${selectedYear}-12-31`),
     supabase.from("transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
-    supabase.from("projects").select("contract_amount, quote_amount").eq("year", selectedYear),
+    supabase.from("projects").select("contract_amount").eq("year", selectedYear),
   ]);
 
   const payments = (creditPayments ?? []) as CreditPayment[];
@@ -68,13 +68,11 @@ export default async function DashboardPage({
   const yearPurchase = yearTx.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
   const yearProfit = yearSales - yearPurchase;
 
-  // 선택된 연도(연도별 실적과 동일한 연도 필터)의 전체 프로젝트 수주액 합계 —
-  // 프로젝트 페이지 하단 합계와 같은 기준(연도)이어야 값이 서로 맞음. 수주액이
-  // 비어있으면 발주액으로 대신함(예상금액 단계에서 수주액 입력 전인 경우가 있어서).
-  const totalExpectedRevenue = (yearProjects ?? []).reduce(
-    (s, p) => s + (p.contract_amount ?? p.quote_amount ?? 0),
-    0
-  );
+  // 선택된 연도(연도별 실적과 동일한 연도 필터)의 전체 프로젝트 수주액 합계 — 발주액
+  // 대체 없이 순수 수주액만 더해서, 프로젝트 페이지 하단의 "수주액" 합계와 항상
+  // 정확히 같은 값이 나오게 함(예전엔 수주액이 비어있으면 발주액으로 대신 더해서
+  // 두 페이지 값이 서로 안 맞는 경우가 있었음).
+  const totalExpectedRevenue = (yearProjects ?? []).reduce((s, p) => s + (p.contract_amount ?? 0), 0);
 
   const firstYear = Math.min(
     firstTx?.[0]?.trans_date ? Number(firstTx[0].trans_date.slice(0, 4)) : currentYear,
