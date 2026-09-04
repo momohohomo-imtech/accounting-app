@@ -8,7 +8,6 @@ import { PrintButton } from "@/components/PrintButton";
 import { Button } from "@/components/ui/Button";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 import { usePrintFitToPage } from "@/lib/usePrintFitToPage";
-import { usePrintFitPagesToHeight } from "@/lib/usePrintFitPagesToHeight";
 import { downloadToolChecklistXlsx, downloadAccessPassFormXlsx } from "@/lib/xlsxExport";
 import { AccessPassPermitTable } from "@/components/AccessPassPermitTable";
 import { DongheeAccessPassPermitTable, ROW_COUNT as DONGHEE_ROW_COUNT } from "@/components/DongheeAccessPassPermitTable";
@@ -43,11 +42,6 @@ export function ToolChecklistDetailReport({
   // 동희 반입반출증은 품목 수에 따라 여러 페이지로 늘어나는 게 정상이라, 전체를
   // 억지로 1페이지에 욱여넣는 이 훅을 꺼야 함(아래 dongheePages 참고).
   const printRef = usePrintFitToPage<HTMLDivElement>(270, formMode === "donghee");
-  // 동희 페이지(.print-donghee-landscape)는 landscape A4 실사용 높이(210mm - 위아래
-  // 여백 20mm = 190mm)에 맞춰 페이지마다 각각 실측 축소함 — DongheeAccessPassPermitTable을
-  // 일부러 큼직하게(SCALE) 렌더링해두고, 표가 페이지 밖으로 넘쳐서 깨지지(행이 잘리고
-  // 헤더 없이 다음 줄로 밀리는 등) 않게 여기서 실제 렌더링 높이에 맞춰 자동으로 줄임.
-  usePrintFitPagesToHeight(".print-donghee-landscape", 190);
   useEscapeKey(true, () => router.push(closeHref));
 
   // 마스터 목록 패딩용 항목(이 명세서에 실제로 안 담긴 것)은 제외 — 그렇지 않으면
