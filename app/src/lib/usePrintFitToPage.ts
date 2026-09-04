@@ -13,12 +13,16 @@ import { useEffect, useRef } from "react";
 // 갈라지는 문제가 있었음. zoom은(transform과 달리) 실제 레이아웃 크기 자체를
 // 줄여서 페이지 분할 계산에도 반영되므로 이 용도에 맞음(크롬/엣지 기준 — 이
 // 앱은 실질적으로 그 환경에서만 씀).
-export function usePrintFitToPage<T extends HTMLElement>(pageHeightMm = 270) {
+// disabled: 이 훅을 쓰는 컴포넌트가 여러 페이지로 나뉘는 게 정상인 출력(예: 동희
+// 반입반출증처럼 품목 수에 따라 페이지가 늘어나는 양식)을 렌더링할 때 쓴다 — 켜져
+// 있으면 전체 내용을 무조건 1페이지 높이로 욱여넣으려 하므로, 의도한 페이지 나눔을
+// 깨버린다.
+export function usePrintFitToPage<T extends HTMLElement>(pageHeightMm = 270, disabled = false) {
   const ref = useRef<T | null>(null);
 
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || disabled) return;
 
     function beforePrint() {
       if (!el) return;
@@ -41,7 +45,7 @@ export function usePrintFitToPage<T extends HTMLElement>(pageHeightMm = 270) {
       window.removeEventListener("beforeprint", beforePrint);
       window.removeEventListener("afterprint", afterPrint);
     };
-  }, [pageHeightMm]);
+  }, [pageHeightMm, disabled]);
 
   return ref;
 }

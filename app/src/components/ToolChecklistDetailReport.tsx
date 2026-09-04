@@ -10,7 +10,7 @@ import { useEscapeKey } from "@/lib/useEscapeKey";
 import { usePrintFitToPage } from "@/lib/usePrintFitToPage";
 import { downloadToolChecklistXlsx, downloadAccessPassFormXlsx } from "@/lib/xlsxExport";
 import { AccessPassPermitTable } from "@/components/AccessPassPermitTable";
-import { DongheeAccessPassPermitTable } from "@/components/DongheeAccessPassPermitTable";
+import { DongheeAccessPassPermitTable, ROW_COUNT as DONGHEE_ROW_COUNT } from "@/components/DongheeAccessPassPermitTable";
 
 type FormMode = "none" | "kia" | "donghee";
 
@@ -39,7 +39,9 @@ export function ToolChecklistDetailReport({
   const router = useRouter();
   const [accessPassOnly, setAccessPassOnly] = useState(false);
   const [formMode, setFormMode] = useState<FormMode>("none");
-  const printRef = usePrintFitToPage<HTMLDivElement>();
+  // 동희 반입반출증은 품목 수에 따라 여러 페이지로 늘어나는 게 정상이라, 전체를
+  // 억지로 1페이지에 욱여넣는 이 훅을 꺼야 함(아래 dongheePages 참고).
+  const printRef = usePrintFitToPage<HTMLDivElement>(270, formMode === "donghee");
   useEscapeKey(true, () => router.push(closeHref));
 
   // 마스터 목록 패딩용 항목(이 명세서에 실제로 안 담긴 것)은 제외 — 그렇지 않으면
@@ -57,6 +59,20 @@ export function ToolChecklistDetailReport({
     .filter((it) => it.for_access_pass && it.quantity.trim() !== "")
     .map((it) => ({ tool_name: it.tool_name, quantity: it.quantity }));
   const metaLine = `${projectName ? `${projectName} · ` : ""}${tripDate ? formatDate(tripDate) : "출장일 미지정"}`;
+
+  // 동희 반입반출증 한 장(DongheeAccessPassPermitTable)은 원본 서류와 동일하게
+  // 품목 5줄 고정이라, 품목이 5개보다 많으면 여러 장으로 나눠야 함. 한 장은 A5라
+  // 가로 A4 한 페이지에 왼쪽/오른쪽 2장씩 들어가므로, 5개씩 나눈 "장" 목록을 다시
+  // 2개씩 묶어 페이지로 만든다(장이 홀수면 마지막 페이지 오른쪽은 비워둠 — 예전처럼
+  // 왼쪽과 같은 내용을 복제하지 않음).
+  const dongheeForms: { tool_name: string; quantity: string }[][] = [];
+  for (let i = 0; i < accessPassItems.length; i += DONGHEE_ROW_COUNT) {
+    dongheeForms.push(accessPassItems.slice(i, i + DONGHEE_ROW_COUNT));
+  }
+  const dongheePages: { tool_name: string; quantity: string }[][][] = [];
+  for (let i = 0; i < dongheeForms.length; i += 2) {
+    dongheePages.push(dongheeForms.slice(i, i + 2));
+  }
 
   async function handleExcel() {
     if (formMode === "kia") {
@@ -150,17 +166,29 @@ export function ToolChecklistDetailReport({
           <p className="py-6 text-center text-slate-400">반입반출증용으로 표시된 품목이 없습니다.</p>
         ) : (
           // 동희오토 양식은 원래 A5 규격이라, 인쇄 시 용지를 가로로 돌려 왼쪽/오른쪽에
-          // 2장씩 나란히 들어가도록 같은 내용을 두 번 렌더링함(용지 방향 전환은
-          // globals.css의 .print-donghee-landscape). 가운데 절취선은 화면에서만
-          // 보이고 인쇄 시에는 숨김.
-          <div className="print-donghee-landscape flex gap-4 print:gap-3">
-            <div className="flex-1">
-              <DongheeAccessPassPermitTable items={accessPassItems} />
-            </div>
-            <div className="w-px shrink-0 border-l border-dashed border-slate-300 print:hidden" />
-            <div className="flex-1 print:break-inside-avoid">
-              <DongheeAccessPassPermitTable items={accessPassItems} />
-            </div>
+          // 2장씩 들어가게 배치함(용지 방향 전환은 globals.css의
+          // .print-donghee-landscape). 품목이 5개(장당 고정 줄 수)를 넘으면 왼쪽·오른쪽에
+          // 서로 다른 품목을 담은 다음 장으로 이어지고, 그래도 남으면 다음 페이지로
+          // 계속됨 — 예전처럼 왼쪽·오른쪽에 같은 내용을 복제하지 않음. 오른쪽 자리가
+          // 없는 마지막 홀수 장은 비워둠. 가운데 절취선은 화면에서만 보이고 인쇄 시에는
+          // 숨김.
+          <div className="space-y-4 print:space-y-0">
+            {dongheePages.map((page, pageIdx) => (
+              <div
+                key={pageIdx}
+                className={`print-donghee-landscape flex gap-4 print:gap-3 print:break-inside-avoid ${
+                  pageIdx < dongheePages.length - 1 ? "print:break-after-page" : ""
+                }`}
+              >
+                <div className="flex-1">
+                  <DongheeAccessPassPermitTable items={page[0]} />
+                </div>
+                <div className="w-px shrink-0 border-l border-dashed border-slate-300 print:hidden" />
+                <div className="flex-1 print:break-inside-avoid">
+                  {page[1] && <DongheeAccessPassPermitTable items={page[1]} />}
+                </div>
+              </div>
+            ))}
           </div>
         )
       ) : (

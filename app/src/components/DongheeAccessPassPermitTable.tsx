@@ -4,13 +4,14 @@ import { formatPermitQuantity } from "@/lib/koreanNumber";
 // 동희오토(대외비/협력사)가 요구하는 "물품 반입증"(DAC-GA501-25-F01) 양식을 셀 단위로
 // 재현한 표. 사용자가 제공한 스캔 원본의 칸 구성·문구를 그대로 옮기되, 서명·인장이
 // 필요한 칸(반입자, 연락처, 경비실 확인자 등)은 원본과 마찬가지로 빈칸으로 둔다.
-// 품목 줄 수는 원본 PDF와 동일하게 5개 고정(실제 품목이 더 많아도 늘어나지 않음).
-// 이 양식은 원래 A5 규격이라, 인쇄 시 A4를 가로(landscape)로 돌려 왼쪽/오른쪽에 2장씩
-// 들어가도록 ToolChecklistDetailReport에서 이 컴포넌트를 두 번 나란히 렌더링한다 —
+// 품목 줄 수는 원본 PDF와 동일하게 이 컴포넌트 한 장당 ROW_COUNT(5)개 고정 — 그래서
+// 품목이 더 많으면 ToolChecklistDetailReport가 이 컴포넌트를 여러 장으로 나눠 호출한다
+// (장마다 서로 다른 품목을 담음, 내용을 복제하지 않음). 이 양식은 원래 A5 규격이라,
+// 인쇄 시 A4를 가로(landscape)로 돌려 왼쪽/오른쪽에 장을 나란히 배치한다 —
 // 그래서 폭이 A5 실제 크기(약 140mm)에 맞춰 좁고 글자 크기도 작게 잡혀 있다.
 const THIN = "1px solid #000";
 const MEDIUM = "1.5px solid #000";
-const ROW_COUNT = 5;
+export const ROW_COUNT = 5;
 
 export type DongheePermitItem = { tool_name: string; quantity: string };
 
