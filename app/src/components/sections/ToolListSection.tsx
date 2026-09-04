@@ -30,14 +30,21 @@ type ChecklistItemRow = {
 
 function buildInitialFormState(items: ChecklistItemRow[]) {
   const initialQuantities: Record<string, string> = {};
+  // 마스터 공구를 이 명세서에서만 다르게 부른 이름(있으면) — 수정 화면을 다시 열 때
+  // 저장된 이름을 그대로 복원해서, 재저장 시 마스터 이름으로 되돌아가 버리지 않게 함.
+  const initialToolNames: Record<string, string> = {};
   const initialAdhocItems: { name: string; quantity: string; forAccessPass: boolean }[] = [];
   for (const i of items) {
     const qty = String(i.quantity ?? "").trim();
     if (!qty) continue;
-    if (i.tool_id) initialQuantities[i.tool_id] = qty;
-    else initialAdhocItems.push({ name: i.tool_name, quantity: qty, forAccessPass: Boolean(i.for_access_pass) });
+    if (i.tool_id) {
+      initialQuantities[i.tool_id] = qty;
+      initialToolNames[i.tool_id] = i.tool_name;
+    } else {
+      initialAdhocItems.push({ name: i.tool_name, quantity: qty, forAccessPass: Boolean(i.for_access_pass) });
+    }
   }
-  return { initialQuantities, initialAdhocItems };
+  return { initialQuantities, initialToolNames, initialAdhocItems };
 }
 
 export async function ToolListSection({
@@ -114,31 +121,39 @@ export async function ToolListSection({
   const copySource = copyFrom ? (checklists ?? []).find((c) => c.id === copyFrom) : null;
   const editSource = editFrom ? (checklists ?? []).find((c) => c.id === editFrom) : null;
 
-  const { initialQuantities, initialAdhocItems, initialTitle, initialProjectId, initialTripDate, initialHelperCount } =
-    editSource
+  const {
+    initialQuantities,
+    initialToolNames,
+    initialAdhocItems,
+    initialTitle,
+    initialProjectId,
+    initialTripDate,
+    initialHelperCount,
+  } = editSource
+    ? {
+        ...buildInitialFormState(itemsByChecklist.get(editSource.id) ?? []),
+        initialTitle: editSource.title as string,
+        initialProjectId: (editSource.project_id as string | null) ?? "",
+        initialTripDate: (editSource.trip_date as string | null) ?? undefined,
+        initialHelperCount: editSource.helper_count != null ? String(editSource.helper_count) : "",
+      }
+    : copySource
       ? {
-          ...buildInitialFormState(itemsByChecklist.get(editSource.id) ?? []),
-          initialTitle: editSource.title as string,
-          initialProjectId: (editSource.project_id as string | null) ?? "",
-          initialTripDate: (editSource.trip_date as string | null) ?? undefined,
-          initialHelperCount: editSource.helper_count != null ? String(editSource.helper_count) : "",
+          ...buildInitialFormState(itemsByChecklist.get(copySource.id) ?? []),
+          initialTitle: `${copySource.title} (복사)`,
+          initialProjectId: "",
+          initialTripDate: undefined as string | undefined,
+          initialHelperCount: copySource.helper_count != null ? String(copySource.helper_count) : "",
         }
-      : copySource
-        ? {
-            ...buildInitialFormState(itemsByChecklist.get(copySource.id) ?? []),
-            initialTitle: `${copySource.title} (복사)`,
-            initialProjectId: "",
-            initialTripDate: undefined as string | undefined,
-            initialHelperCount: copySource.helper_count != null ? String(copySource.helper_count) : "",
-          }
-        : {
-            initialQuantities: {},
-            initialAdhocItems: [],
-            initialTitle: "",
-            initialProjectId: "",
-            initialTripDate: undefined as string | undefined,
-            initialHelperCount: "",
-          };
+      : {
+          initialQuantities: {},
+          initialToolNames: {},
+          initialAdhocItems: [],
+          initialTitle: "",
+          initialProjectId: "",
+          initialTripDate: undefined as string | undefined,
+          initialHelperCount: "",
+        };
 
   const detailChecklist = checklist ? (checklists ?? []).find((c) => c.id === checklist) : null;
 
@@ -158,7 +173,7 @@ export async function ToolListSection({
         const item = itemByTool.get(t.id);
         return {
           id: t.id,
-          tool_name: t.name,
+          tool_name: item ? item.tool_name : t.name,
           quantity: item ? item.quantity : "",
           for_access_pass: item ? item.for_access_pass : t.for_access_pass,
         };
@@ -202,6 +217,7 @@ export async function ToolListSection({
           initialTripDate={initialTripDate}
           initialHelperCount={initialHelperCount}
           initialQuantities={initialQuantities}
+          initialToolNames={initialToolNames}
           initialAdhocItems={initialAdhocItems}
         />
 

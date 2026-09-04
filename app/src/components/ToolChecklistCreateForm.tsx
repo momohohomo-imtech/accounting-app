@@ -36,6 +36,7 @@ export function ToolChecklistCreateForm({
   initialTripDate,
   initialHelperCount = "",
   initialQuantities = {},
+  initialToolNames = {},
   initialAdhocItems = [],
 }: {
   tools: Tool[];
@@ -48,6 +49,8 @@ export function ToolChecklistCreateForm({
   initialTripDate?: string;
   initialHelperCount?: string;
   initialQuantities?: Record<string, string>;
+  /** 이 명세서에서만 다르게 저장된 공구 이름(공구 id별) — 수정 화면을 다시 열 때 복원됨. */
+  initialToolNames?: Record<string, string>;
   initialAdhocItems?: { name: string; quantity: string; forAccessPass: boolean }[];
 }) {
   const router = useRouter();
@@ -65,7 +68,7 @@ export function ToolChecklistCreateForm({
   const [quantities, setQuantities] = useState<Record<string, string>>(
     Object.keys(initialQuantities).length > 0 || isEdit ? initialQuantities : toolDefaultQuantities
   );
-  const [toolNames, setToolNames] = useState<Record<string, string>>({});
+  const [toolNames, setToolNames] = useState<Record<string, string>>(initialToolNames);
   const [adhocItems, setAdhocItems] = useState<AdhocItem[]>(
     initialAdhocItems.map((a) => ({ key: crypto.randomUUID(), ...a }))
   );
