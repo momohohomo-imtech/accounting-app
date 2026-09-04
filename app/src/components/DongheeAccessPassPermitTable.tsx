@@ -24,8 +24,18 @@ export const ROW_COUNT = 5;
 
 export type DongheePermitItem = { tool_name: string; quantity: string };
 
+// 셀 높이(height)는 아래 각 행의 mm 합이 페이지 높이 예산과 맞아떨어지게 계산해둔
+// 값이라, 라벨 텍스트가 좁은 칸에서 줄바꿈되면(예: "비고(부번/SER.NO)") 그 행만
+// 예산보다 커져서 전체 높이가 넘쳐버림 — 그래서 기본으로 한 줄 고정(nowrap)함.
 function cellStyle(heightMm: number, fontMm: number): CSSProperties {
-  return { border: THIN, height: `${heightMm}mm`, padding: "0 3mm", fontSize: `${fontMm}mm` };
+  return {
+    border: THIN,
+    height: `${heightMm}mm`,
+    padding: "0 3mm",
+    fontSize: `${fontMm}mm`,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  };
 }
 function labelStyle(heightMm: number, fontMm: number): CSSProperties {
   return { ...cellStyle(heightMm, fontMm), textAlign: "center", fontWeight: 600, background: "#f8f8f8" };
