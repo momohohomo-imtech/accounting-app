@@ -166,12 +166,12 @@ export function AccessApplicationPopup({
                 <tbody>
                   <tr>
                     <td style={{ border: "1px solid #000", padding: "7px 8px", fontWeight: 600 }}>업체명</td>
-                    <td colSpan={3} style={{ border: "1px solid #000", padding: "7px 8px" }}>
+                    <td colSpan={3} style={{ border: "1px solid #000", padding: "5px 8px" }}>
                       <input
                         value={companyField}
                         onChange={(e) => setCompanyField(e.target.value)}
                         className="w-full border-none bg-transparent p-0 focus:outline-none"
-                        style={{ fontSize: 12 }}
+                        style={{ fontSize: 18, fontWeight: 700 }}
                       />
                     </td>
                     <td style={{ border: "1px solid #000", padding: "7px 8px", fontWeight: 600 }}>작업허가번호</td>
@@ -263,28 +263,30 @@ export function AccessApplicationPopup({
                         style={{ fontSize: 12 }}
                       />
                     </td>
-                    <td style={{ border: "1px solid #000", padding: "8px 4px" }}>
+                    {/* 이름/생년월일/연락처만 글씨를 키움 — 대신 칸 안쪽 여백을 줄여서
+                        줄 전체 높이(=인쇄 시 전체 페이지 크기)는 그대로 유지함. */}
+                    <td style={{ border: "1px solid #000", padding: "6px 4px" }}>
                       <input
                         value={r.name}
                         onChange={(e) => updateRow(r.key, { name: e.target.value })}
                         className="w-full border-none bg-transparent p-0 text-center focus:outline-none"
-                        style={{ fontSize: 12 }}
+                        style={{ fontSize: 15, fontWeight: 600 }}
                       />
                     </td>
-                    <td style={{ border: "1px solid #000", padding: "8px 4px" }}>
+                    <td style={{ border: "1px solid #000", padding: "6px 4px" }}>
                       <input
                         value={r.birthDate}
                         onChange={(e) => updateRow(r.key, { birthDate: e.target.value })}
                         className="w-full border-none bg-transparent p-0 text-center focus:outline-none"
-                        style={{ fontSize: 12 }}
+                        style={{ fontSize: 15, fontWeight: 600 }}
                       />
                     </td>
-                    <td style={{ border: "1px solid #000", padding: "8px 4px" }}>
+                    <td style={{ border: "1px solid #000", padding: "6px 4px" }}>
                       <input
                         value={r.phone}
                         onChange={(e) => updateRow(r.key, { phone: e.target.value })}
                         className="w-full border-none bg-transparent p-0 text-center focus:outline-none"
-                        style={{ fontSize: 12 }}
+                        style={{ fontSize: 15, fontWeight: 600 }}
                       />
                     </td>
                     <td style={{ border: "1px solid #000", padding: "8px 4px" }}>
