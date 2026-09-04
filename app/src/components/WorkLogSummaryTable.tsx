@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { WorkLogSummaryRow } from "@/lib/workLogSummary";
 import { WorkLogGroupDetailPopup } from "@/components/WorkLogGroupDetailPopup";
+import { setWorkLogSummaryCheck } from "@/lib/actions/workLogSummaryChecks";
 
 type SortKey = "siteName" | "title" | "days" | "dates";
 
@@ -28,14 +29,38 @@ export function WorkLogSummaryTable({
   rows,
   emptyMessage,
   year,
+  initialChecked = [],
 }: {
   rows: WorkLogSummaryRow[];
   emptyMessage: string;
   year: number;
+  initialChecked?: string[];
 }) {
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [openGroup, setOpenGroup] = useState<WorkLogSummaryRow | null>(null);
+  const [checked, setChecked] = useState<Set<string>>(() => new Set(initialChecked));
+
+  // 체크는 화면에 바로 반영(낙관적 업데이트)하고 저장 요청은 뒤에서 보냄 — 실패하면
+  // 원래 상태로 되돌림. 서버 저장 덕분에 다음에 다시 열어도 체크 상태가 유지됨.
+  async function toggleChecked(key: string) {
+    const willBeChecked = !checked.has(key);
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (willBeChecked) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+    const result = await setWorkLogSummaryCheck(year, key, willBeChecked);
+    if (result?.error) {
+      setChecked((prev) => {
+        const next = new Set(prev);
+        if (willBeChecked) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+    }
+  }
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -75,6 +100,7 @@ export function WorkLogSummaryTable({
       <table className="w-full min-w-[650px] text-sm">
         <thead>
           <tr className="border-b border-slate-200 text-left text-slate-500">
+            <th className="pb-2 pr-2 w-6" />
             <th className="pb-2 pr-4">{headerButton("siteName", "현장")}</th>
             <th className="pb-2 pr-4">{headerButton("title", "내용")}</th>
             <th className="pb-2 pr-4 text-right">{headerButton("days", "일수")}</th>
@@ -82,30 +108,44 @@ export function WorkLogSummaryTable({
           </tr>
         </thead>
         <tbody>
-          {sorted.map((r) => (
-            <tr key={`${r.siteId}::${r.title}`} className="border-b border-slate-100 last:border-0">
-              <td className="py-2 pr-4">
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: r.siteColor }} />
-                  {r.siteName}
-                </span>
-              </td>
-              <td className="py-2 pr-4">
-                <button
-                  type="button"
-                  onClick={() => setOpenGroup(r)}
-                  className="text-left text-slate-700 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
-                >
-                  {r.title}
-                </button>
-              </td>
-              <td className="py-2 pr-4 text-right font-mono text-slate-900">{r.days}일</td>
-              <td className="py-2 text-xs text-slate-500">{r.dates.map(formatMonthDay).join(", ")}</td>
-            </tr>
-          ))}
+          {sorted.map((r) => {
+            const key = `${r.siteId}::${r.title}`;
+            const isChecked = checked.has(key);
+            return (
+              <tr key={key} className="border-b border-slate-100 last:border-0">
+                <td className="py-2 pr-2">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => toggleChecked(key)}
+                    className="h-3.5 w-3.5"
+                  />
+                </td>
+                <td className="py-2 pr-4">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: r.siteColor }} />
+                    {r.siteName}
+                  </span>
+                </td>
+                <td className="py-2 pr-4">
+                  <button
+                    type="button"
+                    onClick={() => setOpenGroup(r)}
+                    className={`text-left underline decoration-slate-300 underline-offset-2 hover:text-slate-900 ${
+                      isChecked ? "text-slate-400 line-through" : "text-slate-700"
+                    }`}
+                  >
+                    {r.title}
+                  </button>
+                </td>
+                <td className="py-2 pr-4 text-right font-mono text-slate-900">{r.days}일</td>
+                <td className="py-2 text-xs text-slate-500">{r.dates.map(formatMonthDay).join(", ")}</td>
+              </tr>
+            );
+          })}
           {sorted.length === 0 && (
             <tr>
-              <td colSpan={4} className="py-6 text-center text-slate-400">
+              <td colSpan={5} className="py-6 text-center text-slate-400">
                 {emptyMessage}
               </td>
             </tr>

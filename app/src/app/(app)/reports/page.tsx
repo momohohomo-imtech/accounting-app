@@ -310,7 +310,7 @@ export default async function ReportsPage({
     ? `${selectedYear}-${pad(unassignedMonthNum)}-${pad(uEndDay)}`
     : `${selectedYear}-12-31`;
 
-  const [{ data: wlRows }, { data: wlSites }, { data: unassignedLogRows }] = await Promise.all([
+  const [{ data: wlRows }, { data: wlSites }, { data: unassignedLogRows }, { data: wlChecks }] = await Promise.all([
     supabase.from("work_logs").select("*").gte("log_date", wlStart).lte("log_date", wlEnd),
     supabase.from("sites").select("id, name, color"),
     supabase
@@ -321,6 +321,7 @@ export default async function ReportsPage({
       .gte("log_date", uStart)
       .lte("log_date", uEnd)
       .order("log_date", { ascending: true }),
+    supabase.from("work_log_summary_checks").select("group_key").eq("year", selectedYear),
   ]);
 
   const wlRowsFiltered = wlSite ? (wlRows ?? []).filter((r) => r.site_id === wlSite) : wlRows ?? [];
@@ -594,6 +595,7 @@ export default async function ReportsPage({
           rows={workLogSummary}
           emptyMessage="이 기간에 현장이 지정된 작업일지가 없습니다."
           year={selectedYear}
+          initialChecked={(wlChecks ?? []).map((c) => c.group_key)}
         />
       </CollapsibleSection>
 
