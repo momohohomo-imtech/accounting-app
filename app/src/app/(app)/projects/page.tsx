@@ -11,7 +11,7 @@ import { PurchaseOrdersSection } from "@/components/sections/PurchaseOrdersSecti
 import { YearFilter } from "@/components/YearFilter";
 import { ProjectProfitReport } from "@/components/ProjectProfitReport";
 import { LinkButton } from "@/components/ui/Button";
-import { PROJECT_STATUS_OPTIONS, PROJECT_STATUS_COLLECTED } from "@/lib/projectStatus";
+import { PROJECT_STATUS_OPTIONS, PROJECT_STATUS_COLLECTED, PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
 import { formatWon } from "@/lib/format";
 import { ProjectListExportButtons } from "@/components/ProjectListExportButtons";
 
@@ -21,6 +21,15 @@ const TABS = [
   { key: "quotes", label: "견적서" },
   { key: "purchase_orders", label: "발주서" },
 ];
+
+// 프로젝트 목록 행 배경색 — 완료 수금대기는 파랑으로 따로 강조하고, 수금 완료 전
+// 나머지 상태는 전부 옅은 빨강, 수금 완료는 배경 없음(정상).
+const STATUS_ROW_BACKGROUND: Record<string, "red" | "blue"> = Object.fromEntries(
+  PROJECT_STATUS_OPTIONS.filter((o) => o.value !== PROJECT_STATUS_COLLECTED).map((o) => [
+    o.value,
+    o.value === PROJECT_STATUS_AWAITING_PAYMENT ? "blue" : "red",
+  ])
+);
 
 export default async function ProjectsPage({
   searchParams,
@@ -146,7 +155,7 @@ async function ProjectListSection({
       type: "select",
       options: PROJECT_STATUS_OPTIONS,
       width: "6%",
-      rowBackgroundUnless: PROJECT_STATUS_COLLECTED,
+      rowBackgroundByValue: STATUS_ROW_BACKGROUND,
     },
     {
       name: "is_service",

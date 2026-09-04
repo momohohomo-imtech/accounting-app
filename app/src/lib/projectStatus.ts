@@ -10,6 +10,8 @@ export const PROJECT_STATUS_OPTIONS = [
 
 // 수금 완료 전(= 이 값이 아닌) 프로젝트 행을 목록에서 옅은 빨강 배경으로 강조하는 데 씀.
 export const PROJECT_STATUS_COLLECTED = "collected";
+// 완료 수금대기 상태는 목록에서 옅은 파랑 배경으로 별도 강조하는 데 씀.
+export const PROJECT_STATUS_AWAITING_PAYMENT = "done_awaiting_payment";
 
 export function projectStatusLabel(status: string | null | undefined) {
   return PROJECT_STATUS_OPTIONS.find((o) => o.value === status)?.label ?? status ?? "-";

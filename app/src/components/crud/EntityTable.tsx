@@ -39,9 +39,13 @@ function cellColorClass(row: Row, f: FieldConfig): string | undefined {
   return undefined;
 }
 
+const ROW_BG_CLASS = { red: "bg-red-50", blue: "bg-blue-50" } as const;
+
 function rowBgClass(row: Row, fields: FieldConfig[]): string | undefined {
-  const f = fields.find((f) => f.rowBackgroundUnless !== undefined);
-  if (f && row[f.name] !== f.rowBackgroundUnless) return "bg-red-50";
+  for (const f of fields) {
+    const color = f.rowBackgroundByValue?.[row[f.name] as string];
+    if (color) return ROW_BG_CLASS[color];
+  }
   return undefined;
 }
 
