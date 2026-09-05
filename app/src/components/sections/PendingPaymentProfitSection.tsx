@@ -3,6 +3,11 @@ import { formatWon } from "@/lib/format";
 import { PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
 import { estimateIncomeTax, currentBracketIndex, INCOME_TAX_BRACKETS } from "@/lib/tax";
 import { HalfYearSettlementInput } from "@/components/sections/HalfYearSettlementInput";
+import { one } from "@/lib/relations";
+
+// 직원 급여/상여/4대보험 지출은 employees/payroll 관리 화면이 아니라 매입매출장에
+// 이 카테고리로 찍힌 매입 기준으로 집계한다 (payroll 테이블은 입력이 다 안 돼 있어 누락됨).
+const PAYROLL_CATEGORY_NAME = "직원급여/상여/4대보험";
 
 function taxEstimate(profit: number) {
   const taxBase = Math.max(profit, 0);
@@ -19,11 +24,9 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
     { data: pendingProjects },
     { data: unbilledProjects },
     { data: yearProjects },
-    { data: generalTx },
-    { data: payrollRows },
+    { data: nullProjectTx },
     { data: halfYearRow },
     { data: h2Tx },
-    { data: h2PayrollRows },
   ] = await Promise.all([
     // 대시보드 필터 연도의 완료 수금대기 프로젝트만 (모든 항목을 필터 연도 기준으로 통일).
     supabase
@@ -40,33 +43,27 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
       .in("status", [PROJECT_STATUS_AWAITING_PAYMENT, "done"])
       .eq("year", year),
     supabase.from("projects").select("id, quote_amount, status").eq("year", year),
-    // "일반경비" = 프로젝트에 귀속되지 않은(project_id가 없는) 매입 거래 (앱 전반의 표시 관례와 동일)
+    // 프로젝트에 귀속되지 않은(project_id가 없는) 매입 거래 전체(연간) — 카테고리별로
+    // "일반경비"(직원급여 제외)와 "직원급여/상여/4대보험"(payroll 관리 화면이 아니라
+    // 매입매출장의 이 카테고리 기준으로 집계, employees/payroll 입력 누락과 무관하게 실측)로 나눠 씀.
     supabase
       .from("transactions")
-      .select("purchase_amount, purchase_vat")
+      .select("purchase_amount, purchase_vat, trans_date, expense_categories(name)")
       .eq("type", "매입")
       .is("project_id", null)
       .gte("trans_date", `${year}-01-01`)
       .lte("trans_date", `${year}-12-31`),
-    supabase
-      .from("payroll")
-      .select("amount, bonus, health_insurance, long_term_care_insurance, employment_insurance, national_pension")
-      .gte("pay_month", `${year}-01-01`)
-      .lte("pay_month", `${year}-12-31`),
     supabase.from("half_year_settlements").select("profit_amount").eq("year", year).eq("half", 1).maybeSingle(),
     // 하반기 집계 이익금: TaxEstimateSection과 동일하게 부가세 제외한 매출-매입(원장 기준)으로 계산
     supabase
       .from("transactions")
-      .select("sales_amount, purchase_amount, project_id")
+      .select("sales_amount, purchase_amount, project_id, expense_categories(name)")
       .gte("trans_date", `${year}-07-01`)
       .lte("trans_date", `${year}-12-31`),
-    // 하반기 직원급여/상여/4대보험
-    supabase
-      .from("payroll")
-      .select("amount, bonus, health_insurance, long_term_care_insurance, employment_insurance, national_pension")
-      .gte("pay_month", `${year}-07-01`)
-      .lte("pay_month", `${year}-12-31`),
   ]);
+
+  const payrollTx = (nullProjectTx ?? []).filter((t) => one(t.expense_categories)?.name === PAYROLL_CATEGORY_NAME);
+  const generalTx = (nullProjectTx ?? []).filter((t) => one(t.expense_categories)?.name !== PAYROLL_CATEGORY_NAME);
 
   const pendingRows = pendingProjects ?? [];
   const unbilledRows = unbilledProjects ?? [];
@@ -114,12 +111,8 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
     (p) => p.status !== "done" && p.status !== PROJECT_STATUS_AWAITING_PAYMENT
   );
 
-  const generalExpense = (generalTx ?? []).reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
-  const payrollCost = (payrollRows ?? []).reduce(
-    (s, p) =>
-      s + p.amount + p.bonus + p.health_insurance + p.long_term_care_insurance + p.employment_insurance + p.national_pension,
-    0
-  );
+  const generalExpense = generalTx.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
+  const payrollCost = payrollTx.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
   const profitEstimate = yearProfitSum - generalExpense - payrollCost;
   const profitTax = taxEstimate(profitEstimate);
 
@@ -143,17 +136,16 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
     (s, p) => s + p.quote_amount! - (purchaseByProjectH2.get(p.id) ?? 0) - (agencyByProject.get(p.id) ?? 0),
     0
   );
-  // 미발행 예상 이익금에 이미 하반기 매입이 반영된 프로젝트들은 하반기 매출-매입 집계에서
-  // 빼서, 그 프로젝트들의 하반기 매입이 두 항목에서 이중으로 차감되지 않게 한다.
+  // 미발행 예상 이익금에 이미 하반기 매입이 반영된 프로젝트들과, 직원급여 카테고리(아래
+  // h2PayrollCost에서 따로 뺌)는 하반기 매출-매입 집계에서 빼서 이중으로 차감되지 않게 한다.
   const unbilledProjectIdSet = new Set(unbilledProjectsWithProfit.map((p) => p.id));
   const h2Profit = (h2Tx ?? [])
     .filter((t) => !t.project_id || !unbilledProjectIdSet.has(t.project_id))
+    .filter((t) => one(t.expense_categories)?.name !== PAYROLL_CATEGORY_NAME)
     .reduce((s, t) => s + t.sales_amount - t.purchase_amount, 0);
-  const h2PayrollCost = (h2PayrollRows ?? []).reduce(
-    (s, p) =>
-      s + p.amount + p.bonus + p.health_insurance + p.long_term_care_insurance + p.employment_insurance + p.national_pension,
-    0
-  );
+  const h2PayrollCost = payrollTx
+    .filter((t) => t.trans_date >= `${year}-07-01`)
+    .reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
   const half1Profit = halfYearRow?.profit_amount ?? null;
   const combinedProfit =
     half1Profit != null ? half1Profit + h2Profit + unbilledPendingProfit - h2PayrollCost : null;
