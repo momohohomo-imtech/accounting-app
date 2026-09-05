@@ -234,6 +234,11 @@ async function TransactionListSection({
     isLedgerVisible(t, (relevantPayments ?? []) as CreditPayment[])
   );
 
+  const filteredNetTotal = transactions.reduce(
+    (s, t) => s + (t.type === "매출" ? t.sales_amount + t.sales_vat : -(t.purchase_amount + t.purchase_vat)),
+    0
+  );
+
   const projectNodes = (projectTree ?? []).map((p) => {
     const site = one(p.sites) as { name: string; clients?: unknown } | undefined;
     const client = one(site?.clients) as { name: string } | undefined;
@@ -293,6 +298,15 @@ async function TransactionListSection({
         </div>
         <TransactionExportButtons transactions={transactions as Transaction[]} />
       </div>
+
+      <p className="text-sm text-slate-600">
+        필터된 전체 금액{" "}
+        <span className={`font-mono font-semibold ${filteredNetTotal >= 0 ? "text-blue-700" : "text-red-600"}`}>
+          {filteredNetTotal >= 0 ? "+" : "-"}
+          {formatWon(Math.abs(filteredNetTotal))}
+        </span>
+        {" (매출 +, 매입 -)"}
+      </p>
 
       <Card>
         <TransactionTable
