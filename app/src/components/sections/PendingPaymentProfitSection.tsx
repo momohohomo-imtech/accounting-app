@@ -33,13 +33,20 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
     { data: h2Tx },
     { data: h2PayrollRows },
   ] = await Promise.all([
+    // 대시보드 필터 연도의 완료 수금대기 프로젝트만 (모든 항목을 필터 연도 기준으로 통일).
     supabase
       .from("projects")
       .select("id, contract_amount, quote_amount")
-      .eq("status", PROJECT_STATUS_AWAITING_PAYMENT),
+      .eq("status", PROJECT_STATUS_AWAITING_PAYMENT)
+      .eq("year", year),
     // 세금계산서 미발행 예상 이익금 대상: 완료 수금대기 + 공사 완료(둘 다 매출/세금계산서가
-    // 아직 없는 경우가 많음 — 프로젝트 페이지의 hasIncompleteProjects 판단과 동일한 범위).
-    supabase.from("projects").select("id, quote_amount").in("status", [PROJECT_STATUS_AWAITING_PAYMENT, "done"]),
+    // 아직 없는 경우가 많음 — 프로젝트 페이지의 hasIncompleteProjects 판단과 동일한 범위),
+    // 마찬가지로 필터 연도로 한정.
+    supabase
+      .from("projects")
+      .select("id, quote_amount")
+      .in("status", [PROJECT_STATUS_AWAITING_PAYMENT, "done"])
+      .eq("year", year),
     supabase.from("projects").select("id, quote_amount, status").eq("year", year),
     // "일반경비" = 프로젝트에 귀속되지 않은(project_id가 없는) 매입 거래 (앱 전반의 표시 관례와 동일).
     // "직원급여/상여/4대보험" 카테고리는 payroll 테이블에서 따로 빼므로 여기선 제외.
@@ -60,7 +67,7 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
     // 계산하되, "직원급여/상여/4대보험" 카테고리 매입은 payroll 테이블 쪽에서 따로 빼므로 제외.
     supabase
       .from("transactions")
-      .select("sales_amount, purchase_amount, expense_categories(name)")
+      .select("sales_amount, purchase_amount, project_id, expense_categories(name)")
       .gte("trans_date", `${year}-07-01`)
       .lte("trans_date", `${year}-12-31`),
     // 하반기 직원급여/상여/4대보험
@@ -92,7 +99,7 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
       ])
     : [{ data: [] as { project_id: string | null; purchase_amount: number; purchase_vat: number }[] }, { data: [] as { project_id: string; amount: number }[] }];
 
-  // --- 현재 공사 완료 수금 대기: 프로젝트 상태가 "완료 수금대기"인 건들의 수주액 합계 ---
+  // --- {year}년 공사 완료 수금 대기: 필터 연도의 프로젝트 상태가 "완료 수금대기"인 건들의 수주액 합계 ---
   const pendingReceivable = pendingRows.reduce((s, p) => s + (p.contract_amount ?? p.quote_amount ?? 0), 0);
 
   // --- {year}년 이익 예상: 프로젝트 총이익금 - 카테고리 일반경비 - 직원급여/상여/4대보험 ---
@@ -138,8 +145,12 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
     (s, p) => s + p.quote_amount! - (purchaseByProject.get(p.id) ?? 0) - (agencyByProject.get(p.id) ?? 0),
     0
   );
+  // 미발행 예상 이익금에 이미 전체 매입이 반영된 프로젝트들은 하반기 매출-매입 집계에서
+  // 빼서, 그 프로젝트들의 하반기 매입이 두 항목에서 이중으로 차감되지 않게 한다.
+  const unbilledProjectIdSet = new Set(unbilledProjectsWithProfit.map((p) => p.id));
   const h2Profit = (h2Tx ?? [])
     .filter((t) => !isPayrollCategory(t))
+    .filter((t) => !t.project_id || !unbilledProjectIdSet.has(t.project_id))
     .reduce((s, t) => s + t.sales_amount - t.purchase_amount, 0);
   const h2PayrollCost = (h2PayrollRows ?? []).reduce(
     (s, p) =>
@@ -155,7 +166,7 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
     <div className="space-y-1 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-900">
       {pendingRows.length > 0 && (
         <p>
-          <span className="font-semibold">현재 공사 완료 수금 대기</span>
+          <span className="font-semibold">{year}년 공사 완료 수금 대기</span>
           {" — "}
           <span className="font-mono font-semibold">{formatWon(pendingReceivable)}</span>
           {` (${pendingRows.length}건)`}
@@ -196,7 +207,7 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
               {" (7~12월 원장 기준, 부가세 제외, 일반경비 포함)"}
             </p>
             <p>
-              <span className="font-semibold">세금계산서 미발행 예상 이익금</span>
+              <span className="font-semibold">{year}년 세금계산서 미발행 예상 이익금</span>
               {" — "}
               <span className="font-mono font-semibold">{formatWon(unbilledPendingProfit)}</span>
               {` (완료 수금대기·공사 완료·진행중 ${unbilledProjectsWithProfit.length}건)`}
