@@ -116,8 +116,12 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
   // --- 하반기(7~12월) 집계 이익금 + 상반기 확정 이익금(세무사 결산) 합산 예상 세액 ---
   // 세금계산서 아직 안 끊은 이익금: 완료 수금대기·공사 완료 프로젝트는 매입은 원장에
   // 반영돼 있어도 매출이 아직 없어서 하반기 매출-매입만으로는 그 프로젝트의 예상 이익이
-  // 누락됨 — 여기서 보충.
-  const unbilledProjectsWithProfit = unbilledRows.filter((p) => p.quote_amount != null);
+  // 누락됨 — 여기서 보충. 진행중 프로젝트도 발주액(이익금)이 잡혀 있는 건 같은 이유로 포함.
+  const ongoingYearProjectsWithProfit = yearRows.filter((p) => p.status === "ongoing" && p.quote_amount != null);
+  const unbilledProjectsWithProfit = [
+    ...unbilledRows.filter((p) => p.quote_amount != null),
+    ...ongoingYearProjectsWithProfit,
+  ];
   const unbilledPendingProfit = unbilledProjectsWithProfit.reduce(
     (s, p) => s + p.quote_amount! - (purchaseByProject.get(p.id) ?? 0) - (agencyByProject.get(p.id) ?? 0),
     0
@@ -181,7 +185,7 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
               <span className="font-semibold">세금계산서 미발행 예상 이익금</span>
               {" — "}
               <span className="font-mono font-semibold">{formatWon(unbilledPendingProfit)}</span>
-              {` (완료 수금대기·공사 완료 ${unbilledProjectsWithProfit.length}건)`}
+              {` (완료 수금대기·공사 완료·진행중 ${unbilledProjectsWithProfit.length}건)`}
             </p>
             <p>
               <span className="font-semibold">{year}년 하반기 직원급여/상여/4대보험</span>
