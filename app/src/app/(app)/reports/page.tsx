@@ -488,20 +488,22 @@ export default async function ReportsPage({
           <YearFilter basePath="/reports" years={years} selectedYear={selectedYear} />
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">{selectedYear}년 총 매출액</p>
-            <p className="mt-2 font-mono text-2xl font-bold text-slate-900">{formatWon(yearTotal.sales)}</p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">{selectedYear}년 총 매입액</p>
-            <p className="mt-2 font-mono text-2xl font-bold text-slate-900">{formatWon(yearTotal.purchase)}</p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">{selectedYear}년 순손익</p>
-            <p className="mt-2 font-mono text-2xl font-bold text-slate-900">
-              {formatWon(yearTotal.sales - yearTotal.purchase)}
-            </p>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+              <p className="text-sm text-slate-500">{selectedYear}년 총 매출액</p>
+              <p className="mt-2 font-mono text-2xl font-bold text-slate-900">{formatWon(yearTotal.sales)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">{selectedYear}년 총 매입액</p>
+              <p className="mt-2 font-mono text-2xl font-bold text-slate-900">{formatWon(yearTotal.purchase)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">{selectedYear}년 순손익</p>
+              <p className="mt-2 font-mono text-2xl font-bold text-slate-900">
+                {formatWon(yearTotal.sales - yearTotal.purchase)}
+              </p>
+            </div>
           </div>
         </div>
 
