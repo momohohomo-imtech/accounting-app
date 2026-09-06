@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { ExpenseCategory, PaymentMethod, Transaction } from "@/lib/types";
 import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components/ProjectPicker";
 import { bulkImportTransactions, type BulkTransactionInput } from "@/lib/actions/transactions";
-import { formatWon } from "@/lib/format";
+import { formatWon, todayString } from "@/lib/format";
 import { VAT_EXEMPT_CATEGORIES } from "@/lib/vatExempt";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import { useEscapeKey } from "@/lib/useEscapeKey";
@@ -78,7 +78,7 @@ export function TransactionForm({
   );
 
   const [values, setValues] = useState({
-    trans_date: initial?.trans_date ?? new Date().toISOString().slice(0, 10),
+    trans_date: initial?.trans_date ?? todayString(),
     type: initial?.type ?? "매입",
     client_id: initial?.client_id ?? "",
     client_name_raw: initial?.client_name_raw ?? "",

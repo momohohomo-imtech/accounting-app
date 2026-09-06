@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { fieldClass } from "@/components/ui/field";
-import { formatWon } from "@/lib/format";
+import { formatWon, todayString } from "@/lib/format";
 import { cx } from "@/lib/cx";
 import { Button } from "@/components/ui/Button";
 import { bulkImportTransactions, type BulkTransactionInput } from "@/lib/actions/transactions";
@@ -78,7 +78,7 @@ export function TransactionBulkImport({
           const clientId = matchId(clients, r.client_name);
           const projectId = matchId(projects, r.project_name);
           return {
-            trans_date: r.trans_date || new Date().toISOString().slice(0, 10),
+            trans_date: r.trans_date || todayString(),
             type: r.type === "매출" ? "매출" : "매입",
             client_id: clientId,
             client_name_raw: clientId ? null : r.client_name?.trim() || null,

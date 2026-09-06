@@ -13,6 +13,15 @@ export function formatDate(date: string | null | undefined) {
   return date.slice(0, 10);
 }
 
+// new Date().toISOString().slice(0, 10)는 UTC 기준이라, 한국 시간 자정~오전 9시
+// 사이에는 하루 전 날짜가 나오는 버그가 있음 — 로컬 타임존 기준으로 오늘 날짜를 구함.
+export function todayString() {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
 export function formatFileSize(bytes: number | null | undefined) {
   if (!bytes) return "-";
   if (bytes < 1024) return `${bytes}B`;
