@@ -5,6 +5,7 @@ import { ProjectProfitReport } from "@/components/ProjectProfitReport";
 import { VendorDetailReport } from "@/components/VendorDetailReport";
 import { YearFilter } from "@/components/YearFilter";
 import { ReportProjectSiteFilter } from "@/components/ReportProjectSiteFilter";
+import { ReportProjectPicker } from "@/components/ReportProjectPicker";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { AutoPrint } from "@/components/AutoPrint";
 import { ReportAIInsights } from "@/components/ReportAIInsights";
@@ -548,6 +549,13 @@ export default async function ReportsPage({
               </span>
               {projectSiteOptions.length > 0 && (
                 <ReportProjectSiteFilter year={selectedYear} siteOptions={projectSiteOptions} selectedSite={site} />
+              )}
+              {byProject.length > 0 && (
+                <ReportProjectPicker
+                  year={selectedYear}
+                  site={site}
+                  projects={[...byProject].sort((a, b) => a.name.localeCompare(b.name, "ko"))}
+                />
               )}
               <Link
                 href={`/reports?year=${selectedYear}${site ? `&site=${site}` : ""}&printProjects=1`}
