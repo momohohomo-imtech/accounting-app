@@ -14,6 +14,7 @@ import { resolveCategoryColor } from "@/lib/categoryColor";
 import type { ReportAiInsight, CreditPayment } from "@/lib/types";
 import { VendorAggregateTable } from "@/components/VendorAggregateTable";
 import { VendorAgencyToggle } from "@/components/VendorAgencyToggle";
+import { ClassificationPendingTable } from "@/components/ClassificationPendingTable";
 import { CategoryAggregateTable } from "@/components/CategoryAggregateTable";
 import { CategoryDetailReport } from "@/components/CategoryDetailReport";
 import { ProjectProfitTable } from "@/components/ProjectProfitTable";
@@ -269,6 +270,23 @@ export default async function ReportsPage({
         return Array.from(merged.values()).sort((x, y) => y.amount - x.amount);
       })()
     : byVendorPurchaseOnly;
+
+  // 프로젝트 분류 대기 중인 거래 (엑셀 대량입력에서 프로젝트명은 인식했지만 실제
+  // project_id 매칭을 못 찾아 담당자 확인이 필요한 건들)
+  const classificationPendingRows = transactions
+    .filter((t) => t.needs_classification)
+    .map((t) => {
+      const client = one(t.clients) as { name: string } | null;
+      return {
+        id: t.id,
+        date: t.trans_date,
+        type: t.type,
+        clientName: client?.name ?? t.client_name_raw ?? "미지정",
+        itemName: t.item_name ?? "-",
+        amount: t.type === "매출" ? t.sales_amount + t.sales_vat : t.purchase_amount + t.purchase_vat,
+        editHref: `/reports?year=${selectedYear}${site ? `&site=${site}` : ""}&editTx=${t.id}`,
+      };
+    });
 
   // 카테고리별 매입 집계
   const byCategory = (() => {
@@ -570,6 +588,10 @@ export default async function ReportsPage({
           headerExtra={<VendorAgencyToggle checked={includeVendorAgency} />}
         >
           <VendorAggregateTable rows={byVendor} year={selectedYear} vendorAgency={includeVendorAgency} />
+        </CollapsibleSection>
+
+        <CollapsibleSection title={`프로젝트 분류 대기 중 — ${classificationPendingRows.length}건`}>
+          <ClassificationPendingTable rows={classificationPendingRows} />
         </CollapsibleSection>
 
         <CollapsibleSection title="카테고리별 집계 — 어느 카테고리에 얼마를 매입했는지">
