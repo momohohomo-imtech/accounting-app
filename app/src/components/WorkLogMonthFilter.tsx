@@ -15,7 +15,7 @@ export function WorkLogMonthFilter({ year, month }: { year: number; month: numbe
       setYearInput(String(year));
       return;
     }
-    if (y !== year) router.push(`/worklogs?year=${y}&month=${month}`);
+    if (y !== year) router.push(`/worklogs?year=${y}&month=${month}`, { scroll: false });
   };
 
   return (
@@ -41,7 +41,7 @@ export function WorkLogMonthFilter({ year, month }: { year: number; month: numbe
           <button
             key={m}
             type="button"
-            onClick={() => router.push(`/worklogs?year=${year}&month=${m}`)}
+            onClick={() => router.push(`/worklogs?year=${year}&month=${m}`, { scroll: false })}
             className={cx(
               "rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
               m === month ? "bg-slate-900 text-white" : "border border-slate-300 text-slate-600 hover:bg-slate-100"

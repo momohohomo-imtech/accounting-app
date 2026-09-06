@@ -60,7 +60,7 @@ export function VendorDetailReport({
   const [showPayment, setShowPayment] = useState(false);
   const [paymentFilter, setPaymentFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  useEscapeKey(true, () => router.push(closeHref));
+  useEscapeKey(true, () => router.push(closeHref, { scroll: false }));
   const [showItem, setShowItem] = useState(true);
 
   const hasAgency = rows.some((r) => r.kind === "대행구매");

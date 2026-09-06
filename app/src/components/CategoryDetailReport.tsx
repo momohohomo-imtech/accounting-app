@@ -53,7 +53,7 @@ export function CategoryDetailReport({
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [statusFilter, setStatusFilter] = useState("");
-  useEscapeKey(true, () => router.push(closeHref));
+  useEscapeKey(true, () => router.push(closeHref, { scroll: false }));
 
   function editHrefFor(id: string) {
     return `/reports?year=${year}&category=${encodeURIComponent(categoryName)}&editTx=${id}`;

@@ -26,7 +26,7 @@ export function YearFilter({
     const params = new URLSearchParams({ year: String(year) });
     if (siteId) params.set("site_id", siteId);
     if (status) params.set("status", status);
-    router.push(`${basePath}?${params.toString()}`);
+    router.push(`${basePath}?${params.toString()}`, { scroll: false });
   };
 
   return (

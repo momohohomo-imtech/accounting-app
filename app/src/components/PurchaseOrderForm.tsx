@@ -140,7 +140,7 @@ export function PurchaseOrderForm({
       }
       targetId = result?.id;
     }
-    router.push(targetId ? `/purchase-orders/${targetId}/edit` : "/projects?tab=purchase_orders");
+    router.push(targetId ? `/purchase-orders/${targetId}/edit` : "/projects?tab=purchase_orders", { scroll: false });
     router.refresh();
   }
 
@@ -278,7 +278,7 @@ export function PurchaseOrderForm({
         <Button type="submit" disabled={pending}>
           {purchaseOrderId ? "수정 저장" : "발주서 등록"}
         </Button>
-        <Button type="button" variant="secondary" onClick={() => router.push("/projects?tab=purchase_orders")}>
+        <Button type="button" variant="secondary" onClick={() => router.push("/projects?tab=purchase_orders", { scroll: false })}>
           취소
         </Button>
       </div>

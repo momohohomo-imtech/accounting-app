@@ -11,7 +11,7 @@ export function AutoPrint({ cleanupHref }: { cleanupHref?: string }) {
 
   useEffect(() => {
     function cleanup() {
-      if (cleanupHref) router.replace(cleanupHref);
+      if (cleanupHref) router.replace(cleanupHref, { scroll: false });
       window.removeEventListener("afterprint", cleanup);
     }
     window.addEventListener("afterprint", cleanup);

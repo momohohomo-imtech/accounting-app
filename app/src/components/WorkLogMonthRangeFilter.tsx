@@ -12,7 +12,7 @@ export function WorkLogMonthRangeFilter({ value }: { value: string }) {
   function apply() {
     const params = new URLSearchParams(searchParams.toString());
     params.set("wlMonths", input.trim() || "1-12");
-    router.push(`/reports?${params.toString()}`);
+    router.push(`/reports?${params.toString()}`, { scroll: false });
   }
 
   return (

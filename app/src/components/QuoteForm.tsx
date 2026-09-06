@@ -242,7 +242,7 @@ export function QuoteForm({
       }
       targetId = result?.id;
     }
-    router.push(targetId ? `/quotes/${targetId}/edit` : "/projects?tab=quotes");
+    router.push(targetId ? `/quotes/${targetId}/edit` : "/projects?tab=quotes", { scroll: false });
     router.refresh();
   }
 
@@ -535,7 +535,7 @@ export function QuoteForm({
         <Button type="submit" disabled={pending}>
           {quoteId ? "수정 저장" : "견적서 등록"}
         </Button>
-        <Button type="button" variant="secondary" onClick={() => router.push("/projects?tab=quotes")}>
+        <Button type="button" variant="secondary" onClick={() => router.push("/projects?tab=quotes", { scroll: false })}>
           취소
         </Button>
       </div>

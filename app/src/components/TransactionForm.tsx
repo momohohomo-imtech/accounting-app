@@ -413,7 +413,7 @@ export function TransactionForm({
       }
     }
 
-    router.push(redirectTo);
+    router.push(redirectTo, { scroll: false });
     router.refresh();
   }
 
@@ -708,7 +708,7 @@ export function TransactionForm({
         </button>
         <button
           type="button"
-          onClick={() => router.push(redirectTo)}
+          onClick={() => router.push(redirectTo, { scroll: false })}
           className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
         >
           {initial ? "수정 취소" : "취소"}

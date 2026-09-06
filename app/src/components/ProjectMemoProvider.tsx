@@ -55,12 +55,12 @@ export function ProjectMemoProvider({
 
   const close = () => {
     if (!dirty) {
-      router.push(closeHref);
+      router.push(closeHref, { scroll: false });
       return;
     }
     startTransition(async () => {
       await persist();
-      router.push(closeHref);
+      router.push(closeHref, { scroll: false });
     });
   };
 

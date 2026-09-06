@@ -39,7 +39,7 @@ export function WorkLogForm({
         if (!(await confirm("저장하시겠습니까?"))) return;
         setPending(true);
         const { redirectTo } = await globalPending.run(() => saveDayWorkLogs(new FormData(form)));
-        router.push(redirectTo);
+        router.push(redirectTo, { scroll: false });
       }}
       className="space-y-4"
     >

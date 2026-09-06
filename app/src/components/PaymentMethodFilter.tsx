@@ -15,7 +15,7 @@ export function PaymentMethodFilter({ paymentMethods }: { paymentMethods: { id: 
         const params = new URLSearchParams(searchParams.toString());
         if (e.target.value) params.set("payment_method_id", e.target.value);
         else params.delete("payment_method_id");
-        router.push(`/transactions?${params.toString()}`);
+        router.push(`/transactions?${params.toString()}`, { scroll: false });
       }}
       className={`${fieldClass} w-36 print:hidden`}
     >

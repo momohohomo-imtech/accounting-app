@@ -19,7 +19,7 @@ export function ReportProjectSiteFilter({
       value={selectedSite ?? ""}
       onChange={(e) => {
         const v = e.target.value;
-        router.push(`/reports?year=${year}${v ? `&site=${v}` : ""}`);
+        router.push(`/reports?year=${year}${v ? `&site=${v}` : ""}`, { scroll: false });
       }}
       className={`${fieldClass} print:hidden`}
     >

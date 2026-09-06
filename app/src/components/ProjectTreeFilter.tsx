@@ -58,7 +58,7 @@ export function ProjectTreeFilter({
     const params = new URLSearchParams(searchParams.toString());
     if (id) params.set("project_id", id);
     else params.delete("project_id");
-    router.push(`${basePath}?${params.toString()}`);
+    router.push(`${basePath}?${params.toString()}`, { scroll: false });
   }
 
   return (

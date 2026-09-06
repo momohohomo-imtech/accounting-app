@@ -16,7 +16,7 @@ export function UnassignedWorkLogMonthFilter({ value }: { value?: string }) {
         const params = new URLSearchParams(searchParams.toString());
         if (e.target.value) params.set("unassignedMonth", e.target.value);
         else params.delete("unassignedMonth");
-        router.push(`/reports?${params.toString()}`);
+        router.push(`/reports?${params.toString()}`, { scroll: false });
       }}
       className={`${fieldClass} print:hidden`}
     >

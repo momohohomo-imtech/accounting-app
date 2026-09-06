@@ -42,7 +42,7 @@ export function ToolChecklistDetailReport({
   // 동희 반입반출증은 품목 수에 따라 여러 페이지로 늘어나는 게 정상이라, 전체를
   // 억지로 1페이지에 욱여넣는 이 훅을 꺼야 함(아래 dongheePages 참고).
   const printRef = usePrintFitToPage<HTMLDivElement>(270, formMode === "donghee");
-  useEscapeKey(true, () => router.push(closeHref));
+  useEscapeKey(true, () => router.push(closeHref, { scroll: false }));
 
   // 마스터 목록 패딩용 항목(이 명세서에 실제로 안 담긴 것)은 제외 — 그렇지 않으면
   // 반입반출증용 공구가 마스터 어딘가에만 있어도 이 명세서와 무관하게 옵션이 뜸.

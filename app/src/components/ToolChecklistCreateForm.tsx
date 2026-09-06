@@ -146,7 +146,7 @@ export function ToolChecklistCreateForm({
       return;
     }
     if (isEdit) {
-      router.push("/quality-construction?tab=tools");
+      router.push("/quality-construction?tab=tools", { scroll: false });
       return;
     }
     setTitle("");
@@ -165,7 +165,7 @@ export function ToolChecklistCreateForm({
         {isEdit && (
           <button
             type="button"
-            onClick={() => router.push("/quality-construction?tab=tools")}
+            onClick={() => router.push("/quality-construction?tab=tools", { scroll: false })}
             className="text-xs text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
           >
             수정 취소

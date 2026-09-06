@@ -17,7 +17,7 @@ export function TransactionColumnToggles({
   function setParam(key: string, value: boolean) {
     const params = new URLSearchParams(searchParams.toString());
     params.set(key, value ? "1" : "0");
-    router.push(`/transactions?${params.toString()}`);
+    router.push(`/transactions?${params.toString()}`, { scroll: false });
   }
 
   return (

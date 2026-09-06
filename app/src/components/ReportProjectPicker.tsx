@@ -20,7 +20,7 @@ export function ReportProjectPicker({
       onChange={(e) => {
         const id = e.target.value;
         if (!id) return;
-        router.push(`/reports?year=${year}${site ? `&site=${site}` : ""}&project=${id}`);
+        router.push(`/reports?year=${year}${site ? `&site=${site}` : ""}&project=${id}`, { scroll: false });
       }}
       className={`${fieldClass} print:hidden`}
     >

@@ -10,7 +10,7 @@ export function VendorAgencyToggle({ checked }: { checked: boolean }) {
     const params = new URLSearchParams(searchParams.toString());
     if (next) params.set("vendorAgency", "1");
     else params.delete("vendorAgency");
-    router.push(`/reports?${params.toString()}`);
+    router.push(`/reports?${params.toString()}`, { scroll: false });
   }
 
   return (

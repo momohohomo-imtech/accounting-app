@@ -20,7 +20,7 @@ export function WorkLogSiteFilter({
         const params = new URLSearchParams(searchParams.toString());
         if (e.target.value) params.set("wlSite", e.target.value);
         else params.delete("wlSite");
-        router.push(`/reports?${params.toString()}`);
+        router.push(`/reports?${params.toString()}`, { scroll: false });
       }}
       className={`${fieldClass} print:hidden`}
     >

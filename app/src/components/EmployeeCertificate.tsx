@@ -25,7 +25,7 @@ export function EmployeeCertificate({ employee, closeHref }: { employee: Employe
   const [representativeName, setRepresentativeName] = useState("");
   const [purpose, setPurpose] = useState("제출용");
   const [submitTo, setSubmitTo] = useState("");
-  useEscapeKey(true, () => router.push(closeHref));
+  useEscapeKey(true, () => router.push(closeHref, { scroll: false }));
 
   const today = new Date();
   const todayLabel = `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`;

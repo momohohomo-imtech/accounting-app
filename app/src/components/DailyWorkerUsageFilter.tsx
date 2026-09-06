@@ -31,7 +31,7 @@ export function DailyWorkerUsageFilter({
     const v = monthsVal.trim() || "1-12";
     setMonthInput(v);
     const clientParam = clientVal ? `&client=${encodeURIComponent(clientVal)}` : "";
-    router.push(`/daily-workers?tab=usage&year=${year}&months=${encodeURIComponent(v)}${clientParam}`);
+    router.push(`/daily-workers?tab=usage&year=${year}&months=${encodeURIComponent(v)}${clientParam}`, { scroll: false });
   }
 
   return (
