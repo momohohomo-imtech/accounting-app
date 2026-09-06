@@ -585,13 +585,6 @@ export default async function ReportsPage({
           <ProjectProfitTable rows={byProject} year={selectedYear} site={site} />
       </CollapsibleSection>
 
-      <ReportAIInsights
-        summary={aiSummary}
-        savedInsights={(savedInsights ?? []) as unknown as ReportAiInsight[]}
-        saveAction={saveReportAiInsight}
-        deleteAction={deleteReportAiInsight}
-      />
-
       <div className={popupOpen || anyIsolate ? "space-y-6 print:hidden" : "space-y-6"}>
         <CollapsibleSection
           title="매입처별 집계 — 어느 업체에서 얼마를 매입했는지"
@@ -660,6 +653,13 @@ export default async function ReportsPage({
       >
         <UnassignedWorkLogTable rows={unassignedRows} emptyMessage="이 기간에 미선정 항목이 없습니다." />
       </CollapsibleSection>
+
+      <ReportAIInsights
+        summary={aiSummary}
+        savedInsights={(savedInsights ?? []) as unknown as ReportAiInsight[]}
+        saveAction={saveReportAiInsight}
+        deleteAction={deleteReportAiInsight}
+      />
 
       {project && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:static print:bg-transparent print:p-0">
