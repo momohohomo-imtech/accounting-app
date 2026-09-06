@@ -15,8 +15,9 @@ export async function signIn(formData: FormData) {
   redirect("/dashboard");
 }
 
-export async function signOut() {
+export async function signOut(formData?: FormData) {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  redirect("/login");
+  const reason = formData?.get("reason");
+  redirect(reason === "idle" ? "/login?reason=idle" : "/login");
 }

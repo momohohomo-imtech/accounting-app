@@ -74,5 +74,9 @@ export function IdleLogout() {
 
   // Native <form action> submission so the signOut server action's redirect() works correctly
   // (calling the action directly from client code breaks its redirect — see HANDOFF.md).
-  return <form ref={formRef} action={signOut} className="hidden" aria-hidden="true" />;
+  return (
+    <form ref={formRef} action={signOut} className="hidden" aria-hidden="true">
+      <input type="hidden" name="reason" value="idle" />
+    </form>
+  );
 }

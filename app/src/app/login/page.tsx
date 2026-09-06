@@ -6,7 +6,7 @@ import { fieldClass } from "@/components/ui/field";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; reason?: string }>;
 }) {
   const params = await searchParams;
 
@@ -16,6 +16,11 @@ export default async function LoginPage({
         <h1 className="text-xl font-bold text-slate-900">현장관리 시스템</h1>
         <p className="mt-1 text-sm text-slate-500">로그인</p>
 
+        {params.reason === "idle" && (
+          <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
+            30분 이상 사용하지 않아 자동으로 로그아웃됐어요. 다시 로그인해 주세요.
+          </p>
+        )}
         {params.error && (
           <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{params.error}</p>
         )}
