@@ -118,21 +118,24 @@ export default async function DashboardPage({
           <h2 className="text-sm font-semibold text-slate-600">연도별 실적</h2>
           <YearFilter basePath="/dashboard" years={years} selectedYear={selectedYear} />
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {yearCards.map((c) => (
-            <div
-              key={c.label}
-              className={cx(
-                "rounded-2xl border p-5 shadow-sm",
-                c.highlight ? "border-indigo-200 bg-indigo-50" : "border-slate-200 bg-white"
-              )}
-            >
-              <p className="text-sm text-slate-500">
-                {c.label} {c.note && <span className="text-red-600">{c.note}</span>}
-              </p>
-              <p className="mt-2 font-mono text-2xl font-bold text-slate-900">{c.value}</p>
-            </div>
-          ))}
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {yearCards.map((c) => (
+              <div key={c.label}>
+                <p className="text-sm text-slate-500">
+                  {c.label} {c.note && <span className="text-red-600">{c.note}</span>}
+                </p>
+                <p
+                  className={cx(
+                    "mt-2 font-mono text-2xl font-bold",
+                    c.highlight ? "text-indigo-700" : "text-slate-900"
+                  )}
+                >
+                  {c.value}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
