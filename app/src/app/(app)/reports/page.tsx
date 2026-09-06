@@ -488,13 +488,6 @@ export default async function ReportsPage({
           <YearFilter basePath="/reports" years={years} selectedYear={selectedYear} />
         </div>
 
-        <ReportAIInsights
-          summary={aiSummary}
-          savedInsights={(savedInsights ?? []) as unknown as ReportAiInsight[]}
-          saveAction={saveReportAiInsight}
-          deleteAction={deleteReportAiInsight}
-        />
-
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-sm text-slate-500">{selectedYear}년 총 매출액</p>
@@ -589,6 +582,13 @@ export default async function ReportsPage({
 
           <ProjectProfitTable rows={byProject} year={selectedYear} site={site} />
       </CollapsibleSection>
+
+      <ReportAIInsights
+        summary={aiSummary}
+        savedInsights={(savedInsights ?? []) as unknown as ReportAiInsight[]}
+        saveAction={saveReportAiInsight}
+        deleteAction={deleteReportAiInsight}
+      />
 
       <div className={popupOpen || anyIsolate ? "space-y-6 print:hidden" : "space-y-6"}>
         <CollapsibleSection
