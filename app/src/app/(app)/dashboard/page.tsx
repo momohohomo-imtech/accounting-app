@@ -83,6 +83,12 @@ export default async function DashboardPage({
   years.sort((a, b) => b - a);
 
   const yearCards = [
+    {
+      label: `${selectedYear}년 총 예상 매출`,
+      note: "(진행중)",
+      value: formatWon(totalExpectedRevenue),
+      highlight: true,
+    },
     { label: `${selectedYear}년 매출액`, value: formatWon(yearSales) },
     { label: `${selectedYear}년 매입액`, value: formatWon(yearPurchase) },
     { label: `${selectedYear}년 이익금`, value: formatWon(yearProfit) },
@@ -112,16 +118,18 @@ export default async function DashboardPage({
           <h2 className="text-sm font-semibold text-slate-600">연도별 실적</h2>
           <YearFilter basePath="/dashboard" years={years} selectedYear={selectedYear} />
         </div>
-        <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-5 shadow-sm">
-          <p className="text-sm text-slate-500">
-            아이엠테크 {selectedYear}년 총 예상 매출 <span className="text-red-600">(진행중)</span>
-          </p>
-          <p className="mt-2 font-mono text-2xl font-bold text-slate-900">{formatWon(totalExpectedRevenue)}</p>
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {yearCards.map((c) => (
-            <div key={c.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">{c.label}</p>
+            <div
+              key={c.label}
+              className={cx(
+                "rounded-2xl border p-5 shadow-sm",
+                c.highlight ? "border-indigo-200 bg-indigo-50" : "border-slate-200 bg-white"
+              )}
+            >
+              <p className="text-sm text-slate-500">
+                {c.label} {c.note && <span className="text-red-600">{c.note}</span>}
+              </p>
               <p className="mt-2 font-mono text-2xl font-bold text-slate-900">{c.value}</p>
             </div>
           ))}

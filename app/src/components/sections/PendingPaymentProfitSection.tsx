@@ -3,6 +3,7 @@ import { formatWon } from "@/lib/format";
 import { PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
 import { estimateIncomeTax, currentBracketIndex, INCOME_TAX_BRACKETS } from "@/lib/tax";
 import { HalfYearSettlementInput } from "@/components/sections/HalfYearSettlementInput";
+import { DetailToggle } from "@/components/DetailToggle";
 import { one } from "@/lib/relations";
 
 // 직원 급여/상여/4대보험 지출은 employees/payroll 관리 화면이 아니라 매입매출장에
@@ -190,32 +191,37 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
         {half1Profit != null && combinedProfit != null && combinedTax != null && (
           <>
             <p>
-              <span className="font-semibold">{year}년 하반기 매출-매입</span>
-              {" — "}
-              <span className="font-mono font-semibold">{formatWon(h2Profit)}</span>
-              {" (7~12월 원장 기준, 부가세 제외, 일반경비 포함)"}
-            </p>
-            <p>
-              <span className="font-semibold">{year}년 세금계산서 미발행 예상 이익금</span>
-              {" — "}
-              <span className="font-mono font-semibold">{formatWon(unbilledPendingProfit)}</span>
-              {` (완료 수금대기·공사 완료·진행중 ${unbilledProjectsWithProfit.length}건)`}
-            </p>
-            <p>
-              <span className="font-semibold">{year}년 하반기 직원급여/상여/4대보험</span>
-              {" — "}
-              <span className="font-mono font-semibold">{formatWon(h2PayrollCost)}</span>
-            </p>
-            <p>
               <span className="font-semibold">{year}년 연간 합계 예상 이익금</span>
               {" — "}
               <span className="font-mono font-semibold">{formatWon(combinedProfit)}</span>
-              {" (상반기 확정 + 하반기 매출-매입 + 세금계산서 미발행 예상 이익금 − 하반기 인건비) / 예상 세액 약 "}
+              {" / 예상 세액 약 "}
               <span className="font-mono font-semibold">{formatWon(combinedTax.totalTax)}</span>
               {" (세율 "}
               <span className="font-mono font-semibold">{combinedTax.ratePct}%</span>
               {" 구간)"}
             </p>
+            <DetailToggle label="계산 과정 보기">
+              <p>
+                <span className="font-semibold">{year}년 하반기 매출-매입</span>
+                {" — "}
+                <span className="font-mono font-semibold">{formatWon(h2Profit)}</span>
+                {" (7~12월 원장 기준, 부가세 제외, 일반경비 포함)"}
+              </p>
+              <p>
+                <span className="font-semibold">{year}년 세금계산서 미발행 예상 이익금</span>
+                {" — "}
+                <span className="font-mono font-semibold">{formatWon(unbilledPendingProfit)}</span>
+                {` (완료 수금대기·공사 완료·진행중 ${unbilledProjectsWithProfit.length}건)`}
+              </p>
+              <p>
+                <span className="font-semibold">{year}년 하반기 직원급여/상여/4대보험</span>
+                {" — "}
+                <span className="font-mono font-semibold">{formatWon(h2PayrollCost)}</span>
+              </p>
+              <p className="text-blue-700">
+                연간 합계 = 상반기 확정 + 하반기 매출-매입 + 세금계산서 미발행 예상 이익금 − 하반기 인건비
+              </p>
+            </DetailToggle>
           </>
         )}
       </div>
