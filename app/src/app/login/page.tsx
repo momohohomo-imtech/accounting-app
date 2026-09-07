@@ -2,6 +2,7 @@ import { signIn } from "@/lib/actions/auth";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { fieldClass } from "@/components/ui/field";
+import { ClearIdleLogoutMark } from "@/components/ClearIdleLogoutMark";
 
 export default async function LoginPage({
   searchParams,
@@ -39,13 +40,7 @@ export default async function LoginPage({
           </Button>
         </form>
       </Card>
-      {/* 로그인 화면에 왔다는 건 새로 인증할 참이라는 뜻이므로, 이전 세션의 유휴시간
-          기록을 지워서 로그인 직후 바로 다시 로그아웃되는 걸 방지한다. */}
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `try { localStorage.removeItem("idle-logout:last-activity"); } catch (e) {}`,
-        }}
-      />
+      <ClearIdleLogoutMark />
     </div>
   );
 }
