@@ -1,8 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { DailyWorkerTaxFilter } from "@/components/DailyWorkerTaxFilter";
+import { DailyWorkerUsageLogForm } from "@/components/DailyWorkerUsageLogForm";
 import { DailyWorkerUsageStatementTable } from "@/components/DailyWorkerUsageStatementTable";
-import { PrintButton } from "@/components/PrintButton";
+import { DailyWorkerUsageStatementExportButtons } from "@/components/DailyWorkerUsageStatementExportButtons";
 
 const FLOOR_YEAR = 2026;
 
@@ -19,34 +20,35 @@ export async function DailyWorkerTaxSection({ year, month }: { year?: string; mo
   const rangeEndDay = new Date(selectedYear, selectedMonth, 0).getDate();
   const rangeEnd = `${selectedYear}-${pad(selectedMonth)}-${pad(rangeEndDay)}`;
 
-  const [{ data: offices }, { data: rows }, { data: firstTx }] = await Promise.all([
-    supabase.from("daily_worker_offices").select("name"),
+  const [{ data: offices }, { data: workers }, { data: logs }, { data: firstLog }] = await Promise.all([
+    supabase.from("daily_worker_offices").select("id, name").order("name"),
+    supabase.from("daily_workers").select("id, name, office_id, status, grade").eq("status", "active").order("name"),
     supabase
-      .from("transactions")
-      .select("id, trans_date, item_name, note1, note2, purchase_amount, purchase_vat, clients(name), client_name_raw, projects(name)")
-      .eq("type", "매입")
-      .gte("trans_date", rangeStart)
-      .lte("trans_date", rangeEnd)
-      .order("trans_date", { ascending: true }),
-    supabase.from("transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
+      .from("daily_worker_usage_logs")
+      .select("id, use_date, daily_worker_id, note, daily_workers(name, resident_id_masked, phone)")
+      .gte("use_date", rangeStart)
+      .lte("use_date", rangeEnd)
+      .order("use_date", { ascending: true }),
+    supabase.from("daily_worker_usage_logs").select("use_date").order("use_date", { ascending: true }).limit(1),
   ]);
 
-  const officeNames = new Set((offices ?? []).map((o) => o.name));
-
-  const statementRows = (rows ?? [])
-    .map((t) => ({
-      id: t.id,
-      trans_date: t.trans_date,
-      client_name: (one(t.clients) as { name: string } | undefined)?.name ?? t.client_name_raw ?? "-",
-      amount: t.purchase_amount + t.purchase_vat,
-      project_name: (one(t.projects) as { name: string } | undefined)?.name ?? "",
-      note: t.note1 ?? t.note2 ?? "",
-      item_name: t.item_name ?? "",
-    }))
-    .filter((t) => officeNames.has(t.client_name) || t.item_name.includes("인건비"));
+  const statementRows = (logs ?? [])
+    .map((l) => {
+      const worker = one(l.daily_workers) as { name: string; resident_id_masked: string | null; phone: string | null } | undefined;
+      return {
+        id: l.id,
+        use_date: l.use_date,
+        daily_worker_id: l.daily_worker_id,
+        name: worker?.name ?? "-",
+        resident_id_masked: worker?.resident_id_masked ?? null,
+        phone: worker?.phone ?? null,
+        note: l.note,
+      };
+    })
+    .filter((r) => r.name !== "-");
 
   const firstYear = Math.min(
-    firstTx?.[0]?.trans_date ? Number(firstTx[0].trans_date.slice(0, 4)) : currentYear,
+    firstLog?.[0]?.use_date ? Number(firstLog[0].use_date.slice(0, 4)) : currentYear,
     FLOOR_YEAR
   );
   const years = Array.from({ length: currentYear - firstYear + 1 }, (_, i) => currentYear - i);
@@ -54,26 +56,32 @@ export async function DailyWorkerTaxSection({ year, month }: { year?: string; mo
   years.sort((a, b) => b - a);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <div className="print:hidden">
+        <h2 className="text-lg font-semibold text-slate-900">세무사 확인용 — 일용직 사용내역서</h2>
+        <p className="text-xs text-slate-400">
+          선택한 달에 사용한 일용직 근로자를 등록해두면 사용일자·이름·주민번호·전화번호가 담긴 내역서로 보여줍니다.
+        </p>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm print:hidden">
+        <h3 className="mb-3 font-semibold text-slate-900">일용직 사용내역 등록</h3>
+        <DailyWorkerUsageLogForm offices={offices ?? []} workers={(workers ?? []).map((w) => ({ id: w.id, name: w.name, office_id: w.office_id, grade: w.grade }))} />
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900">세무사 확인용 — 일용직 사용내역서</h2>
-          <p className="text-xs text-slate-400">
-            선택한 달의 일용직 사용내역만 보여줍니다. 매입 내역 중 거래처가 인력사무소이거나 품목에 &ldquo;인건비&rdquo;가
-            포함된 건을 자동으로 모았습니다.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <DailyWorkerTaxFilter years={years} selectedYear={selectedYear} selectedMonth={selectedMonth} />
-          <PrintButton />
-        </div>
+        <DailyWorkerTaxFilter years={years} selectedYear={selectedYear} selectedMonth={selectedMonth} />
+        <DailyWorkerUsageStatementExportButtons rows={statementRows} periodLabel={`${selectedYear}년_${selectedMonth}월`} />
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm print:border-0 print:p-0 print:shadow-none">
         <h2 className="mb-3 font-semibold text-slate-900">
           일용직 사용내역서 — {selectedYear}년 {selectedMonth}월
         </h2>
-        <DailyWorkerUsageStatementTable rows={statementRows} />
+        <DailyWorkerUsageStatementTable
+          rows={statementRows}
+          workers={(workers ?? []).map((w) => ({ id: w.id, name: w.name }))}
+        />
       </div>
     </div>
   );
