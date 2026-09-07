@@ -39,7 +39,7 @@ export function DailyWorkerUsageStatementTable({ rows, workers }: { rows: Statem
   const confirm = useConfirm();
   const pending = useGlobalPending();
   const [sortKey, setSortKey] = useState<SortKey>("use_date");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [editingId, setEditingId] = useState<string | null>(null);
 
   function handleSort(key: SortKey) {

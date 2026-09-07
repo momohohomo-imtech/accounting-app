@@ -28,7 +28,7 @@ export async function DailyWorkerTaxSection({ year, month }: { year?: string; mo
       .select("id, use_date, daily_worker_id, note, daily_workers(name, resident_id_masked, phone)")
       .gte("use_date", rangeStart)
       .lte("use_date", rangeEnd)
-      .order("use_date", { ascending: true }),
+      .order("use_date", { ascending: false }),
     supabase.from("daily_worker_usage_logs").select("use_date").order("use_date", { ascending: true }).limit(1),
   ]);
 
