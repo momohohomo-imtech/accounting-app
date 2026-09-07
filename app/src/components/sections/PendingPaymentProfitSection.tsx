@@ -10,6 +10,10 @@ import { one } from "@/lib/relations";
 // 이 카테고리로 찍힌 매입 기준으로 집계한다 (payroll 테이블은 입력이 다 안 돼 있어 누락됨).
 const PAYROLL_CATEGORY_NAME = "직원급여/상여/4대보험";
 
+function moneyClass(amount: number) {
+  return amount < 0 ? "text-red-600" : "";
+}
+
 function taxEstimate(profit: number) {
   const taxBase = Math.max(profit, 0);
   const incomeTax = estimateIncomeTax(taxBase);
@@ -140,10 +144,12 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
   // 미발행 예상 이익금에 이미 하반기 매입이 반영된 프로젝트들과, 직원급여 카테고리(아래
   // h2PayrollCost에서 따로 뺌)는 하반기 매출-매입 집계에서 빼서 이중으로 차감되지 않게 한다.
   const unbilledProjectIdSet = new Set(unbilledProjectsWithProfit.map((p) => p.id));
-  const h2Profit = (h2Tx ?? [])
+  const h2LedgerTx = (h2Tx ?? [])
     .filter((t) => !t.project_id || !unbilledProjectIdSet.has(t.project_id))
-    .filter((t) => one(t.expense_categories)?.name !== PAYROLL_CATEGORY_NAME)
-    .reduce((s, t) => s + t.sales_amount - t.purchase_amount, 0);
+    .filter((t) => one(t.expense_categories)?.name !== PAYROLL_CATEGORY_NAME);
+  const h2Sales = h2LedgerTx.reduce((s, t) => s + t.sales_amount, 0);
+  const h2Purchase = h2LedgerTx.reduce((s, t) => s + t.purchase_amount, 0);
+  const h2Profit = h2Sales - h2Purchase;
   const h2PayrollCost = payrollTx
     .filter((t) => t.trans_date >= `${year}-07-01`)
     .reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
@@ -166,7 +172,7 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
         <p>
           <span className="font-semibold">{year}년 이익 예상</span>
           {" — "}
-          <span className="font-mono font-semibold">{formatWon(profitEstimate)}</span>
+          <span className={`font-mono font-semibold ${moneyClass(profitEstimate)}`}>{formatWon(profitEstimate)}</span>
           {" (프로젝트 총이익금 − 일반경비 − 직원급여/상여/4대보험) / "}
           개인사업자 세율구간{" "}
           <span className="font-mono font-semibold">{profitTax.ratePct}%</span>
@@ -193,7 +199,7 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
             <p>
               <span className="font-semibold">{year}년 연간 합계 예상 이익금</span>
               {" — "}
-              <span className="font-mono font-semibold">{formatWon(combinedProfit)}</span>
+              <span className={`font-mono font-semibold ${moneyClass(combinedProfit)}`}>{formatWon(combinedProfit)}</span>
               {" / 예상 세액 약 "}
               <span className="font-mono font-semibold">{formatWon(combinedTax.totalTax)}</span>
               {" (세율 "}
@@ -203,14 +209,20 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
             <DetailToggle label="계산 과정 보기">
               <p>
                 <span className="font-semibold">{year}년 하반기 매출-매입</span>
-                {" — "}
-                <span className="font-mono font-semibold">{formatWon(h2Profit)}</span>
+                {" — 매출 "}
+                <span className="font-mono font-semibold">{formatWon(h2Sales)}</span>
+                {" − 매입 "}
+                <span className="font-mono font-semibold">{formatWon(h2Purchase)}</span>
+                {" = "}
+                <span className={`font-mono font-semibold ${moneyClass(h2Profit)}`}>{formatWon(h2Profit)}</span>
                 {" (7~12월 원장 기준, 부가세 제외, 일반경비 포함)"}
               </p>
               <p>
                 <span className="font-semibold">{year}년 세금계산서 미발행 예상 이익금</span>
                 {" — "}
-                <span className="font-mono font-semibold">{formatWon(unbilledPendingProfit)}</span>
+                <span className={`font-mono font-semibold ${moneyClass(unbilledPendingProfit)}`}>
+                  {formatWon(unbilledPendingProfit)}
+                </span>
                 {` (완료 수금대기·공사 완료·진행중 ${unbilledProjectsWithProfit.length}건)`}
               </p>
               <p>
