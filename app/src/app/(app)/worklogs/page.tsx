@@ -13,6 +13,8 @@ import { SiteColorLegend } from "@/components/SiteColorLegend";
 import { AutoPrint } from "@/components/AutoPrint";
 import { PageTabs } from "@/components/PageTabs";
 import { BusinessTripListClient } from "@/components/BusinessTripListClient";
+import { BusinessTripFilter } from "@/components/BusinessTripFilter";
+import { monthRange } from "@/lib/dateRange";
 import { cx } from "@/lib/cx";
 import type { BusinessTripLog, WorkLog } from "@/lib/types";
 
@@ -21,13 +23,22 @@ const TABS = [
   { key: "calendar", label: "작업일지" },
   { key: "trip", label: "출장일지" },
 ];
+const TRIP_FLOOR_YEAR = 2026;
 
 export default async function WorkLogsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; year?: string; month?: string; day?: string; printSummary?: string }>;
+  searchParams: Promise<{
+    tab?: string;
+    year?: string;
+    month?: string;
+    day?: string;
+    printSummary?: string;
+    site?: string;
+    project?: string;
+  }>;
 }) {
-  const { tab, year, month, day, printSummary } = await searchParams;
+  const { tab, year, month, day, printSummary, site, project } = await searchParams;
   const activeTab = tab === "trip" ? "trip" : "calendar";
 
   return (
@@ -36,7 +47,7 @@ export default async function WorkLogsPage({
         <PageTabs basePath="/worklogs" tabs={TABS} active={activeTab} />
       </div>
       {activeTab === "trip" ? (
-        <BusinessTripSection />
+        <BusinessTripSection year={year} month={month} site={site} project={project} />
       ) : (
         <WorkLogCalendarSection year={year} month={month} day={day} printSummary={printSummary} />
       )}
@@ -44,17 +55,73 @@ export default async function WorkLogsPage({
   );
 }
 
-async function BusinessTripSection() {
+async function BusinessTripSection({
+  year,
+  month,
+  site,
+  project,
+}: {
+  year?: string;
+  month?: string;
+  site?: string;
+  project?: string;
+}) {
   const supabase = await createClient();
-  const { data: logs } = await supabase
-    .from("business_trip_logs")
-    .select("*")
-    .order("work_date", { ascending: false });
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const selectedYear = year ? Number(year) : currentYear;
+  const selectedMonth = month ?? "all";
+  const { start, end } = monthRange(selectedYear, selectedMonth, currentMonth);
+
+  const [{ data: logs }, { data: allLogs }] = await Promise.all([
+    supabase
+      .from("business_trip_logs")
+      .select("*")
+      .gte("work_date", start)
+      .lte("work_date", end)
+      .order("work_date", { ascending: false }),
+    supabase.from("business_trip_logs").select("work_date, site_name, projects"),
+  ]);
+
+  const typedLogs = (logs ?? []) as BusinessTripLog[];
+  const filteredLogs = typedLogs.filter((log) => {
+    if (site && log.site_name !== site) return false;
+    if (project && !log.projects.some((p) => p.project_name === project)) return false;
+    return true;
+  });
+
+  const allTyped = (allLogs ?? []) as Pick<BusinessTripLog, "work_date" | "site_name" | "projects">[];
+  const firstYear = Math.min(
+    ...allTyped.map((l) => Number(l.work_date.slice(0, 4))).filter((y) => !Number.isNaN(y)),
+    TRIP_FLOOR_YEAR
+  );
+  const years = Array.from({ length: currentYear - firstYear + 1 }, (_, i) => currentYear - i);
+  if (!years.includes(selectedYear)) years.unshift(selectedYear);
+  years.sort((a, b) => b - a);
+
+  const siteOptions = Array.from(new Set(allTyped.map((l) => l.site_name).filter((v): v is string => Boolean(v)))).sort(
+    (a, b) => a.localeCompare(b)
+  );
+  const projectOptions = Array.from(
+    new Set(allTyped.flatMap((l) => l.projects.map((p) => p.project_name)).filter((v): v is string => Boolean(v)))
+  ).sort((a, b) => a.localeCompare(b));
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-slate-900">출장일지</h1>
-      <BusinessTripListClient logs={(logs ?? []) as BusinessTripLog[]} />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl font-bold text-slate-900">출장일지</h1>
+        <BusinessTripFilter
+          years={years}
+          selectedYear={selectedYear}
+          selectedMonth={selectedMonth}
+          siteOptions={siteOptions}
+          selectedSite={site ?? ""}
+          projectOptions={projectOptions}
+          selectedProject={project ?? ""}
+        />
+      </div>
+      <BusinessTripListClient logs={filteredLogs} />
     </div>
   );
 }
