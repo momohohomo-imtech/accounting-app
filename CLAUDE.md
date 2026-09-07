@@ -18,7 +18,7 @@
   `AccessListWorkerPicker`, `SiteAggregateTable`, `BusinessTripListClient`,
   `CategoryAggregateTable`, `CategoryDetailReport`, `ToolChecklistHistoryTable`,
   `QuotesTable`, `PurchaseOrdersTable`, `UnassignedWorkLogTable`,
-  `ClassificationPendingTable`)에
+  `ClassificationPendingTable`, `DailyWorkerUsageStatementTable`)에
   이 패턴이 적용돼 있음 — 새 표를 추가할 때 이 목록도 같이 업데이트할 것.
 
 - **저장/수정/삭제 등 서버 액션을 호출하는 폼·팝업은 항상 화면 전체를

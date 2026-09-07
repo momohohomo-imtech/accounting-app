@@ -11,6 +11,7 @@ import { PageTabs } from "@/components/PageTabs";
 import { DailyWorkerOfficesSection } from "@/components/sections/DailyWorkerOfficesSection";
 import { AccessListsSection } from "@/components/sections/AccessListsSection";
 import { DailyWorkerUsageSection } from "@/components/sections/DailyWorkerUsageSection";
+import { DailyWorkerTaxSection } from "@/components/sections/DailyWorkerTaxSection";
 import { Pill } from "@/components/ui/Pill";
 
 const TABS = [
@@ -18,6 +19,7 @@ const TABS = [
   { key: "offices", label: "인력사무소" },
   { key: "access", label: "출입명단" },
   { key: "usage", label: "일용직 사용내역" },
+  { key: "tax", label: "세무사 확인용" },
 ];
 
 export default async function DailyWorkersPage({
@@ -44,6 +46,7 @@ export default async function DailyWorkersPage({
       {active === "offices" && <DailyWorkerOfficesSection />}
       {active === "access" && <AccessListsSection year={year} month={month} />}
       {active === "usage" && <DailyWorkerUsageSection year={year} months={months} client={client} />}
+      {active === "tax" && <DailyWorkerTaxSection year={year} month={month} />}
       {active === "list" && <WorkerListSection officeId={office_id} />}
     </div>
   );
