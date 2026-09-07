@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
+import { isLedgerVisible } from "@/lib/credit";
+import type { CreditPayment } from "@/lib/types";
 import { formatWon, formatDate } from "@/lib/format";
 import { projectStatusLabel } from "@/lib/projectStatus";
 import { ProjectReportActions } from "@/components/ProjectReportActions";
@@ -38,12 +40,18 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
   const { data: workLogDateRows } = await supabase.from("work_logs").select("log_date").in("project_id", groupIds);
   const workDayCount = new Set((workLogDateRows ?? []).map((r) => r.log_date)).size;
 
-  const { data: purchaseRows } = await supabase
+  const { data: purchaseRowsRaw } = await supabase
     .from("transactions")
     .select("*, clients(name), expense_categories(name, project_only, color)")
     .in("project_id", groupIds)
     .eq("type", "매입")
     .order("trans_date", { ascending: true });
+
+  const { data: creditPayments } = await supabase.from("credit_payments").select("*");
+  // 외상(미완납)은 완납 전까지 장부에서 제외 — 대시보드·보고서와 동일한 기준.
+  const purchaseRows = (purchaseRowsRaw ?? []).filter((t) =>
+    isLedgerVisible(t, (creditPayments ?? []) as CreditPayment[])
+  );
 
   const { data: agencyRows } = await supabase
     .from("project_agency_purchases")
@@ -76,7 +84,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
     })
   );
 
-  const rows = purchaseRows ?? [];
+  const rows = purchaseRows;
   const purchaseTotal = rows.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
   const agencyTotal = (agencyRows ?? []).reduce((s, a) => s + a.amount, 0);
 

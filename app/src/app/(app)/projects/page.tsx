@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
+import { isLedgerVisible } from "@/lib/credit";
+import type { CreditPayment } from "@/lib/types";
 import { CreatePanel } from "@/components/crud/CreatePanel";
 import { EntityTable } from "@/components/crud/EntityTable";
 import { createProjectRecord, updateProjectRecord, deleteProjectRecord } from "@/lib/actions/projects";
@@ -97,22 +99,38 @@ async function ProjectListSection({
   }));
 
   const projectIds = (projects ?? []).map((p) => p.id);
-  const [{ data: purchaseRows }, { data: agencyRows }] = projectIds.length
+  const [{ data: purchaseRowsRaw }, { data: agencyRows }, { data: creditPayments }] = projectIds.length
     ? await Promise.all([
         supabase
           .from("transactions")
-          .select("project_id, purchase_amount, purchase_vat")
+          .select("id, type, payment_type, sales_amount, sales_vat, project_id, purchase_amount, purchase_vat")
           .eq("type", "매입")
           .in("project_id", projectIds),
         supabase.from("project_agency_purchases").select("project_id, amount").in("project_id", projectIds),
+        supabase.from("credit_payments").select("*"),
       ])
     : [
-        { data: [] as { project_id: string | null; purchase_amount: number; purchase_vat: number }[] },
+        {
+          data: [] as {
+            id: string;
+            type: string;
+            payment_type: string;
+            sales_amount: number;
+            sales_vat: number;
+            project_id: string | null;
+            purchase_amount: number;
+            purchase_vat: number;
+          }[],
+        },
         { data: [] as { project_id: string; amount: number }[] },
+        { data: [] as CreditPayment[] },
       ];
 
+  // 외상(미완납)은 완납 전까지 장부에서 제외 — 대시보드·보고서와 동일한 기준.
+  const purchaseRows = (purchaseRowsRaw ?? []).filter((t) => isLedgerVisible(t, (creditPayments ?? []) as CreditPayment[]));
+
   const purchaseByProject = new Map<string, number>();
-  for (const t of purchaseRows ?? []) {
+  for (const t of purchaseRows) {
     if (!t.project_id) continue;
     purchaseByProject.set(t.project_id, (purchaseByProject.get(t.project_id) ?? 0) + t.purchase_amount + t.purchase_vat);
   }

@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
+import { isLedgerVisible } from "@/lib/credit";
+import type { CreditPayment } from "@/lib/types";
 import { parseMonthRange } from "@/lib/monthRange";
 import { DailyWorkerUsageFilter } from "@/components/DailyWorkerUsageFilter";
 import { DailyWorkerUsageExportButtons } from "@/components/DailyWorkerUsageExportButtons";
@@ -24,21 +26,26 @@ export async function DailyWorkerUsageSection({
   const rangeEndDay = new Date(selectedYear, end, 0).getDate();
   const rangeEnd = `${selectedYear}-${pad(end)}-${pad(rangeEndDay)}`;
 
-  const [{ data: offices }, { data: rows }, { data: firstTx }] = await Promise.all([
+  const [{ data: offices }, { data: rowsRaw }, { data: firstTx }, { data: creditPayments }] = await Promise.all([
     supabase.from("daily_worker_offices").select("name"),
     supabase
       .from("transactions")
-      .select("id, trans_date, item_name, note1, note2, purchase_amount, purchase_vat, clients(name), client_name_raw, projects(name)")
+      .select(
+        "id, type, payment_type, sales_amount, sales_vat, trans_date, item_name, note1, note2, purchase_amount, purchase_vat, clients(name), client_name_raw, projects(name)"
+      )
       .eq("type", "매입")
       .gte("trans_date", rangeStart)
       .lte("trans_date", rangeEnd)
       .order("trans_date", { ascending: false }),
     supabase.from("transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
+    supabase.from("credit_payments").select("*"),
   ]);
 
   const officeNames = new Set((offices ?? []).map((o) => o.name));
+  // 외상(미완납)은 완납 전까지 장부에서 제외 — 대시보드·보고서와 동일한 기준.
+  const rows = (rowsRaw ?? []).filter((t) => isLedgerVisible(t, (creditPayments ?? []) as CreditPayment[]));
 
-  const usageRows = (rows ?? [])
+  const usageRows = rows
     .map((t) => ({
       id: t.id,
       trans_date: t.trans_date,
