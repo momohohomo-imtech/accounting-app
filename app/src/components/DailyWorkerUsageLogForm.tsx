@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createDailyWorkerUsageLogRecord } from "@/lib/actions/daily-worker-usage-logs";
 import { AccessListWorkerPicker } from "@/components/AccessListWorkerPicker";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
-import { formatDate, todayString } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 
 type OfficeOption = { id: string; name: string };
 type WorkerOption = { id: string; name: string; office_id: string; grade?: string | null };
@@ -14,8 +14,8 @@ export function DailyWorkerUsageLogForm({ offices, workers }: { offices: OfficeO
   const router = useRouter();
   const pending = useGlobalPending();
   const formRef = useRef<HTMLFormElement>(null);
-  const [dateInput, setDateInput] = useState(todayString());
-  const [dates, setDates] = useState<string[]>([todayString()]);
+  const [dateInput, setDateInput] = useState("");
+  const [dates, setDates] = useState<string[]>([]);
 
   function addDate() {
     if (!dateInput || dates.includes(dateInput)) return;
@@ -31,8 +31,8 @@ export function DailyWorkerUsageLogForm({ offices, workers }: { offices: OfficeO
     if (dates.length === 0) return;
     await pending.run(() => Promise.resolve(createDailyWorkerUsageLogRecord(new FormData(form))));
     formRef.current?.reset();
-    setDates([todayString()]);
-    setDateInput(todayString());
+    setDates([]);
+    setDateInput("");
     router.refresh();
   }
 
