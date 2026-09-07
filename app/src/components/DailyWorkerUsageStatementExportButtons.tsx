@@ -3,7 +3,12 @@
 import { downloadDailyWorkerUsageStatementXlsx } from "@/lib/xlsxExport";
 import { Button } from "@/components/ui/Button";
 import { PrintButton } from "@/components/PrintButton";
-import { buildStatementDisplayItems, MONTHLY_DAY_LIMIT, type StatementRow } from "@/components/DailyWorkerUsageStatementTable";
+import {
+  buildStatementBlocks,
+  blockDateLabel,
+  MONTHLY_DAY_LIMIT,
+  type StatementRow,
+} from "@/components/DailyWorkerUsageStatementTable";
 
 export function DailyWorkerUsageStatementExportButtons({
   rows,
@@ -13,22 +18,27 @@ export function DailyWorkerUsageStatementExportButtons({
   periodLabel: string;
 }) {
   async function handleExport() {
-    const items = buildStatementDisplayItems(rows);
+    const blocks = buildStatementBlocks(rows);
     const total = rows.reduce((s, r) => s + (r.daily_wage ?? 0), 0);
 
-    const exportItems = items.map((item) => {
-      if (item.kind !== "entry") return item;
-      const r = item.row;
-      return {
+    const exportItems = blocks.flatMap((block, i) => {
+      const entries = block.rows.map((r) => ({
         kind: "entry" as const,
         use_date: r.use_date,
         name: r.name,
-        monthlyCount: item.monthlyCount,
+        monthlyCount: r.monthlyCount,
         residentId: r.resident_id_masked ?? "-",
         phone: r.phone ?? "-",
         dailyWage: r.daily_wage,
         note: r.note ?? "-",
+      }));
+      const subtotal = {
+        kind: "subtotal" as const,
+        label: `${block.rows[0].name} ${blockDateLabel(block)} 소계 (${block.rows.length}일)`,
+        amount: block.amount,
       };
+      const gap = i < blocks.length - 1 ? [{ kind: "gap" as const }] : [];
+      return [...entries, subtotal, ...gap];
     });
 
     await downloadDailyWorkerUsageStatementXlsx(

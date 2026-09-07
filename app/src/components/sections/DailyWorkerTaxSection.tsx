@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { formatWon } from "@/lib/format";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { DailyWorkerTaxFilter } from "@/components/DailyWorkerTaxFilter";
 import { DailyWorkerUsageLogForm } from "@/components/DailyWorkerUsageLogForm";
 import { DailyWorkerUsageStatementTable } from "@/components/DailyWorkerUsageStatementTable";
@@ -68,10 +69,9 @@ export async function DailyWorkerTaxSection({ year, month }: { year?: string; mo
         </p>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm print:hidden">
-        <h3 className="mb-3 font-semibold text-slate-900">일용직 사용내역 등록</h3>
+      <CollapsibleSection title="일용직 사용내역 등록" className="print:hidden">
         <DailyWorkerUsageLogForm offices={offices ?? []} workers={(workers ?? []).map((w) => ({ id: w.id, name: w.name, office_id: w.office_id, grade: w.grade }))} />
-      </div>
+      </CollapsibleSection>
 
       <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
         <DailyWorkerTaxFilter years={years} selectedYear={selectedYear} selectedMonth={selectedMonth} />

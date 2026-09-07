@@ -459,7 +459,7 @@ type UsageStatementExportItem =
       dailyWage: number | null;
       note: string;
     }
-  | { kind: "subtotal"; days: number; amount: number }
+  | { kind: "subtotal"; label: string; amount: number }
   | { kind: "gap" };
 
 // 세무사 확인용 일용직 사용내역서 — 화면과 같은 근로자별 연속일 소계/빈 줄 구조를 그대로 재현하고,
@@ -494,7 +494,7 @@ export async function downloadDailyWorkerUsageStatementXlsx(
       continue;
     }
     if (item.kind === "subtotal") {
-      const row = ws.addRow(["", `소계 (${item.days}일)`, "", "", "", item.amount, ""]);
+      const row = ws.addRow(["", item.label, "", "", "", item.amount, ""]);
       row.font = { bold: true };
       row.eachCell({ includeEmpty: true }, (cell) => {
         cell.alignment = { horizontal: "center" };

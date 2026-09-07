@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
+import { cx } from "@/lib/cx";
 import { formatDate, formatWon } from "@/lib/format";
 import { updateDailyWorkerUsageLogRecord, deleteDailyWorkerUsageLogRecord } from "@/lib/actions/daily-worker-usage-logs";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -17,20 +18,25 @@ export type StatementRow = {
   note: string | null;
 };
 
-type WorkerOption = { id: string; name: string };
+type BlockRow = StatementRow & { monthlyCount: number };
 
-type DisplayItem =
-  | { kind: "entry"; row: StatementRow; monthlyCount: number }
-  | { kind: "subtotal"; days: number; amount: number }
-  | { kind: "gap" };
+export type StatementBlock = { id: string; rows: BlockRow[]; amount: number };
+
+type WorkerOption = { id: string; name: string };
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 // 한 사람당 한 달 최대 사용일수 — 이 날짜를 넘어가면(8일째부터) 카운트를 빨간 글씨로 경고.
 export const MONTHLY_DAY_LIMIT = 7;
 
-// 같은 근로자의 날짜가 하루 간격으로 이어지면 한 블록으로 묶어 소계를 내고,
-// 블록이 바뀌는 지점(다른 근로자로 넘어가거나 날짜가 끊길 때)마다 빈 줄을 끼워 넣는다.
-export function buildStatementDisplayItems(rows: StatementRow[]): DisplayItem[] {
+export function blockDateLabel(block: StatementBlock) {
+  const first = block.rows[0];
+  const last = block.rows[block.rows.length - 1];
+  return block.rows.length > 1 ? `${formatDate(first.use_date)} ~ ${formatDate(last.use_date)}` : formatDate(first.use_date);
+}
+
+// 같은 근로자의 날짜가 하루 간격으로 이어지면 한 블록으로 묶어 소계를 낸다.
+// 블록이 바뀌는 지점(다른 근로자로 넘어가거나 날짜가 끊길 때)마다 새 블록이 시작된다.
+export function buildStatementBlocks(rows: StatementRow[]): StatementBlock[] {
   const byWorker = new Map<string, StatementRow[]>();
   for (const r of rows) {
     const list = byWorker.get(r.daily_worker_id) ?? [];
@@ -52,19 +58,16 @@ export function buildStatementDisplayItems(rows: StatementRow[]): DisplayItem[] 
     return bMax.localeCompare(aMax);
   });
 
-  const items: DisplayItem[] = [];
+  const blocks: StatementBlock[] = [];
   for (const group of groups) {
     const sorted = [...group].sort((a, b) => a.use_date.localeCompare(b.use_date));
     let run: StatementRow[] = [];
 
     const flushRun = () => {
       if (run.length === 0) return;
-      run.forEach((r) =>
-        items.push({ kind: "entry", row: r, monthlyCount: monthlyCountByRowId.get(r.id) ?? 1 })
-      );
+      const blockRows = run.map((r) => ({ ...r, monthlyCount: monthlyCountByRowId.get(r.id) ?? 1 }));
       const amount = run.reduce((s, r) => s + (r.daily_wage ?? 0), 0);
-      items.push({ kind: "subtotal", days: run.length, amount });
-      items.push({ kind: "gap" });
+      blocks.push({ id: `${run[0].daily_worker_id}:${run[0].use_date}`, rows: blockRows, amount });
       run = [];
     };
 
@@ -86,8 +89,7 @@ export function buildStatementDisplayItems(rows: StatementRow[]): DisplayItem[] 
     flushRun();
   }
 
-  while (items.length > 0 && items[items.length - 1].kind === "gap") items.pop();
-  return items;
+  return blocks;
 }
 
 const inputClass = "w-full rounded-lg border border-slate-300 px-2 py-1 text-sm";
@@ -97,17 +99,25 @@ export function DailyWorkerUsageStatementTable({ rows, workers }: { rows: Statem
   const confirm = useConfirm();
   const pending = useGlobalPending();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [openBlocks, setOpenBlocks] = useState<Set<string>>(new Set());
 
-  const items = useMemo(() => buildStatementDisplayItems(rows), [rows]);
+  const blocks = useMemo(() => buildStatementBlocks(rows), [rows]);
   const rowNoById = useMemo(() => {
     const map = new Map<string, number>();
     let n = 0;
-    for (const item of items) {
-      if (item.kind === "entry") map.set(item.row.id, ++n);
-    }
+    for (const block of blocks) for (const r of block.rows) map.set(r.id, ++n);
     return map;
-  }, [items]);
+  }, [blocks]);
   const total = rows.reduce((s, r) => s + (r.daily_wage ?? 0), 0);
+
+  function toggleBlock(id: string) {
+    setOpenBlocks((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   async function handleSaveEdit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -139,114 +149,120 @@ export function DailyWorkerUsageStatementTable({ rows, workers }: { rows: Statem
         </tr>
       </thead>
       <tbody>
-        {items.map((item, idx) => {
-          if (item.kind === "gap") {
-            return (
-              <tr key={`gap-${idx}`} aria-hidden="true">
+        {blocks.map((block) => {
+          const open = openBlocks.has(block.id);
+          return (
+            <Fragment key={block.id}>
+              {block.rows.map((r) => {
+                const rowNo = rowNoById.get(r.id) ?? 0;
+                const hiddenOnScreen = !open && "hidden print:table-row";
+
+                if (editingId === r.id) {
+                  return (
+                    <tr key={r.id} className={cx("border-b border-slate-200 bg-slate-50", hiddenOnScreen)}>
+                      <td colSpan={COLS} className="py-3 pr-2">
+                        <form onSubmit={handleSaveEdit} className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-6">
+                          <input type="hidden" name="id" value={r.id} />
+                          <input type="date" name="use_date" required defaultValue={r.use_date} className={inputClass} />
+                          <select name="daily_worker_id" required defaultValue={r.daily_worker_id} className={inputClass}>
+                            {workers.map((w) => (
+                              <option key={w.id} value={w.id}>
+                                {w.name}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="number"
+                            name="daily_wage"
+                            defaultValue={r.daily_wage ?? ""}
+                            placeholder="일급"
+                            className={inputClass}
+                          />
+                          <input name="note" defaultValue={r.note ?? ""} placeholder="비고" className={inputClass} />
+                          <div className="flex gap-2 lg:col-span-2">
+                            <button
+                              type="submit"
+                              className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-700"
+                            >
+                              저장
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingId(null)}
+                              className="rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-600 hover:bg-slate-100"
+                            >
+                              취소
+                            </button>
+                          </div>
+                        </form>
+                      </td>
+                    </tr>
+                  );
+                }
+
+                return (
+                  <tr key={r.id} className={cx("border-b border-slate-100 text-slate-700", hiddenOnScreen)}>
+                    <td className="py-1.5 pr-2 text-center">{rowNo}</td>
+                    <td className="py-1.5 pr-2 text-center">{formatDate(r.use_date)}</td>
+                    <td className="py-1.5 pr-2 text-center">
+                      {r.name}{" "}
+                      <span
+                        className={
+                          r.monthlyCount > MONTHLY_DAY_LIMIT
+                            ? "text-[10px] font-semibold text-red-600"
+                            : "text-[10px] text-slate-400"
+                        }
+                      >
+                        {r.monthlyCount}일째
+                      </span>
+                    </td>
+                    <td className="py-1.5 pr-2 text-center">{r.resident_id_masked ?? "-"}</td>
+                    <td className="py-1.5 pr-2 text-center">{r.phone ?? "-"}</td>
+                    <td className="py-1.5 pr-2 text-center">{r.daily_wage != null ? formatWon(r.daily_wage) : "-"}</td>
+                    <td className="py-1.5 pr-2 text-center">{r.note ?? "-"}</td>
+                    <td className="py-1.5 text-center print:hidden">
+                      <div className="flex justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setEditingId(r.id)}
+                          className="rounded-lg border border-slate-300 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100"
+                        >
+                          수정
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleConfirmDelete(r.id)}
+                          className="rounded-lg border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              <tr className="border-b-2 border-slate-300 bg-slate-50 font-semibold text-slate-800">
+                <td colSpan={COLS} className="py-1.5 pr-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleBlock(block.id)}
+                    className="flex w-full items-center justify-between gap-2 text-left print:pointer-events-none"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span className="text-xs text-slate-400 print:hidden">{open ? "▼" : "▶"}</span>
+                      {block.rows[0].name} · {blockDateLabel(block)} · 소계 ({block.rows.length}일)
+                    </span>
+                    <span>{formatWon(block.amount)}</span>
+                  </button>
+                </td>
+              </tr>
+              <tr aria-hidden="true">
                 <td colSpan={COLS} className="h-4 border-0 p-0" />
               </tr>
-            );
-          }
-          if (item.kind === "subtotal") {
-            return (
-              <tr key={`subtotal-${idx}`} className="border-b-2 border-slate-300 bg-slate-50 font-semibold text-slate-800">
-                <td colSpan={5} className="py-1.5 pr-2 text-center">
-                  소계 ({item.days}일)
-                </td>
-                <td className="py-1.5 pr-2 text-center">{formatWon(item.amount)}</td>
-                <td colSpan={2} className="py-1.5" />
-              </tr>
-            );
-          }
-
-          const r = item.row;
-          const rowNo = rowNoById.get(r.id) ?? 0;
-
-          if (editingId === r.id) {
-            return (
-              <tr key={r.id} className="border-b border-slate-200 bg-slate-50">
-                <td colSpan={COLS} className="py-3 pr-2">
-                  <form onSubmit={handleSaveEdit} className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-6">
-                    <input type="hidden" name="id" value={r.id} />
-                    <input type="date" name="use_date" required defaultValue={r.use_date} className={inputClass} />
-                    <select name="daily_worker_id" required defaultValue={r.daily_worker_id} className={inputClass}>
-                      {workers.map((w) => (
-                        <option key={w.id} value={w.id}>
-                          {w.name}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      type="number"
-                      name="daily_wage"
-                      defaultValue={r.daily_wage ?? ""}
-                      placeholder="일급"
-                      className={inputClass}
-                    />
-                    <input name="note" defaultValue={r.note ?? ""} placeholder="비고" className={inputClass} />
-                    <div className="flex gap-2 lg:col-span-2">
-                      <button
-                        type="submit"
-                        className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-700"
-                      >
-                        저장
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingId(null)}
-                        className="rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-600 hover:bg-slate-100"
-                      >
-                        취소
-                      </button>
-                    </div>
-                  </form>
-                </td>
-              </tr>
-            );
-          }
-
-          return (
-            <tr key={r.id} className="border-b border-slate-100 text-slate-700">
-              <td className="py-1.5 pr-2 text-center">{rowNo}</td>
-              <td className="py-1.5 pr-2 text-center">{formatDate(r.use_date)}</td>
-              <td className="py-1.5 pr-2 text-center">
-                {r.name}{" "}
-                <span
-                  className={
-                    item.monthlyCount > MONTHLY_DAY_LIMIT
-                      ? "text-[10px] font-semibold text-red-600"
-                      : "text-[10px] text-slate-400"
-                  }
-                >
-                  {item.monthlyCount}일째
-                </span>
-              </td>
-              <td className="py-1.5 pr-2 text-center">{r.resident_id_masked ?? "-"}</td>
-              <td className="py-1.5 pr-2 text-center">{r.phone ?? "-"}</td>
-              <td className="py-1.5 pr-2 text-center">{r.daily_wage != null ? formatWon(r.daily_wage) : "-"}</td>
-              <td className="py-1.5 pr-2 text-center">{r.note ?? "-"}</td>
-              <td className="py-1.5 text-center print:hidden">
-                <div className="flex justify-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setEditingId(r.id)}
-                    className="rounded-lg border border-slate-300 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100"
-                  >
-                    수정
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleConfirmDelete(r.id)}
-                    className="rounded-lg border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50"
-                  >
-                    삭제
-                  </button>
-                </div>
-              </td>
-            </tr>
+            </Fragment>
           );
         })}
-        {items.length === 0 && (
+        {blocks.length === 0 && (
           <tr>
             <td colSpan={COLS} className="py-6 text-center text-slate-400">
               해당 월의 사용내역이 없습니다.
