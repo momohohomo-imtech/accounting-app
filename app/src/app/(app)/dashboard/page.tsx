@@ -22,6 +22,8 @@ export default async function DashboardPage({
   const currentYear = now.getFullYear();
   const selectedYear = year ? Number(year) : currentYear;
   const monthStart = `${currentYear}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  const monthEndDay = new Date(currentYear, now.getMonth() + 1, 0).getDate();
+  const monthEnd = `${currentYear}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(monthEndDay).padStart(2, "0")}`;
 
   const [
     { data: monthTxRaw },
@@ -33,7 +35,7 @@ export default async function DashboardPage({
     { data: firstTx },
     { data: yearProjects },
   ] = await Promise.all([
-    supabase.from("transactions").select("*").gte("trans_date", monthStart),
+    supabase.from("transactions").select("*").gte("trans_date", monthStart).lte("trans_date", monthEnd),
     supabase.from("transactions").select("*").eq("payment_type", "credit"),
     supabase.from("credit_payments").select("*"),
     supabase.from("projects").select("id, status").eq("status", "ongoing"),
@@ -110,7 +112,7 @@ export default async function DashboardPage({
         </p>
       </div>
 
-      <TaxEstimateSection />
+      <TaxEstimateSection year={selectedYear} />
       <PendingPaymentProfitSection year={selectedYear} />
 
       <div className="space-y-3">
