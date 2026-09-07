@@ -18,8 +18,11 @@
   `AccessListWorkerPicker`, `SiteAggregateTable`, `BusinessTripListClient`,
   `CategoryAggregateTable`, `CategoryDetailReport`, `ToolChecklistHistoryTable`,
   `QuotesTable`, `PurchaseOrdersTable`, `UnassignedWorkLogTable`,
-  `ClassificationPendingTable`, `DailyWorkerUsageStatementTable`)에
+  `ClassificationPendingTable`)에
   이 패턴이 적용돼 있음 — 새 표를 추가할 때 이 목록도 같이 업데이트할 것.
+  (예외: `DailyWorkerUsageStatementTable`은 세무사 제출용 사용내역서 문서라
+  근로자별 연속일 소계 순서가 고정돼야 해서 임의 정렬을 지원하지 않음 —
+  `AccessListPrintPopup`과 같은 인쇄 문서 취급.)
 
 - **저장/수정/삭제 등 서버 액션을 호출하는 폼·팝업은 항상 화면 전체를
   잠그는 처리 중 표시를 띄울 것.** 새로 만들거나 수정하는 폼/팝업도 예외

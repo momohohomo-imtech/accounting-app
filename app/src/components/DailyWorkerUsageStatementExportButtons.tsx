@@ -1,20 +1,35 @@
 "use client";
 
 import { downloadXlsx } from "@/lib/xlsxExport";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatWon } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { PrintButton } from "@/components/PrintButton";
+import { buildStatementDisplayItems, type StatementRow } from "@/components/DailyWorkerUsageStatementTable";
 
-type ExportRow = { use_date: string; name: string; resident_id_masked: string | null; phone: string | null; note: string | null };
-
-export function DailyWorkerUsageStatementExportButtons({ rows, periodLabel }: { rows: ExportRow[]; periodLabel: string }) {
+export function DailyWorkerUsageStatementExportButtons({
+  rows,
+  periodLabel,
+}: {
+  rows: StatementRow[];
+  periodLabel: string;
+}) {
   async function handleExport() {
-    const data = rows.map((r) => [formatDate(r.use_date), r.name, r.resident_id_masked ?? "-", r.phone ?? "-", r.note ?? "-"]);
+    const items = buildStatementDisplayItems(rows);
+    const total = rows.reduce((s, r) => s + (r.daily_wage ?? 0), 0);
+
+    const data = items.map((item) => {
+      if (item.kind === "gap") return ["", "", "", "", "", ""];
+      if (item.kind === "subtotal") return ["", `소계 (${item.days}일)`, "", "", item.amount, ""];
+      const r = item.row;
+      return [formatDate(r.use_date), r.name, r.resident_id_masked ?? "-", r.phone ?? "-", r.daily_wage ?? "", r.note ?? "-"];
+    });
+
     await downloadXlsx(
       `일용직_사용내역서_${periodLabel}.xlsx`,
-      ["사용일자", "이름", "주민번호", "전화번호", "비고"],
+      ["사용일자", "이름", "주민번호", "전화번호", "일급", "비고"],
       data,
-      "일용직 사용내역서"
+      "일용직 사용내역서",
+      [[`${periodLabel} 지급액 ${formatWon(total)}`]]
     );
   }
 

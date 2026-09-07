@@ -81,9 +81,20 @@ export function DailyWorkerUsageLogForm({ offices, workers }: { offices: OfficeO
 
       <AccessListWorkerPicker offices={offices} workers={workers} employees={[]} />
 
-      <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-slate-500">비고 (선택)</label>
-        <input name="note" className="rounded-lg border border-slate-300 px-3 py-2 text-sm sm:w-64" />
+      <div className="flex flex-wrap gap-3">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-slate-500">일급 (선택, 직접 입력)</label>
+          <input
+            type="number"
+            name="daily_wage"
+            placeholder="예: 150000"
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm sm:w-40"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-slate-500">비고 (선택)</label>
+          <input name="note" className="rounded-lg border border-slate-300 px-3 py-2 text-sm sm:w-64" />
+        </div>
       </div>
 
       <button

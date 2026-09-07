@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
+import { formatWon } from "@/lib/format";
 import { DailyWorkerTaxFilter } from "@/components/DailyWorkerTaxFilter";
 import { DailyWorkerUsageLogForm } from "@/components/DailyWorkerUsageLogForm";
 import { DailyWorkerUsageStatementTable } from "@/components/DailyWorkerUsageStatementTable";
@@ -25,7 +26,7 @@ export async function DailyWorkerTaxSection({ year, month }: { year?: string; mo
     supabase.from("daily_workers").select("id, name, office_id, status, grade").eq("status", "active").order("name"),
     supabase
       .from("daily_worker_usage_logs")
-      .select("id, use_date, daily_worker_id, note, daily_workers(name, resident_id_masked, phone)")
+      .select("id, use_date, daily_worker_id, note, daily_wage, daily_workers(name, resident_id_masked, phone)")
       .gte("use_date", rangeStart)
       .lte("use_date", rangeEnd)
       .order("use_date", { ascending: false }),
@@ -42,10 +43,13 @@ export async function DailyWorkerTaxSection({ year, month }: { year?: string; mo
         name: worker?.name ?? "-",
         resident_id_masked: worker?.resident_id_masked ?? null,
         phone: worker?.phone ?? null,
+        daily_wage: l.daily_wage,
         note: l.note,
       };
     })
     .filter((r) => r.name !== "-");
+
+  const totalPaid = statementRows.reduce((s, r) => s + (r.daily_wage ?? 0), 0);
 
   const firstYear = Math.min(
     firstLog?.[0]?.use_date ? Number(firstLog[0].use_date.slice(0, 4)) : currentYear,
@@ -71,13 +75,21 @@ export async function DailyWorkerTaxSection({ year, month }: { year?: string; mo
 
       <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
         <DailyWorkerTaxFilter years={years} selectedYear={selectedYear} selectedMonth={selectedMonth} />
-        <DailyWorkerUsageStatementExportButtons rows={statementRows} periodLabel={`${selectedYear}년_${selectedMonth}월`} />
+        <div className="flex flex-col items-end gap-1">
+          <DailyWorkerUsageStatementExportButtons rows={statementRows} periodLabel={`${selectedYear}년_${selectedMonth}월`} />
+          <p className="text-[11px] text-slate-400">PDF로 저장하려면 인쇄 대화상자의 대상(프린터)에서 &ldquo;PDF로 저장&rdquo;을 선택하세요.</p>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm print:border-0 print:p-0 print:shadow-none">
-        <h2 className="mb-3 font-semibold text-slate-900">
-          일용직 사용내역서 — {selectedYear}년 {selectedMonth}월
-        </h2>
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="font-semibold text-slate-900">
+            일용직 사용내역서 — {selectedYear}년 {selectedMonth}월
+          </h2>
+          <p className="text-sm font-semibold text-slate-900">
+            {selectedMonth}월 지급액 <span className="ml-1 font-mono">{formatWon(totalPaid)}</span>
+          </p>
+        </div>
         <DailyWorkerUsageStatementTable
           rows={statementRows}
           workers={(workers ?? []).map((w) => ({ id: w.id, name: w.name }))}
