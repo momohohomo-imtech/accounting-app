@@ -29,7 +29,7 @@ export async function DailyWorkerTaxSection({ year, month }: { year?: string; mo
     supabase
       .from("daily_worker_usage_logs")
       .select(
-        "id, use_date, daily_worker_id, note, daily_wage, site_id, daily_workers(name, resident_id_masked, phone), sites(name)"
+        "id, use_date, daily_worker_id, note, daily_wage, site_id, daily_workers(name, resident_id, phone), sites(name)"
       )
       .gte("use_date", rangeStart)
       .lte("use_date", rangeEnd)
@@ -39,14 +39,14 @@ export async function DailyWorkerTaxSection({ year, month }: { year?: string; mo
 
   const statementRows = (logs ?? [])
     .map((l) => {
-      const worker = one(l.daily_workers) as { name: string; resident_id_masked: string | null; phone: string | null } | undefined;
+      const worker = one(l.daily_workers) as { name: string; resident_id: string | null; phone: string | null } | undefined;
       const site = one(l.sites) as { name: string } | undefined;
       return {
         id: l.id,
         use_date: l.use_date,
         daily_worker_id: l.daily_worker_id,
         name: worker?.name ?? "-",
-        resident_id_masked: worker?.resident_id_masked ?? null,
+        resident_id: worker?.resident_id ?? null,
         phone: worker?.phone ?? null,
         daily_wage: l.daily_wage,
         note: l.note,

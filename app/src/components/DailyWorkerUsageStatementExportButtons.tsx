@@ -28,7 +28,7 @@ export function DailyWorkerUsageStatementExportButtons({
         siteName: block.siteName,
         name: r.name,
         monthlyCount: r.monthlyCount,
-        residentId: r.resident_id_masked ?? "-",
+        residentId: r.resident_id ?? "-",
         phone: r.phone ?? "-",
         dailyWage: r.daily_wage,
         note: r.note ?? "-",

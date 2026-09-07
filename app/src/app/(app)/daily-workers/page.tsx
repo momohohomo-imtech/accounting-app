@@ -76,9 +76,9 @@ async function WorkerListSection({ officeId }: { officeId?: string }) {
     { name: "grade", label: "등급", width: "6%", redValue: "불량" },
     { name: "birth_date", label: "생년월일", type: "date" },
     {
-      name: "resident_id_masked",
-      label: "주민번호(마스킹)",
-      placeholder: "예: 710429-*******",
+      name: "resident_id",
+      label: "주민번호",
+      placeholder: "예: 710429-1234567",
       hideInTable: true,
     },
     { name: "phone", label: "연락처", type: "tel" },

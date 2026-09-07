@@ -12,7 +12,7 @@ export type StatementRow = {
   use_date: string;
   daily_worker_id: string;
   name: string;
-  resident_id_masked: string | null;
+  resident_id: string | null;
   phone: string | null;
   daily_wage: number | null;
   note: string | null;
@@ -285,7 +285,7 @@ export function DailyWorkerUsageStatementTable({
                         {r.monthlyCount}일째
                       </span>
                     </td>
-                    <td className="py-1.5 pr-2 text-center">{r.resident_id_masked ?? "-"}</td>
+                    <td className="py-1.5 pr-2 text-center">{r.resident_id ?? "-"}</td>
                     <td className="py-1.5 pr-2 text-center">{r.phone ?? "-"}</td>
                     <td className="py-1.5 pr-2 text-center">{r.daily_wage != null ? formatWon(r.daily_wage) : "-"}</td>
                     <td className="py-1.5 pr-2 text-center">{r.note ?? "-"}</td>
