@@ -18,7 +18,7 @@
   `AccessListWorkerPicker`, `SiteAggregateTable`, `BusinessTripListClient`,
   `CategoryAggregateTable`, `CategoryDetailReport`, `ToolChecklistHistoryTable`,
   `QuotesTable`, `PurchaseOrdersTable`, `UnassignedWorkLogTable`,
-  `ClassificationPendingTable`)에
+  `ClassificationPendingTable`, `RevenueVerificationTable`)에
   이 패턴이 적용돼 있음 — 새 표를 추가할 때 이 목록도 같이 업데이트할 것.
   (예외: `DailyWorkerUsageStatementTable`은 세무사 제출용 사용내역서 문서라
   근로자별 연속일 소계 순서가 고정돼야 해서 임의 정렬을 지원하지 않음 —

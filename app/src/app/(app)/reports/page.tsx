@@ -19,6 +19,7 @@ import { ClassificationPendingTable } from "@/components/ClassificationPendingTa
 import { CategoryAggregateTable } from "@/components/CategoryAggregateTable";
 import { CategoryDetailReport } from "@/components/CategoryDetailReport";
 import { ProjectProfitTable } from "@/components/ProjectProfitTable";
+import { RevenueVerificationTable } from "@/components/RevenueVerificationTable";
 import { TransactionEditPopup } from "@/components/TransactionEditPopup";
 import { WorkLogSummaryTable } from "@/components/WorkLogSummaryTable";
 import { WorkLogMonthRangeFilter } from "@/components/WorkLogMonthRangeFilter";
@@ -201,6 +202,21 @@ export default async function ReportsPage({
     .sort((a, b) => a.label.localeCompare(b.label));
 
   const byProject = site ? byProjectAll.filter((p) => p.site_id === site) : byProjectAll;
+
+  // 매출 검증: 수주액(실수령액으로 입력해둔 금액)과 실제 매출 원장(세금계산서 기준) 합계를
+  // 대조 — 수주액 필드만 입력되고 원장에 매출이 안 찍혔거나, 반대로 원장엔 매출이 있는데
+  // 수주액이 비어있거나, 금액이 서로 다른 경우를 찾아낸다.
+  const revenueVerificationRows = byProject
+    .filter((p) => (p.contract_amount ?? 0) > 0 || p.sales > 0)
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      siteName: (one(p.sites) as { name: string } | null)?.name ?? null,
+      status: p.status,
+      quoteAmount: p.quoteAmount,
+      contractAmount: p.contract_amount ?? 0,
+      ledgerSales: p.sales,
+    }));
 
   const projectSummaryQuoteAmount = byProject.reduce((s, p) => s + p.quoteAmount, 0);
   const projectSummaryProfit = byProject.reduce((s, p) => s + p.profit, 0);
@@ -583,6 +599,10 @@ export default async function ReportsPage({
           </div>
 
           <ProjectProfitTable rows={byProject} year={selectedYear} site={site} />
+      </CollapsibleSection>
+
+      <CollapsibleSection title="매출 검증 — 수주액 vs 실제 매출 원장" className="print:hidden">
+        <RevenueVerificationTable rows={revenueVerificationRows} />
       </CollapsibleSection>
 
       <div className={popupOpen || anyIsolate ? "space-y-6 print:hidden" : "space-y-6"}>
