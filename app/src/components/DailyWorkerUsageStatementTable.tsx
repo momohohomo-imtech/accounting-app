@@ -64,7 +64,10 @@ export function buildStatementBlocks(rows: StatementRow[]): StatementBlock[] {
 
   const blocks: StatementBlock[] = [];
   for (const group of bySite.values()) {
-    const sorted = [...group].sort((a, b) => a.use_date.localeCompare(b.use_date));
+    // 같은 날짜끼리는 이름을 가나다순으로 정렬.
+    const sorted = [...group].sort(
+      (a, b) => a.use_date.localeCompare(b.use_date) || a.name.localeCompare(b.name, "ko")
+    );
     let run: StatementRow[] = [];
     let runLastDate = "";
 
