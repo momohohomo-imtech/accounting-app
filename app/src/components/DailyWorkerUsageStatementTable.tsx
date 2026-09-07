@@ -51,15 +51,8 @@ export function buildStatementBlocks(rows: StatementRow[]): StatementBlock[] {
     sorted.forEach((r, i) => monthlyCountByRowId.set(r.id, i + 1));
   }
 
-  const groups = Array.from(byWorker.values());
-  groups.sort((a, b) => {
-    const aMax = a.reduce((m, r) => (r.use_date > m ? r.use_date : m), a[0].use_date);
-    const bMax = b.reduce((m, r) => (r.use_date > m ? r.use_date : m), b[0].use_date);
-    return bMax.localeCompare(aMax);
-  });
-
   const blocks: StatementBlock[] = [];
-  for (const group of groups) {
+  for (const group of byWorker.values()) {
     const sorted = [...group].sort((a, b) => a.use_date.localeCompare(b.use_date));
     let run: StatementRow[] = [];
 
@@ -88,6 +81,13 @@ export function buildStatementBlocks(rows: StatementRow[]): StatementBlock[] {
     });
     flushRun();
   }
+
+  // 근로자와 무관하게, 블록의 마지막(가장 최근) 날짜 기준으로 최신이 위로 오게 정렬.
+  blocks.sort((a, b) => {
+    const aLast = a.rows[a.rows.length - 1].use_date;
+    const bLast = b.rows[b.rows.length - 1].use_date;
+    return bLast.localeCompare(aLast);
+  });
 
   return blocks;
 }
