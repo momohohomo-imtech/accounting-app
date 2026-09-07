@@ -55,6 +55,10 @@ function ProjectBlockEditor({
   const manpowerDisplay = manpowerTouched ? project.total_manpower : String(autoManpower);
 
   const [pickerOpen, setPickerOpen] = useState(false);
+  // 팝업 안에서 따로 고르는 날짜 — "공사일" 칸과 별개로 다른 날짜의 내역을 둘러볼 수
+  // 있게 함. 팝업을 열 때는 현재 공사일로 시작하되, 여기서 프로젝트를 선택하면 그
+  // 날짜가 이 프로젝트 블록의 공사일로 그대로 반영됨.
+  const [pickerDate, setPickerDate] = useState(project.work_date);
   const [loadingEntries, setLoadingEntries] = useState(false);
   const [dateEntries, setDateEntries] = useState<WorkLogDateEntry[] | null>(null);
 
@@ -65,21 +69,22 @@ function ProjectBlockEditor({
     setLoadingEntries(false);
   }
 
-  // 팝오버가 열려 있는 동안 공사일을 바꾸면(팝오버를 닫지 않고) 그 날짜의 목록을 다시
-  // 불러옴 — 예전엔 열 때만 불러와서 날짜를 바꾸면 제목만 바뀌고 목록은 이전 날짜
-  // 것 그대로 보여서 선택이 이상하게 느껴졌음.
   useEffect(() => {
     if (!pickerOpen) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- 팝오버가 열려 있는 동안 날짜가 바뀔 때마다 그 날짜의 작업일지 목록을 다시 불러옴
-    loadEntries(project.work_date);
-  }, [pickerOpen, project.work_date]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 팝업 안에서 고른 날짜가 바뀔 때마다 그 날짜의 작업일지 목록을 다시 불러옴
+    loadEntries(pickerDate);
+  }, [pickerOpen, pickerDate]);
 
   function togglePicker() {
-    setPickerOpen((prev) => !prev);
+    setPickerOpen((prev) => {
+      const next = !prev;
+      if (next) setPickerDate(project.work_date);
+      return next;
+    });
   }
 
   function pickEntry(entry: WorkLogDateEntry) {
-    onChange({ ...project, project_name: entry.title });
+    onChange({ ...project, project_name: entry.title, work_date: pickerDate });
     if (entry.site_name) onSiteNameFill(entry.site_name);
     setPickerOpen(false);
   }
@@ -125,7 +130,16 @@ function ProjectBlockEditor({
           />
           {pickerOpen && (
             <div className="absolute left-0 top-full z-10 mt-1 w-full max-w-sm rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
-              <p className="mb-1 px-1 text-xs text-slate-400">{project.work_date} 작업일지 내역</p>
+              <div className="mb-1.5 flex items-center gap-1.5 px-1">
+                <span className="text-xs text-slate-400">날짜</span>
+                <input
+                  type="date"
+                  value={pickerDate}
+                  onChange={(e) => setPickerDate(e.target.value)}
+                  className="rounded border border-slate-300 px-1.5 py-0.5 text-xs"
+                />
+              </div>
+              <p className="mb-1 px-1 text-xs text-slate-400">{pickerDate} 작업일지 내역 — 고르면 이 날짜로 공사일이 바뀝니다</p>
               {loadingEntries ? (
                 <p className="px-1 py-2 text-xs text-slate-400">불러오는 중...</p>
               ) : dateEntries && dateEntries.length > 0 ? (
