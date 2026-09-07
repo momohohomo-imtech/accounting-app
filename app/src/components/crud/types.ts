@@ -15,8 +15,8 @@ export type FieldConfig = {
   placeholder?: string;
   readOnly?: boolean;
   display?: "progress";
-  /** Format numbers with thousands separators in the table view. */
-  format?: "currency";
+  /** Format numbers with thousands separators in the table view. "won" also appends "원". */
+  format?: "currency" | "won";
   /** Hide this column from the table view (still available in the create/edit form). */
   hideInTable?: boolean;
   /** CSS width (e.g. "8%") applied to this column when present. */

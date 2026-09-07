@@ -15,7 +15,7 @@ const accountFields: FieldConfig[] = [
   { name: "bank_name", label: "은행명", required: true },
   { name: "nickname", label: "별칭" },
   { name: "account_number", label: "계좌번호" },
-  { name: "opening_balance", label: "시작 잔액", type: "number" },
+  { name: "opening_balance", label: "시작 잔액", type: "number", format: "won" },
   { name: "sort_order", label: "정렬순서", type: "number" },
 ];
 

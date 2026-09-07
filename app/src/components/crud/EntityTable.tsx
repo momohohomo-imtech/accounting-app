@@ -5,7 +5,7 @@ import type { FieldConfig } from "./types";
 import { EntityForm } from "./EntityForm";
 import { Table, THead, Tr, Td } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
-import { formatNumber } from "@/lib/format";
+import { formatNumber, formatWon } from "@/lib/format";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
@@ -21,6 +21,7 @@ function displayValue(row: Row, f: FieldConfig) {
   }
   if (f.type === "checkbox") return raw ? "O" : "";
   if (raw === null || raw === undefined || raw === "") return "-";
+  if (f.format === "won") return formatWon(raw as number);
   if (f.format === "currency") return formatNumber(raw as number | string);
   return String(raw);
 }
