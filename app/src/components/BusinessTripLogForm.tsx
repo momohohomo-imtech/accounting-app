@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   BusinessTripEquipment,
   BusinessTripExpense,
@@ -58,15 +58,24 @@ function ProjectBlockEditor({
   const [loadingEntries, setLoadingEntries] = useState(false);
   const [dateEntries, setDateEntries] = useState<WorkLogDateEntry[] | null>(null);
 
-  async function togglePicker() {
-    const next = !pickerOpen;
-    setPickerOpen(next);
-    if (next) {
-      setLoadingEntries(true);
-      const entries = await getWorkLogsForDate(project.work_date);
-      setDateEntries(entries);
-      setLoadingEntries(false);
-    }
+  async function loadEntries(date: string) {
+    setLoadingEntries(true);
+    const entries = await getWorkLogsForDate(date);
+    setDateEntries(entries);
+    setLoadingEntries(false);
+  }
+
+  // 팝오버가 열려 있는 동안 공사일을 바꾸면(팝오버를 닫지 않고) 그 날짜의 목록을 다시
+  // 불러옴 — 예전엔 열 때만 불러와서 날짜를 바꾸면 제목만 바뀌고 목록은 이전 날짜
+  // 것 그대로 보여서 선택이 이상하게 느껴졌음.
+  useEffect(() => {
+    if (!pickerOpen) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 팝오버가 열려 있는 동안 날짜가 바뀔 때마다 그 날짜의 작업일지 목록을 다시 불러옴
+    loadEntries(project.work_date);
+  }, [pickerOpen, project.work_date]);
+
+  function togglePicker() {
+    setPickerOpen((prev) => !prev);
   }
 
   function pickEntry(entry: WorkLogDateEntry) {
