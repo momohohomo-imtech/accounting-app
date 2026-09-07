@@ -16,12 +16,13 @@ const accountFields: FieldConfig[] = [
   { name: "nickname", label: "별칭" },
   { name: "account_number", label: "계좌번호" },
   { name: "opening_balance", label: "시작 잔액", type: "number" },
+  { name: "sort_order", label: "정렬순서", type: "number" },
 ];
 
 export default async function BankPage() {
   const supabase = await createClient();
   const [{ data: accounts }, { data: clients }, { data: transactions }, { data: allTx }] = await Promise.all([
-    supabase.from("bank_accounts").select("*").order("created_at", { ascending: false }),
+    supabase.from("bank_accounts").select("*").order("sort_order").order("created_at", { ascending: false }),
     supabase.from("clients").select("id, name").order("name"),
     supabase
       .from("bank_transactions")
@@ -116,7 +117,11 @@ export default async function BankPage() {
         </form>
 
         <div className="mt-5 overflow-x-auto">
-          <BankTransactionTable transactions={transactions ?? []} />
+          <BankTransactionTable
+            transactions={transactions ?? []}
+            accounts={(accounts ?? []).map((a) => ({ id: a.id, name: a.nickname ?? a.bank_name }))}
+            clients={clients ?? []}
+          />
         </div>
       </div>
     </div>
