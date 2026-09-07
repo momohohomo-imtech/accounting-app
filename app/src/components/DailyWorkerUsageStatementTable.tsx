@@ -99,6 +99,7 @@ export function DailyWorkerUsageStatementTable({ rows, workers }: { rows: Statem
   const confirm = useConfirm();
   const pending = useGlobalPending();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [wageMultiplier, setWageMultiplier] = useState<1 | 1.5 | 2>(1);
   const [openBlocks, setOpenBlocks] = useState<Set<string>>(new Set());
 
   const blocks = useMemo(() => buildStatementBlocks(rows), [rows]);
@@ -123,8 +124,14 @@ export function DailyWorkerUsageStatementTable({ rows, workers }: { rows: Statem
     e.preventDefault();
     const form = e.currentTarget;
     if (!(await confirm("수정 내용을 저장하시겠습니까?"))) return;
-    await pending.run(() => Promise.resolve(updateDailyWorkerUsageLogRecord(new FormData(form))));
+    const fd = new FormData(form);
+    if (wageMultiplier !== 1) {
+      const base = Number(fd.get("daily_wage") ?? 0);
+      fd.set("daily_wage", String(base * wageMultiplier));
+    }
+    await pending.run(() => Promise.resolve(updateDailyWorkerUsageLogRecord(fd)));
     setEditingId(null);
+    setWageMultiplier(1);
   }
 
   async function handleConfirmDelete(id: string) {
@@ -178,6 +185,26 @@ export function DailyWorkerUsageStatementTable({ rows, workers }: { rows: Statem
                             placeholder="일급"
                             className={inputClass}
                           />
+                          <div className="flex items-center gap-3 px-1 text-xs text-slate-600">
+                            <label className="flex items-center gap-1">
+                              <input
+                                type="checkbox"
+                                checked={wageMultiplier === 1.5}
+                                onChange={() => setWageMultiplier((m) => (m === 1.5 ? 1 : 1.5))}
+                                className="h-4 w-4"
+                              />
+                              1.5배
+                            </label>
+                            <label className="flex items-center gap-1">
+                              <input
+                                type="checkbox"
+                                checked={wageMultiplier === 2}
+                                onChange={() => setWageMultiplier((m) => (m === 2 ? 1 : 2))}
+                                className="h-4 w-4"
+                              />
+                              2배
+                            </label>
+                          </div>
                           <input name="note" defaultValue={r.note ?? ""} placeholder="비고" className={inputClass} />
                           <div className="flex gap-2 lg:col-span-2">
                             <button
@@ -188,7 +215,10 @@ export function DailyWorkerUsageStatementTable({ rows, workers }: { rows: Statem
                             </button>
                             <button
                               type="button"
-                              onClick={() => setEditingId(null)}
+                              onClick={() => {
+                                setEditingId(null);
+                                setWageMultiplier(1);
+                              }}
                               className="rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-600 hover:bg-slate-100"
                             >
                               취소
@@ -224,7 +254,10 @@ export function DailyWorkerUsageStatementTable({ rows, workers }: { rows: Statem
                       <div className="flex justify-center gap-1">
                         <button
                           type="button"
-                          onClick={() => setEditingId(r.id)}
+                          onClick={() => {
+                            setEditingId(r.id);
+                            setWageMultiplier(1);
+                          }}
                           className="rounded-lg border border-slate-300 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100"
                         >
                           수정
