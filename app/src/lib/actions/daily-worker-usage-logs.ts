@@ -5,14 +5,15 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function createDailyWorkerUsageLogRecord(formData: FormData) {
   const supabase = await createClient();
-  const useDate = String(formData.get("use_date") ?? "");
+  const useDates = formData.getAll("use_dates").map(String).filter(Boolean);
   const note = String(formData.get("note") ?? "") || null;
   const workerIds = formData.getAll("daily_worker_ids").map(String).filter(Boolean);
-  if (!useDate || workerIds.length === 0) return;
+  if (useDates.length === 0 || workerIds.length === 0) return;
 
-  await supabase
-    .from("daily_worker_usage_logs")
-    .insert(workerIds.map((daily_worker_id) => ({ use_date: useDate, daily_worker_id, note })));
+  const rows = useDates.flatMap((use_date) =>
+    workerIds.map((daily_worker_id) => ({ use_date, daily_worker_id, note }))
+  );
+  await supabase.from("daily_worker_usage_logs").insert(rows);
   revalidatePath("/daily-workers");
 }
 
