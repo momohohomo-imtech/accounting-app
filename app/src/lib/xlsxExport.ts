@@ -452,6 +452,7 @@ type UsageStatementExportItem =
   | {
       kind: "entry";
       use_date: string;
+      siteName: string;
       name: string;
       monthlyCount: number;
       residentId: string;
@@ -476,13 +477,13 @@ export async function downloadDailyWorkerUsageStatementXlsx(
 
   const titleRow = ws.addRow([`일용직 사용내역서 — ${periodLabel}`]);
   titleRow.font = { bold: true, size: 14 };
-  ws.mergeCells(titleRow.number, 1, titleRow.number, 7);
+  ws.mergeCells(titleRow.number, 1, titleRow.number, 8);
 
   const totalRow = ws.addRow([`${periodLabel} 지급액 ${new Intl.NumberFormat("ko-KR").format(totalPaid)}원`]);
   totalRow.font = { bold: true, color: { argb: "FF1E293B" } };
-  ws.mergeCells(totalRow.number, 1, totalRow.number, 7);
+  ws.mergeCells(totalRow.number, 1, totalRow.number, 8);
 
-  const headerRow = ws.addRow(["사용일자", "이름", "누적일수", "주민번호", "전화번호", "일급", "비고"]);
+  const headerRow = ws.addRow(["사용일자", "현장", "이름", "누적일수", "주민번호", "전화번호", "일급", "비고"]);
   headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
   headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E293B" } };
   headerRow.alignment = { horizontal: "center", vertical: "middle" };
@@ -494,7 +495,7 @@ export async function downloadDailyWorkerUsageStatementXlsx(
       continue;
     }
     if (item.kind === "subtotal") {
-      const row = ws.addRow(["", item.label, "", "", "", item.amount, ""]);
+      const row = ws.addRow(["", item.label, "", "", "", "", item.amount, ""]);
       row.font = { bold: true };
       row.eachCell({ includeEmpty: true }, (cell) => {
         cell.alignment = { horizontal: "center" };
@@ -503,6 +504,7 @@ export async function downloadDailyWorkerUsageStatementXlsx(
     }
     const row = ws.addRow([
       item.use_date,
+      item.siteName,
       item.name,
       `${item.monthlyCount}일째`,
       item.residentId,
@@ -514,7 +516,7 @@ export async function downloadDailyWorkerUsageStatementXlsx(
       cell.alignment = { horizontal: "center" };
     });
     if (item.monthlyCount > monthlyDayLimit) {
-      row.getCell(3).font = { bold: true, color: { argb: "FFDC2626" } };
+      row.getCell(4).font = { bold: true, color: { argb: "FFDC2626" } };
     }
   }
 
@@ -527,12 +529,13 @@ export async function downloadDailyWorkerUsageStatementXlsx(
   });
 
   ws.getColumn(1).width = 12;
-  ws.getColumn(2).width = 12;
-  ws.getColumn(3).width = 10;
-  ws.getColumn(4).width = 16;
+  ws.getColumn(2).width = 14;
+  ws.getColumn(3).width = 12;
+  ws.getColumn(4).width = 10;
   ws.getColumn(5).width = 16;
-  ws.getColumn(6).width = 12;
-  ws.getColumn(7).width = 20;
+  ws.getColumn(6).width = 16;
+  ws.getColumn(7).width = 12;
+  ws.getColumn(8).width = 20;
 
   triggerDownload(await wb.xlsx.writeBuffer(), filename);
 }

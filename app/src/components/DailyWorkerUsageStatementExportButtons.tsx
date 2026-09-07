@@ -25,6 +25,7 @@ export function DailyWorkerUsageStatementExportButtons({
       const entries = block.rows.map((r) => ({
         kind: "entry" as const,
         use_date: r.use_date,
+        siteName: block.siteName,
         name: r.name,
         monthlyCount: r.monthlyCount,
         residentId: r.resident_id_masked ?? "-",
@@ -34,7 +35,7 @@ export function DailyWorkerUsageStatementExportButtons({
       }));
       const subtotal = {
         kind: "subtotal" as const,
-        label: `${block.rows[0].name} ${blockDateLabel(block)} 소계 (${block.rows.length}일)`,
+        label: `${block.siteName} ${blockDateLabel(block)} 소계 (${block.days}일 · ${block.rows.length}건)`,
         amount: block.amount,
       };
       const gap = i < blocks.length - 1 ? [{ kind: "gap" as const }] : [];

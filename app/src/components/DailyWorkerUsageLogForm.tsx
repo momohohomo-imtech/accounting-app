@@ -9,8 +9,17 @@ import { formatDate } from "@/lib/format";
 
 type OfficeOption = { id: string; name: string };
 type WorkerOption = { id: string; name: string; office_id: string; grade?: string | null };
+type SiteOption = { id: string; name: string };
 
-export function DailyWorkerUsageLogForm({ offices, workers }: { offices: OfficeOption[]; workers: WorkerOption[] }) {
+export function DailyWorkerUsageLogForm({
+  offices,
+  workers,
+  sites,
+}: {
+  offices: OfficeOption[];
+  workers: WorkerOption[];
+  sites: SiteOption[];
+}) {
   const router = useRouter();
   const pending = useGlobalPending();
   const formRef = useRef<HTMLFormElement>(null);
@@ -38,6 +47,18 @@ export function DailyWorkerUsageLogForm({ offices, workers }: { offices: OfficeO
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-3">
+      <div className="flex flex-col gap-1 sm:w-64">
+        <label className="text-xs font-medium text-slate-500">현장</label>
+        <select name="site_id" required className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+          <option value="">현장 선택</option>
+          {sites.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="flex flex-col gap-1">
         <label className="text-xs font-medium text-slate-500">사용일자 (복수 선택 가능)</label>
         <div className="flex flex-wrap items-center gap-2">

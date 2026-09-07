@@ -16,13 +16,18 @@ export type StatementRow = {
   phone: string | null;
   daily_wage: number | null;
   note: string | null;
+  site_id: string | null;
+  site_name: string | null;
 };
 
 type BlockRow = StatementRow & { monthlyCount: number };
 
-export type StatementBlock = { id: string; rows: BlockRow[]; amount: number };
+export type StatementBlock = { id: string; siteName: string; rows: BlockRow[]; amount: number; days: number };
 
 type WorkerOption = { id: string; name: string };
+type SiteOption = { id: string; name: string };
+
+const NO_SITE_LABEL = "현장 미지정";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 // 한 사람당 한 달 최대 사용일수 — 이 날짜를 넘어가면(8일째부터) 카운트를 빨간 글씨로 경고.
@@ -34,14 +39,20 @@ export function blockDateLabel(block: StatementBlock) {
   return block.rows.length > 1 ? `${formatDate(first.use_date)} ~ ${formatDate(last.use_date)}` : formatDate(first.use_date);
 }
 
-// 같은 근로자의 날짜가 하루 간격으로 이어지면 한 블록으로 묶어 소계를 낸다.
-// 블록이 바뀌는 지점(다른 근로자로 넘어가거나 날짜가 끊길 때)마다 새 블록이 시작된다.
+// 현장의 날짜가 하루 간격 이내로 이어지면(같은 날 여러 근로자 포함) 한 블록으로 묶어 소계를 낸다.
+// 블록이 바뀌는 지점(다른 현장으로 넘어가거나 날짜가 끊길 때)마다 새 블록이 시작된다.
 export function buildStatementBlocks(rows: StatementRow[]): StatementBlock[] {
   const byWorker = new Map<string, StatementRow[]>();
+  const bySite = new Map<string, StatementRow[]>();
   for (const r of rows) {
-    const list = byWorker.get(r.daily_worker_id) ?? [];
-    list.push(r);
-    byWorker.set(r.daily_worker_id, list);
+    const workerList = byWorker.get(r.daily_worker_id) ?? [];
+    workerList.push(r);
+    byWorker.set(r.daily_worker_id, workerList);
+
+    const siteKey = r.site_id ?? "__none__";
+    const siteList = bySite.get(siteKey) ?? [];
+    siteList.push(r);
+    bySite.set(siteKey, siteList);
   }
 
   // 근로자별로 이번 달 몇 번째 사용일인지(연속 여부와 무관하게 월 전체 누적) 미리 계산.
@@ -52,37 +63,46 @@ export function buildStatementBlocks(rows: StatementRow[]): StatementBlock[] {
   }
 
   const blocks: StatementBlock[] = [];
-  for (const group of byWorker.values()) {
+  for (const group of bySite.values()) {
     const sorted = [...group].sort((a, b) => a.use_date.localeCompare(b.use_date));
     let run: StatementRow[] = [];
+    let runLastDate = "";
 
     const flushRun = () => {
       if (run.length === 0) return;
       const blockRows = run.map((r) => ({ ...r, monthlyCount: monthlyCountByRowId.get(r.id) ?? 1 }));
       const amount = run.reduce((s, r) => s + (r.daily_wage ?? 0), 0);
-      blocks.push({ id: `${run[0].daily_worker_id}:${run[0].use_date}`, rows: blockRows, amount });
+      const days = new Set(run.map((r) => r.use_date)).size;
+      blocks.push({
+        id: `${run[0].site_id ?? "none"}:${run[0].use_date}`,
+        siteName: run[0].site_name ?? NO_SITE_LABEL,
+        rows: blockRows,
+        amount,
+        days,
+      });
       run = [];
     };
 
-    sorted.forEach((r, i) => {
-      if (i === 0) {
+    sorted.forEach((r) => {
+      if (run.length === 0) {
         run.push(r);
+        runLastDate = r.use_date;
         return;
       }
-      const diffDays = Math.round(
-        (new Date(r.use_date).getTime() - new Date(sorted[i - 1].use_date).getTime()) / ONE_DAY_MS
-      );
-      if (diffDays === 1) {
+      const diffDays = Math.round((new Date(r.use_date).getTime() - new Date(runLastDate).getTime()) / ONE_DAY_MS);
+      if (diffDays <= 1) {
         run.push(r);
+        runLastDate = r.use_date;
       } else {
         flushRun();
         run.push(r);
+        runLastDate = r.use_date;
       }
     });
     flushRun();
   }
 
-  // 근로자와 무관하게, 블록의 마지막(가장 최근) 날짜 기준으로 최신이 위로 오게 정렬.
+  // 현장과 무관하게, 블록의 마지막(가장 최근) 날짜 기준으로 최신이 위로 오게 정렬.
   blocks.sort((a, b) => {
     const aLast = a.rows[a.rows.length - 1].use_date;
     const bLast = b.rows[b.rows.length - 1].use_date;
@@ -95,7 +115,15 @@ export function buildStatementBlocks(rows: StatementRow[]): StatementBlock[] {
 const inputClass = "w-full rounded-lg border border-slate-300 px-2 py-1 text-sm";
 const COLS = 8;
 
-export function DailyWorkerUsageStatementTable({ rows, workers }: { rows: StatementRow[]; workers: WorkerOption[] }) {
+export function DailyWorkerUsageStatementTable({
+  rows,
+  workers,
+  sites,
+}: {
+  rows: StatementRow[];
+  workers: WorkerOption[];
+  sites: SiteOption[];
+}) {
   const confirm = useConfirm();
   const pending = useGlobalPending();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -175,6 +203,14 @@ export function DailyWorkerUsageStatementTable({ rows, workers }: { rows: Statem
                             {workers.map((w) => (
                               <option key={w.id} value={w.id}>
                                 {w.name}
+                              </option>
+                            ))}
+                          </select>
+                          <select name="site_id" defaultValue={r.site_id ?? ""} className={inputClass}>
+                            <option value="">현장 선택</option>
+                            {sites.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.name}
                               </option>
                             ))}
                           </select>
@@ -283,7 +319,7 @@ export function DailyWorkerUsageStatementTable({ rows, workers }: { rows: Statem
                   >
                     <span className="flex items-center gap-1.5">
                       <span className="text-xs text-slate-400 print:hidden">{open ? "▼" : "▶"}</span>
-                      {block.rows[0].name} · {blockDateLabel(block)} · 소계 ({block.rows.length}일)
+                      {block.siteName} · {blockDateLabel(block)} · 소계 ({block.days}일 · {block.rows.length}건)
                     </span>
                     <span>{formatWon(block.amount)}</span>
                   </button>

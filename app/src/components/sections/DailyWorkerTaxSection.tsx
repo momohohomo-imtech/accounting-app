@@ -22,12 +22,15 @@ export async function DailyWorkerTaxSection({ year, month }: { year?: string; mo
   const rangeEndDay = new Date(selectedYear, selectedMonth, 0).getDate();
   const rangeEnd = `${selectedYear}-${pad(selectedMonth)}-${pad(rangeEndDay)}`;
 
-  const [{ data: offices }, { data: workers }, { data: logs }, { data: firstLog }] = await Promise.all([
+  const [{ data: offices }, { data: workers }, { data: sites }, { data: logs }, { data: firstLog }] = await Promise.all([
     supabase.from("daily_worker_offices").select("id, name").order("name"),
     supabase.from("daily_workers").select("id, name, office_id, status, grade").eq("status", "active").order("name"),
+    supabase.from("sites").select("id, name").order("name"),
     supabase
       .from("daily_worker_usage_logs")
-      .select("id, use_date, daily_worker_id, note, daily_wage, daily_workers(name, resident_id_masked, phone)")
+      .select(
+        "id, use_date, daily_worker_id, note, daily_wage, site_id, daily_workers(name, resident_id_masked, phone), sites(name)"
+      )
       .gte("use_date", rangeStart)
       .lte("use_date", rangeEnd)
       .order("use_date", { ascending: false }),
@@ -37,6 +40,7 @@ export async function DailyWorkerTaxSection({ year, month }: { year?: string; mo
   const statementRows = (logs ?? [])
     .map((l) => {
       const worker = one(l.daily_workers) as { name: string; resident_id_masked: string | null; phone: string | null } | undefined;
+      const site = one(l.sites) as { name: string } | undefined;
       return {
         id: l.id,
         use_date: l.use_date,
@@ -46,6 +50,8 @@ export async function DailyWorkerTaxSection({ year, month }: { year?: string; mo
         phone: worker?.phone ?? null,
         daily_wage: l.daily_wage,
         note: l.note,
+        site_id: l.site_id,
+        site_name: site?.name ?? null,
       };
     })
     .filter((r) => r.name !== "-");
@@ -65,12 +71,16 @@ export async function DailyWorkerTaxSection({ year, month }: { year?: string; mo
       <div className="print:hidden">
         <h2 className="text-lg font-semibold text-slate-900">세무사 확인용 — 일용직 사용내역서</h2>
         <p className="text-xs text-slate-400">
-          선택한 달에 사용한 일용직 근로자를 등록해두면 사용일자·이름·주민번호·전화번호가 담긴 내역서로 보여줍니다.
+          선택한 달에 사용한 일용직 근로자를 현장과 함께 등록해두면 사용일자·이름·주민번호·전화번호가 담긴 내역서로 보여줍니다. 소계는 현장 단위(연속일)로 묶입니다.
         </p>
       </div>
 
       <CollapsibleSection title="일용직 사용내역 등록" className="print:hidden">
-        <DailyWorkerUsageLogForm offices={offices ?? []} workers={(workers ?? []).map((w) => ({ id: w.id, name: w.name, office_id: w.office_id, grade: w.grade }))} />
+        <DailyWorkerUsageLogForm
+          offices={offices ?? []}
+          workers={(workers ?? []).map((w) => ({ id: w.id, name: w.name, office_id: w.office_id, grade: w.grade }))}
+          sites={sites ?? []}
+        />
       </CollapsibleSection>
 
       <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
@@ -93,6 +103,7 @@ export async function DailyWorkerTaxSection({ year, month }: { year?: string; mo
         <DailyWorkerUsageStatementTable
           rows={statementRows}
           workers={(workers ?? []).map((w) => ({ id: w.id, name: w.name }))}
+          sites={sites ?? []}
         />
       </div>
     </div>
