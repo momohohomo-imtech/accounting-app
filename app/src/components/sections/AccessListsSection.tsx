@@ -2,31 +2,62 @@ import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { createAccessListRecord, updateAccessListRecord, deleteAccessListRecord } from "@/lib/actions/access-lists";
 import { sortByEmployeeNo } from "@/lib/format";
+import { monthRange } from "@/lib/dateRange";
 import { AccessListWorkerPicker } from "@/components/AccessListWorkerPicker";
 import { AccessListSubmitButton } from "@/components/AccessListSubmitButton";
 import { AccessListCard } from "@/components/AccessListCard";
+import { YearMonthFilter } from "@/components/YearMonthFilter";
 
-export async function AccessListsSection() {
+const FLOOR_YEAR = 2026;
+
+export async function AccessListsSection({ year, month }: { year?: string; month?: string }) {
   const supabase = await createClient();
-  const [{ data: sites }, { data: offices }, { data: workers }, { data: employeesRaw }, { data: lists }, { data: links }] =
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const selectedYear = year ? Number(year) : currentYear;
+  const selectedMonth = month ?? "current";
+  const { start, end } = monthRange(selectedYear, selectedMonth, currentMonth);
+
+  const [{ data: sites }, { data: offices }, { data: workers }, { data: employeesRaw }, { data: allLists }, { data: lists }] =
     await Promise.all([
       supabase.from("sites").select("id, name").order("name"),
       supabase.from("daily_worker_offices").select("id, name").order("name"),
       supabase.from("daily_workers").select("id, name, office_id, status, grade").eq("status", "active").order("name"),
       supabase.from("employees").select("id, name, employee_no"),
-      supabase.from("access_lists").select("*, sites(name)").order("created_at", { ascending: false }),
+      supabase.from("access_lists").select("id, created_at").order("created_at", { ascending: false }),
       supabase
+        .from("access_lists")
+        .select("*, sites(name)")
+        .gte("created_at", `${start}T00:00:00`)
+        .lte("created_at", `${end}T23:59:59`)
+        .order("created_at", { ascending: false }),
+    ]);
+
+  const listIds = (lists ?? []).map((l) => l.id);
+  const { data: links } = listIds.length
+    ? await supabase
         .from("access_list_workers")
         .select(
           "id, access_list_id, daily_worker_id, employee_id, note, manual_name, manual_phone, manual_birth_date, manual_nationality, daily_workers(name, phone, nationality, birth_date, grade), employees(name, phone, nationality, birth_date)"
-        ),
-    ]);
+        )
+        .in("access_list_id", listIds)
+    : { data: [] };
 
   const employees = sortByEmployeeNo(employeesRaw ?? []);
+  const maxDataYear = (allLists ?? []).reduce(
+    (max, l) => Math.max(max, Number(String(l.created_at).slice(0, 4))),
+    FLOOR_YEAR
+  );
+  const topYear = Math.max(currentYear, maxDataYear, selectedYear);
+  const years = Array.from({ length: topYear - FLOOR_YEAR + 1 }, (_, i) => FLOOR_YEAR + i);
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-semibold text-slate-900">출입명단</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold text-slate-900">출입명단</h2>
+        <YearMonthFilter basePath="/daily-workers" years={years} selectedYear={selectedYear} selectedMonth={selectedMonth} />
+      </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h3 className="mb-3 font-semibold text-slate-900">출입명단 생성</h3>

@@ -17,6 +17,7 @@ import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { LinkButton } from "@/components/ui/Button";
 import { formatWon } from "@/lib/format";
+import { monthRange } from "@/lib/dateRange";
 import { isLedgerVisible } from "@/lib/credit";
 import type { CreditPayment, Transaction } from "@/lib/types";
 
@@ -152,16 +153,6 @@ async function fetchTransactionTotals({
     purchase: visible.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0),
     sales: visible.reduce((s, t) => s + t.sales_amount + t.sales_vat, 0),
   };
-}
-
-function monthRange(selectedYear: number, monthParam: string, currentMonth: number) {
-  if (monthParam === "all") return { start: `${selectedYear}-01-01`, end: `${selectedYear}-12-31` };
-  if (monthParam === "h1") return { start: `${selectedYear}-01-01`, end: `${selectedYear}-06-30` };
-  if (monthParam === "h2") return { start: `${selectedYear}-07-01`, end: `${selectedYear}-12-31` };
-  const m = monthParam === "current" ? currentMonth : Number(monthParam);
-  const mm = String(m).padStart(2, "0");
-  const lastDay = new Date(selectedYear, m, 0).getDate();
-  return { start: `${selectedYear}-${mm}-01`, end: `${selectedYear}-${mm}-${String(lastDay).padStart(2, "0")}` };
 }
 
 async function TransactionListSection({

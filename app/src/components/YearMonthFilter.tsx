@@ -12,10 +12,12 @@ const MONTH_OPTIONS = [
 ];
 
 export function YearMonthFilter({
+  basePath = "/transactions",
   years,
   selectedYear,
   selectedMonth,
 }: {
+  basePath?: string;
   years: number[];
   selectedYear: number;
   selectedMonth: string;
@@ -26,7 +28,7 @@ export function YearMonthFilter({
   function setParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
     params.set(key, value);
-    router.push(`/transactions?${params.toString()}`, { scroll: false });
+    router.push(`${basePath}?${params.toString()}`, { scroll: false });
   }
 
   return (
