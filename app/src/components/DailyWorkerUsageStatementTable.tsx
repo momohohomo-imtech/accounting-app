@@ -20,11 +20,13 @@ export type StatementRow = {
 type WorkerOption = { id: string; name: string };
 
 type DisplayItem =
-  | { kind: "entry"; row: StatementRow }
+  | { kind: "entry"; row: StatementRow; monthlyCount: number }
   | { kind: "subtotal"; days: number; amount: number }
   | { kind: "gap" };
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+// 한 사람당 한 달 최대 사용일수 — 이 날짜를 넘어가면(8일째부터) 카운트를 빨간 글씨로 경고.
+export const MONTHLY_DAY_LIMIT = 7;
 
 // 같은 근로자의 날짜가 하루 간격으로 이어지면 한 블록으로 묶어 소계를 내고,
 // 블록이 바뀌는 지점(다른 근로자로 넘어가거나 날짜가 끊길 때)마다 빈 줄을 끼워 넣는다.
@@ -34,6 +36,13 @@ export function buildStatementDisplayItems(rows: StatementRow[]): DisplayItem[] 
     const list = byWorker.get(r.daily_worker_id) ?? [];
     list.push(r);
     byWorker.set(r.daily_worker_id, list);
+  }
+
+  // 근로자별로 이번 달 몇 번째 사용일인지(연속 여부와 무관하게 월 전체 누적) 미리 계산.
+  const monthlyCountByRowId = new Map<string, number>();
+  for (const list of byWorker.values()) {
+    const sorted = [...list].sort((a, b) => a.use_date.localeCompare(b.use_date));
+    sorted.forEach((r, i) => monthlyCountByRowId.set(r.id, i + 1));
   }
 
   const groups = Array.from(byWorker.values());
@@ -50,7 +59,9 @@ export function buildStatementDisplayItems(rows: StatementRow[]): DisplayItem[] 
 
     const flushRun = () => {
       if (run.length === 0) return;
-      run.forEach((r) => items.push({ kind: "entry", row: r }));
+      run.forEach((r) =>
+        items.push({ kind: "entry", row: r, monthlyCount: monthlyCountByRowId.get(r.id) ?? 1 })
+      );
       const amount = run.reduce((s, r) => s + (r.daily_wage ?? 0), 0);
       items.push({ kind: "subtotal", days: run.length, amount });
       items.push({ kind: "gap" });
@@ -198,7 +209,18 @@ export function DailyWorkerUsageStatementTable({ rows, workers }: { rows: Statem
             <tr key={r.id} className="border-b border-slate-100 text-slate-700">
               <td className="py-1.5 pr-2 text-center">{rowNo}</td>
               <td className="py-1.5 pr-2 text-center">{formatDate(r.use_date)}</td>
-              <td className="py-1.5 pr-2 text-center">{r.name}</td>
+              <td className="py-1.5 pr-2 text-center">
+                {r.name}{" "}
+                <span
+                  className={
+                    item.monthlyCount > MONTHLY_DAY_LIMIT
+                      ? "text-[10px] font-semibold text-red-600"
+                      : "text-[10px] text-slate-400"
+                  }
+                >
+                  {item.monthlyCount}일째
+                </span>
+              </td>
               <td className="py-1.5 pr-2 text-center">{r.resident_id_masked ?? "-"}</td>
               <td className="py-1.5 pr-2 text-center">{r.phone ?? "-"}</td>
               <td className="py-1.5 pr-2 text-center">{r.daily_wage != null ? formatWon(r.daily_wage) : "-"}</td>

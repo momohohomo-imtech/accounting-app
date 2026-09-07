@@ -447,3 +447,92 @@ export async function downloadWorkLogCalendarXlsx(
 
   triggerDownload(await wb.xlsx.writeBuffer(), filename);
 }
+
+type UsageStatementExportItem =
+  | {
+      kind: "entry";
+      use_date: string;
+      name: string;
+      monthlyCount: number;
+      residentId: string;
+      phone: string;
+      dailyWage: number | null;
+      note: string;
+    }
+  | { kind: "subtotal"; days: number; amount: number }
+  | { kind: "gap" };
+
+// 세무사 확인용 일용직 사용내역서 — 화면과 같은 근로자별 연속일 소계/빈 줄 구조를 그대로 재현하고,
+// 월 누적 사용일수가 한도를 넘긴 칸은 빨간 글씨로 표시한다.
+export async function downloadDailyWorkerUsageStatementXlsx(
+  filename: string,
+  periodLabel: string,
+  totalPaid: number,
+  items: UsageStatementExportItem[],
+  monthlyDayLimit: number
+) {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("일용직 사용내역서");
+
+  const titleRow = ws.addRow([`일용직 사용내역서 — ${periodLabel}`]);
+  titleRow.font = { bold: true, size: 14 };
+  ws.mergeCells(titleRow.number, 1, titleRow.number, 7);
+
+  const totalRow = ws.addRow([`${periodLabel} 지급액 ${new Intl.NumberFormat("ko-KR").format(totalPaid)}원`]);
+  totalRow.font = { bold: true, color: { argb: "FF1E293B" } };
+  ws.mergeCells(totalRow.number, 1, totalRow.number, 7);
+
+  const headerRow = ws.addRow(["사용일자", "이름", "누적일수", "주민번호", "전화번호", "일급", "비고"]);
+  headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E293B" } };
+  headerRow.alignment = { horizontal: "center", vertical: "middle" };
+  const headerRowNumber = headerRow.number;
+
+  for (const item of items) {
+    if (item.kind === "gap") {
+      ws.addRow([]);
+      continue;
+    }
+    if (item.kind === "subtotal") {
+      const row = ws.addRow(["", `소계 (${item.days}일)`, "", "", "", item.amount, ""]);
+      row.font = { bold: true };
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        cell.alignment = { horizontal: "center" };
+      });
+      continue;
+    }
+    const row = ws.addRow([
+      item.use_date,
+      item.name,
+      `${item.monthlyCount}일째`,
+      item.residentId,
+      item.phone,
+      item.dailyWage ?? "",
+      item.note,
+    ]);
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      cell.alignment = { horizontal: "center" };
+    });
+    if (item.monthlyCount > monthlyDayLimit) {
+      row.getCell(3).font = { bold: true, color: { argb: "FFDC2626" } };
+    }
+  }
+
+  const thin = { style: "thin" as const, color: { argb: "FFCBD5E1" } };
+  ws.eachRow((row, rowNumber) => {
+    if (rowNumber < headerRowNumber) return;
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      cell.border = { top: thin, left: thin, bottom: thin, right: thin };
+    });
+  });
+
+  ws.getColumn(1).width = 12;
+  ws.getColumn(2).width = 12;
+  ws.getColumn(3).width = 10;
+  ws.getColumn(4).width = 16;
+  ws.getColumn(5).width = 16;
+  ws.getColumn(6).width = 12;
+  ws.getColumn(7).width = 20;
+
+  triggerDownload(await wb.xlsx.writeBuffer(), filename);
+}
