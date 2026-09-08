@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
-type Memo = { id: string; content: string; created_at: string; updated_at: string };
+type Memo = { id: string; content: string; created_at: string; updated_at: string; project_name?: string };
 
 export function ConstructionMemoList({
   projectId,
@@ -16,7 +16,9 @@ export function ConstructionMemoList({
   updateAction,
   deleteAction,
 }: {
-  projectId: string;
+  /** 특정 프로젝트를 선택했을 때만 전달됨 — 이 경우에만 새 메모 작성 폼을 보여줌
+   *  (연도/현장 단위로 여러 프로젝트 메모를 모아볼 때는 작성 폼 없이 조회/수정/삭제만). */
+  projectId?: string;
   memos: Memo[];
   createAction: (formData: FormData) => unknown;
   updateAction: (formData: FormData) => unknown;
@@ -32,7 +34,7 @@ export function ConstructionMemoList({
 
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!content.trim()) return;
+    if (!projectId || !content.trim()) return;
     const fd = new FormData();
     fd.append("project_id", projectId);
     fd.append("content", content);
@@ -68,25 +70,27 @@ export function ConstructionMemoList({
 
   return (
     <div className="space-y-4">
-      <form
-        onSubmit={handleCreate}
-        className="space-y-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm print:hidden"
-      >
-        <label className={labelClass}>새 메모</label>
-        <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          rows={3}
-          placeholder="관련 내용, 진행 상황 등을 기록하세요."
-          className={fieldClass}
-        />
-        {formError && <p className="text-sm text-red-600">{formError}</p>}
-        <div>
-          <Button type="submit" size="sm" disabled={!content.trim()}>
-            메모 등록
-          </Button>
-        </div>
-      </form>
+      {projectId && (
+        <form
+          onSubmit={handleCreate}
+          className="space-y-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm print:hidden"
+        >
+          <label className={labelClass}>새 메모</label>
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            rows={3}
+            placeholder="관련 내용, 진행 상황 등을 기록하세요."
+            className={fieldClass}
+          />
+          {formError && <p className="text-sm text-red-600">{formError}</p>}
+          <div>
+            <Button type="submit" size="sm" disabled={!content.trim()}>
+              메모 등록
+            </Button>
+          </div>
+        </form>
+      )}
 
       <div className="space-y-3">
         {memos.map((m) => (
@@ -111,10 +115,13 @@ export function ConstructionMemoList({
             ) : (
               <>
                 <div className="flex items-start justify-between gap-3">
-                  <p className="text-xs text-slate-400">
-                    {formatDate(m.created_at)}
-                    {m.updated_at !== m.created_at && ` (수정 ${formatDate(m.updated_at)})`}
-                  </p>
+                  <div>
+                    {m.project_name && <p className="text-sm font-semibold text-slate-700">{m.project_name}</p>}
+                    <p className="text-xs text-slate-400">
+                      {formatDate(m.created_at)}
+                      {m.updated_at !== m.created_at && ` (수정 ${formatDate(m.updated_at)})`}
+                    </p>
+                  </div>
                   <div className="flex shrink-0 items-center gap-2 print:hidden">
                     {confirmDeleteId === m.id ? (
                       <>
