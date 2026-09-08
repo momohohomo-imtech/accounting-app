@@ -8,8 +8,6 @@ import {
   updateConstructionMemo,
   deleteConstructionMemo,
 } from "@/lib/actions/constructionMemos";
-import { KnowHowSection } from "@/components/KnowHowSection";
-import { createKnowHowNote, updateKnowHowNote, deleteKnowHowNote } from "@/lib/actions/knowHow";
 
 type MemoRow = { id: string; content: string; created_at: string; updated_at: string; project_name?: string };
 
@@ -62,20 +60,14 @@ export async function ConstructionMemoSection({
   const matchingProjectIds = scopedProjects.map((p) => p.id);
   const projectNameById = new Map(projectNodes.map((p) => [p.id, p.name]));
 
-  const [{ data: memosRaw }, { data: knowHowNotes }] = await Promise.all([
+  const { data: memosRaw } =
     matchingProjectIds.length > 0
-      ? supabase
+      ? await supabase
           .from("construction_memos")
           .select("id, content, created_at, updated_at, project_id")
           .in("project_id", matchingProjectIds)
           .order("created_at", { ascending: false })
-      : Promise.resolve({ data: [] as { id: string; content: string; created_at: string; updated_at: string; project_id: string }[] }),
-    supabase
-      .from("know_how_notes")
-      .select("*")
-      .eq("category", "construction")
-      .order("created_at", { ascending: false }),
-  ]);
+      : { data: [] as { id: string; content: string; created_at: string; updated_at: string; project_id: string }[] };
 
   const memos: MemoRow[] = (memosRaw ?? []).map((m) => ({
     id: m.id,
@@ -86,12 +78,6 @@ export async function ConstructionMemoSection({
     // 메모인지 표시(프로젝트를 이미 콕 집었으면 굳이 반복 표시 안 함).
     project_name: selectedProjectId ? undefined : (projectNameById.get(m.project_id) ?? ""),
   }));
-
-  async function createKnowHowBound(formData: FormData) {
-    "use server";
-    formData.set("category", "construction");
-    return createKnowHowNote(formData);
-  }
 
   return (
     <div className="space-y-6">
@@ -120,14 +106,6 @@ export async function ConstructionMemoSection({
           deleteAction={deleteConstructionMemo}
         />
       )}
-
-      <KnowHowSection
-        title="공사관리 노하우"
-        notes={(knowHowNotes ?? []) as unknown as { id: string; title: string; content: string | null; memo: string | null; created_at: string }[]}
-        createAction={createKnowHowBound}
-        updateAction={updateKnowHowNote}
-        deleteAction={deleteKnowHowNote}
-      />
     </div>
   );
 }
