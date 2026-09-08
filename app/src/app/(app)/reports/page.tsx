@@ -499,6 +499,16 @@ export default async function ReportsPage({
     );
   }
 
+  // 항목이 많아서 성격별로 묶어 보여주기 위한 구역 제목 — 개별 항목 인쇄 중일 땐
+  // 화면 구성용 안내일 뿐이라 같이 인쇄 안 되게 뺌(전체 인쇄 시엔 그대로 나옴).
+  function groupHeader(label: string) {
+    return (
+      <h2 className={`px-1 text-xs font-bold uppercase tracking-wider text-slate-400 ${popupOpen || isolate ? "print:hidden" : ""}`}>
+        {label}
+      </h2>
+    );
+  }
+
   // 프로젝트별 손익 엑셀용 행 — 화면 표(ProjectProfitTable)와 같은 컬럼 구성.
   const projectExportRows = byProject.map((p) => [
     p.name,
@@ -594,6 +604,8 @@ export default async function ReportsPage({
       </div>
 
       <div className="space-y-6">
+        {groupHeader("재무 개요")}
+
         <div className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${hiddenClass("quarterly")}`}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-semibold text-slate-900">분기별 매입·매출·손익</h2>
@@ -656,7 +668,10 @@ export default async function ReportsPage({
         </CollapsibleSection>
       </div>
 
-      <CollapsibleSection
+      <div className="space-y-6">
+        {groupHeader("프로젝트")}
+
+        <CollapsibleSection
           className={hiddenClass("projects")}
           title="프로젝트별 손익 (클릭하면 발주금 대비 상세 손익)"
           defaultOpen={printSection === "projects"}
@@ -726,9 +741,12 @@ export default async function ReportsPage({
         }
       >
         <RevenueVerificationTable rows={revenueVerificationRows} />
-      </CollapsibleSection>
+        </CollapsibleSection>
+      </div>
 
       <div className="space-y-6">
+        {groupHeader("거래처·카테고리 집계")}
+
         <CollapsibleSection
           title="매입처별 집계 — 어느 업체에서 얼마를 매입했는지"
           className={hiddenClass("vendors")}
@@ -807,7 +825,10 @@ export default async function ReportsPage({
         </CollapsibleSection>
       </div>
 
-      <CollapsibleSection
+      <div className="space-y-6">
+        {groupHeader("작업일지")}
+
+        <CollapsibleSection
         className={hiddenClass("worklog")}
         title={`작업일지 집계 — ${selectedYear}년 ${wlMonthRange.label} 동안 같은 작업을 몇 일 했는지`}
         defaultOpen={printSection === "worklog"}
@@ -854,7 +875,8 @@ export default async function ReportsPage({
         }
       >
         <UnassignedWorkLogTable rows={unassignedRows} emptyMessage="이 기간에 미선정 항목이 없습니다." />
-      </CollapsibleSection>
+        </CollapsibleSection>
+      </div>
 
       <ReportAIInsights
         summary={aiSummary}
