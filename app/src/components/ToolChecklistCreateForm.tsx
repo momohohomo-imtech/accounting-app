@@ -228,7 +228,7 @@ export function ToolChecklistCreateForm({
               key={sortOrder}
               className={cx("rounded-xl p-3", groupIndex % 2 === 0 ? "bg-white" : "bg-slate-100")}
             >
-              <p className="mb-1.5 text-sm font-bold text-black">{toolGroupLabel(sortOrder)}</p>
+              <p className="mb-1.5 text-sm font-bold text-black underline">{toolGroupLabel(sortOrder)}</p>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2">
                 {groupTools.map((t) => (
                   <div

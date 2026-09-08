@@ -46,7 +46,7 @@ export function ToolMasterGrid({ tools }: { tools: Tool[] }) {
           key={sortOrder}
           className={cx("rounded-xl p-3", groupIndex % 2 === 0 ? "bg-white" : "bg-slate-100")}
         >
-          <p className="mb-1.5 text-sm font-bold text-black">{toolGroupLabel(sortOrder)}</p>
+          <p className="mb-1.5 text-sm font-bold text-black underline">{toolGroupLabel(sortOrder)}</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {groupTools.map((t, i) => (
               <div
