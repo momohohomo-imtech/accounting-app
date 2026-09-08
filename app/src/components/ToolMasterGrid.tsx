@@ -58,6 +58,9 @@ export function ToolMasterGrid({ tools }: { tools: Tool[] }) {
                   title={t.for_access_pass ? `${t.name} (반입반출증용)` : t.name}
                 >
                   <span className="truncate">{t.name}</span>
+                  {t.default_quantity && (
+                    <span className="shrink-0 text-xs text-slate-400">({t.default_quantity})</span>
+                  )}
                   {t.for_access_pass && (
                     <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-red-600" />
                   )}
