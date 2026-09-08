@@ -19,7 +19,7 @@ export default async function QualityConstructionPage({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-900 print:hidden">품질관리·공사관리</h1>
+      <h1 className="text-2xl font-bold text-slate-900 print:hidden">공사 관리</h1>
       <div className="print:hidden">
         <PageTabs basePath="/quality-construction" tabs={TABS} active={active} />
       </div>
