@@ -161,9 +161,8 @@ export function ToolChecklistCreateForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm print:hidden">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-slate-900">{isEdit ? "공구명세서 수정" : "새 공구명세서 만들기"}</h3>
-        {isEdit && (
+      {isEdit && (
+        <div className="flex justify-end">
           <button
             type="button"
             onClick={() => router.push("/quality-construction?tab=tools", { scroll: false })}
@@ -171,8 +170,8 @@ export function ToolChecklistCreateForm({
           >
             수정 취소
           </button>
-        )}
-      </div>
+        </div>
+      )}
       <div className="flex flex-wrap gap-3">
         <div className="flex flex-col gap-1">
           <label className={labelClass}>제목</label>

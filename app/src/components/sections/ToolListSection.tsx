@@ -206,21 +206,27 @@ export async function ToolListSection({
           </div>
         </CollapsibleSection>
 
-        <ToolChecklistCreateForm
-          key={editFrom ?? copyFrom ?? "new"}
-          tools={toolOptions}
-          sites={siteOptions}
-          projects={projects ?? []}
-          checklistId={editSource?.id as string | undefined}
-          initialTitle={initialTitle}
-          initialProjectId={initialProjectId}
-          initialTripDate={initialTripDate}
-          initialHelperCount={initialHelperCount}
-          initialQuantities={initialQuantities}
-          initialToolNames={initialToolNames}
-          initialAdhocItems={initialAdhocItems}
-          hasSource={Boolean(editSource || copySource)}
-        />
+        <CollapsibleSection
+          title={editSource ? "공구명세서 수정" : "새 공구명세서 만들기"}
+          defaultOpen={Boolean(editSource || copySource)}
+          bare
+        >
+          <ToolChecklistCreateForm
+            key={editFrom ?? copyFrom ?? "new"}
+            tools={toolOptions}
+            sites={siteOptions}
+            projects={projects ?? []}
+            checklistId={editSource?.id as string | undefined}
+            initialTitle={initialTitle}
+            initialProjectId={initialProjectId}
+            initialTripDate={initialTripDate}
+            initialHelperCount={initialHelperCount}
+            initialQuantities={initialQuantities}
+            initialToolNames={initialToolNames}
+            initialAdhocItems={initialAdhocItems}
+            hasSource={Boolean(editSource || copySource)}
+          />
+        </CollapsibleSection>
 
         <CollapsibleSection title="저장된 공구명세서 (이력)">
           <ToolChecklistHistoryTable rows={historyRows} />
