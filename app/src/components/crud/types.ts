@@ -19,6 +19,8 @@ export type FieldConfig = {
   format?: "currency" | "won";
   /** Hide this column from the table view (still available in the create/edit form). */
   hideInTable?: boolean;
+  /** Hide this field from the "새로 추가" create form (still available when editing an existing row). */
+  hideInCreate?: boolean;
   /** CSS width (e.g. "8%") applied to this column when present. */
   width?: string;
   /** When the row's value at this field name is truthy, render this cell's text in red (table view only). */

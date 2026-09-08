@@ -55,7 +55,7 @@ export function CreatePanel({
         }}
         className="space-y-3"
       >
-        <EntityForm fields={fields} />
+        <EntityForm fields={fields.filter((f) => !f.hideInCreate)} />
         {formError && <p className="text-sm text-red-600">{formError}</p>}
         <div className="flex items-center gap-2">
           <Button type="submit">추가하기</Button>

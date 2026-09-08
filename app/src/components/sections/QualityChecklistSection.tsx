@@ -12,22 +12,36 @@ import {
 import { KnowHowSection } from "@/components/KnowHowSection";
 import { createKnowHowNote, updateKnowHowNote, deleteKnowHowNote } from "@/lib/actions/knowHow";
 
-const fields: FieldConfig[] = [
-  { name: "process_name", label: "공정/공사명", required: true },
-  { name: "item_name", label: "점검 항목", required: true },
-  {
-    name: "result",
-    label: "결과",
-    type: "select",
-    options: [
-      { value: "보류", label: "보류" },
-      { value: "합격", label: "합격", color: "blue" },
-      { value: "불합격", label: "불합격", color: "red" },
-    ],
-  },
-  { name: "check_date", label: "점검일", type: "date" },
-  { name: "note", label: "메모", type: "textarea", hideInTable: true },
-];
+function buildFields(projectSearchOptions: { value: string; label: string; year: number; siteLabel: string }[]): FieldConfig[] {
+  return [
+    {
+      name: "project_id",
+      label: "프로젝트",
+      // 새로 만들 땐 위 필터에서 고른 프로젝트로 자동 지정되니 폼엔 안 보이고,
+      // 수정할 때만 나타나서 다른 프로젝트로 옮길 수 있게 함.
+      hideInCreate: true,
+      required: true,
+      type: "project-search",
+      projectSearchOptions,
+      toggleable: true,
+      defaultVisible: false,
+    },
+    { name: "process_name", label: "공정/공사명", required: true },
+    { name: "item_name", label: "점검 항목", required: true },
+    {
+      name: "result",
+      label: "결과",
+      type: "select",
+      options: [
+        { value: "보류", label: "보류" },
+        { value: "합격", label: "합격", color: "blue" },
+        { value: "불합격", label: "불합격", color: "red" },
+      ],
+    },
+    { name: "check_date", label: "점검일", type: "date" },
+    { name: "note", label: "메모", type: "textarea", hideInTable: true },
+  ];
+}
 
 export async function QualityChecklistSection({ projectId }: { projectId?: string }) {
   const supabase = await createClient();
@@ -56,6 +70,14 @@ export async function QualityChecklistSection({ projectId }: { projectId?: strin
       clientName: client?.name ?? null,
     };
   });
+
+  const projectSearchOptions = projectNodes.map((p) => ({
+    value: p.id,
+    label: p.name,
+    year: p.year,
+    siteLabel: p.siteName,
+  }));
+  const fields = buildFields(projectSearchOptions);
 
   async function createBound(formData: FormData) {
     "use server";
