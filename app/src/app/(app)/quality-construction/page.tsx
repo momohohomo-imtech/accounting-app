@@ -24,7 +24,7 @@ export default async function QualityConstructionPage({
   }>;
 }) {
   const { tab, project_id, year, client, site_id, copyFrom, editFrom, checklist } = await searchParams;
-  const active = tab ?? "quality";
+  const active = tab ?? "tools";
 
   return (
     <div className="space-y-6">
