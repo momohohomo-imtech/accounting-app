@@ -36,7 +36,20 @@ function redirectToLoginOnTimeout(request: NextRequest) {
   return NextResponse.redirect(url);
 }
 
+// 브라우저가 로그인 필요한 화면을 캐시(뒤로가기 캐시 포함)해두면, 유휴 로그아웃
+// 시각이 지났거나 창을 닫았다 새로 열었을 때도 서버에 새로 확인하지 않고 예전
+// 화면을 그대로 다시 보여줄 수 있음 — 이를 막기 위해 모든 응답에 no-store를 강제.
+function withNoStore(response: NextResponse) {
+  response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+  response.headers.set("Pragma", "no-cache");
+  return response;
+}
+
 export async function updateSession(request: NextRequest) {
+  return withNoStore(await updateSessionInner(request));
+}
+
+async function updateSessionInner(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
