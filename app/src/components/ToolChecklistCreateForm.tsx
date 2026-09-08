@@ -225,7 +225,7 @@ export function ToolChecklistCreateForm({
           {groups.map(([sortOrder, groupTools]) => (
             <div key={sortOrder}>
               <p className="mb-1.5 text-xs font-semibold text-slate-500">{toolGroupLabel(sortOrder)}</p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2">
                 {groupTools.map((t) => (
                   <div
                     key={t.id}
@@ -265,7 +265,7 @@ export function ToolChecklistCreateForm({
           </button>
         </div>
         {adhocItems.length > 0 && (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-2">
             {adhocItems.map((a) => (
               <div
                 key={a.key}
