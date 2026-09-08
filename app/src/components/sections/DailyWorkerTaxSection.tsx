@@ -69,7 +69,7 @@ export async function DailyWorkerTaxSection({ year, month }: { year?: string; mo
   return (
     <div className="space-y-6">
       <div className="print:hidden">
-        <h2 className="text-lg font-semibold text-slate-900">세무사 확인용 — 일용직 사용내역서</h2>
+        <h2 className="text-lg font-semibold text-slate-900">세무사 제출용 — 일용직 사용내역서</h2>
         <p className="text-xs text-slate-400">
           선택한 달에 사용한 일용직 근로자를 현장과 함께 등록해두면 사용일자·이름·주민번호·전화번호가 담긴 내역서로 보여줍니다. 소계는 현장 단위(연속일)로 묶입니다.
         </p>

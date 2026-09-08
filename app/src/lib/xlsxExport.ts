@@ -463,7 +463,7 @@ type UsageStatementExportItem =
   | { kind: "subtotal"; label: string; amount: number }
   | { kind: "gap" };
 
-// 세무사 확인용 일용직 사용내역서 — 화면과 같은 근로자별 연속일 소계/빈 줄 구조를 그대로 재현하고,
+// 세무사 제출용 일용직 사용내역서 — 화면과 같은 근로자별 연속일 소계/빈 줄 구조를 그대로 재현하고,
 // 월 누적 사용일수가 한도를 넘긴 칸은 빨간 글씨로 표시한다.
 export async function downloadDailyWorkerUsageStatementXlsx(
   filename: string,

@@ -19,7 +19,7 @@ const TABS = [
   { key: "offices", label: "인력사무소" },
   { key: "access", label: "출입명단" },
   { key: "usage", label: "일용직 사용내역" },
-  { key: "tax", label: "세무사 확인용" },
+  { key: "tax", label: "세무사 제출용" },
 ];
 
 export default async function DailyWorkersPage({
