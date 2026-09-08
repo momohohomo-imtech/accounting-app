@@ -69,6 +69,8 @@ async function ProjectListSection({
   const supabase = await createClient();
   const currentYear = new Date().getFullYear();
   const selectedYear = year ? Number(year) : currentYear;
+  // 상태 필터는 체크박스로 여러 개를 동시에 고를 수 있어서 콤마로 구분된 값으로 옴.
+  const statusList = status ? status.split(",").filter(Boolean) : [];
 
   let projectsQuery = supabase
     .from("projects")
@@ -76,7 +78,7 @@ async function ProjectListSection({
     .eq("year", selectedYear)
     .order("created_at", { ascending: false });
   if (siteId) projectsQuery = projectsQuery.eq("site_id", siteId);
-  if (status) projectsQuery = projectsQuery.eq("status", status);
+  if (statusList.length > 0) projectsQuery = projectsQuery.in("status", statusList);
 
   const [{ data: sites }, { data: allProjects }, { data: projects }, { data: allYears }] = await Promise.all([
     supabase.from("sites").select("id, name, clients(name)").order("name"),
@@ -301,7 +303,7 @@ async function ProjectListSection({
             siteOptions={siteOptions}
             selectedSiteId={siteId}
             statusOptions={PROJECT_STATUS_OPTIONS}
-            selectedStatus={status}
+            selectedStatuses={statusList}
           />
           <ProjectListExportButtons year={selectedYear} rows={tableRows} />
         </div>
@@ -322,7 +324,7 @@ async function ProjectListSection({
                 p.id,
                 <LinkButton
                   key={p.id}
-                  href={`/projects?tab=list&year=${selectedYear}${siteId ? `&site_id=${siteId}` : ""}${status ? `&status=${status}` : ""}&report=${p.id}`}
+                  href={`/projects?tab=list&year=${selectedYear}${siteId ? `&site_id=${siteId}` : ""}${status ? `&status=${encodeURIComponent(status)}` : ""}&report=${p.id}`}
                   variant="secondary"
                   size="xs"
                 >
@@ -353,7 +355,7 @@ async function ProjectListSection({
           <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
             <ProjectProfitReport
               projectId={report}
-              closeHref={`/projects?tab=list&year=${selectedYear}${siteId ? `&site_id=${siteId}` : ""}${status ? `&status=${status}` : ""}`}
+              closeHref={`/projects?tab=list&year=${selectedYear}${siteId ? `&site_id=${siteId}` : ""}${status ? `&status=${encodeURIComponent(status)}` : ""}`}
             />
           </div>
         </div>
