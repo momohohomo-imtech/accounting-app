@@ -8,6 +8,7 @@ import { fieldClass, labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { groupToolsBySortOrder, toolGroupLabel } from "@/lib/tools";
+import { cx } from "@/lib/cx";
 import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components/ProjectPicker";
 
 type Tool = {
@@ -222,8 +223,11 @@ export function ToolChecklistCreateForm({
         <p className="text-sm text-slate-400">등록된 공구가 없습니다 — 아래에서 직접 추가해도 됩니다.</p>
       ) : (
         <div className="space-y-4">
-          {groups.map(([sortOrder, groupTools]) => (
-            <div key={sortOrder}>
+          {groups.map(([sortOrder, groupTools], groupIndex) => (
+            <div
+              key={sortOrder}
+              className={cx("rounded-xl p-3", groupIndex % 2 === 0 ? "bg-white" : "bg-slate-100")}
+            >
               <p className="mb-1.5 text-xs font-semibold text-slate-500">{toolGroupLabel(sortOrder)}</p>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2">
                 {groupTools.map((t) => (

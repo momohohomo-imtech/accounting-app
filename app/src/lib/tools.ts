@@ -14,7 +14,8 @@ const GROUP_LABELS: Record<number, string> = {
 
 export function toolGroupLabel(sortOrder: number) {
   if (sortOrder === 0) return "미지정";
-  return GROUP_LABELS[sortOrder] ?? `${sortOrder}번`;
+  const name = GROUP_LABELS[sortOrder];
+  return name ? `${sortOrder} ${name}` : `${sortOrder}번`;
 }
 
 export function groupToolsBySortOrder<T extends { sort_order: number }>(tools: T[]): [number, T[]][] {

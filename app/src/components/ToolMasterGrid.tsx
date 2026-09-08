@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { swapToolPosition } from "@/lib/actions/tools";
 import { ToolEditPopup } from "@/components/ToolEditPopup";
 import { groupToolsBySortOrder, toolGroupLabel } from "@/lib/tools";
+import { cx } from "@/lib/cx";
 
 type Tool = {
   id: string;
@@ -40,8 +41,11 @@ export function ToolMasterGrid({ tools }: { tools: Tool[] }) {
 
   return (
     <div className="space-y-4">
-      {groups.map(([sortOrder, groupTools]) => (
-        <div key={sortOrder}>
+      {groups.map(([sortOrder, groupTools], groupIndex) => (
+        <div
+          key={sortOrder}
+          className={cx("rounded-xl p-3", groupIndex % 2 === 0 ? "bg-white" : "bg-slate-100")}
+        >
           <p className="mb-1.5 text-xs font-semibold text-slate-500">{toolGroupLabel(sortOrder)}</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {groupTools.map((t, i) => (
@@ -59,7 +63,7 @@ export function ToolMasterGrid({ tools }: { tools: Tool[] }) {
                 >
                   <span className="truncate">{t.name}</span>
                   {t.default_quantity && (
-                    <span className="shrink-0 text-xs text-slate-400">({t.default_quantity})</span>
+                    <span className="shrink-0 text-xs text-black">({t.default_quantity})</span>
                   )}
                   {t.for_access_pass && (
                     <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-red-600" />
