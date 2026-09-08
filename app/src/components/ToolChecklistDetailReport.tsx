@@ -91,7 +91,7 @@ export function ToolChecklistDetailReport({
   }
 
   return (
-    <div ref={printRef} className="space-y-4 print:space-y-1">
+    <div ref={printRef} className="print-force-black space-y-4 print:space-y-1">
       {/* 양식 모드에서는 이 표제부가 인쇄에 안 나오게 함 — 아래 AccessPassPermitTable이
           자체 제목을 갖고 있어서 같이 나오면 중복됨. */}
       <div className={`flex flex-wrap items-center justify-between gap-2 print:mb-0.5 ${formMode !== "none" ? "print:hidden" : ""}`}>

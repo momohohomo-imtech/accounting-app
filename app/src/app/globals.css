@@ -67,6 +67,15 @@ textarea {
   }
 }
 
+/* 공구명세서 인쇄(빈 양식 포함)는 회색 톤 보조 글자(그룹 제목·메모 등)까지
+   전부 검정으로 나오게 함 — ToolChecklistDetailReport. */
+@media print {
+  .print-force-black,
+  .print-force-black * {
+    color: #000 !important;
+  }
+}
+
 /* 팝업(모달)에서 "인쇄"를 누르면 나머지 페이지는 숨기고 모달 내용만 인쇄되게.
    팝업은 ModalPortal로 body의 진짜 직계 자식(#app-modal-portal)으로 렌더링되므로,
    그 외의 body 직계 자식(앱 전체)만 숨기면 확실하게 팝업만 남는다. */
