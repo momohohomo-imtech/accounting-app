@@ -4,9 +4,9 @@ import { ConstructionMemoSection } from "@/components/sections/ConstructionMemoS
 import { ToolListSection } from "@/components/sections/ToolListSection";
 
 const TABS = [
-  { key: "quality", label: "품질관리" },
-  { key: "construction", label: "공사 메모" },
   { key: "tools", label: "공구리스트" },
+  { key: "construction", label: "공사 메모" },
+  { key: "quality", label: "품질관리" },
 ];
 
 export default async function QualityConstructionPage({
