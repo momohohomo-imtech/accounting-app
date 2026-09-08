@@ -26,7 +26,14 @@ export function ConstructionMemoFilter({
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const years = useMemo(() => Array.from(new Set(projects.map((p) => p.year))).sort((a, b) => b - a), [projects]);
+  const years = useMemo(() => {
+    const list = Array.from(new Set(projects.map((p) => p.year)));
+    // 선택된 연도에 아직 등록된 프로젝트가 없어도(예: 올해 막 시작) 드롭다운에서
+    // 사라지지 않게 목록에 끼워넣음.
+    const y = Number(selectedYear);
+    if (selectedYear !== "all" && !Number.isNaN(y) && !list.includes(y)) list.push(y);
+    return list.sort((a, b) => b - a);
+  }, [projects, selectedYear]);
 
   const clientsForYear = useMemo(() => {
     const scoped = selectedYear === "all" ? projects : projects.filter((p) => String(p.year) === selectedYear);
@@ -57,8 +64,9 @@ export function ConstructionMemoFilter({
     const site = next.site ?? selectedSiteId;
     const project = next.project ?? selectedProjectId;
 
-    if (year === "all") params.delete("year");
-    else params.set("year", year);
+    // 연도는 "all"도 명시적으로 URL에 남겨야 함 — 지우면 서버 쪽에서 파라미터가
+    // 없는 것과 구분이 안 돼서 기본값(올해)으로 되돌아가 버림.
+    params.set("year", year);
     if (client === "all") params.delete("client");
     else params.set("client", client);
     if (site === "all") params.delete("site_id");

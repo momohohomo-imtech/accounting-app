@@ -43,7 +43,9 @@ export async function ConstructionMemoSection({
     };
   });
 
-  const selectedYear = year ?? "all";
+  // 파라미터가 아예 없으면(처음 진입) 올해를 기본으로 보여주고, "전체"는
+  // 사용자가 명시적으로 골랐을 때만(URL에 year=all로 남음) 전체 연도를 보여줌.
+  const selectedYear = year ?? String(new Date().getFullYear());
   const selectedClient = client ?? "all";
   const selectedSiteId = siteId ?? "all";
   const selectedProjectId = projectId ?? "";
@@ -58,11 +60,10 @@ export async function ConstructionMemoSection({
   if (selectedProjectId) scopedProjects = scopedProjects.filter((p) => p.id === selectedProjectId);
 
   const matchingProjectIds = scopedProjects.map((p) => p.id);
-  const hasFilter = selectedYear !== "all" || selectedSiteId !== "all" || Boolean(selectedProjectId);
   const projectNameById = new Map(projectNodes.map((p) => [p.id, p.name]));
 
   const [{ data: memosRaw }, { data: knowHowNotes }] = await Promise.all([
-    hasFilter && matchingProjectIds.length > 0
+    matchingProjectIds.length > 0
       ? supabase
           .from("construction_memos")
           .select("id, content, created_at, updated_at, project_id")
@@ -106,11 +107,7 @@ export async function ConstructionMemoSection({
         />
       </div>
 
-      {!hasFilter ? (
-        <p className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-400">
-          위에서 연도(또는 현장·프로젝트)를 선택하면 메모를 볼 수 있어요.
-        </p>
-      ) : matchingProjectIds.length === 0 ? (
+      {matchingProjectIds.length === 0 ? (
         <p className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-400">
           조건에 맞는 프로젝트가 없습니다.
         </p>
