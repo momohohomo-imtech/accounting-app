@@ -36,7 +36,9 @@ export function ToolChecklistDetailReport({
   closeHref: string;
   copyHref: string;
   editHref: string;
-  /** 실제로 저장된 명세서가 아닌 빈 양식 미리보기일 때 "수정"/"복사" 링크를 숨김. */
+  /** 실제로 저장된 명세서가 아닌 빈 양식 미리보기일 때 true — "수정"/"복사" 링크를
+   *  숨기고, 인쇄 시 회색 톤 보조 글자까지 전부 검정으로 강제(실제 저장된
+   *  명세서 인쇄는 기존 방식 그대로 둠). */
   hideEditActions?: boolean;
 }) {
   const router = useRouter();
@@ -91,7 +93,7 @@ export function ToolChecklistDetailReport({
   }
 
   return (
-    <div ref={printRef} className="print-force-black space-y-4 print:space-y-1">
+    <div ref={printRef} className={`space-y-4 print:space-y-1 ${hideEditActions ? "print-force-black" : ""}`}>
       {/* 양식 모드에서는 이 표제부가 인쇄에 안 나오게 함 — 아래 AccessPassPermitTable이
           자체 제목을 갖고 있어서 같이 나오면 중복됨. */}
       <div className={`flex flex-wrap items-center justify-between gap-2 print:mb-0.5 ${formMode !== "none" ? "print:hidden" : ""}`}>
