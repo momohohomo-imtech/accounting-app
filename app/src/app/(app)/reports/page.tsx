@@ -499,14 +499,14 @@ export default async function ReportsPage({
     );
   }
 
-  // 항목이 많아서 성격별로 묶어 보여주기 위한 구역 제목 — 개별 항목 인쇄 중일 땐
-  // 화면 구성용 안내일 뿐이라 같이 인쇄 안 되게 뺌(전체 인쇄 시엔 그대로 나옴).
-  function groupHeader(label: string) {
-    return (
-      <h2 className={`px-1 text-xs font-bold uppercase tracking-wider text-slate-400 ${popupOpen || isolate ? "print:hidden" : ""}`}>
-        {label}
-      </h2>
-    );
+  // 항목이 많아서 성격별로 구역을 나누고, 각 구역 자체를 드롭다운(기본 숨김)으로
+  // 묶음 — 단, 그 구역 안의 항목을 개별 인쇄하는 중이면 그 구역은 열려 있어야
+  // 인쇄될 내용이 실제로 화면(DOM)에 존재하게 됨.
+  function groupTitle(label: string) {
+    return <span className="text-xl font-bold text-black">{label}</span>;
+  }
+  function groupDefaultOpen(keys: string[]) {
+    return Boolean(printSection && keys.includes(printSection));
   }
 
   // 프로젝트별 손익 엑셀용 행 — 화면 표(ProjectProfitTable)와 같은 컬럼 구성.
@@ -603,9 +603,12 @@ export default async function ReportsPage({
         </div>
       </div>
 
-      <div className="space-y-6">
-        {groupHeader("재무 개요")}
-
+      <CollapsibleSection
+        title={groupTitle("재무 개요")}
+        bare
+        defaultOpen={groupDefaultOpen(["quarterly", "monthly", "bySite"])}
+      >
+       <div className="space-y-6 mt-3">
         <div className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${hiddenClass("quarterly")}`}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-semibold text-slate-900">분기별 매입·매출·손익</h2>
@@ -666,10 +669,15 @@ export default async function ReportsPage({
             empty="현장 데이터가 없습니다."
           />
         </CollapsibleSection>
-      </div>
+       </div>
+      </CollapsibleSection>
 
-      <div className="space-y-6">
-        {groupHeader("프로젝트")}
+      <CollapsibleSection
+        title={groupTitle("프로젝트")}
+        bare
+        defaultOpen={groupDefaultOpen(["projects", "revenue"])}
+      >
+       <div className="space-y-6 mt-3">
 
         <CollapsibleSection
           className={hiddenClass("projects")}
@@ -742,11 +750,15 @@ export default async function ReportsPage({
       >
         <RevenueVerificationTable rows={revenueVerificationRows} />
         </CollapsibleSection>
-      </div>
+       </div>
+      </CollapsibleSection>
 
-      <div className="space-y-6">
-        {groupHeader("거래처·카테고리 집계")}
-
+      <CollapsibleSection
+        title={groupTitle("거래처·카테고리 집계")}
+        bare
+        defaultOpen={groupDefaultOpen(["vendors", "classification", "categories", "customers"])}
+      >
+       <div className="space-y-6 mt-3">
         <CollapsibleSection
           title="매입처별 집계 — 어느 업체에서 얼마를 매입했는지"
           className={hiddenClass("vendors")}
@@ -823,10 +835,15 @@ export default async function ReportsPage({
             empty="매출 거래가 없습니다."
           />
         </CollapsibleSection>
-      </div>
+       </div>
+      </CollapsibleSection>
 
-      <div className="space-y-6">
-        {groupHeader("작업일지")}
+      <CollapsibleSection
+        title={groupTitle("작업일지")}
+        bare
+        defaultOpen={groupDefaultOpen(["worklog", "unassigned"])}
+      >
+       <div className="space-y-6 mt-3">
 
         <CollapsibleSection
         className={hiddenClass("worklog")}
@@ -876,7 +893,8 @@ export default async function ReportsPage({
       >
         <UnassignedWorkLogTable rows={unassignedRows} emptyMessage="이 기간에 미선정 항목이 없습니다." />
         </CollapsibleSection>
-      </div>
+       </div>
+      </CollapsibleSection>
 
       <ReportAIInsights
         summary={aiSummary}
