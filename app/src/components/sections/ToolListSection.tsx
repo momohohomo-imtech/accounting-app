@@ -227,7 +227,8 @@ export async function ToolListSection({
         </CollapsibleSection>
 
         <KnowHowSection
-          title="공구리스트 노하우"
+          title="공구 관련 메모"
+          itemLabel="메모"
           notes={(knowHowNotes ?? []) as unknown as { id: string; title: string; content: string | null; memo: string | null; created_at: string }[]}
           createAction={createKnowHowBound}
           updateAction={updateKnowHowNote}

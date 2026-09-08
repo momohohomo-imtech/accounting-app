@@ -80,10 +80,12 @@ function NoteForm({
 
 function KnowHowItem({
   note,
+  itemLabel,
   updateAction,
   deleteAction,
 }: {
   note: Note;
+  itemLabel: string;
   updateAction: Action;
   deleteAction: Action;
 }) {
@@ -95,7 +97,7 @@ function KnowHowItem({
   const [pending, setPending] = useState(false);
 
   async function handleDelete() {
-    if (!(await confirm("이 노하우를 삭제하시겠습니까?", { danger: true }))) return;
+    if (!(await confirm(`이 ${itemLabel}를 삭제하시겠습니까?`, { danger: true }))) return;
     setPending(true);
     const fd = new FormData();
     fd.append("id", note.id);
@@ -153,12 +155,15 @@ function KnowHowItem({
 
 export function KnowHowSection({
   title,
+  itemLabel = "노하우",
   notes,
   createAction,
   updateAction,
   deleteAction,
 }: {
   title: string;
+  /** 버튼·안내 문구에 쓰이는 항목 명칭(예: "노하우", "메모") — 기본은 "노하우". */
+  itemLabel?: string;
   notes: Note[];
   createAction: Action;
   updateAction: Action;
@@ -172,7 +177,7 @@ export function KnowHowSection({
         <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
         {!adding && (
           <Button size="sm" type="button" onClick={() => setAdding(true)}>
-            + 노하우 추가
+            + {itemLabel} 추가
           </Button>
         )}
       </div>
@@ -181,10 +186,10 @@ export function KnowHowSection({
 
       <div className="space-y-2">
         {notes.map((n) => (
-          <KnowHowItem key={n.id} note={n} updateAction={updateAction} deleteAction={deleteAction} />
+          <KnowHowItem key={n.id} note={n} itemLabel={itemLabel} updateAction={updateAction} deleteAction={deleteAction} />
         ))}
         {notes.length === 0 && !adding && (
-          <p className="py-6 text-center text-sm text-slate-400">등록된 노하우가 없습니다.</p>
+          <p className="py-6 text-center text-sm text-slate-400">등록된 {itemLabel}가 없습니다.</p>
         )}
       </div>
     </div>
