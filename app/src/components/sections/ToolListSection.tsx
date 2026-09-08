@@ -6,6 +6,7 @@ import { createTool } from "@/lib/actions/tools";
 import { ToolMasterGrid } from "@/components/ToolMasterGrid";
 import { ToolChecklistCreateForm } from "@/components/ToolChecklistCreateForm";
 import { ToolChecklistHistoryTable } from "@/components/ToolChecklistHistoryTable";
+import { ToolChecklistHistoryFilter } from "@/components/ToolChecklistHistoryFilter";
 import { ToolChecklistDetailReport } from "@/components/ToolChecklistDetailReport";
 import { KnowHowSection } from "@/components/KnowHowSection";
 import { createKnowHowNote, updateKnowHowNote, deleteKnowHowNote } from "@/lib/actions/knowHow";
@@ -51,10 +52,16 @@ export async function ToolListSection({
   copyFrom,
   editFrom,
   checklist,
+  historyYear,
+  historyMonth,
+  historySite,
 }: {
   copyFrom?: string;
   editFrom?: string;
   checklist?: string;
+  historyYear?: string;
+  historyMonth?: string;
+  historySite?: string;
 }) {
   const supabase = await createClient();
   const [{ data: tools }, { data: sites }, { data: projects }, { data: checklists }, { data: items }, { data: knowHowNotes }] =
@@ -62,7 +69,7 @@ export async function ToolListSection({
       supabase.from("tools").select("*").order("sort_order").order("position").order("name"),
       supabase.from("sites").select("id, name, clients(name)").order("name"),
       supabase.from("projects").select("id, name, site_id, status, year, project_code").order("name"),
-      supabase.from("tool_checklists").select("*, projects(name)").order("created_at", { ascending: false }),
+      supabase.from("tool_checklists").select("*, projects(name, site_id)").order("created_at", { ascending: false }),
       supabase.from("tool_checklist_items").select("*"),
       supabase.from("know_how_notes").select("*").eq("category", "tools").order("created_at", { ascending: false }),
     ]);
@@ -86,14 +93,48 @@ export async function ToolListSection({
     itemsByChecklist.set(it.checklist_id, list);
   }
 
-  const historyRows = (checklists ?? []).map((c) => ({
-    id: c.id as string,
-    title: c.title as string,
-    project_name: (one(c.projects) as { name: string } | null)?.name ?? null,
-    trip_date: c.trip_date as string | null,
-    item_count: (itemsByChecklist.get(c.id) ?? []).length,
-    created_at: c.created_at as string,
-  }));
+  const historyRows = (checklists ?? []).map((c) => {
+    const project = one(c.projects) as { name: string; site_id: string | null } | null;
+    return {
+      id: c.id as string,
+      title: c.title as string,
+      project_name: project?.name ?? null,
+      site_id: project?.site_id ?? null,
+      trip_date: c.trip_date as string | null,
+      item_count: (itemsByChecklist.get(c.id) ?? []).length,
+      created_at: c.created_at as string,
+    };
+  });
+
+  // 이력 목록은 출장일(trip_date) 기준으로 연/월/현장 필터링 — 기본은 이번 달만
+  // 보여주고, "전체"를 고르면 명시적으로 URL에 남겨서(연/월 다 포함) 파라미터가
+  // 없는 최초 진입 상태와 구분되게 함(안 그러면 "전체"를 눌러도 다시 이번
+  // 달로 되돌아가 버림).
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const selectedHistoryYear = historyYear ?? String(currentYear);
+  const selectedHistoryMonth = historyMonth ?? String(currentMonth);
+  const selectedHistorySiteId = historySite ?? "all";
+
+  const historyYears = Array.from(
+    new Set(
+      historyRows
+        .filter((r) => r.trip_date)
+        .map((r) => Number(r.trip_date!.slice(0, 4)))
+        .concat(selectedHistoryYear === "all" ? [] : [Number(selectedHistoryYear)])
+    )
+  ).sort((a, b) => b - a);
+
+  const filteredHistoryRows = historyRows.filter((r) => {
+    const [tripYear, tripMonth] = r.trip_date
+      ? [r.trip_date.slice(0, 4), String(Number(r.trip_date.slice(5, 7)))]
+      : [null, null];
+    const yearMatches = selectedHistoryYear === "all" || tripYear === selectedHistoryYear;
+    const monthMatches = selectedHistoryMonth === "all" || tripMonth === selectedHistoryMonth;
+    const siteMatches = selectedHistorySiteId === "all" || r.site_id === selectedHistorySiteId;
+    return yearMatches && monthMatches && siteMatches;
+  });
 
   const toolOptions = (tools ?? []).map((t) => ({
     id: t.id as string,
@@ -228,8 +269,20 @@ export async function ToolListSection({
           />
         </CollapsibleSection>
 
-        <CollapsibleSection title="저장된 공구명세서 (이력)">
-          <ToolChecklistHistoryTable rows={historyRows} />
+        <CollapsibleSection
+          title="저장된 공구명세서 (이력)"
+          headerExtra={
+            <ToolChecklistHistoryFilter
+              basePath="/quality-construction"
+              years={historyYears}
+              selectedYear={selectedHistoryYear}
+              selectedMonth={selectedHistoryMonth}
+              sites={siteOptions}
+              selectedSiteId={selectedHistorySiteId}
+            />
+          }
+        >
+          <ToolChecklistHistoryTable rows={filteredHistoryRows} />
         </CollapsibleSection>
 
         <KnowHowSection

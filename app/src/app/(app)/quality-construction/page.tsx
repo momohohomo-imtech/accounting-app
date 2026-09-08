@@ -21,9 +21,24 @@ export default async function QualityConstructionPage({
     copyFrom?: string;
     editFrom?: string;
     checklist?: string;
+    historyYear?: string;
+    historyMonth?: string;
+    historySite?: string;
   }>;
 }) {
-  const { tab, project_id, year, client, site_id, copyFrom, editFrom, checklist } = await searchParams;
+  const {
+    tab,
+    project_id,
+    year,
+    client,
+    site_id,
+    copyFrom,
+    editFrom,
+    checklist,
+    historyYear,
+    historyMonth,
+    historySite,
+  } = await searchParams;
   const active = tab ?? "tools";
 
   return (
@@ -36,7 +51,16 @@ export default async function QualityConstructionPage({
       {active === "construction" && (
         <ConstructionMemoSection year={year} client={client} siteId={site_id} projectId={project_id} />
       )}
-      {active === "tools" && <ToolListSection copyFrom={copyFrom} editFrom={editFrom} checklist={checklist} />}
+      {active === "tools" && (
+        <ToolListSection
+          copyFrom={copyFrom}
+          editFrom={editFrom}
+          checklist={checklist}
+          historyYear={historyYear}
+          historyMonth={historyMonth}
+          historySite={historySite}
+        />
+      )}
     </div>
   );
 }
