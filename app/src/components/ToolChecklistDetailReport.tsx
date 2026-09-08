@@ -222,10 +222,14 @@ export function ToolChecklistDetailReport({
                 <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 print:grid-cols-5 print:gap-x-[50px] print:gap-y-2">
                   {g.items.map((it) => {
                     const filled = it.quantity.trim() !== "";
+                    // 빈 양식(폼 인쇄)에서는 모든 품목이 항상 "미기재" 상태라, 실제
+                    // 명세서처럼 흐리게(opacity-50) 처리하면 전부 흐려져 버림 — 빈
+                    // 양식일 땐 흐림 처리 없이 전부 또렷하게(진하게) 보이게 함.
+                    const dimUnfilled = !hideEditActions && !filled;
                     return (
                       <li
                         key={it.id}
-                        className={`flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 print:gap-2 print:rounded-none print:border-0 print:px-0 print:py-1 print:text-[28px] ${filled ? "print:border-b-2 print:border-black" : "print:opacity-50"}`}
+                        className={`flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 print:gap-2 print:rounded-none print:border-0 print:px-0 print:py-1 print:text-[28px] ${filled && !hideEditActions ? "print:border-b-2 print:border-black" : ""} ${dimUnfilled ? "print:opacity-50" : ""}`}
                       >
                         <span className="truncate print:text-slate-900">☐ {it.tool_name}</span>
                         <span
