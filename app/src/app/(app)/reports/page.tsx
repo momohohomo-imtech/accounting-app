@@ -503,7 +503,7 @@ export default async function ReportsPage({
   // 묶음 — 단, 그 구역 안의 항목을 개별 인쇄하는 중이면 그 구역은 열려 있어야
   // 인쇄될 내용이 실제로 화면(DOM)에 존재하게 됨.
   function groupTitle(label: string) {
-    return <span className="text-xl font-bold text-black">{label}</span>;
+    return <span className="text-base font-bold text-black">{label}</span>;
   }
   function groupDefaultOpen(keys: string[]) {
     return Boolean(printSection && keys.includes(printSection));
