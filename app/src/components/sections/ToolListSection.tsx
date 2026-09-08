@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { CreatePanel } from "@/components/crud/CreatePanel";
@@ -196,7 +197,10 @@ export async function ToolListSection({
           initialHelperCount: "",
         };
 
-  const detailChecklist = checklist ? (checklists ?? []).find((c) => c.id === checklist) : null;
+  // "__blank__"는 실제 저장된 명세서가 아니라, 마스터 공구 전체를 빈 칸으로 인쇄해볼
+  // 수 있게 하는 특수 값(아래 "폼 인쇄" 링크에서 씀).
+  const isBlankForm = checklist === "__blank__";
+  const detailChecklist = checklist && !isBlankForm ? (checklists ?? []).find((c) => c.id === checklist) : null;
 
   // 인쇄/엑셀용 상세 목록은 (선택된 품목만이 아니라) 마스터 공구 전체를 순번별로
   // 보여주되, 이 명세서에 실제 담긴 품목만 수량을 채워서 표시함(나머지는 빈칸/회색).
@@ -235,7 +239,7 @@ export async function ToolListSection({
     }
     return groups;
   })();
-  const popupOpen = Boolean(detailChecklist);
+  const popupOpen = Boolean(detailChecklist) || isBlankForm;
 
   return (
     <div className="space-y-6">
@@ -251,6 +255,14 @@ export async function ToolListSection({
           title={editSource ? "공구명세서 수정" : "새 공구명세서 만들기"}
           defaultOpen={Boolean(editSource || copySource)}
           bare
+          headerExtra={
+            <Link
+              href="/quality-construction?tab=tools&checklist=__blank__"
+              className="text-xs text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900 print:hidden"
+            >
+              폼 인쇄
+            </Link>
+          }
         >
           <ToolChecklistCreateForm
             key={editFrom ?? copyFrom ?? "new"}
@@ -295,18 +307,19 @@ export async function ToolListSection({
         />
       </div>
 
-      {detailChecklist && (
+      {(detailChecklist || isBlankForm) && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:static print:bg-transparent print:p-0">
           <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
             <ToolChecklistDetailReport
-              title={detailChecklist.title}
-              helperCount={detailChecklist.helper_count ?? null}
-              projectName={(one(detailChecklist.projects) as { name: string } | null)?.name ?? null}
-              tripDate={detailChecklist.trip_date}
+              title={detailChecklist ? detailChecklist.title : "공구명세서 양식"}
+              helperCount={detailChecklist ? (detailChecklist.helper_count ?? null) : null}
+              projectName={detailChecklist ? ((one(detailChecklist.projects) as { name: string } | null)?.name ?? null) : null}
+              tripDate={detailChecklist ? detailChecklist.trip_date : null}
               groups={detailGroups}
               closeHref="/quality-construction?tab=tools"
-              copyHref={`/quality-construction?tab=tools&copyFrom=${detailChecklist.id}`}
-              editHref={`/quality-construction?tab=tools&editFrom=${detailChecklist.id}`}
+              copyHref={detailChecklist ? `/quality-construction?tab=tools&copyFrom=${detailChecklist.id}` : "/quality-construction?tab=tools"}
+              editHref={detailChecklist ? `/quality-construction?tab=tools&editFrom=${detailChecklist.id}` : "/quality-construction?tab=tools"}
+              hideEditActions={isBlankForm}
             />
           </div>
         </div>

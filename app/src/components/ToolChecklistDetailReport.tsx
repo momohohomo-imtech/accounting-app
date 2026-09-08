@@ -26,6 +26,7 @@ export function ToolChecklistDetailReport({
   closeHref,
   copyHref,
   editHref,
+  hideEditActions = false,
 }: {
   title: string;
   helperCount?: number | null;
@@ -35,6 +36,8 @@ export function ToolChecklistDetailReport({
   closeHref: string;
   copyHref: string;
   editHref: string;
+  /** 실제로 저장된 명세서가 아닌 빈 양식 미리보기일 때 "수정"/"복사" 링크를 숨김. */
+  hideEditActions?: boolean;
 }) {
   const router = useRouter();
   const [accessPassOnly, setAccessPassOnly] = useState(false);
@@ -143,12 +146,16 @@ export function ToolChecklistDetailReport({
           <Button variant="secondary" size="xs" onClick={handleExcel}>
             엑셀 다운로드
           </Button>
-          <Link href={editHref} className="text-sm text-slate-500 hover:text-slate-800">
-            수정
-          </Link>
-          <Link href={copyHref} className="text-sm text-slate-500 hover:text-slate-800">
-            복사해서 새로 만들기
-          </Link>
+          {!hideEditActions && (
+            <>
+              <Link href={editHref} className="text-sm text-slate-500 hover:text-slate-800">
+                수정
+              </Link>
+              <Link href={copyHref} className="text-sm text-slate-500 hover:text-slate-800">
+                복사해서 새로 만들기
+              </Link>
+            </>
+          )}
           <Link href={closeHref} className="text-sm text-slate-500 hover:text-slate-800">
             닫기
           </Link>
