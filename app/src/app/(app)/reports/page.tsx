@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { formatWon } from "@/lib/format";
+import { formatWon, formatDate } from "@/lib/format";
 import { ProjectProfitReport } from "@/components/ProjectProfitReport";
 import { VendorDetailReport } from "@/components/VendorDetailReport";
 import { YearFilter } from "@/components/YearFilter";
@@ -28,6 +28,7 @@ import { UnassignedWorkLogTable } from "@/components/UnassignedWorkLogTable";
 import { UnassignedWorkLogMonthFilter } from "@/components/UnassignedWorkLogMonthFilter";
 import { buildWorkLogSummary } from "@/lib/workLogSummary";
 import { parseMonthRange } from "@/lib/monthRange";
+import { ReportExcelButton } from "@/components/ReportExcelButton";
 import type { WorkLog } from "@/lib/types";
 
 const MONTH_LABELS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
@@ -73,12 +74,11 @@ export default async function ReportsPage({
     vendorAgency?: string;
     category?: string;
     site?: string;
-    printProjects?: string;
     editTx?: string;
     wlMonths?: string;
     wlSite?: string;
-    printWorkLog?: string;
     unassignedMonth?: string;
+    printSection?: string;
   }>;
 }) {
   const {
@@ -88,12 +88,11 @@ export default async function ReportsPage({
     vendorAgency,
     category,
     site,
-    printProjects,
     editTx,
     wlMonths,
     wlSite,
-    printWorkLog,
     unassignedMonth,
+    printSection,
   } = await searchParams;
   const includeVendorAgency = vendorAgency === "1";
   const currentYear = new Date().getFullYear();
@@ -470,9 +469,88 @@ export default async function ReportsPage({
   const vendorAllRows = [...vendorRows, ...vendorAgencyRows];
 
   const popupOpen = Boolean(project || vendor || category);
-  const isolateProjects = printProjects === "1";
-  const isolateWorkLog = printWorkLog === "1";
-  const anyIsolate = isolateProjects || isolateWorkLog;
+  const isolate = Boolean(printSection);
+
+  // 항목별 "인쇄" 버튼 — 해당 항목 하나만 남기고 나머지는 인쇄에서 숨긴 채로
+  // 새로 접속해서(?printSection=키) AutoPrint가 자동으로 인쇄창을 띄움. 인쇄창이
+  // 닫히면 printSection만 뺀 현재 필터 그대로 되돌아감(cleanupHref).
+  function reportUrl(extra?: { printSection: string }) {
+    const p = new URLSearchParams();
+    p.set("year", String(selectedYear));
+    if (site) p.set("site", site);
+    if (includeVendorAgency) p.set("vendorAgency", "1");
+    if (wlMonths) p.set("wlMonths", wlMonths);
+    if (wlSite) p.set("wlSite", wlSite);
+    if (unassignedMonth) p.set("unassignedMonth", unassignedMonth);
+    if (extra?.printSection) p.set("printSection", extra.printSection);
+    return `/reports?${p.toString()}`;
+  }
+  function hiddenClass(key: string) {
+    return popupOpen || (isolate && printSection !== key) ? "print:hidden" : "";
+  }
+  function printLink(section: string) {
+    return (
+      <Link
+        href={reportUrl({ printSection: section })}
+        className="inline-flex items-center rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 print:hidden"
+      >
+        인쇄
+      </Link>
+    );
+  }
+
+  // 프로젝트별 손익 엑셀용 행 — 화면 표(ProjectProfitTable)와 같은 컬럼 구성.
+  const projectExportRows = byProject.map((p) => [
+    p.name,
+    p.progress_pct ?? 0,
+    p.quoteAmount,
+    p.sales,
+    p.purchase,
+    p.profit,
+    p.quoteAmount > 0 ? Math.round((p.profit / p.quoteAmount) * 1000) / 10 : 0,
+  ]);
+
+  const revenueExportRows = revenueVerificationRows.map((r) => [
+    r.name,
+    r.siteName ?? "-",
+    r.status ?? "-",
+    r.quoteAmount,
+    r.contractAmount,
+    r.ledgerSales,
+    r.contractAmount - r.ledgerSales,
+  ]);
+
+  const vendorExportRows = byVendor.map((v) => [v.name, v.count, v.amount]);
+
+  const classificationExportRows = classificationPendingRows.map((r) => [
+    formatDate(r.date),
+    r.type,
+    r.clientName,
+    r.itemName,
+    r.amount,
+  ]);
+
+  // 카테고리별 집계 엑셀용 — 화면 표(CategoryAggregateTable)와 같은 매입/대행구매 병합 로직.
+  const categoryExportRows = (() => {
+    const map = new Map<string, { name: string; count: number; amount: number; agencyCount: number; agencyAmount: number }>();
+    for (const r of byCategory) map.set(r.name, { name: r.name, count: r.count, amount: r.amount, agencyCount: 0, agencyAmount: 0 });
+    for (const a of agencyByCategory) {
+      const existing = map.get(a.name);
+      if (existing) {
+        existing.agencyCount = a.count;
+        existing.agencyAmount = a.amount;
+      } else {
+        map.set(a.name, { name: a.name, count: 0, amount: 0, agencyCount: a.count, agencyAmount: a.amount });
+      }
+    }
+    return Array.from(map.values()).map((r) => [r.name, r.count, r.amount, r.agencyCount, r.agencyAmount]);
+  })();
+
+  const customerExportRows = byCustomer.map((v) => [v.name, v.count, v.amount]);
+
+  const workLogExportRows = workLogSummary.map((r) => [r.siteName, r.title, r.days, r.dates.join(", ")]);
+
+  const unassignedExportRows = unassignedRows.map((r) => [formatDate(r.date), r.siteName, r.title]);
 
   const aiSummary = {
     year: selectedYear,
@@ -487,18 +565,9 @@ export default async function ReportsPage({
 
   return (
     <div className="space-y-6">
-      {isolateProjects && (
-        <AutoPrint cleanupHref={`/reports?year=${selectedYear}${site ? `&site=${site}` : ""}`} />
-      )}
-      {isolateWorkLog && (
-        <AutoPrint
-          cleanupHref={`/reports?year=${selectedYear}&wlMonths=${encodeURIComponent(wlMonths ?? "1-12")}${
-            wlSite ? `&wlSite=${wlSite}` : ""
-          }`}
-        />
-      )}
+      {isolate && <AutoPrint cleanupHref={reportUrl()} />}
 
-      <div className={popupOpen || anyIsolate ? "space-y-6 print:hidden" : "space-y-6"}>
+      <div className={popupOpen || isolate ? "space-y-6 print:hidden" : "space-y-6"}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold text-slate-900">보고서</h1>
           <YearFilter basePath="/reports" years={years} selectedYear={selectedYear} />
@@ -522,23 +591,63 @@ export default async function ReportsPage({
             </div>
           </div>
         </div>
+      </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="mb-3 font-semibold text-slate-900">분기별 매입·매출·손익</h2>
+      <div className="space-y-6">
+        <div className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${hiddenClass("quarterly")}`}>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold text-slate-900">분기별 매입·매출·손익</h2>
+            <div className="flex items-center gap-2 print:hidden">
+              <ReportExcelButton
+                filename={`분기별_매입매출손익_${selectedYear}.xlsx`}
+                headers={["분기", "매출", "매입", "손익"]}
+                rows={quarterly.map((q) => [q.label, q.sales, q.purchase, q.profit])}
+              />
+              {printLink("quarterly")}
+            </div>
+          </div>
           <SimpleTable
             rows={quarterly.map((q) => [q.label, formatWon(q.sales), formatWon(q.purchase), formatWon(q.profit)])}
             headers={["분기", "매출", "매입", "손익"]}
           />
         </div>
 
-        <CollapsibleSection title="월별 매입·매출·손익">
+        <CollapsibleSection
+          title="월별 매입·매출·손익"
+          className={hiddenClass("monthly")}
+          defaultOpen={printSection === "monthly"}
+          headerExtra={
+            <div className="flex items-center gap-2 print:hidden">
+              <ReportExcelButton
+                filename={`월별_매입매출손익_${selectedYear}.xlsx`}
+                headers={["월", "매출", "매입", "손익"]}
+                rows={monthly.map((m) => [m.label, m.sales, m.purchase, m.profit])}
+              />
+              {printLink("monthly")}
+            </div>
+          }
+        >
           <SimpleTable
             rows={monthly.map((m) => [m.label, formatWon(m.sales), formatWon(m.purchase), formatWon(m.profit)])}
             headers={["월", "매출", "매입", "손익"]}
           />
         </CollapsibleSection>
 
-        <CollapsibleSection title="현장별 손익 — 어느 현장에서 얼마를 벌고 썼는지">
+        <CollapsibleSection
+          title="현장별 손익 — 어느 현장에서 얼마를 벌고 썼는지"
+          className={hiddenClass("bySite")}
+          defaultOpen={printSection === "bySite"}
+          headerExtra={
+            <div className="flex items-center gap-2 print:hidden">
+              <ReportExcelButton
+                filename={`현장별_손익_${selectedYear}.xlsx`}
+                headers={["현장", "매출", "매입", "손익"]}
+                rows={bySite.map((s) => [s.name, s.sales, s.purchase, s.profit])}
+              />
+              {printLink("bySite")}
+            </div>
+          }
+        >
           <SimpleTable
             rows={bySite.map((s) => [s.name, formatWon(s.sales), formatWon(s.purchase), formatWon(s.profit)])}
             headers={["현장", "매출", "매입", "손익"]}
@@ -548,9 +657,9 @@ export default async function ReportsPage({
       </div>
 
       <CollapsibleSection
-          className={popupOpen || isolateWorkLog ? "print:hidden" : ""}
+          className={hiddenClass("projects")}
           title="프로젝트별 손익 (클릭하면 발주금 대비 상세 손익)"
-          defaultOpen={isolateProjects}
+          defaultOpen={printSection === "projects"}
           headerExtra={
             <div className="flex items-center gap-2 print:hidden">
               <span className="text-xs text-slate-500">
@@ -568,12 +677,12 @@ export default async function ReportsPage({
                   projects={[...byProject].sort((a, b) => a.name.localeCompare(b.name, "ko"))}
                 />
               )}
-              <Link
-                href={`/reports?year=${selectedYear}${site ? `&site=${site}` : ""}&printProjects=1`}
-                className="inline-flex items-center rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100"
-              >
-                인쇄
-              </Link>
+              <ReportExcelButton
+                filename={`프로젝트별_손익_${selectedYear}.xlsx`}
+                headers={["프로젝트", "진행률", "발주액", "매출", "매입", "이익금", "이익율"]}
+                rows={projectExportRows}
+              />
+              {printLink("projects")}
             </div>
           }
         >
@@ -601,27 +710,95 @@ export default async function ReportsPage({
           <ProjectProfitTable rows={byProject} year={selectedYear} site={site} />
       </CollapsibleSection>
 
-      <CollapsibleSection title="매출 검증 — 수주액 vs 실제 매출 원장" className="print:hidden">
+      <CollapsibleSection
+        title="매출 검증 — 수주액 vs 실제 매출 원장"
+        className={hiddenClass("revenue")}
+        defaultOpen={printSection === "revenue"}
+        headerExtra={
+          <div className="flex items-center gap-2 print:hidden">
+            <ReportExcelButton
+              filename={`매출검증_${selectedYear}.xlsx`}
+              headers={["프로젝트명", "현장", "상태", "발주액", "수주액(실수령액)", "실제 매출 원장", "차이"]}
+              rows={revenueExportRows}
+            />
+            {printLink("revenue")}
+          </div>
+        }
+      >
         <RevenueVerificationTable rows={revenueVerificationRows} />
       </CollapsibleSection>
 
-      <div className={popupOpen || anyIsolate ? "space-y-6 print:hidden" : "space-y-6"}>
+      <div className="space-y-6">
         <CollapsibleSection
           title="매입처별 집계 — 어느 업체에서 얼마를 매입했는지"
-          headerExtra={<VendorAgencyToggle checked={includeVendorAgency} />}
+          className={hiddenClass("vendors")}
+          defaultOpen={printSection === "vendors"}
+          headerExtra={
+            <div className="flex items-center gap-2 print:hidden">
+              <VendorAgencyToggle checked={includeVendorAgency} />
+              <ReportExcelButton
+                filename={`매입처별_집계_${selectedYear}.xlsx`}
+                headers={["거래처", "건수", "매입 합계"]}
+                rows={vendorExportRows}
+              />
+              {printLink("vendors")}
+            </div>
+          }
         >
           <VendorAggregateTable rows={byVendor} year={selectedYear} vendorAgency={includeVendorAgency} />
         </CollapsibleSection>
 
-        <CollapsibleSection title={`프로젝트 분류 대기 중 — ${classificationPendingRows.length}건`}>
+        <CollapsibleSection
+          title={`프로젝트 분류 대기 중 — ${classificationPendingRows.length}건`}
+          className={hiddenClass("classification")}
+          defaultOpen={printSection === "classification"}
+          headerExtra={
+            <div className="flex items-center gap-2 print:hidden">
+              <ReportExcelButton
+                filename={`프로젝트_분류_대기중_${selectedYear}.xlsx`}
+                headers={["날짜", "구분", "거래처", "품목", "금액"]}
+                rows={classificationExportRows}
+              />
+              {printLink("classification")}
+            </div>
+          }
+        >
           <ClassificationPendingTable rows={classificationPendingRows} />
         </CollapsibleSection>
 
-        <CollapsibleSection title="카테고리별 집계 — 어느 카테고리에 얼마를 매입했는지">
+        <CollapsibleSection
+          title="카테고리별 집계 — 어느 카테고리에 얼마를 매입했는지"
+          className={hiddenClass("categories")}
+          defaultOpen={printSection === "categories"}
+          headerExtra={
+            <div className="flex items-center gap-2 print:hidden">
+              <ReportExcelButton
+                filename={`카테고리별_집계_${selectedYear}.xlsx`}
+                headers={["카테고리", "매입 건수", "매입 합계", "대행구매 건수", "대행구매액 (프로젝트)"]}
+                rows={categoryExportRows}
+              />
+              {printLink("categories")}
+            </div>
+          }
+        >
           <CategoryAggregateTable rows={byCategory} agencyRows={agencyByCategory} year={selectedYear} />
         </CollapsibleSection>
 
-        <CollapsibleSection title="매출처별 집계">
+        <CollapsibleSection
+          title="매출처별 집계"
+          className={hiddenClass("customers")}
+          defaultOpen={printSection === "customers"}
+          headerExtra={
+            <div className="flex items-center gap-2 print:hidden">
+              <ReportExcelButton
+                filename={`매출처별_집계_${selectedYear}.xlsx`}
+                headers={["거래처", "건수", "매출 합계"]}
+                rows={customerExportRows}
+              />
+              {printLink("customers")}
+            </div>
+          }
+        >
           <SimpleTable
             rows={byCustomer.map((v) => [v.name, `${v.count}건`, formatWon(v.amount)])}
             headers={["거래처", "건수", "매출 합계"]}
@@ -631,9 +808,9 @@ export default async function ReportsPage({
       </div>
 
       <CollapsibleSection
-        className={popupOpen || isolateProjects ? "print:hidden" : ""}
+        className={hiddenClass("worklog")}
         title={`작업일지 집계 — ${selectedYear}년 ${wlMonthRange.label} 동안 같은 작업을 몇 일 했는지`}
-        defaultOpen={isolateWorkLog}
+        defaultOpen={printSection === "worklog"}
         headerExtra={
           <div className="flex items-center gap-2 print:hidden">
             <span className="text-xs text-slate-500">총 {workLogTotalDays}일</span>
@@ -641,14 +818,12 @@ export default async function ReportsPage({
               <WorkLogSiteFilter siteOptions={wlSites.map((s) => ({ value: s.id, label: s.name }))} selectedSite={wlSite} />
             )}
             <WorkLogMonthRangeFilter value={wlMonths ?? "1-12"} />
-            <Link
-              href={`/reports?year=${selectedYear}&wlMonths=${encodeURIComponent(wlMonths ?? "1-12")}${
-                wlSite ? `&wlSite=${wlSite}` : ""
-              }&printWorkLog=1`}
-              className="inline-flex items-center rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100"
-            >
-              인쇄
-            </Link>
+            <ReportExcelButton
+              filename={`작업일지_집계_${selectedYear}.xlsx`}
+              headers={["현장", "내용", "일수", "날짜"]}
+              rows={workLogExportRows}
+            />
+            {printLink("worklog")}
           </div>
         }
       >
@@ -662,12 +837,19 @@ export default async function ReportsPage({
       </CollapsibleSection>
 
       <CollapsibleSection
-        className={popupOpen || anyIsolate ? "print:hidden" : ""}
+        className={hiddenClass("unassigned")}
         title="작업일지 - 프로젝트 미선정 (현장은 골랐지만 프로젝트 연결 안 된 항목)"
+        defaultOpen={printSection === "unassigned"}
         headerExtra={
           <div className="flex items-center gap-2 print:hidden">
             <span className="text-xs text-slate-500">총 {unassignedDayCount}일</span>
             <UnassignedWorkLogMonthFilter value={unassignedMonth} />
+            <ReportExcelButton
+              filename={`작업일지_미선정_${selectedYear}.xlsx`}
+              headers={["날짜", "현장", "제목"]}
+              rows={unassignedExportRows}
+            />
+            {printLink("unassigned")}
           </div>
         }
       >
