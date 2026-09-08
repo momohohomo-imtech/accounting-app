@@ -1,11 +1,11 @@
 import { PageTabs } from "@/components/PageTabs";
 import { QualityChecklistSection } from "@/components/sections/QualityChecklistSection";
-import { ConstructionStageSection } from "@/components/sections/ConstructionStageSection";
+import { ConstructionMemoSection } from "@/components/sections/ConstructionMemoSection";
 import { ToolListSection } from "@/components/sections/ToolListSection";
 
 const TABS = [
   { key: "quality", label: "품질관리" },
-  { key: "construction", label: "공사관리" },
+  { key: "construction", label: "공사 메모" },
   { key: "tools", label: "공구리스트" },
 ];
 
@@ -24,7 +24,7 @@ export default async function QualityConstructionPage({
         <PageTabs basePath="/quality-construction" tabs={TABS} active={active} />
       </div>
       {active === "quality" && <QualityChecklistSection projectId={project_id} />}
-      {active === "construction" && <ConstructionStageSection projectId={project_id} />}
+      {active === "construction" && <ConstructionMemoSection projectId={project_id} />}
       {active === "tools" && <ToolListSection copyFrom={copyFrom} editFrom={editFrom} checklist={checklist} />}
     </div>
   );
