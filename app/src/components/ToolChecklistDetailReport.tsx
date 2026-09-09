@@ -22,6 +22,7 @@ export function ToolChecklistDetailReport({
   helperCount,
   projectName,
   tripDate,
+  memo,
   groups,
   closeHref,
   copyHref,
@@ -32,6 +33,7 @@ export function ToolChecklistDetailReport({
   helperCount?: number | null;
   projectName: string | null;
   tripDate: string | null;
+  memo?: string | null;
   groups: Group[];
   closeHref: string;
   copyHref: string;
@@ -88,7 +90,8 @@ export function ToolChecklistDetailReport({
       `${title}_${accessPassOnly ? "반입반출증" : "공구명세서"}.xlsx`,
       accessPassOnly ? `${title} (반입반출증)` : title,
       metaLine,
-      visibleGroups
+      visibleGroups,
+      accessPassOnly ? null : memo
     );
   }
 
@@ -249,6 +252,13 @@ export function ToolChecklistDetailReport({
               </p>
             )}
           </div>
+
+          {memo && memo.trim() !== "" && (
+            <div className="print:break-inside-avoid rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 print:rounded-none print:border-0 print:border-t print:border-black print:bg-transparent print:px-0 print:pt-1.5">
+              <p className="mb-1 text-xs font-semibold text-slate-500 print:text-[15px]">메모</p>
+              <p className="whitespace-pre-wrap text-sm text-slate-700 print:text-[22px] print:text-slate-900">{memo}</p>
+            </div>
+          )}
 
           <p className="text-right text-xs text-slate-400 print:text-[9px]">총 {selectedCount}개 품목 선택됨</p>
         </>

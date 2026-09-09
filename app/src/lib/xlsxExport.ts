@@ -62,7 +62,8 @@ export async function downloadToolChecklistXlsx(
   filename: string,
   title: string,
   metaLine: string,
-  groups: { label: string; items: { tool_name: string; quantity: string }[] }[]
+  groups: { label: string; items: { tool_name: string; quantity: string }[] }[],
+  memo?: string | null
 ) {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("공구명세서");
@@ -103,6 +104,15 @@ export async function downloadToolChecklistXlsx(
       });
     }
   });
+
+  if (memo && memo.trim() !== "") {
+    ws.addRow([]);
+    const memoLabelRow = ws.addRow(["메모"]);
+    memoLabelRow.font = { bold: true, size: 11, color: { argb: "FF334155" } };
+    for (const line of memo.split("\n")) {
+      ws.addRow([line]);
+    }
+  }
 
   ws.getColumn(1).width = 26;
   ws.getColumn(2).width = 14;

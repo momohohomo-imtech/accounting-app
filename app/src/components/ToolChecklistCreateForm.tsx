@@ -36,6 +36,7 @@ export function ToolChecklistCreateForm({
   initialProjectId = "",
   initialTripDate,
   initialHelperCount = "",
+  initialMemo = "",
   initialQuantities = {},
   initialToolNames = {},
   initialAdhocItems = [],
@@ -50,6 +51,7 @@ export function ToolChecklistCreateForm({
   initialProjectId?: string;
   initialTripDate?: string;
   initialHelperCount?: string;
+  initialMemo?: string;
   initialQuantities?: Record<string, string>;
   /** 이 명세서에서만 다르게 저장된 공구 이름(공구 id별) — 수정 화면을 다시 열 때 복원됨. */
   initialToolNames?: Record<string, string>;
@@ -68,6 +70,7 @@ export function ToolChecklistCreateForm({
   );
   const [title, setTitle] = useState(initialTitle);
   const [helperCount, setHelperCount] = useState(initialHelperCount);
+  const [memo, setMemo] = useState(initialMemo);
   const [projectId, setProjectId] = useState(initialProjectId);
   const [tripDate, setTripDate] = useState(initialTripDate ?? todayIso);
   const [quantities, setQuantities] = useState<Record<string, string>>(
@@ -120,6 +123,7 @@ export function ToolChecklistCreateForm({
     if (checklistId) fd.append("id", checklistId);
     fd.append("title", title);
     fd.append("helper_count", helperCount.trim());
+    fd.append("memo", memo.trim());
     fd.append("project_id", projectId);
     fd.append("trip_date", tripDate);
     for (const t of tools) {
@@ -152,6 +156,7 @@ export function ToolChecklistCreateForm({
     }
     setTitle("");
     setHelperCount("");
+    setMemo("");
     setProjectId("");
     setQuantities(toolDefaultQuantities);
     setToolNames({});
@@ -256,9 +261,20 @@ export function ToolChecklistCreateForm({
         </div>
       )}
 
+      <div className="flex flex-col gap-1">
+        <label className={labelClass}>메모 (선택, 인쇄 시 표시됨)</label>
+        <textarea
+          value={memo}
+          onChange={(e) => setMemo(e.target.value)}
+          placeholder="예: 오전 7시 집합, 현장 도착 후 사무실에 연락"
+          rows={2}
+          className={`${fieldClass} w-full resize-y`}
+        />
+      </div>
+
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-xs font-semibold text-slate-500">임의 추가 (수동 기입 공구 또는 메모)</p>
+          <p className="text-xs font-semibold text-slate-500">임의 추가 (목록에 없는 공구 직접 입력)</p>
           <button
             type="button"
             onClick={addAdhocItem}

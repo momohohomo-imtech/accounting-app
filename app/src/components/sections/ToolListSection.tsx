@@ -171,6 +171,7 @@ export async function ToolListSection({
     initialProjectId,
     initialTripDate,
     initialHelperCount,
+    initialMemo,
   } = editSource
     ? {
         ...buildInitialFormState(itemsByChecklist.get(editSource.id) ?? []),
@@ -178,6 +179,7 @@ export async function ToolListSection({
         initialProjectId: (editSource.project_id as string | null) ?? "",
         initialTripDate: (editSource.trip_date as string | null) ?? undefined,
         initialHelperCount: editSource.helper_count != null ? String(editSource.helper_count) : "",
+        initialMemo: (editSource.memo as string | null) ?? "",
       }
     : copySource
       ? {
@@ -186,6 +188,7 @@ export async function ToolListSection({
           initialProjectId: "",
           initialTripDate: undefined as string | undefined,
           initialHelperCount: copySource.helper_count != null ? String(copySource.helper_count) : "",
+          initialMemo: (copySource.memo as string | null) ?? "",
         }
       : {
           initialQuantities: {},
@@ -195,6 +198,7 @@ export async function ToolListSection({
           initialProjectId: "",
           initialTripDate: undefined as string | undefined,
           initialHelperCount: "",
+          initialMemo: "",
         };
 
   // "__blank__"는 실제 저장된 명세서가 아니라, 마스터 공구 전체를 빈 칸으로 인쇄해볼
@@ -274,6 +278,7 @@ export async function ToolListSection({
             initialProjectId={initialProjectId}
             initialTripDate={initialTripDate}
             initialHelperCount={initialHelperCount}
+            initialMemo={initialMemo}
             initialQuantities={initialQuantities}
             initialToolNames={initialToolNames}
             initialAdhocItems={initialAdhocItems}
@@ -315,6 +320,7 @@ export async function ToolListSection({
               helperCount={detailChecklist ? (detailChecklist.helper_count ?? null) : null}
               projectName={detailChecklist ? ((one(detailChecklist.projects) as { name: string } | null)?.name ?? null) : null}
               tripDate={detailChecklist ? detailChecklist.trip_date : null}
+              memo={detailChecklist ? ((detailChecklist.memo as string | null) ?? null) : null}
               groups={detailGroups}
               closeHref="/quality-construction?tab=tools"
               copyHref={detailChecklist ? `/quality-construction?tab=tools&copyFrom=${detailChecklist.id}` : "/quality-construction?tab=tools"}
