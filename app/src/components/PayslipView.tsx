@@ -27,7 +27,7 @@ export async function PayslipView({ payrollId, closeHref }: { payrollId: string;
     ["건강보험", p.health_insurance],
     ["장기요양보험", p.long_term_care_insurance],
     ["고용보험", p.employment_insurance],
-    ...(p.employment_insurance_refund ? ([["고용보험 환급", -p.employment_insurance_refund]] as [string, number][]) : []),
+    ...(p.employment_insurance_refund ? ([["환급금", -p.employment_insurance_refund]] as [string, number][]) : []),
     ["소득세", p.income_tax],
     ["지방소득세", p.local_income_tax],
     ["농특세", p.rural_tax],
