@@ -65,20 +65,20 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
             </td>
           </tr>
           <tr>
-            <td style={labelStyle(9, 4.5)}>업체(부서)</td>
-            <td style={cellStyle(9, 4.5)} />
-            <td style={labelStyle(9, 4.5)}>반입자</td>
-            <td style={cellStyle(9, 4.5)} />
+            <td style={labelStyle(9, 3.3)}>업체(부서)</td>
+            <td style={cellStyle(9, 3.3)} />
+            <td style={labelStyle(9, 3.3)}>반입자</td>
+            <td style={cellStyle(9, 3.3)} />
           </tr>
           <tr>
-            <td style={labelStyle(9, 4.5)}>반입차량</td>
-            <td style={cellStyle(9, 4.5)} />
-            <td style={labelStyle(9, 4.5)}>연락처</td>
-            <td style={cellStyle(9, 4.5)} />
+            <td style={labelStyle(9, 3.3)}>반입차량</td>
+            <td style={cellStyle(9, 3.3)} />
+            <td style={labelStyle(9, 3.3)}>연락처</td>
+            <td style={cellStyle(9, 3.3)} />
           </tr>
           <tr>
-            <td style={labelStyle(9, 4.5)}>반입목적</td>
-            <td colSpan={3} style={cellStyle(9, 4.5)} />
+            <td style={labelStyle(9, 3.3)}>반입목적</td>
+            <td colSpan={3} style={cellStyle(9, 3.3)} />
           </tr>
         </tbody>
       </table>
@@ -88,8 +88,8 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
           <col style={{ width: "6%" }} />
           <col style={{ width: "37%" }} />
           <col style={{ width: "11%" }} />
-          <col style={{ width: "11%" }} />
-          <col style={{ width: "35%" }} />
+          <col style={{ width: "19%" }} />
+          <col style={{ width: "27%" }} />
         </colgroup>
         <thead>
           <tr style={{ textAlign: "center" }}>
@@ -106,13 +106,13 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
               잘라서 두 장의 행 높이(따라서 전체 높이)가 항상 정확히 같게 함. */}
           {rows.map((item, i) => (
             <tr key={i}>
-              <td style={{ ...cellStyle(9.9, 4.95), textAlign: "center" }}>{i + 1}</td>
-              <td style={cellStyle(9.9, 4.95)}>{item?.tool_name ?? ""}</td>
-              <td style={{ ...cellStyle(9.9, 4.95), textAlign: "center" }}>{item ? "EA" : ""}</td>
-              <td style={{ ...cellStyle(9.9, 4.95), textAlign: "center", fontFamily: "monospace" }}>
+              <td style={{ ...cellStyle(9.9, 3.8), textAlign: "center" }}>{i + 1}</td>
+              <td style={cellStyle(9.9, 3.8)}>{item?.tool_name ?? ""}</td>
+              <td style={{ ...cellStyle(9.9, 3.8), textAlign: "center" }}>{item ? "EA" : ""}</td>
+              <td style={{ ...cellStyle(9.9, 3.8), textAlign: "center", fontFamily: "monospace" }}>
                 {item ? formatPermitQuantity(item.quantity) : ""}
               </td>
-              <td style={cellStyle(9.9, 4.95)} />
+              <td style={cellStyle(9.9, 3.8)} />
             </tr>
           ))}
         </tbody>
@@ -158,16 +158,16 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
         </colgroup>
         <tbody>
           <tr>
-            <td style={labelStyle(9, 4.5)}>반입확인</td>
-            <td style={{ ...cellStyle(9, 4.5), textAlign: "center" }}>보안실</td>
-            <td style={labelStyle(9, 4.5)}>성명(보안대원)</td>
-            <td style={{ ...cellStyle(9, 4.5), textAlign: "center" }}>(인)</td>
+            <td style={labelStyle(9, 3.3)}>반입확인</td>
+            <td style={{ ...cellStyle(9, 3.3), textAlign: "center" }}>보안실</td>
+            <td style={labelStyle(9, 3.3)}>성명(보안대원)</td>
+            <td style={{ ...cellStyle(9, 3.3), textAlign: "center" }}>(인)</td>
           </tr>
           <tr>
-            <td style={labelStyle(9, 4.5)}>출문승인(해당부서)</td>
-            <td style={cellStyle(9, 4.5)} />
-            <td style={labelStyle(9, 4.5)}>성명(담당자)</td>
-            <td style={{ ...cellStyle(9, 4.5), textAlign: "center" }}>(인)</td>
+            <td style={labelStyle(9, 3.3)}>출문승인(해당부서)</td>
+            <td style={cellStyle(9, 3.3)} />
+            <td style={labelStyle(9, 3.3)}>성명(담당자)</td>
+            <td style={{ ...cellStyle(9, 3.3), textAlign: "center" }}>(인)</td>
           </tr>
         </tbody>
       </table>
