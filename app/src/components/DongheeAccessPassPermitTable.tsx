@@ -83,17 +83,17 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
         </tbody>
       </table>
 
-      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed", marginTop: "6mm" }}>
+      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed", marginTop: "10mm" }}>
         <colgroup>
-          <col style={{ width: "6%" }} />
-          <col style={{ width: "37%" }} />
-          <col style={{ width: "11%" }} />
-          <col style={{ width: "19%" }} />
+          <col style={{ width: "8%" }} />
           <col style={{ width: "27%" }} />
+          <col style={{ width: "10%" }} />
+          <col style={{ width: "22%" }} />
+          <col style={{ width: "33%" }} />
         </colgroup>
         <thead>
           <tr style={{ textAlign: "center" }}>
-            <td style={labelStyle(7.2, 4.05)}>NO</td>
+            <td style={{ ...labelStyle(7.2, 4.05), padding: "0 1mm" }}>NO</td>
             <td style={labelStyle(7.2, 4.05)}>품명</td>
             <td style={labelStyle(7.2, 4.05)}>단위</td>
             <td style={labelStyle(7.2, 4.05)}>수량</td>
@@ -106,7 +106,7 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
               잘라서 두 장의 행 높이(따라서 전체 높이)가 항상 정확히 같게 함. */}
           {rows.map((item, i) => (
             <tr key={i}>
-              <td style={{ ...cellStyle(9.9, 3.8), textAlign: "center" }}>{i + 1}</td>
+              <td style={{ ...cellStyle(9.9, 3.8), textAlign: "center", padding: "0 1mm" }}>{i + 1}</td>
               <td style={cellStyle(9.9, 3.8)}>{item?.tool_name ?? ""}</td>
               <td style={{ ...cellStyle(9.9, 3.8), textAlign: "center" }}>{item ? "EA" : ""}</td>
               <td style={{ ...cellStyle(9.9, 3.8), textAlign: "center", fontFamily: "monospace" }}>
@@ -118,12 +118,12 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
         </tbody>
       </table>
 
-      <p style={{ textAlign: "center", fontSize: "3.6mm", margin: "7.7mm 0 0.9mm" }}>상기 물품의 반출을 확인함</p>
+      <p style={{ textAlign: "center", fontSize: "3.6mm", margin: "10.7mm 0 0.9mm" }}>상기 물품의 반출을 확인함</p>
       <p style={{ textAlign: "center", fontSize: "3.6mm", margin: "0.9mm 0 2.7mm" }}>
         물품반입일 : 20&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;일
       </p>
 
-      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed", marginTop: "5mm" }}>
+      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed", marginTop: "8mm" }}>
         <colgroup>
           <col style={{ width: "13%" }} />
           <col style={{ width: "87%" }} />
