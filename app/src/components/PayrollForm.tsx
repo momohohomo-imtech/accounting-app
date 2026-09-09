@@ -208,7 +208,7 @@ export function PayrollForm({
             className={fieldClass}
           />
         </Field>
-        <Field label="고용보험 환급금">
+        <Field label="환급금">
           <input
             type="number"
             name="employment_insurance_refund"
