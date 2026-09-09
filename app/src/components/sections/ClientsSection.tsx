@@ -4,7 +4,7 @@ import { EntityTable } from "@/components/crud/EntityTable";
 import { createClientRecord, updateClientRecord, deleteClientRecord } from "@/lib/actions/clients";
 import type { FieldConfig } from "@/components/crud/types";
 
-export async function ClientsSection() {
+export async function ClientsSection({ showHeading = true }: { showHeading?: boolean } = {}) {
   const supabase = await createClient();
   const [{ data: clients }, { data: categories }] = await Promise.all([
     supabase.from("clients").select("*").order("created_at", { ascending: false }),
@@ -40,7 +40,7 @@ export async function ClientsSection() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-semibold text-slate-900">거래처</h2>
+      {showHeading && <h2 className="text-lg font-semibold text-slate-900">거래처</h2>}
       <CreatePanel title="거래처" fields={fields} createAction={createClientRecord} />
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <EntityTable

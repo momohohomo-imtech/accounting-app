@@ -19,7 +19,7 @@ import { ProjectListExportButtons } from "@/components/ProjectListExportButtons"
 
 const TABS = [
   { key: "list", label: "프로젝트" },
-  { key: "sites", label: "현장" },
+  { key: "sites", label: "현장 / 거래처" },
   { key: "quotes", label: "견적서" },
   { key: "purchase_orders", label: "발주서" },
 ];

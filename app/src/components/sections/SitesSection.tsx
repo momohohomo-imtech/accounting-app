@@ -4,6 +4,7 @@ import { EntityTable } from "@/components/crud/EntityTable";
 import { createSiteRecord, updateSiteRecord, deleteSiteRecord } from "@/lib/actions/sites";
 import type { FieldConfig } from "@/components/crud/types";
 import { ClientsSection } from "@/components/sections/ClientsSection";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 
 export async function SitesSection() {
   const supabase = await createClient();
@@ -26,19 +27,22 @@ export async function SitesSection() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-semibold text-slate-900">현장</h2>
-      <CreatePanel title="현장" fields={fields} createAction={createSiteRecord} />
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <EntityTable
-          fields={fields}
-          rows={(sites ?? []).map((s) => ({ ...s }))}
-          updateAction={updateSiteRecord}
-          deleteAction={deleteSiteRecord}
-        />
-      </div>
+      <CollapsibleSection title="현장" bare>
+        <CreatePanel title="현장" fields={fields} createAction={createSiteRecord} />
+        <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <EntityTable
+            fields={fields}
+            rows={(sites ?? []).map((s) => ({ ...s }))}
+            updateAction={updateSiteRecord}
+            deleteAction={deleteSiteRecord}
+          />
+        </div>
+      </CollapsibleSection>
 
       <div className="border-t border-slate-200 pt-6">
-        <ClientsSection />
+        <CollapsibleSection title="거래처" bare>
+          <ClientsSection showHeading={false} />
+        </CollapsibleSection>
       </div>
     </div>
   );
