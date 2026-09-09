@@ -261,17 +261,6 @@ export function ToolChecklistCreateForm({
         </div>
       )}
 
-      <div className="flex flex-col gap-1">
-        <label className={labelClass}>메모 (선택, 인쇄 시 표시됨)</label>
-        <textarea
-          value={memo}
-          onChange={(e) => setMemo(e.target.value)}
-          placeholder="예: 오전 7시 집합, 현장 도착 후 사무실에 연락"
-          rows={2}
-          className={`${fieldClass} w-full resize-y`}
-        />
-      </div>
-
       <div>
         <div className="mb-2 flex items-center justify-between">
           <p className="text-xs font-semibold text-slate-500">임의 추가 (목록에 없는 공구 직접 입력)</p>
@@ -322,6 +311,17 @@ export function ToolChecklistCreateForm({
             ))}
           </div>
         )}
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className={labelClass}>메모 (선택, 인쇄 시 표시됨)</label>
+        <textarea
+          value={memo}
+          onChange={(e) => setMemo(e.target.value)}
+          placeholder="예: 오전 7시 집합, 현장 도착 후 사무실에 연락"
+          rows={2}
+          className={`${fieldClass} w-full resize-y`}
+        />
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
