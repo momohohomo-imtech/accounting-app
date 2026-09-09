@@ -45,8 +45,8 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
   const rows = Array.from({ length: ROW_COUNT }, (_, i) => items[i]);
 
   return (
-    <div style={{ fontFamily: "'맑은 고딕', 'Malgun Gothic', sans-serif", fontSize: "5mm", color: "#000" }}>
-      <p style={{ textAlign: "right", fontSize: "3mm", margin: "0 0 1mm" }}>대외비(협력사)</p>
+    <div style={{ fontFamily: "'맑은 고딕', 'Malgun Gothic', sans-serif", fontSize: "4.5mm", color: "#000" }}>
+      <p style={{ textAlign: "right", fontSize: "2.7mm", margin: "0 0 0.9mm" }}>대외비(협력사)</p>
 
       <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
         <colgroup>
@@ -57,30 +57,30 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
         </colgroup>
         <tbody>
           <tr>
-            <td colSpan={4} style={{ border: MEDIUM, height: "12mm", textAlign: "center", fontSize: "8mm", fontWeight: 700 }}>
+            <td colSpan={4} style={{ border: MEDIUM, height: "10.8mm", textAlign: "center", fontSize: "7.2mm", fontWeight: 700 }}>
               물 품 반 입 증
             </td>
           </tr>
           <tr>
-            <td style={labelStyle(10, 5)}>업체(부서)</td>
-            <td style={cellStyle(10, 5)} />
-            <td style={labelStyle(10, 5)}>반입자</td>
-            <td style={cellStyle(10, 5)} />
+            <td style={labelStyle(9, 4.5)}>업체(부서)</td>
+            <td style={cellStyle(9, 4.5)} />
+            <td style={labelStyle(9, 4.5)}>반입자</td>
+            <td style={cellStyle(9, 4.5)} />
           </tr>
           <tr>
-            <td style={labelStyle(10, 5)}>반입차량</td>
-            <td style={cellStyle(10, 5)} />
-            <td style={labelStyle(10, 5)}>연락처</td>
-            <td style={cellStyle(10, 5)} />
+            <td style={labelStyle(9, 4.5)}>반입차량</td>
+            <td style={cellStyle(9, 4.5)} />
+            <td style={labelStyle(9, 4.5)}>연락처</td>
+            <td style={cellStyle(9, 4.5)} />
           </tr>
           <tr>
-            <td style={labelStyle(10, 5)}>반입목적</td>
-            <td colSpan={3} style={cellStyle(10, 5)} />
+            <td style={labelStyle(9, 4.5)}>반입목적</td>
+            <td colSpan={3} style={cellStyle(9, 4.5)} />
           </tr>
         </tbody>
       </table>
 
-      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed", marginTop: "2mm" }}>
+      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed", marginTop: "1.8mm" }}>
         <colgroup>
           <col style={{ width: "8%" }} />
           <col style={{ width: "37%" }} />
@@ -90,11 +90,11 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
         </colgroup>
         <thead>
           <tr style={{ textAlign: "center" }}>
-            <td style={labelStyle(8, 4.5)}>NO</td>
-            <td style={labelStyle(8, 4.5)}>품명</td>
-            <td style={labelStyle(8, 4.5)}>단위</td>
-            <td style={labelStyle(8, 4.5)}>수량</td>
-            <td style={labelStyle(8, 4.5)}>비고(부번/SER.NO)</td>
+            <td style={labelStyle(7.2, 4.05)}>NO</td>
+            <td style={labelStyle(7.2, 4.05)}>품명</td>
+            <td style={labelStyle(7.2, 4.05)}>단위</td>
+            <td style={labelStyle(7.2, 4.05)}>수량</td>
+            <td style={labelStyle(7.2, 4.05)}>비고(부번/SER.NO)</td>
           </tr>
         </thead>
         <tbody>
@@ -103,22 +103,22 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
               잘라서 두 장의 행 높이(따라서 전체 높이)가 항상 정확히 같게 함. */}
           {rows.map((item, i) => (
             <tr key={i}>
-              <td style={{ ...cellStyle(11, 5.5), textAlign: "center" }}>{i + 1}</td>
-              <td style={{ ...cellStyle(11, 5.5), whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <td style={{ ...cellStyle(9.9, 4.95), textAlign: "center" }}>{i + 1}</td>
+              <td style={{ ...cellStyle(9.9, 4.95), whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {item?.tool_name ?? ""}
               </td>
-              <td style={{ ...cellStyle(11, 5.5), textAlign: "center" }}>{item ? "EA" : ""}</td>
-              <td style={{ ...cellStyle(11, 5.5), textAlign: "center", fontFamily: "monospace" }}>
+              <td style={{ ...cellStyle(9.9, 4.95), textAlign: "center" }}>{item ? "EA" : ""}</td>
+              <td style={{ ...cellStyle(9.9, 4.95), textAlign: "center", fontFamily: "monospace" }}>
                 {item ? formatPermitQuantity(item.quantity) : ""}
               </td>
-              <td style={cellStyle(11, 5.5)} />
+              <td style={cellStyle(9.9, 4.95)} />
             </tr>
           ))}
         </tbody>
       </table>
 
-      <p style={{ textAlign: "center", fontSize: "4mm", margin: "3mm 0 1mm" }}>상기 물품의 반출을 확인함</p>
-      <p style={{ textAlign: "center", fontSize: "4mm", margin: "1mm 0 3mm" }}>
+      <p style={{ textAlign: "center", fontSize: "3.6mm", margin: "2.7mm 0 0.9mm" }}>상기 물품의 반출을 확인함</p>
+      <p style={{ textAlign: "center", fontSize: "3.6mm", margin: "0.9mm 0 2.7mm" }}>
         물품반입일 : 20&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;일
       </p>
 
@@ -129,12 +129,12 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
         </colgroup>
         <tbody>
           <tr>
-            <td style={{ ...labelStyle(22, 4) }}>
+            <td style={{ ...labelStyle(19.8, 3.6) }}>
               주의
               <br />
               사항
             </td>
-            <td style={{ border: THIN, padding: "1mm 3mm", fontSize: "3.8mm", lineHeight: 1.35 }}>
+            <td style={{ border: THIN, padding: "0.9mm 3mm", fontSize: "3.42mm", lineHeight: 1.35 }}>
               1. 방문자께서 개인물품류, 검사구, 공구류 등 소지하여 출입하실 경우 &quot;반입증&quot; 작성바랍니다.
               <br />
               2. 입문시 정문 보안대원으로부터 &quot;반입증&quot;에 정문 보안대원의 확인 및 날인
@@ -154,21 +154,21 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
         </colgroup>
         <tbody>
           <tr>
-            <td style={labelStyle(10, 5)}>반입확인</td>
-            <td style={{ ...cellStyle(10, 5), textAlign: "center" }}>보안실</td>
-            <td style={labelStyle(10, 5)}>성명(보안대원)</td>
-            <td style={{ ...cellStyle(10, 5), textAlign: "center" }}>(인)</td>
+            <td style={labelStyle(9, 4.5)}>반입확인</td>
+            <td style={{ ...cellStyle(9, 4.5), textAlign: "center" }}>보안실</td>
+            <td style={labelStyle(9, 4.5)}>성명(보안대원)</td>
+            <td style={{ ...cellStyle(9, 4.5), textAlign: "center" }}>(인)</td>
           </tr>
           <tr>
-            <td style={labelStyle(10, 5)}>출문승인(해당부서)</td>
-            <td style={cellStyle(10, 5)} />
-            <td style={labelStyle(10, 5)}>성명(담당자)</td>
-            <td style={{ ...cellStyle(10, 5), textAlign: "center" }}>(인)</td>
+            <td style={labelStyle(9, 4.5)}>출문승인(해당부서)</td>
+            <td style={cellStyle(9, 4.5)} />
+            <td style={labelStyle(9, 4.5)}>성명(담당자)</td>
+            <td style={{ ...cellStyle(9, 4.5), textAlign: "center" }}>(인)</td>
           </tr>
         </tbody>
       </table>
 
-      <p style={{ fontSize: "2.8mm", margin: "2mm 0 0" }}>DAC-GA501-25-F01</p>
+      <p style={{ fontSize: "2.52mm", margin: "1.8mm 0 0" }}>DAC-GA501-25-F01</p>
     </div>
   );
 }

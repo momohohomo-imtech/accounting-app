@@ -182,10 +182,11 @@ export function ToolChecklistDetailReport({
           // .print-donghee-landscape). 품목이 5개(장당 고정 줄 수)를 넘으면 왼쪽·오른쪽에
           // 서로 다른 품목을 담은 다음 장으로 이어지고, 그래도 남으면 다음 페이지로
           // 계속됨 — 예전처럼 왼쪽·오른쪽에 같은 내용을 복제하지 않음. 짝이 없는
-          // 마지막 홀수 장(오른쪽 자리가 빔)은 절취선도 같이 숨기고 폭을 70%로 키워서
-          // 혼자 있을 때는 더 크게 보이게 함 — 짝이 있을 때(둘 다 채워짐)는 42%씩
-          // 유지(둘 다 70%면 합이 100%를 넘어감). 가운데 절취선(화면에서만 보임)이
-          // 자연스럽게 가운데 큰 여백에 오도록 `justify-between`으로 배치.
+          // 마지막 홀수 장(오른쪽 자리가 빔)은 절취선도 같이 숨기고 폭을 98%로 키워서
+          // 혼자 있을 때는 더 크게 보이게 함 — 짝이 있을 때(둘 다 채워짐)는 48%씩로
+          // 최대한 넓히되(둘을 합쳐도 96%라 절취선 자리 4%가 남음), 98%씩 두 장을
+          // 나란히 두면 196%가 돼서 한 페이지에 안 들어가므로 이게 한계치. 가운데
+          // 절취선(화면에서만 보임)이 자연스럽게 가운데 여백에 오도록 `justify-between`으로 배치.
           <div className="space-y-4 print:space-y-0">
             {dongheePages.map((page, pageIdx) => {
               const solo = !page[1];
@@ -196,13 +197,13 @@ export function ToolChecklistDetailReport({
                     pageIdx < dongheePages.length - 1 ? "print:break-after-page" : ""
                   }`}
                 >
-                  <div className={solo ? "w-[70%]" : "w-[42%]"}>
+                  <div className={solo ? "w-[98%]" : "w-[48%]"}>
                     <DongheeAccessPassPermitTable items={page[0]} />
                   </div>
                   {!solo && (
                     <>
                       <div className="w-px shrink-0 border-l border-dashed border-slate-300 print:hidden" />
-                      <div className="w-[42%] print:break-inside-avoid">
+                      <div className="w-[48%] print:break-inside-avoid">
                         <DongheeAccessPassPermitTable items={page[1]} />
                       </div>
                     </>
