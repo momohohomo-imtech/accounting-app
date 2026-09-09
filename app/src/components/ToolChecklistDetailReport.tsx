@@ -218,7 +218,7 @@ export function ToolChecklistDetailReport({
               여유 있게 잡음 — 실제 품목이 더 많아 넘치면 usePrintFitToPage가 알아서
               1장에 맞게 축소하므로, 적을 때 빈 공간이 남는 문제와 많을 때 넘치는
               문제를 동시에 해결함. */}
-          <div className="space-y-4 print:space-y-1">
+          <div className="space-y-4 print:space-y-1 print:mb-3">
             {visibleGroups.map((g) => (
               <div key={g.label} className="print:break-inside-avoid">
                 <p className="mb-1.5 text-xs font-semibold text-slate-500 print:mb-0.5 print:text-[15px]">{g.label}</p>
@@ -256,7 +256,7 @@ export function ToolChecklistDetailReport({
           {memo && memo.trim() !== "" && (
             <div className="print:break-inside-avoid rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 print:rounded-none print:border-0 print:border-t print:border-black print:bg-transparent print:px-0 print:pt-1.5">
               <p className="mb-1 text-xs font-semibold text-slate-500 print:text-[15px]">메모</p>
-              <p className="whitespace-pre-wrap text-sm text-slate-700 print:text-[22px] print:text-slate-900">{memo}</p>
+              <p className="whitespace-pre-wrap text-sm text-slate-700 print:text-[34px] print:text-slate-900">{memo}</p>
             </div>
           )}
 
