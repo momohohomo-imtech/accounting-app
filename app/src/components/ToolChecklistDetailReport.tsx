@@ -186,7 +186,8 @@ export function ToolChecklistDetailReport({
           // 혼자 있을 때는 더 크게 보이게 함 — 짝이 있을 때(둘 다 채워짐)는 48%씩로
           // 최대한 넓히되(둘을 합쳐도 96%라 절취선 자리 4%가 남음), 98%씩 두 장을
           // 나란히 두면 196%가 돼서 한 페이지에 안 들어가므로 이게 한계치. 가운데
-          // 절취선(화면에서만 보임)이 자연스럽게 가운데 여백에 오도록 `justify-between`으로 배치.
+          // 절취선(인쇄에도 나옴 — 잘라 쓰라는 안내선)이 정확히 중앙(48%+2% 여백=50%)에
+          // 오도록 `justify-between`으로 배치.
           <div className="space-y-4 print:space-y-0">
             {dongheePages.map((page, pageIdx) => {
               const solo = !page[1];
@@ -202,7 +203,7 @@ export function ToolChecklistDetailReport({
                   </div>
                   {!solo && (
                     <>
-                      <div className="w-px shrink-0 border-l border-dashed border-slate-300 print:hidden" />
+                      <div className="w-px shrink-0 border-l border-dashed border-slate-300" />
                       <div className="w-[48%] min-w-0 print:break-inside-avoid">
                         <DongheeAccessPassPermitTable items={page[1]} />
                       </div>
