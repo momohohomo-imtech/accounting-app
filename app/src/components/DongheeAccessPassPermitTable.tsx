@@ -83,7 +83,7 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
         </tbody>
       </table>
 
-      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed", marginTop: "10mm" }}>
+      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed", marginTop: "6mm" }}>
         <colgroup>
           <col style={{ width: "6%" }} />
           <col style={{ width: "37%" }} />
@@ -118,12 +118,12 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
         </tbody>
       </table>
 
-      <p style={{ textAlign: "center", fontSize: "3.6mm", margin: "10.7mm 0 0.9mm" }}>상기 물품의 반출을 확인함</p>
+      <p style={{ textAlign: "center", fontSize: "3.6mm", margin: "7.7mm 0 0.9mm" }}>상기 물품의 반출을 확인함</p>
       <p style={{ textAlign: "center", fontSize: "3.6mm", margin: "0.9mm 0 2.7mm" }}>
         물품반입일 : 20&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;일
       </p>
 
-      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed", marginTop: "8mm" }}>
+      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed", marginTop: "5mm" }}>
         <colgroup>
           <col style={{ width: "13%" }} />
           <col style={{ width: "87%" }} />
