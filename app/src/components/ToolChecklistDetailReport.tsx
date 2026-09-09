@@ -102,16 +102,16 @@ export function ToolChecklistDetailReport({
       <div className={`flex flex-wrap items-center justify-between gap-2 print:mb-0.5 ${formMode !== "none" ? "print:hidden" : ""}`}>
         <div>
           {/* 제목/조공 인원 글씨는 품목 글씨(25px)의 2배 크기로 표시. */}
-          <h2 className="text-lg font-semibold text-slate-900 print:text-[50px]">
+          <h2 className="text-lg font-semibold text-slate-900 print:text-[50px] print:[word-spacing:40px]">
             {title}
-            {helperCount != null && <span className="ml-2 text-lg font-semibold text-slate-900 print:ml-1.5 print:text-[50px]">조공 {helperCount}</span>}
+            {helperCount != null && <span className="ml-2 text-lg font-semibold text-slate-900 print:ml-[40px] print:text-[50px]">조공 {helperCount}인</span>}
             {formMode === "kia" && <span className="ml-2 text-sm font-normal text-slate-500 print:text-xs">(화성 반입반출증 양식)</span>}
             {formMode === "donghee" && <span className="ml-2 text-sm font-normal text-slate-500 print:text-xs">(동희 반입반출증 양식)</span>}
             {formMode === "none" && accessPassOnly && (
               <span className="ml-2 text-sm font-normal text-slate-500 print:text-xs">(반입반출증용만)</span>
             )}
           </h2>
-          {formMode === "none" && <p className="text-xs text-slate-500 print:text-[8px]">{metaLine}</p>}
+          {formMode === "none" && <p className="text-xs text-slate-500 print:text-[28px]">{metaLine}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-3 print:hidden">
           {hasAccessPassItems && formMode === "none" && (
@@ -221,7 +221,7 @@ export function ToolChecklistDetailReport({
           <div className="space-y-4 print:space-y-1 print:mb-3">
             {visibleGroups.map((g) => (
               <div key={g.label} className="print:break-inside-avoid">
-                <p className="mb-1.5 text-xs font-semibold text-slate-500 print:mb-0.5 print:text-[15px]">{g.label}</p>
+                <p className="mb-1.5 text-xs font-semibold text-slate-500 print:mb-0.5 print:text-[28px]">{g.label}</p>
                 <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 print:grid-cols-5 print:gap-x-[50px] print:gap-y-2">
                   {g.items.map((it) => {
                     const filled = it.quantity.trim() !== "";
