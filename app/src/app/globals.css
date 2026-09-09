@@ -68,11 +68,16 @@ textarea {
 }
 
 /* 공구명세서 인쇄(빈 양식 포함)는 회색 톤 보조 글자(그룹 제목·메모 등)까지
-   전부 검정으로 나오게 함 — ToolChecklistDetailReport. */
+   전부 검정으로 나오게 함 — ToolChecklistDetailReport. 단, 검정 배경에 흰 글씨로
+   찍는 그룹/메모 라벨(.tool-label-badge)은 예외 — 안 그러면 검정 배경에 검정
+   글씨가 돼서 안 보임. */
 @media print {
   .print-force-black,
   .print-force-black * {
     color: #000 !important;
+  }
+  .print-force-black .tool-label-badge {
+    color: #fff !important;
   }
 }
 
