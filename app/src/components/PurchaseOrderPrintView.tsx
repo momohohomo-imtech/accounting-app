@@ -26,10 +26,10 @@ const GENERAL_TERMS = [
   '(증권) 선급금이행증권 및 하자보증증권을 계약금 및 잔금 수령시 "갑"의 회사에 예치하여야 한다.',
 ];
 
-// 원본 아이엠테크 발주서 양식의 품목표가 NO 1~9(9행) 고정 그리드였던 것을 그대로 따름.
-// 품목이 9개를 넘으면 다음 페이지에 같은 양식을 이어서 출력하고, 9개보다 적으면
-// 빈 행을 채워 항상 한 페이지가 꽉 차 보이게 한다.
-const ROWS_PER_PAGE = 9;
+// 품목표를 NO 1~13(13행) 고정 그리드로 표시. 품목이 13개를 넘으면 다음 페이지에
+// 같은 양식을 이어서 출력하고, 13개보다 적으면 빈 행을 채워 항상 한 페이지가
+// 꽉 차 보이게 한다.
+const ROWS_PER_PAGE = 13;
 
 function chunkItems(items: PurchaseOrderItemRow[]): PurchaseOrderItemRow[][] {
   if (items.length === 0) return [[]];
@@ -139,7 +139,7 @@ export function PurchaseOrderPrintView({
           >
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2">
-                <Image src="/logo-lockup.png" alt="" width={26} height={20} className="h-5 w-auto" />
+                <Image src="/logo-lockup.png" alt="" width={26} height={20} priority className="h-5 w-auto" />
                 <span className="font-mono text-[10px] tracking-widest text-slate-400">
                   PURCHASE ORDER{pages.length > 1 ? ` · ${pageIndex + 1}/${pages.length}` : ""}
                 </span>
@@ -147,7 +147,7 @@ export function PurchaseOrderPrintView({
               <div className="flex text-center text-[10px]">
                 {["담당", "검토", "승인"].map((label) => (
                   <div key={label} className="-ml-px flex h-6 w-11 flex-col border border-slate-300 first:ml-0">
-                    <div className="border-b border-slate-300 bg-brand-soft py-0.5 font-semibold text-slate-600">{label}</div>
+                    <div className="border-b border-slate-300 bg-brand-soft py-px font-semibold text-slate-600">{label}</div>
                     <div className="flex-1" />
                   </div>
                 ))}
@@ -161,7 +161,7 @@ export function PurchaseOrderPrintView({
 
             <h1 className="mt-3 text-center text-2xl font-bold tracking-[0.4em] text-brand">발 주 서</h1>
 
-            <div className="mt-3 grid grid-cols-2 gap-x-8 gap-y-0.5 text-[13px]">
+            <div className="mt-2 grid grid-cols-2 gap-x-8 gap-y-0.5 text-[13px]">
               <p>
                 <span className="text-slate-500">발주번호: </span>
                 <span className="font-mono font-medium text-slate-900">{purchaseOrder.po_number ?? "-"}</span>
@@ -190,36 +190,36 @@ export function PurchaseOrderPrintView({
 
             <div className="mt-2 grid grid-cols-2 gap-2">
               <div className="rounded-lg border border-slate-300">
-                <p className="border-b border-slate-300 bg-brand-soft px-3 py-0.5 text-[11px] font-semibold text-slate-600">매입처</p>
+                <p className="border-b border-slate-300 bg-brand-soft px-3 py-px text-[11px] font-semibold text-slate-600">매입처</p>
                 <p className="px-3 py-1 text-[13px] font-medium text-slate-900">{purchaseOrder.clientName ?? "-"} 귀하</p>
               </div>
               <div className="rounded-lg border border-slate-300">
-                <p className="border-b border-slate-300 bg-brand-soft px-3 py-0.5 text-[11px] font-semibold text-slate-600">발주자</p>
+                <p className="border-b border-slate-300 bg-brand-soft px-3 py-px text-[11px] font-semibold text-slate-600">발주자</p>
                 <table className="w-full text-[11px]">
                   <tbody>
                     <tr className="border-b border-slate-200">
-                      <td className="w-16 px-3 py-0.5 text-slate-500">등록번호</td>
-                      <td className="px-3 py-0.5 text-slate-900">{bizRegNo || "-"}</td>
+                      <td className="w-16 px-3 py-px text-slate-500">등록번호</td>
+                      <td className="px-3 py-px text-slate-900">{bizRegNo || "-"}</td>
                     </tr>
                     <tr className="border-b border-slate-200">
-                      <td className="px-3 py-0.5 text-slate-500">상호</td>
-                      <td className="px-3 py-0.5 text-slate-900">
+                      <td className="px-3 py-px text-slate-500">상호</td>
+                      <td className="px-3 py-px text-slate-900">
                         {companyName || "-"} {representativeName && <span>(대표 {representativeName})</span>}
                       </td>
                     </tr>
                     <tr className="border-b border-slate-200">
-                      <td className="px-3 py-0.5 text-slate-500">주소</td>
-                      <td className="px-3 py-0.5 text-slate-900">{address || "-"}</td>
+                      <td className="px-3 py-px text-slate-500">주소</td>
+                      <td className="px-3 py-px text-slate-900">{address || "-"}</td>
                     </tr>
                     <tr className="border-b border-slate-200">
-                      <td className="px-3 py-0.5 text-slate-500">업태/종목</td>
-                      <td className="px-3 py-0.5 text-slate-900">
+                      <td className="px-3 py-px text-slate-500">업태/종목</td>
+                      <td className="px-3 py-px text-slate-900">
                         {bizType || "-"} / {bizItem || "-"}
                       </td>
                     </tr>
                     <tr>
-                      <td className="px-3 py-0.5 text-slate-500">전화/팩스</td>
-                      <td className="px-3 py-0.5 text-slate-900">
+                      <td className="px-3 py-px text-slate-500">전화/팩스</td>
+                      <td className="px-3 py-px text-slate-900">
                         {phone || "-"} / {fax || "-"}
                       </td>
                     </tr>
@@ -228,16 +228,16 @@ export function PurchaseOrderPrintView({
               </div>
             </div>
 
-            <div className="mt-2 flex items-center justify-between rounded-lg border-2 border-brand bg-brand-soft px-3 py-1.5">
+            <div className="mt-2 flex items-center justify-between rounded-lg border-2 border-brand bg-brand-soft px-3 py-1">
               <span className="text-[13px] font-semibold text-slate-700">
-                발주금액{pages.length > 1 ? " (총액)" : ""} <span className="text-[11px] font-normal text-slate-500">(VAT 별도)</span>
+                발주금액{pages.length > 1 ? " (총액)" : ""} <span className="text-[11px] font-bold text-slate-700">(VAT 별도)</span>
               </span>
               <span className="text-[13px] font-bold text-slate-900">
                 {numberToKoreanAmount(total)} (<span className="font-mono">{formatWon(total)}</span>)
               </span>
             </div>
 
-            <table className="mt-2 w-full table-fixed text-[13px]">
+            <table className="mt-2 w-full table-fixed text-[13px] leading-tight">
               <colgroup>
                 <col className="w-10" />
                 <col />
@@ -248,49 +248,49 @@ export function PurchaseOrderPrintView({
               </colgroup>
               <thead>
                 <tr className="border-b border-t-2 border-slate-900 text-left text-slate-500">
-                  <th className="py-0.5 pr-2 text-center">No</th>
-                  <th className="py-0.5 pr-2">품명</th>
-                  <th className="py-0.5 pr-2">규격</th>
-                  <th className="py-0.5 pr-2 text-right">수량</th>
-                  <th className="py-0.5 pr-2 text-right">단가</th>
-                  <th className="py-0.5 text-right">금액</th>
+                  <th className="py-px pr-2 text-center">No</th>
+                  <th className="py-px pr-2">품명</th>
+                  <th className="py-px pr-2">규격</th>
+                  <th className="py-px pr-2 text-right">수량</th>
+                  <th className="py-px pr-2 text-right">단가</th>
+                  <th className="py-px text-right">금액</th>
                 </tr>
               </thead>
               <tbody>
                 {pageItems.map((it, i) => (
                   <tr key={it.id} className="border-b border-slate-100">
-                    <td className="py-0.5 pr-2 text-center text-slate-500">{i + 1}</td>
-                    <td className="truncate py-0.5 pr-2">{it.item_name ?? "-"}</td>
-                    <td className="truncate py-0.5 pr-2 text-slate-500">{it.spec ?? "-"}</td>
-                    <td className="py-0.5 pr-2 text-right font-mono">{it.quantity ?? "-"}</td>
-                    <td className="py-0.5 pr-2 text-right font-mono">{it.unit_price ? formatWon(it.unit_price) : "-"}</td>
-                    <td className="py-0.5 text-right font-mono">{formatWon(it.amount)}</td>
+                    <td className="py-px pr-2 text-center text-slate-500">{i + 1}</td>
+                    <td className="truncate py-px pr-2">{it.item_name ?? "-"}</td>
+                    <td className="truncate py-px pr-2 text-slate-500">{it.spec ?? "-"}</td>
+                    <td className="py-px pr-2 text-right font-mono">{it.quantity ?? "-"}</td>
+                    <td className="py-px pr-2 text-right font-mono">{it.unit_price ? formatWon(it.unit_price) : "-"}</td>
+                    <td className="py-px text-right font-mono">{formatWon(it.amount)}</td>
                   </tr>
                 ))}
                 {Array.from({ length: blankRows }).map((_, i) => (
                   <tr key={`blank-${i}`} className="border-b border-slate-100">
-                    <td className="py-0.5 pr-2 text-center text-slate-400">{pageItems.length + i + 1}</td>
-                    <td className="py-0.5 pr-2">&nbsp;</td>
-                    <td className="py-0.5 pr-2">&nbsp;</td>
-                    <td className="py-0.5 pr-2">&nbsp;</td>
-                    <td className="py-0.5 pr-2">&nbsp;</td>
-                    <td className="py-0.5">&nbsp;</td>
+                    <td className="py-px pr-2 text-center text-slate-400">{pageItems.length + i + 1}</td>
+                    <td className="py-px pr-2">&nbsp;</td>
+                    <td className="py-px pr-2">&nbsp;</td>
+                    <td className="py-px pr-2">&nbsp;</td>
+                    <td className="py-px pr-2">&nbsp;</td>
+                    <td className="py-px">&nbsp;</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-slate-300">
-                  <td colSpan={5} className="py-0.5 text-right font-semibold text-slate-900">
+                  <td colSpan={5} className="py-px text-right font-semibold text-slate-900">
                     {pages.length > 1 ? "페이지 소계" : "합계"}
                   </td>
-                  <td className="py-0.5 text-right font-mono text-sm font-bold text-slate-900">{formatWon(pageSubtotal)}</td>
+                  <td className="py-px text-right font-mono text-sm font-bold text-slate-900">{formatWon(pageSubtotal)}</td>
                 </tr>
               </tfoot>
             </table>
 
             <div className="mt-2 rounded-lg border border-slate-300">
-              <p className="border-b border-slate-300 bg-brand-soft px-3 py-0.5 text-[11px] font-semibold text-slate-600">계약 조건</p>
-              <div className="space-y-0.5 px-3 py-1 text-[10px] leading-snug text-slate-700">
+              <p className="border-b border-slate-300 bg-brand-soft px-3 py-px text-[11px] font-semibold text-slate-600">계약 조건</p>
+              <div className="space-y-0.5 px-3 py-px text-[10px] leading-tight text-slate-700">
                 <p>
                   <span className="font-semibold">가. 대금결제</span> — {paymentTerms || "-"}
                 </p>
@@ -312,14 +312,14 @@ export function PurchaseOrderPrintView({
             </div>
 
             {purchaseOrder.memo && (
-              <div className="mt-2 rounded-lg border border-slate-200 px-3 py-1.5 text-[13px]">
+              <div className="mt-1.5 rounded-lg border border-slate-200 px-3 py-1 text-[13px]">
                 <p className="mb-0.5 text-[11px] font-semibold text-slate-500">라. 비고</p>
                 <p className="whitespace-pre-wrap text-slate-700">{purchaseOrder.memo}</p>
               </div>
             )}
 
-            <div className="mt-3 flex items-center justify-center gap-2 text-[13px] text-slate-900">
-              <Image src="/logo-lockup.png" alt="" width={18} height={14} className="h-3.5 w-auto" />
+            <div className="mt-2 flex items-center justify-center gap-2 text-[13px] text-slate-900">
+              <Image src="/logo-lockup.png" alt="" width={18} height={14} priority className="h-3.5 w-auto" />
               <p className="font-semibold">
                 {companyName || "-"} {representativeName && <span>대표 {representativeName} (인)</span>}
               </p>

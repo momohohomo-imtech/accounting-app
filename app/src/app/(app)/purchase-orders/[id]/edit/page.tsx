@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { PurchaseOrderForm } from "@/components/PurchaseOrderForm";
 import { PurchaseOrderPrintView } from "@/components/PurchaseOrderPrintView";
+import { LinkButton } from "@/components/ui/Button";
 
 export default async function EditPurchaseOrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -33,6 +34,9 @@ export default async function EditPurchaseOrderPage({ params }: { params: Promis
         <h1 className="text-2xl font-bold text-slate-900">
           발주서 수정 <span className="font-mono text-base font-normal text-slate-400">{purchaseOrder.po_number}</span>
         </h1>
+        <LinkButton href="/projects?tab=purchase_orders" variant="secondary" size="sm">
+          ← 프로젝트·현장 발주서로
+        </LinkButton>
       </div>
 
       <div className="print:hidden">
