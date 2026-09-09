@@ -14,6 +14,7 @@ type BankTxRow = {
   description: string | null;
   amount: number;
   matched_client_id: string | null;
+  matched_client_name_raw: string | null;
   bank_accounts?: { nickname: string | null; bank_name: string } | null;
   clients?: { name: string } | null;
 };
@@ -33,7 +34,7 @@ function sortValue(t: BankTxRow, key: SortKey): string | number {
     case "description":
       return t.description ?? "";
     case "client":
-      return t.clients?.name ?? "";
+      return t.clients?.name ?? t.matched_client_name_raw ?? "";
     case "amount":
       return t.amount;
   }
@@ -143,6 +144,12 @@ export function BankTransactionTable({
                       </option>
                     ))}
                   </select>
+                  <input
+                    name="matched_client_name_raw"
+                    defaultValue={t.matched_client_name_raw ?? ""}
+                    placeholder="거래처 직접 입력"
+                    className={inputClass}
+                  />
                   <div className="flex gap-2 lg:col-span-6">
                     <button
                       type="submit"
@@ -175,7 +182,7 @@ export function BankTransactionTable({
                 </span>
               </td>
               <td className="py-2 pr-4 text-slate-700">{t.description ?? "-"}</td>
-              <td className="py-2 pr-4 text-slate-700">{t.clients?.name ?? "-"}</td>
+              <td className="py-2 pr-4 text-slate-700">{t.clients?.name ?? t.matched_client_name_raw ?? "-"}</td>
               <td className="py-2 pr-4 text-right font-medium text-slate-900">{formatWon(t.amount)}</td>
               <td className="py-2 text-right">
                 <div className="flex justify-end gap-1">

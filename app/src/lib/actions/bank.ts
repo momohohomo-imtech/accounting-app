@@ -14,13 +14,15 @@ function parseAccount(formData: FormData) {
 }
 
 function parseTransaction(formData: FormData) {
+  const matchedClientId = String(formData.get("matched_client_id") ?? "") || null;
   return {
     bank_account_id: String(formData.get("bank_account_id")),
     trans_date: String(formData.get("trans_date")),
     description: String(formData.get("description") ?? "") || null,
     direction: String(formData.get("direction") ?? "입금"),
     amount: Number(formData.get("amount") ?? 0),
-    matched_client_id: String(formData.get("matched_client_id") ?? "") || null,
+    matched_client_id: matchedClientId,
+    matched_client_name_raw: matchedClientId ? null : String(formData.get("matched_client_name_raw") ?? "") || null,
   };
 }
 

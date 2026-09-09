@@ -99,7 +99,7 @@ export default async function BankPage() {
             <input name="description" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">매칭 거래처</label>
+            <label className="text-xs font-medium text-slate-500">매칭 거래처 (등록됨)</label>
             <select name="matched_client_id" className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
               <option value="">선택 안함</option>
               {(clients ?? []).map((c) => (
@@ -108,6 +108,14 @@ export default async function BankPage() {
                 </option>
               ))}
             </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">매칭 거래처 (자유 입력)</label>
+            <input
+              name="matched_client_name_raw"
+              placeholder="등록 안 된 거래처는 직접 입력"
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
           </div>
           <div className="sm:col-span-2 lg:col-span-3">
             <button className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
