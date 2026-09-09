@@ -230,7 +230,7 @@ export function PurchaseOrderPrintView({
 
             <div className="mt-2 flex items-center justify-between rounded-lg border-2 border-brand bg-brand-soft px-3 py-1">
               <span className="text-[13px] font-semibold text-slate-700">
-                발주금액{pages.length > 1 ? " (총액)" : ""} <span className="text-[11px] font-bold text-slate-700">(VAT 별도)</span>
+                발주금액{pages.length > 1 ? " (총액)" : ""} <span className="text-[13px] font-bold text-slate-700">(VAT 별도)</span>
               </span>
               <span className="text-[13px] font-bold text-slate-900">
                 {numberToKoreanAmount(total)} (<span className="font-mono">{formatWon(total)}</span>)
@@ -248,42 +248,42 @@ export function PurchaseOrderPrintView({
               </colgroup>
               <thead>
                 <tr className="border-b border-t-2 border-slate-900 text-left text-slate-500">
-                  <th className="py-px pr-2 text-center">No</th>
-                  <th className="py-px pr-2">품명</th>
-                  <th className="py-px pr-2">규격</th>
-                  <th className="py-px pr-2 text-right">수량</th>
-                  <th className="py-px pr-2 text-right">단가</th>
-                  <th className="py-px text-right">금액</th>
+                  <th className="py-0.5 pr-2 text-center">No</th>
+                  <th className="py-0.5 pr-2">품명</th>
+                  <th className="py-0.5 pr-2">규격</th>
+                  <th className="py-0.5 pr-2 text-right">수량</th>
+                  <th className="py-0.5 pr-2 text-right">단가</th>
+                  <th className="py-0.5 text-right">금액</th>
                 </tr>
               </thead>
               <tbody>
                 {pageItems.map((it, i) => (
                   <tr key={it.id} className="border-b border-slate-100">
-                    <td className="py-px pr-2 text-center text-slate-500">{i + 1}</td>
-                    <td className="truncate py-px pr-2">{it.item_name ?? "-"}</td>
-                    <td className="truncate py-px pr-2 text-slate-500">{it.spec ?? "-"}</td>
-                    <td className="py-px pr-2 text-right font-mono">{it.quantity ?? "-"}</td>
-                    <td className="py-px pr-2 text-right font-mono">{it.unit_price ? formatWon(it.unit_price) : "-"}</td>
-                    <td className="py-px text-right font-mono">{formatWon(it.amount)}</td>
+                    <td className="py-0.5 pr-2 text-center text-slate-500">{i + 1}</td>
+                    <td className="truncate py-0.5 pr-2">{it.item_name ?? "-"}</td>
+                    <td className="truncate py-0.5 pr-2 text-slate-500">{it.spec ?? "-"}</td>
+                    <td className="py-0.5 pr-2 text-right font-mono">{it.quantity ?? "-"}</td>
+                    <td className="py-0.5 pr-2 text-right font-mono">{it.unit_price ? formatWon(it.unit_price) : "-"}</td>
+                    <td className="py-0.5 text-right font-mono">{formatWon(it.amount)}</td>
                   </tr>
                 ))}
                 {Array.from({ length: blankRows }).map((_, i) => (
                   <tr key={`blank-${i}`} className="border-b border-slate-100">
-                    <td className="py-px pr-2 text-center text-slate-400">{pageItems.length + i + 1}</td>
-                    <td className="py-px pr-2">&nbsp;</td>
-                    <td className="py-px pr-2">&nbsp;</td>
-                    <td className="py-px pr-2">&nbsp;</td>
-                    <td className="py-px pr-2">&nbsp;</td>
-                    <td className="py-px">&nbsp;</td>
+                    <td className="py-0.5 pr-2 text-center text-slate-400">{pageItems.length + i + 1}</td>
+                    <td className="py-0.5 pr-2">&nbsp;</td>
+                    <td className="py-0.5 pr-2">&nbsp;</td>
+                    <td className="py-0.5 pr-2">&nbsp;</td>
+                    <td className="py-0.5 pr-2">&nbsp;</td>
+                    <td className="py-0.5">&nbsp;</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-slate-300">
-                  <td colSpan={5} className="py-px text-right font-semibold text-slate-900">
+                  <td colSpan={5} className="py-0.5 text-right font-semibold text-slate-900">
                     {pages.length > 1 ? "페이지 소계" : "합계"}
                   </td>
-                  <td className="py-px text-right font-mono text-sm font-bold text-slate-900">{formatWon(pageSubtotal)}</td>
+                  <td className="py-0.5 text-right font-mono text-sm font-bold text-slate-900">{formatWon(pageSubtotal)}</td>
                 </tr>
               </tfoot>
             </table>
