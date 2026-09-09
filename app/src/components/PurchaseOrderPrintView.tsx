@@ -26,10 +26,10 @@ const GENERAL_TERMS = [
   '(증권) 선급금이행증권 및 하자보증증권을 계약금 및 잔금 수령시 "갑"의 회사에 예치하여야 한다.',
 ];
 
-// 품목표를 NO 1~9(9행) 고정 그리드로 표시. 품목이 9개를 넘으면 다음 페이지에
-// 같은 양식을 이어서 출력하고, 9개보다 적으면 빈 행을 채워 항상 한 페이지가
-// 꽉 차 보이게 한다. (행 패딩 6px 기준으로 A4 한 장에 맞는 최대 행 수)
-const ROWS_PER_PAGE = 9;
+// 품목표를 NO 1~13(13행) 고정 그리드로 표시. 품목이 13개를 넘으면 다음 페이지에
+// 같은 양식을 이어서 출력하고, 13개보다 적으면 빈 행을 채워 항상 한 페이지가
+// 꽉 차 보이게 한다.
+const ROWS_PER_PAGE = 13;
 
 function chunkItems(items: PurchaseOrderItemRow[]): PurchaseOrderItemRow[][] {
   if (items.length === 0) return [[]];
