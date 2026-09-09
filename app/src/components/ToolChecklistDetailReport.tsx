@@ -197,13 +197,13 @@ export function ToolChecklistDetailReport({
                     pageIdx < dongheePages.length - 1 ? "print:break-after-page" : ""
                   }`}
                 >
-                  <div className={solo ? "w-[98%]" : "w-[48%]"}>
+                  <div className={`min-w-0 ${solo ? "w-[98%]" : "w-[48%]"}`}>
                     <DongheeAccessPassPermitTable items={page[0]} />
                   </div>
                   {!solo && (
                     <>
                       <div className="w-px shrink-0 border-l border-dashed border-slate-300 print:hidden" />
-                      <div className="w-[48%] print:break-inside-avoid">
+                      <div className="w-[48%] min-w-0 print:break-inside-avoid">
                         <DongheeAccessPassPermitTable items={page[1]} />
                       </div>
                     </>

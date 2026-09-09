@@ -35,6 +35,7 @@ function cellStyle(heightMm: number, fontMm: number): CSSProperties {
     fontSize: `${fontMm}mm`,
     whiteSpace: "nowrap",
     overflow: "hidden",
+    textOverflow: "ellipsis",
   };
 }
 function labelStyle(heightMm: number, fontMm: number): CSSProperties {
@@ -46,14 +47,16 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
 
   return (
     <div style={{ fontFamily: "'맑은 고딕', 'Malgun Gothic', sans-serif", fontSize: "4.5mm", color: "#000" }}>
-      <p style={{ textAlign: "right", fontSize: "2.7mm", margin: "0 0 0.9mm" }}>대외비(협력사)</p>
+      <p style={{ textAlign: "right", fontSize: "2.7mm", margin: "0 0 2mm" }}>대외비(협력사)</p>
 
+      {/* "업체(부서)"/"반입목적"처럼 4~5자 라벨은 15%로는 좁아서 잘렸음(반입자/연락처는
+          3자라 15%로도 충분해서 그대로 둠) — 1열은 넓히고 그만큼 값 칸(2·4열)에서 뺌. */}
       <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
         <colgroup>
+          <col style={{ width: "22%" }} />
+          <col style={{ width: "31%" }} />
           <col style={{ width: "15%" }} />
-          <col style={{ width: "35%" }} />
-          <col style={{ width: "15%" }} />
-          <col style={{ width: "35%" }} />
+          <col style={{ width: "32%" }} />
         </colgroup>
         <tbody>
           <tr>
@@ -80,13 +83,13 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
         </tbody>
       </table>
 
-      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed", marginTop: "1.8mm" }}>
+      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed", marginTop: "10mm" }}>
         <colgroup>
-          <col style={{ width: "8%" }} />
+          <col style={{ width: "6%" }} />
           <col style={{ width: "37%" }} />
-          <col style={{ width: "13%" }} />
-          <col style={{ width: "13%" }} />
-          <col style={{ width: "29%" }} />
+          <col style={{ width: "11%" }} />
+          <col style={{ width: "11%" }} />
+          <col style={{ width: "35%" }} />
         </colgroup>
         <thead>
           <tr style={{ textAlign: "center" }}>
@@ -104,9 +107,7 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
           {rows.map((item, i) => (
             <tr key={i}>
               <td style={{ ...cellStyle(9.9, 4.95), textAlign: "center" }}>{i + 1}</td>
-              <td style={{ ...cellStyle(9.9, 4.95), whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {item?.tool_name ?? ""}
-              </td>
+              <td style={cellStyle(9.9, 4.95)}>{item?.tool_name ?? ""}</td>
               <td style={{ ...cellStyle(9.9, 4.95), textAlign: "center" }}>{item ? "EA" : ""}</td>
               <td style={{ ...cellStyle(9.9, 4.95), textAlign: "center", fontFamily: "monospace" }}>
                 {item ? formatPermitQuantity(item.quantity) : ""}
@@ -117,12 +118,12 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
         </tbody>
       </table>
 
-      <p style={{ textAlign: "center", fontSize: "3.6mm", margin: "2.7mm 0 0.9mm" }}>상기 물품의 반출을 확인함</p>
+      <p style={{ textAlign: "center", fontSize: "3.6mm", margin: "10.7mm 0 0.9mm" }}>상기 물품의 반출을 확인함</p>
       <p style={{ textAlign: "center", fontSize: "3.6mm", margin: "0.9mm 0 2.7mm" }}>
         물품반입일 : 20&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;일
       </p>
 
-      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
+      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed", marginTop: "8mm" }}>
         <colgroup>
           <col style={{ width: "13%" }} />
           <col style={{ width: "87%" }} />
@@ -145,12 +146,15 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
         </tbody>
       </table>
 
+      {/* "출문승인(해당부서)"(1열)·"성명(보안대원)"(3열)이 기존 22%/20%로는 좁아서
+          잘렸음 — 값 칸(2·4열)은 어차피 서명/도장용 빈칸이라 줄여도 무방해서 그만큼
+          라벨 칸을 넓힘. */}
       <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed", marginTop: "-1px" }}>
         <colgroup>
-          <col style={{ width: "22%" }} />
-          <col style={{ width: "28%" }} />
-          <col style={{ width: "20%" }} />
-          <col style={{ width: "30%" }} />
+          <col style={{ width: "40%" }} />
+          <col style={{ width: "18%" }} />
+          <col style={{ width: "26%" }} />
+          <col style={{ width: "16%" }} />
         </colgroup>
         <tbody>
           <tr>
@@ -168,7 +172,7 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
         </tbody>
       </table>
 
-      <p style={{ fontSize: "2.52mm", margin: "1.8mm 0 0" }}>DAC-GA501-25-F01</p>
+      <p style={{ fontSize: "2.52mm", margin: "4mm 0 0" }}>DAC-GA501-25-F01</p>
     </div>
   );
 }
