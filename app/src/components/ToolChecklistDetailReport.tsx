@@ -221,7 +221,7 @@ export function ToolChecklistDetailReport({
           <div className="space-y-4 print:space-y-1 print:mb-3">
             {visibleGroups.map((g) => (
               <div key={g.label} className="print:break-inside-avoid">
-                <p className="mb-1.5 text-xs font-semibold text-slate-500 print:mb-0.5 print:text-[28px] print:bg-slate-200 print:px-2 print:py-1 print:font-bold print:text-slate-900">
+                <p className="tool-label-badge mb-1.5 text-xs font-semibold text-slate-500 print:mb-0.5 print:text-[28px] print:bg-slate-200 print:px-2 print:py-1 print:font-bold print:text-white">
                   {g.label}
                 </p>
                 <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 print:grid-cols-5 print:gap-x-[50px] print:gap-y-2">
@@ -257,7 +257,7 @@ export function ToolChecklistDetailReport({
 
           {memo && memo.trim() !== "" && (
             <div className="print:break-inside-avoid rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 print:rounded-none print:border-0 print:border-t print:border-black print:bg-transparent print:px-0 print:pt-1.5">
-              <p className="mb-1 text-xs font-semibold text-slate-500 print:text-[28px] print:bg-slate-200 print:px-2 print:py-1 print:font-bold print:text-slate-900">
+              <p className="tool-label-badge mb-1 text-xs font-semibold text-slate-500 print:text-[28px] print:bg-slate-200 print:px-2 print:py-1 print:font-bold print:text-white">
                 메모
               </p>
               <p className="whitespace-pre-wrap text-sm text-slate-700 print:text-[34px] print:text-slate-900">{memo}</p>
