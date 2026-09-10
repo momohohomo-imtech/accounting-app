@@ -25,15 +25,22 @@ const accountFields: FieldConfig[] = [
 export default async function BankPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string; period?: string; deposit?: string; withdrawal?: string }>;
+  searchParams: Promise<{
+    year?: string;
+    period?: string;
+    deposit?: string;
+    withdrawal?: string;
+    excludeAccounts?: string;
+  }>;
 }) {
-  const { year, period, deposit, withdrawal } = await searchParams;
+  const { year, period, deposit, withdrawal, excludeAccounts } = await searchParams;
   const supabase = await createClient();
   const currentYear = new Date().getFullYear();
   const selectedYear = year ? Number(year) : currentYear;
   const selectedPeriod = period ?? "";
   const showDeposit = deposit !== "0";
   const showWithdrawal = withdrawal !== "0";
+  const excludedAccountIds = excludeAccounts ? excludeAccounts.split(",").filter(Boolean) : [];
 
   const pad = (n: number) => String(n).padStart(2, "0");
   let rangeStart = `${selectedYear}-01-01`;
@@ -52,6 +59,15 @@ export default async function BankPage({
     rangeEnd = `${selectedYear}-${pad(m)}-${pad(lastDay)}`;
   }
 
+  const { data: accounts } = await supabase
+    .from("bank_accounts")
+    .select("*")
+    .order("sort_order")
+    .order("created_at", { ascending: false });
+
+  const excludedSet = new Set(excludedAccountIds);
+  const includedAccountIds = (accounts ?? []).filter((a) => !excludedSet.has(a.id)).map((a) => a.id);
+
   let transactionsQuery = supabase
     .from("bank_transactions")
     .select("*, bank_accounts(nickname, bank_name), clients(name)")
@@ -60,9 +76,9 @@ export default async function BankPage({
     .order("trans_date", { ascending: false });
   // 둘 다 체크(전체) 또는 둘 다 해제(빈 결과 방지)면 필터 안 걸고, 하나만 체크됐을 때만 그 방향으로 좁힌다.
   if (showDeposit !== showWithdrawal) transactionsQuery = transactionsQuery.eq("direction", showDeposit ? "입금" : "출금");
+  if (excludedSet.size > 0) transactionsQuery = transactionsQuery.in("bank_account_id", includedAccountIds);
 
-  const [{ data: accounts }, { data: clients }, { data: transactions }, { data: allTx }, { data: firstTx }] = await Promise.all([
-    supabase.from("bank_accounts").select("*").order("sort_order").order("created_at", { ascending: false }),
+  const [{ data: clients }, { data: transactions }, { data: allTx }, { data: firstTx }] = await Promise.all([
     supabase.from("clients").select("id, name").order("name"),
     transactionsQuery,
     supabase.from("bank_transactions").select("bank_account_id, direction, amount"),
@@ -142,6 +158,8 @@ export default async function BankPage({
             selectedPeriod={selectedPeriod}
             showDeposit={showDeposit}
             showWithdrawal={showWithdrawal}
+            accounts={(accounts ?? []).map((a) => ({ id: a.id, name: a.nickname ?? a.bank_name }))}
+            excludedAccountIds={excludedAccountIds}
           />
         </div>
 
