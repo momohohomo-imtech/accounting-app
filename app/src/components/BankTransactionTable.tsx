@@ -230,14 +230,24 @@ export function BankTransactionTable({
                   <span className="text-xs text-slate-300" title="계좌 간 이체 내역은 올릴 수 없습니다">
                     -
                   </span>
+                ) : t.promoted_transaction_id ? (
+                  <button
+                    type="button"
+                    onClick={() => handleTogglePromote(t.id, false)}
+                    className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-red-50 hover:text-red-600"
+                    title="눌러서 매입/매출장 등록을 취소합니다 (등록됐던 내역이 삭제됩니다)"
+                  >
+                    등록됨
+                  </button>
                 ) : (
-                  <input
-                    type="checkbox"
-                    checked={Boolean(t.promoted_transaction_id)}
-                    onChange={(e) => handleTogglePromote(t.id, e.target.checked)}
-                    className="h-4 w-4"
-                    title="체크하면 매입/매출장에 분류 대기 중으로 자동 등록됩니다"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => handleTogglePromote(t.id, true)}
+                    className="rounded-full border border-slate-300 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-100"
+                    title="눌러서 매입/매출장에 분류 대기 중으로 자동 등록합니다"
+                  >
+                    등록
+                  </button>
                 )}
               </td>
               <td className="py-2 text-right">
