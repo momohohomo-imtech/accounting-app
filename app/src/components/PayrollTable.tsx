@@ -6,7 +6,7 @@ import { LinkButton, Button } from "@/components/ui/Button";
 import { PayrollForm, type EmployeeOption, type PayrollInitial } from "@/components/PayrollForm";
 
 type PayrollRow = PayrollInitial & { id: string; employees?: { name: string } | null };
-type SortKey = "employee" | "pay_month" | "total" | "deduction" | "net";
+type SortKey = "employee" | "pay_month" | "total" | "deduction" | "net" | "memo";
 
 function derive(p: PayrollRow) {
   const total = p.amount + p.bonus;
@@ -68,6 +68,8 @@ export function PayrollTable({
         cmp = (a.employees?.name ?? "").localeCompare(b.employees?.name ?? "");
       } else if (sortKey === "pay_month") {
         cmp = a.pay_month.localeCompare(b.pay_month);
+      } else if (sortKey === "memo") {
+        cmp = (a.memo ?? "").localeCompare(b.memo ?? "");
       } else {
         cmp = derive(a)[sortKey === "total" ? "total" : sortKey === "deduction" ? "deductionTotal" : "net"] -
           derive(b)[sortKey === "total" ? "total" : sortKey === "deduction" ? "deductionTotal" : "net"];
@@ -83,6 +85,7 @@ export function PayrollTable({
         <tr className="border-b border-slate-200 text-left text-slate-500">
           <th className="pb-2 pr-4">{headerButton("employee", "직원")}</th>
           <th className="pb-2 pr-4">{headerButton("pay_month", "지급월")}</th>
+          <th className="pb-2 pr-4">{headerButton("memo", "메모")}</th>
           <th className="pb-2 pr-4 text-right">{headerButton("total", "지급합계")}</th>
           <th className="pb-2 pr-4 text-right">{headerButton("deduction", "공제합계")}</th>
           <th className="pb-2 pr-4 text-right">{headerButton("net", "차인지급액")}</th>
@@ -94,7 +97,7 @@ export function PayrollTable({
           if (editingId === p.id) {
             return (
               <tr key={p.id} className="border-b border-slate-100 bg-slate-50 last:border-0">
-                <td colSpan={6} className="py-3 pr-4">
+                <td colSpan={7} className="py-3 pr-4">
                   <PayrollForm
                     employees={employees}
                     action={async (fd) => {
@@ -116,6 +119,9 @@ export function PayrollTable({
             <tr key={p.id} className="border-b border-slate-100 last:border-0">
               <td className="py-2 pr-4 text-slate-700">{p.employees?.name}</td>
               <td className="py-2 pr-4 text-slate-700">{formatDate(p.pay_month).slice(0, 7)}</td>
+              <td className="py-2 pr-4 max-w-[12rem] truncate text-slate-500" title={p.memo ?? undefined}>
+                {p.memo || "-"}
+              </td>
               <td className="py-2 pr-4 text-right text-slate-700">{formatWon(total)}</td>
               <td className="py-2 pr-4 text-right text-slate-500">{formatWon(deductionTotal)}</td>
               <td className="py-2 pr-4 text-right font-medium text-slate-900">{formatWon(net)}</td>
@@ -150,7 +156,7 @@ export function PayrollTable({
         })}
         {payroll.length === 0 && (
           <tr>
-            <td colSpan={6} className="py-6 text-center text-slate-400">
+            <td colSpan={7} className="py-6 text-center text-slate-400">
               급여 지급 기록이 없습니다.
             </td>
           </tr>
