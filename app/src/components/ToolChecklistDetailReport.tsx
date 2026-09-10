@@ -203,18 +203,22 @@ export function ToolChecklistDetailReport({
           // 중앙(49%+1% 여백=50%)에 오도록 `justify-between`으로 배치.
           <div className="space-y-4 print:space-y-0">
             {dongheePages.map((page, pageIdx) => (
-              <div
-                key={pageIdx}
-                className={`flex justify-between print:break-inside-avoid print:w-[277mm] print:h-[190mm] print:origin-top-left donghee-print-rotate ${
-                  pageIdx < dongheePages.length - 1 ? "print:break-after-page" : ""
-                }`}
-              >
-                <div className="w-[49%] min-w-0">
-                  <DongheeAccessPassPermitTable items={page[0]} />
-                </div>
-                <div className="w-px shrink-0 border-l border-dashed border-slate-300" />
-                <div className="w-[49%] min-w-0 print:break-inside-avoid">
-                  <DongheeAccessPassPermitTable items={page[1] ?? []} />
+              // 실제 인쇄해보니 90도 회전한 내용이 계산상 크기(190×277mm)보다 작게
+              // 나와서(정확한 원인 불명 — 배율 150%로 하면 딱 맞았음), 바깥에 zoom:1.5
+              // 래퍼를 하나 더 둬서 안쪽 회전 로직은 그대로 두고 전체를 1.5배 키움.
+              <div key={pageIdx} className="print:[zoom:1.5]">
+                <div
+                  className={`flex justify-between print:break-inside-avoid print:w-[277mm] print:h-[190mm] print:origin-top-left donghee-print-rotate ${
+                    pageIdx < dongheePages.length - 1 ? "print:break-after-page" : ""
+                  }`}
+                >
+                  <div className="w-[49%] min-w-0">
+                    <DongheeAccessPassPermitTable items={page[0]} />
+                  </div>
+                  <div className="w-px shrink-0 border-l border-dashed border-slate-300" />
+                  <div className="w-[49%] min-w-0 print:break-inside-avoid">
+                    <DongheeAccessPassPermitTable items={page[1] ?? []} />
+                  </div>
                 </div>
               </div>
             ))}
