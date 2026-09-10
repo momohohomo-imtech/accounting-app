@@ -685,14 +685,15 @@ export function TransactionForm({
                 닫기
               </button>
             </div>
+            {/* ProjectPicker는 "완료 프로젝트 보기" 체크·연도/현장 변경 시에도 값 초기화를
+                위해 onChange("")를 호출함 — 여기서 그때마다 팝업을 닫아버리면 실제 프로젝트를
+                고르기 전에 체크박스만 눌러도 팝업이 꺼지는 버그가 됨. 그래서 선택해도 자동으로
+                안 닫히게 하고, 위 "닫기" 버튼이나 바깥 클릭으로만 닫히게 함. */}
             <ProjectPicker
               sites={sites}
               projects={projects}
               value={lineItems[projectPopupIndex].project_id}
-              onChange={(v) => {
-                updateLineItem(projectPopupIndex, { project_id: v });
-                setProjectPopupIndex(null);
-              }}
+              onChange={(v) => updateLineItem(projectPopupIndex, { project_id: v })}
               label="프로젝트 (비워두면 상단 공통값 사용)"
             />
           </div>
