@@ -16,8 +16,8 @@ export default async function QualityConstructionPage({
     tab?: string;
     project_id?: string;
     year?: string;
-    client?: string;
     site_id?: string;
+    month?: string;
     copyFrom?: string;
     editFrom?: string;
     checklist?: string;
@@ -30,8 +30,8 @@ export default async function QualityConstructionPage({
     tab,
     project_id,
     year,
-    client,
     site_id,
+    month,
     copyFrom,
     editFrom,
     checklist,
@@ -48,9 +48,7 @@ export default async function QualityConstructionPage({
         <PageTabs basePath="/quality-construction" tabs={TABS} active={active} />
       </div>
       {active === "quality" && <QualityChecklistSection projectId={project_id} />}
-      {active === "construction" && (
-        <ConstructionMemoSection year={year} client={client} siteId={site_id} projectId={project_id} />
-      )}
+      {active === "construction" && <ConstructionMemoSection year={year} siteId={site_id} month={month} />}
       {active === "tools" && (
         <ToolListSection
           copyFrom={copyFrom}

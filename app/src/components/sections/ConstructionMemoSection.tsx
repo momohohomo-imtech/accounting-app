@@ -1,83 +1,79 @@
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { ConstructionMemoFilter } from "@/components/ConstructionMemoFilter";
-import type { ProjectTreeNode } from "@/components/ProjectTreeFilter";
 import { ConstructionMemoList } from "@/components/ConstructionMemoList";
+import type { ConstructionMemoProjectOption } from "@/components/ConstructionMemoFormPopup";
 import {
   createConstructionMemo,
   updateConstructionMemo,
   deleteConstructionMemo,
 } from "@/lib/actions/constructionMemos";
 
-type MemoRow = { id: string; content: string; created_at: string; updated_at: string; project_name?: string };
+type MemoRow = {
+  id: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  project_id: string;
+  project_name: string;
+  site_id: string;
+  site_name: string;
+};
 
 export async function ConstructionMemoSection({
   year,
-  client,
   siteId,
-  projectId,
+  month,
 }: {
   year?: string;
-  client?: string;
   siteId?: string;
-  projectId?: string;
+  month?: string;
 }) {
   const supabase = await createClient();
-  const { data: projectTree } = await supabase
-    .from("projects")
-    .select("id, name, year, site_id, sites(name, clients(name))")
-    .order("name");
+  const [{ data: projectsRaw }, { data: sites }, { data: memosRaw }] = await Promise.all([
+    supabase.from("projects").select("id, name, site_id, sites(name)").order("name"),
+    supabase.from("sites").select("id, name").order("name"),
+    supabase
+      .from("construction_memos")
+      .select("id, content, created_at, updated_at, project_id, projects(name, site_id, sites(name))")
+      .order("created_at", { ascending: false }),
+  ]);
 
-  const projectNodes: ProjectTreeNode[] = (projectTree ?? []).map((p) => {
-    const site = one(p.sites) as { name: string; clients?: unknown } | undefined;
-    const clientObj = one(site?.clients) as { name: string } | undefined;
+  const projectOptions: ConstructionMemoProjectOption[] = (projectsRaw ?? []).map((p) => {
+    const site = one(p.sites) as { name: string } | undefined;
+    return { id: p.id, name: p.name, siteName: site?.name ?? "미지정" };
+  });
+
+  const allMemos: MemoRow[] = (memosRaw ?? []).map((m) => {
+    const project = one(m.projects) as { name: string; site_id: string; sites?: unknown } | undefined;
+    const site = one(project?.sites) as { name: string } | undefined;
     return {
-      id: p.id,
-      name: p.name,
-      year: p.year,
-      siteId: p.site_id,
-      siteName: site?.name ?? "미지정",
-      clientName: clientObj?.name ?? null,
+      id: m.id,
+      content: m.content,
+      created_at: m.created_at,
+      updated_at: m.updated_at,
+      project_id: m.project_id,
+      project_name: project?.name ?? "(삭제된 프로젝트)",
+      site_id: project?.site_id ?? "",
+      site_name: site?.name ?? "미지정",
     };
   });
 
   // 파라미터가 아예 없으면(처음 진입) 올해를 기본으로 보여주고, "전체"는
   // 사용자가 명시적으로 골랐을 때만(URL에 year=all로 남음) 전체 연도를 보여줌.
-  const selectedYear = year ?? String(new Date().getFullYear());
-  const selectedClient = client ?? "all";
+  const currentYear = new Date().getFullYear();
+  const selectedYear = year ?? String(currentYear);
   const selectedSiteId = siteId ?? "all";
-  const selectedProjectId = projectId ?? "";
+  const selectedMonth = month ?? "all";
 
-  // 연도만 고르면 그 해 전체, 현장까지 고르면 그 현장 전체, 프로젝트까지 고르면
-  // 그 프로젝트만 — 단계별로 점점 좁혀서 메모를 모아 보여줌.
-  let scopedProjects = projectNodes;
-  if (selectedYear !== "all") scopedProjects = scopedProjects.filter((p) => String(p.year) === selectedYear);
-  if (selectedClient !== "all")
-    scopedProjects = scopedProjects.filter((p) => (p.clientName ?? "미지정") === selectedClient);
-  if (selectedSiteId !== "all") scopedProjects = scopedProjects.filter((p) => p.siteId === selectedSiteId);
-  if (selectedProjectId) scopedProjects = scopedProjects.filter((p) => p.id === selectedProjectId);
+  const years = Array.from(new Set(allMemos.map((m) => new Date(m.created_at).getFullYear())));
+  if (!years.includes(currentYear)) years.push(currentYear);
+  years.sort((a, b) => b - a);
 
-  const matchingProjectIds = scopedProjects.map((p) => p.id);
-  const projectNameById = new Map(projectNodes.map((p) => [p.id, p.name]));
-
-  const { data: memosRaw } =
-    matchingProjectIds.length > 0
-      ? await supabase
-          .from("construction_memos")
-          .select("id, content, created_at, updated_at, project_id")
-          .in("project_id", matchingProjectIds)
-          .order("created_at", { ascending: false })
-      : { data: [] as { id: string; content: string; created_at: string; updated_at: string; project_id: string }[] };
-
-  const memos: MemoRow[] = (memosRaw ?? []).map((m) => ({
-    id: m.id,
-    content: m.content,
-    created_at: m.created_at,
-    updated_at: m.updated_at,
-    // 프로젝트를 아직 특정하지 않고 연도/현장 단위로 모아볼 때만 어느 프로젝트
-    // 메모인지 표시(프로젝트를 이미 콕 집었으면 굳이 반복 표시 안 함).
-    project_name: selectedProjectId ? undefined : (projectNameById.get(m.project_id) ?? ""),
-  }));
+  let memos = allMemos;
+  if (selectedYear !== "all") memos = memos.filter((m) => new Date(m.created_at).getFullYear() === Number(selectedYear));
+  if (selectedSiteId !== "all") memos = memos.filter((m) => m.site_id === selectedSiteId);
+  if (selectedMonth !== "all") memos = memos.filter((m) => new Date(m.created_at).getMonth() + 1 === Number(selectedMonth));
 
   return (
     <div className="space-y-6">
@@ -85,27 +81,21 @@ export async function ConstructionMemoSection({
         <h2 className="mb-3 text-lg font-semibold text-slate-900">공사 메모 — 프로젝트별 진행 상황 기록</h2>
         <ConstructionMemoFilter
           basePath="/quality-construction"
-          projects={projectNodes}
+          years={years}
           selectedYear={selectedYear}
-          selectedClient={selectedClient}
+          sites={sites ?? []}
           selectedSiteId={selectedSiteId}
-          selectedProjectId={selectedProjectId}
+          selectedMonth={selectedMonth}
         />
       </div>
 
-      {matchingProjectIds.length === 0 ? (
-        <p className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-400">
-          조건에 맞는 프로젝트가 없습니다.
-        </p>
-      ) : (
-        <ConstructionMemoList
-          projectId={selectedProjectId || undefined}
-          memos={memos}
-          createAction={createConstructionMemo}
-          updateAction={updateConstructionMemo}
-          deleteAction={deleteConstructionMemo}
-        />
-      )}
+      <ConstructionMemoList
+        memos={memos}
+        projects={projectOptions}
+        createAction={createConstructionMemo}
+        updateAction={updateConstructionMemo}
+        deleteAction={deleteConstructionMemo}
+      />
     </div>
   );
 }
