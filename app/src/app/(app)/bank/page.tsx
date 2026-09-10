@@ -24,31 +24,31 @@ const accountFields: FieldConfig[] = [
 export default async function BankPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string; quarter?: string; month?: string; direction?: string }>;
+  searchParams: Promise<{ year?: string; period?: string; deposit?: string; withdrawal?: string }>;
 }) {
-  const { year, quarter, month, direction } = await searchParams;
+  const { year, period, deposit, withdrawal } = await searchParams;
   const supabase = await createClient();
   const currentYear = new Date().getFullYear();
   const selectedYear = year ? Number(year) : currentYear;
-  const selectedQuarter = quarter ?? "";
-  const selectedMonth = month ?? "";
-  const selectedDirection = direction ?? "";
+  const selectedPeriod = period ?? "";
+  const showDeposit = deposit !== "0";
+  const showWithdrawal = withdrawal !== "0";
 
   const pad = (n: number) => String(n).padStart(2, "0");
   let rangeStart = `${selectedYear}-01-01`;
   let rangeEnd = `${selectedYear}-12-31`;
-  if (selectedMonth) {
-    const m = Number(selectedMonth);
-    const lastDay = new Date(selectedYear, m, 0).getDate();
-    rangeStart = `${selectedYear}-${pad(m)}-01`;
-    rangeEnd = `${selectedYear}-${pad(m)}-${pad(lastDay)}`;
-  } else if (selectedQuarter) {
-    const q = Number(selectedQuarter);
+  if (selectedPeriod.startsWith("q")) {
+    const q = Number(selectedPeriod.slice(1));
     const startMonth = (q - 1) * 3 + 1;
     const endMonth = startMonth + 2;
     const lastDay = new Date(selectedYear, endMonth, 0).getDate();
     rangeStart = `${selectedYear}-${pad(startMonth)}-01`;
     rangeEnd = `${selectedYear}-${pad(endMonth)}-${pad(lastDay)}`;
+  } else if (selectedPeriod) {
+    const m = Number(selectedPeriod);
+    const lastDay = new Date(selectedYear, m, 0).getDate();
+    rangeStart = `${selectedYear}-${pad(m)}-01`;
+    rangeEnd = `${selectedYear}-${pad(m)}-${pad(lastDay)}`;
   }
 
   let transactionsQuery = supabase
@@ -57,7 +57,8 @@ export default async function BankPage({
     .gte("trans_date", rangeStart)
     .lte("trans_date", rangeEnd)
     .order("trans_date", { ascending: false });
-  if (selectedDirection) transactionsQuery = transactionsQuery.eq("direction", selectedDirection);
+  // 둘 다 체크(전체) 또는 둘 다 해제(빈 결과 방지)면 필터 안 걸고, 하나만 체크됐을 때만 그 방향으로 좁힌다.
+  if (showDeposit !== showWithdrawal) transactionsQuery = transactionsQuery.eq("direction", showDeposit ? "입금" : "출금");
 
   const [{ data: accounts }, { data: clients }, { data: transactions }, { data: allTx }, { data: firstTx }] = await Promise.all([
     supabase.from("bank_accounts").select("*").order("sort_order").order("created_at", { ascending: false }),
@@ -185,9 +186,9 @@ export default async function BankPage({
           <BankTransactionFilter
             years={years}
             selectedYear={selectedYear}
-            selectedQuarter={selectedQuarter}
-            selectedMonth={selectedMonth}
-            selectedDirection={selectedDirection}
+            selectedPeriod={selectedPeriod}
+            showDeposit={showDeposit}
+            showWithdrawal={showWithdrawal}
           />
         </div>
 
