@@ -47,10 +47,10 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
     // 마찬가지로 필터 연도로 한정.
     supabase
       .from("projects")
-      .select("id, quote_amount")
+      .select("id, name, quote_amount")
       .in("status", [PROJECT_STATUS_AWAITING_PAYMENT, "done"])
       .eq("year", year),
-    supabase.from("projects").select("id, quote_amount, status").eq("year", year),
+    supabase.from("projects").select("id, name, quote_amount, status").eq("year", year),
     // 프로젝트에 귀속되지 않은(project_id가 없는) 매입 거래 전체(연간) — 카테고리별로
     // "일반경비"(직원급여 제외)와 "직원급여/상여/4대보험"(payroll 관리 화면이 아니라
     // 매입매출장의 이 카테고리 기준으로 집계, employees/payroll 입력 누락과 무관하게 실측)로 나눠 씀.
@@ -305,6 +305,11 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
                 </p>
               </div>
             </DetailToggle>
+            {unbilledProjectsWithProfit.length > 0 && (
+              <p className="pl-4 text-xs text-blue-700">
+                {unbilledProjectsWithProfit.map((p) => p.name).join(", ")}
+              </p>
+            )}
           </>
         )}
       </div>
