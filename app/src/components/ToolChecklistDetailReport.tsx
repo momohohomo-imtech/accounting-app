@@ -184,9 +184,10 @@ export function ToolChecklistDetailReport({
           // 계속됨 — 예전처럼 왼쪽·오른쪽에 같은 내용을 복제하지 않음. 짝이 없는 마지막
           // 홀수 장은 예전엔 폭을 98%로 키운 "혼자" 레이아웃을 따로 뒀었는데, 페이지마다
           // 폭이 달라져 보이는 문제가 있었음 — 그래서 항상 오른쪽에 빈 양식(품목 없는
-          // DongheeAccessPassPermitTable)을 채워 넣어, 모든 페이지가 예외 없이 48%씩
-          // 2장 레이아웃을 쓰게 통일함. 가운데 절취선(인쇄에도 나옴 — 잘라 쓰라는
-          // 안내선)이 정확히 중앙(48%+2% 여백=50%)에 오도록 `justify-between`으로 배치.
+          // DongheeAccessPassPermitTable)을 채워 넣어, 모든 페이지가 예외 없이 49%씩
+          // 2장 레이아웃을 쓰게 통일함(둘을 합쳐 98% — 절취선 자리 2%가 물리적 한계치,
+          // 이 이상은 두 장이 겹침). 가운데 절취선(인쇄에도 나옴 — 잘라 쓰라는
+          // 안내선)이 정확히 중앙(49%+1% 여백=50%)에 오도록 `justify-between`으로 배치.
           <div className="space-y-4 print:space-y-0">
             {dongheePages.map((page, pageIdx) => (
               <div
@@ -195,11 +196,11 @@ export function ToolChecklistDetailReport({
                   pageIdx < dongheePages.length - 1 ? "print:break-after-page" : ""
                 }`}
               >
-                <div className="w-[48%] min-w-0">
+                <div className="w-[49%] min-w-0">
                   <DongheeAccessPassPermitTable items={page[0]} />
                 </div>
                 <div className="w-px shrink-0 border-l border-dashed border-slate-300" />
-                <div className="w-[48%] min-w-0 print:break-inside-avoid">
+                <div className="w-[49%] min-w-0 print:break-inside-avoid">
                   <DongheeAccessPassPermitTable items={page[1] ?? []} />
                 </div>
               </div>
