@@ -314,7 +314,7 @@ export async function ToolListSection({
 
       {(detailChecklist || isBlankForm) && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:static print:overflow-visible print:bg-transparent print:p-0">
-          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:p-0 print:shadow-none">
+          <div className="w-full max-w-[210mm] rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:p-0 print:shadow-none">
             <ToolChecklistDetailReport
               title={detailChecklist ? detailChecklist.title : "공구명세서 양식"}
               helperCount={detailChecklist ? (detailChecklist.helper_count ?? null) : null}
