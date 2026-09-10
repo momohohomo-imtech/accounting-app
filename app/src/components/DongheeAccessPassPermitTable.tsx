@@ -87,17 +87,17 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
         <colgroup>
           <col style={{ width: "8%" }} />
           <col style={{ width: "27%" }} />
-          <col style={{ width: "10%" }} />
+          <col style={{ width: "12%" }} />
           <col style={{ width: "22%" }} />
-          <col style={{ width: "33%" }} />
+          <col style={{ width: "31%" }} />
         </colgroup>
         <thead>
           <tr style={{ textAlign: "center" }}>
-            <td style={{ ...labelStyle(7.2, 4.05), padding: "0 1mm" }}>NO</td>
-            <td style={labelStyle(7.2, 4.05)}>품명</td>
-            <td style={labelStyle(7.2, 4.05)}>단위</td>
-            <td style={labelStyle(7.2, 4.05)}>수량</td>
-            <td style={labelStyle(7.2, 4.05)}>비고(부번/SER.NO)</td>
+            <td style={{ ...labelStyle(7.2, 3.8), padding: "0 1mm" }}>NO</td>
+            <td style={labelStyle(7.2, 3.8)}>품명</td>
+            <td style={labelStyle(7.2, 3.8)}>단위</td>
+            <td style={labelStyle(7.2, 3.8)}>수량</td>
+            <td style={labelStyle(7.2, 3.8)}>비고(부번/SER.NO)</td>
           </tr>
         </thead>
         <tbody>
