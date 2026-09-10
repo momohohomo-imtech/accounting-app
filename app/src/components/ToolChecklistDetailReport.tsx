@@ -147,6 +147,11 @@ export function ToolChecklistDetailReport({
               동희 반입반출증
             </label>
           )}
+          {formMode === "donghee" && (
+            <span className="text-xs font-medium text-amber-600">
+              ⚠ 인쇄 대화상자에서 용지 방향을 반드시 &quot;가로&quot;로 선택해주세요
+            </span>
+          )}
           <PrintButton />
           <Button variant="secondary" size="xs" onClick={handleExcel}>
             엑셀 다운로드
@@ -178,8 +183,10 @@ export function ToolChecklistDetailReport({
           <p className="py-6 text-center text-slate-400">반입반출증용으로 표시된 품목이 없습니다.</p>
         ) : (
           // 동희오토 양식은 원래 A5 규격이라, 인쇄 시 용지를 가로로 돌려 왼쪽/오른쪽에
-          // 2장씩 들어가게 배치함(용지 방향 전환은 globals.css의
-          // .print-donghee-landscape). 품목이 5개(장당 고정 줄 수)를 넘으면 왼쪽·오른쪽에
+          // 2장씩 들어가게 배치함 — 예전엔 이걸 CSS(@page 이름 지정)로 자동 전환했는데,
+          // 크롬이 세로↔가로 페이지를 오갈 때마다 빈 페이지를 끼워 넣는 문제가 있어서
+          // (globals.css 참고) 포기하고, 아래 안내문구로 사용자가 인쇄 대화상자에서
+          // 직접 "가로"를 선택하게 함. 품목이 5개(장당 고정 줄 수)를 넘으면 왼쪽·오른쪽에
           // 서로 다른 품목을 담은 다음 장으로 이어지고, 그래도 남으면 다음 페이지로
           // 계속됨 — 예전처럼 왼쪽·오른쪽에 같은 내용을 복제하지 않음. 짝이 없는 마지막
           // 홀수 장은 예전엔 폭을 98%로 키운 "혼자" 레이아웃을 따로 뒀었는데, 페이지마다
@@ -192,7 +199,7 @@ export function ToolChecklistDetailReport({
             {dongheePages.map((page, pageIdx) => (
               <div
                 key={pageIdx}
-                className={`print-donghee-landscape flex justify-between print:break-inside-avoid ${
+                className={`flex justify-between print:break-inside-avoid ${
                   pageIdx < dongheePages.length - 1 ? "print:break-after-page" : ""
                 }`}
               >

@@ -38,16 +38,15 @@ textarea {
   margin: 10mm;
 }
 
-/* 동희 반입반출증(A5 양식 2장을 A4 한 장에 좌우로 배치)만 인쇄 시 용지를 가로로
-   돌림 — 이 페이지에 한해서만 적용되도록 이 이름이 붙은 요소에만
-   `page: donghee-landscape`로 연결(.print-donghee-landscape, ToolChecklistDetailReport). */
-@page donghee-landscape {
-  size: A4 landscape;
-  margin: 10mm;
-}
-.print-donghee-landscape {
-  page: donghee-landscape;
-}
+/* 동희 반입반출증(A5 양식 2장을 A4 한 장에 좌우로 배치)은 예전엔 이름 붙은
+   `@page donghee-landscape { size: A4 landscape }`로 이 부분만 자동으로 용지를
+   가로로 돌렸었는데, 크롬이 기본(세로) 페이지에서 이 가로 페이지로 들어가고
+   나올 때마다 빈 페이지를 하나씩 끼워 넣는 문제가 있었음(예: 실제로는 2페이지면
+   되는데 앞뒤로 빈 페이지가 붙어서 4장이 찍힘) — 크롬 인쇄 엔진 자체의 한계라
+   CSS로는 못 고침. 그래서 자동 방향 전환을 포기하고, 인쇄 대화상자에서 사용자가
+   직접 "가로"를 선택하도록 안내함(ToolChecklistDetailReport의 동희 모드 안내
+   문구 참고) — 이러면 페이지 전체가 처음부터 끝까지 같은 방향이라 빈 페이지가
+   안 생김. */
 
 @media print {
   aside {
