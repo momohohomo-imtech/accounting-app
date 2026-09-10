@@ -10,7 +10,7 @@ import {
   deletePayrollRecord,
 } from "@/lib/actions/employees";
 import type { FieldConfig } from "@/components/crud/types";
-import { PayrollForm } from "@/components/PayrollForm";
+import { PayrollRegisterPopup } from "@/components/PayrollRegisterPopup";
 import { PayrollTable } from "@/components/PayrollTable";
 import { PayrollImport } from "@/components/PayrollImport";
 import { PayslipView } from "@/components/PayslipView";
@@ -126,12 +126,12 @@ export default async function EmployeesPage({
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="mb-3 font-semibold text-slate-900">급여 지급 등록</h2>
-          <PayrollForm employees={employeeOptions} action={createPayrollRecord} />
-
-          <div className="mb-3 mt-6 flex items-center justify-between">
-            <h3 className="font-semibold text-slate-900">급여 지급 이력</h3>
-            <YearFilter basePath="/employees" years={payrollYears} selectedYear={selectedYear} />
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-semibold text-slate-900">급여 지급 이력</h2>
+            <div className="flex items-center gap-3">
+              <YearFilter basePath="/employees" years={payrollYears} selectedYear={selectedYear} />
+              <PayrollRegisterPopup employees={employeeOptions} action={createPayrollRecord} />
+            </div>
           </div>
 
           <div className="overflow-x-auto">

@@ -1167,3 +1167,15 @@ SCALE=4로도 "좌우는 됐는데 상하로는 아직 많이 작다"며, "스�
   100%를 넘어감) — `ToolChecklistDetailReport.tsx`에서 `page[1]` 유무로
   분기.
 - 미검증(로그인 세션 없음), 빌드/린트만 통과.
+
+### 직원/급여 — 급여 지급 등록을 팝업으로 변경
+항상 펼쳐져 있던 `PayrollForm`(직원/급여 페이지의 "급여 지급 등록" 섹션)을,
+"+ 급여 지급 등록" 버튼을 누르면 뜨는 모달 팝업으로 바꿈. 새 컴포넌트
+`PayrollRegisterPopup.tsx`가 버튼 상태(`open`)와 `ModalPortal` +
+`useEscapeKey`를 관리하고, 기존 `PayrollForm`을 그대로 감싸 씀(등록 성공 시
+`setOpen(false)`로 자동 닫힘, 취소도 동일 — `PayrollTable`의 인라인 수정
+폼에서 쓰던 것과 같은 패턴). `employees/page.tsx`는 "급여 지급 이력" 헤더
+줄에 연도 필터와 이 버튼을 나란히 배치하도록 정리함.
+- 빌드/린트 통과(node_modules 새로 설치해서 확인, `package-lock.json` 변경은
+  되돌림 — 기존 lockfile 유지). 미검증(로그인 세션 없음) — 다음 세션에서
+  실제로 버튼→팝업→등록→목록 반영까지 확인할 것.
