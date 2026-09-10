@@ -1,6 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { CreatePanel } from "@/components/crud/CreatePanel";
-import { EntityTable } from "@/components/crud/EntityTable";
 import {
   createBankAccountRecord,
   updateBankAccountRecord,
@@ -9,10 +7,9 @@ import {
 import type { FieldConfig } from "@/components/crud/types";
 import { formatWon } from "@/lib/format";
 import { BankTransactionTable } from "@/components/BankTransactionTable";
-import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { BankTransactionFilter } from "@/components/BankTransactionFilter";
-import { BankTransactionForm } from "@/components/BankTransactionForm";
-import { BankTransferForm } from "@/components/BankTransferForm";
+import { BankAccountsPopup } from "@/components/BankAccountsPopup";
+import { BankEntryPopup } from "@/components/BankEntryPopup";
 
 const accountFields: FieldConfig[] = [
   { name: "bank_name", label: "은행명", required: true },
@@ -103,14 +100,23 @@ export default async function BankPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h1 className="text-2xl font-bold text-slate-900">은행 계좌 / 거래내역</h1>
-        <p className="text-sm text-slate-500">
-          총 잔액 합계{" "}
-          <span className={`font-mono text-base font-bold ${totalBalance < 0 ? "text-red-600" : "text-slate-900"}`}>
-            {formatWon(totalBalance)}
-          </span>
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h1 className="text-2xl font-bold text-slate-900">은행 계좌 / 거래내역</h1>
+          <p className="text-sm text-slate-500">
+            총 잔액 합계{" "}
+            <span className={`font-mono text-base font-bold ${totalBalance < 0 ? "text-red-600" : "text-slate-900"}`}>
+              {formatWon(totalBalance)}
+            </span>
+          </p>
+        </div>
+        <BankAccountsPopup
+          fields={accountFields}
+          accounts={accounts ?? []}
+          createAction={createBankAccountRecord}
+          updateAction={updateBankAccountRecord}
+          deleteAction={deleteBankAccountRecord}
+        />
       </div>
 
       {(accounts ?? []).length > 0 && (
@@ -129,38 +135,24 @@ export default async function BankPage({
         </div>
       )}
 
-      <CreatePanel title="은행 계좌" fields={accountFields} createAction={createBankAccountRecord} />
-
-      <CollapsibleSection title="계좌 목록" defaultOpen={false}>
-        <EntityTable
-          fields={accountFields}
-          rows={accounts ?? []}
-          updateAction={updateBankAccountRecord}
-          deleteAction={deleteBankAccountRecord}
-        />
-      </CollapsibleSection>
-
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <BankTransferForm accounts={(accounts ?? []).map((a) => ({ id: a.id, name: a.nickname ?? a.bank_name }))} />
-      </div>
-
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <BankTransactionForm
-          accounts={(accounts ?? []).map((a) => ({ id: a.id, name: a.nickname ?? a.bank_name }))}
-          clients={clients ?? []}
-        />
-
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-semibold text-slate-900">거래내역</h2>
-          <BankTransactionFilter
-            years={years}
-            selectedYear={selectedYear}
-            selectedPeriod={selectedPeriod}
-            showDeposit={showDeposit}
-            showWithdrawal={showWithdrawal}
-            accounts={(accounts ?? []).map((a) => ({ id: a.id, name: a.nickname ?? a.bank_name }))}
-            excludedAccountIds={excludedAccountIds}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <BankTransactionFilter
+              years={years}
+              selectedYear={selectedYear}
+              selectedPeriod={selectedPeriod}
+              showDeposit={showDeposit}
+              showWithdrawal={showWithdrawal}
+              accounts={(accounts ?? []).map((a) => ({ id: a.id, name: a.nickname ?? a.bank_name }))}
+              excludedAccountIds={excludedAccountIds}
+            />
+            <BankEntryPopup
+              accounts={(accounts ?? []).map((a) => ({ id: a.id, name: a.nickname ?? a.bank_name }))}
+              clients={clients ?? []}
+            />
+          </div>
         </div>
 
         <div className="mt-3 overflow-x-auto">

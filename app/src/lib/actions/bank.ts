@@ -121,6 +121,69 @@ export async function createBankTransferRecord(formData: FormData) {
   revalidatePath("/bank");
 }
 
+// 은행 거래내역 체크박스 ON — 매입/매출장(transactions)에 "분류 대기 중" 상태로 자동 등록.
+// 출금이면 매입, 입금이면 매출로 넣는다. 계좌 간 이체 건은 실제 매입/매출이 아니라 올릴 수 없음.
+export async function promoteBankTransactionToLedger(formData: FormData) {
+  const supabase = await createClient();
+  const id = String(formData.get("id"));
+
+  const { data: bankTx } = await supabase
+    .from("bank_transactions")
+    .select("*, bank_accounts(nickname, bank_name)")
+    .eq("id", id)
+    .maybeSingle();
+  if (!bankTx) return { error: "거래내역을 찾을 수 없습니다." };
+  if (bankTx.promoted_transaction_id) return {};
+  if (bankTx.transfer_group_id) return { error: "계좌 간 이체 내역은 매입/매출장으로 올릴 수 없습니다." };
+
+  const isPurchase = bankTx.direction === "출금";
+  const accountName = bankTx.bank_accounts?.nickname ?? bankTx.bank_accounts?.bank_name ?? "";
+
+  const { data: inserted, error } = await supabase
+    .from("transactions")
+    .insert({
+      trans_date: bankTx.trans_date,
+      type: isPurchase ? "매입" : "매출",
+      client_id: bankTx.matched_client_id,
+      client_name_raw: bankTx.matched_client_name_raw,
+      item_name: bankTx.description,
+      purchase_amount: isPurchase ? bankTx.amount : 0,
+      purchase_vat: 0,
+      sales_amount: isPurchase ? 0 : bankTx.amount,
+      sales_vat: 0,
+      payment_type: "immediate",
+      vat_included: false,
+      tax_invoice_issued: false,
+      needs_classification: true,
+      note1: `[은행] ${accountName}`,
+    })
+    .select("id")
+    .single();
+  if (error || !inserted) return { error: error?.message ?? "매입/매출장 등록에 실패했습니다." };
+
+  await supabase.from("bank_transactions").update({ promoted_transaction_id: inserted.id }).eq("id", id);
+  revalidatePath("/bank");
+  revalidatePath("/transactions");
+}
+
+// 체크 해제 — 자동으로 만들어졌던 매입/매출장 내역을 같이 지운다.
+export async function unpromoteBankTransactionFromLedger(formData: FormData) {
+  const supabase = await createClient();
+  const id = String(formData.get("id"));
+
+  const { data: bankTx } = await supabase
+    .from("bank_transactions")
+    .select("promoted_transaction_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (bankTx?.promoted_transaction_id) {
+    await supabase.from("transactions").delete().eq("id", bankTx.promoted_transaction_id);
+    await supabase.from("bank_transactions").update({ promoted_transaction_id: null }).eq("id", id);
+  }
+  revalidatePath("/bank");
+  revalidatePath("/transactions");
+}
+
 export async function updateBankTransactionRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
@@ -132,7 +195,15 @@ export async function deleteBankTransactionRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
 
-  const { data: row } = await supabase.from("bank_transactions").select("transfer_group_id").eq("id", id).maybeSingle();
+  const { data: row } = await supabase
+    .from("bank_transactions")
+    .select("transfer_group_id, promoted_transaction_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (row?.promoted_transaction_id) {
+    // 매입/매출장으로 올라가 있던 자동 등록 내역도 같이 지운다.
+    await supabase.from("transactions").delete().eq("id", row.promoted_transaction_id);
+  }
   if (row?.transfer_group_id) {
     // 이체로 자동 생성된 짝이 있으면 같이 지운다 — 한쪽만 남으면 잔액이 어긋나므로.
     await supabase.from("bank_transactions").delete().eq("transfer_group_id", row.transfer_group_id);
@@ -140,4 +211,5 @@ export async function deleteBankTransactionRecord(formData: FormData) {
     await supabase.from("bank_transactions").delete().eq("id", id);
   }
   revalidatePath("/bank");
+  revalidatePath("/transactions");
 }

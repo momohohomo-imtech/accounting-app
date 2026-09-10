@@ -1,7 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { updateBankTransactionRecord, deleteBankTransactionRecord } from "@/lib/actions/bank";
+import {
+  updateBankTransactionRecord,
+  deleteBankTransactionRecord,
+  promoteBankTransactionToLedger,
+  unpromoteBankTransactionFromLedger,
+} from "@/lib/actions/bank";
 import { formatWon, formatDate } from "@/lib/format";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
@@ -17,6 +22,7 @@ type BankTxRow = {
   matched_client_id: string | null;
   matched_client_name_raw: string | null;
   transfer_group_id: string | null;
+  promoted_transaction_id: string | null;
   bank_accounts?: { nickname: string | null; bank_name: string } | null;
   clients?: { name: string } | null;
 };
@@ -104,6 +110,14 @@ export function BankTransactionTable({
     await pending.run(() => Promise.resolve(deleteBankTransactionRecord(fd)));
   }
 
+  async function handleTogglePromote(id: string, checked: boolean) {
+    const fd = new FormData();
+    fd.append("id", id);
+    await pending.run(() =>
+      Promise.resolve(checked ? promoteBankTransactionToLedger(fd) : unpromoteBankTransactionFromLedger(fd))
+    );
+  }
+
   return (
     <table className="w-full min-w-[700px] text-sm">
       <thead>
@@ -114,6 +128,7 @@ export function BankTransactionTable({
           <th className="pb-2 pr-4">{headerButton("description", "내용")}</th>
           <th className="pb-2 pr-4">{headerButton("client", "매칭 거래처")}</th>
           <th className="pb-2 pr-4 text-right">{headerButton("amount", "금액")}</th>
+          <th className="pb-2 pr-4 text-center">매입/매출장</th>
           <th className="pb-2 text-right">관리</th>
         </tr>
       </thead>
@@ -121,7 +136,7 @@ export function BankTransactionTable({
         {sorted.map((t) =>
           editingId === t.id ? (
             <tr key={t.id} className="border-b border-slate-100 bg-slate-50 last:border-0">
-              <td colSpan={7} className="py-3 pr-4">
+              <td colSpan={8} className="py-3 pr-4">
                 <form onSubmit={handleSaveEdit} className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-6">
                   <input type="hidden" name="id" value={t.id} />
                   <select name="bank_account_id" required defaultValue={t.bank_account_id} className={inputClass}>
@@ -182,6 +197,21 @@ export function BankTransactionTable({
               <td className="py-2 pr-4 text-slate-700">{t.description ?? "-"}</td>
               <td className="py-2 pr-4 text-slate-700">{t.clients?.name ?? t.matched_client_name_raw ?? "-"}</td>
               <td className="py-2 pr-4 text-right font-medium text-slate-900">{formatWon(t.amount)}</td>
+              <td className="py-2 pr-4 text-center">
+                {t.transfer_group_id ? (
+                  <span className="text-xs text-slate-300" title="계좌 간 이체 내역은 올릴 수 없습니다">
+                    -
+                  </span>
+                ) : (
+                  <input
+                    type="checkbox"
+                    checked={Boolean(t.promoted_transaction_id)}
+                    onChange={(e) => handleTogglePromote(t.id, e.target.checked)}
+                    className="h-4 w-4"
+                    title="체크하면 매입/매출장에 분류 대기 중으로 자동 등록됩니다"
+                  />
+                )}
+              </td>
               <td className="py-2 text-right">
                 <div className="flex justify-end gap-1">
                   <button
@@ -205,7 +235,7 @@ export function BankTransactionTable({
         )}
         {sorted.length === 0 && (
           <tr>
-            <td colSpan={7} className="py-6 text-center text-slate-400">
+            <td colSpan={8} className="py-6 text-center text-slate-400">
               거래내역이 없습니다.
             </td>
           </tr>
