@@ -16,6 +16,8 @@ import { LinkButton } from "@/components/ui/Button";
 import { PROJECT_STATUS_OPTIONS, PROJECT_STATUS_COLLECTED, PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
 import { formatWon } from "@/lib/format";
 import { ProjectListExportButtons } from "@/components/ProjectListExportButtons";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
+import { ProjectsPageMemo } from "@/components/ProjectsPageMemo";
 
 const TABS = [
   { key: "list", label: "프로젝트" },
@@ -80,12 +82,14 @@ async function ProjectListSection({
   if (siteId) projectsQuery = projectsQuery.eq("site_id", siteId);
   if (statusList.length > 0) projectsQuery = projectsQuery.in("status", statusList);
 
-  const [{ data: sites }, { data: allProjects }, { data: projects }, { data: allYears }] = await Promise.all([
-    supabase.from("sites").select("id, name, clients(name)").order("name"),
-    supabase.from("projects").select("id, name, year, site_id"),
-    projectsQuery,
-    supabase.from("projects").select("year"),
-  ]);
+  const [{ data: sites }, { data: allProjects }, { data: projects }, { data: allYears }, { data: pageMemo }] =
+    await Promise.all([
+      supabase.from("sites").select("id, name, clients(name)").order("name"),
+      supabase.from("projects").select("id, name, year, site_id"),
+      projectsQuery,
+      supabase.from("projects").select("year"),
+      supabase.from("projects_page_memo").select("content").maybeSingle(),
+    ]);
 
   const siteOptions = (sites ?? []).map((s) => {
     const clientName = (one(s.clients) as { name: string } | undefined)?.name;
@@ -287,13 +291,18 @@ async function ProjectListSection({
     <div className="space-y-6">
       <div className={report ? "space-y-6 print:hidden" : "space-y-6"}>
         {awaitingPaymentProjects.length > 0 && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 print:hidden">
-            <p className="text-xs text-red-600">
-              공사완료 예상 미수액 (완료 수금대기 {awaitingPaymentProjects.length}건의 수주액 합계)
-            </p>
+          <CollapsibleSection
+            bare
+            defaultOpen={false}
+            title={<span className="text-red-600">공사완료 예상 미수액</span>}
+            className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 print:hidden"
+          >
+            <p className="text-xs text-red-600">완료 수금대기 {awaitingPaymentProjects.length}건의 수주액 합계</p>
             <p className="mt-1 font-mono text-xl font-bold text-red-600">{formatWon(awaitingPaymentContractSum)}</p>
-          </div>
+          </CollapsibleSection>
         )}
+
+        <ProjectsPageMemo initialContent={pageMemo?.content ?? ""} />
 
         <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
           <YearFilter
