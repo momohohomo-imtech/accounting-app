@@ -78,12 +78,22 @@ export default async function BankPage({
   if (showDeposit !== showWithdrawal) transactionsQuery = transactionsQuery.eq("direction", showDeposit ? "입금" : "출금");
   if (excludedSet.size > 0) transactionsQuery = transactionsQuery.in("bank_account_id", includedAccountIds);
 
-  const [{ data: clients }, { data: transactions }, { data: allTx }, { data: firstTx }] = await Promise.all([
-    supabase.from("clients").select("id, name").order("name"),
-    transactionsQuery,
-    supabase.from("bank_transactions").select("bank_account_id, direction, amount"),
-    supabase.from("bank_transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
-  ]);
+  const [{ data: clients }, { data: transactions }, { data: allTx }, { data: firstTx }, { data: rawNames }] =
+    await Promise.all([
+      supabase.from("clients").select("id, name").order("name"),
+      transactionsQuery,
+      supabase.from("bank_transactions").select("bank_account_id, direction, amount"),
+      supabase.from("bank_transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
+      supabase.from("bank_transactions").select("matched_client_name_raw").not("matched_client_name_raw", "is", null),
+    ]);
+
+  // 자동완성 목록 = 등록된 거래처 이름 + 예전에 수기로 직접 입력했던 이름들(등록 안 된 것 포함).
+  const nameSuggestions = Array.from(
+    new Set([
+      ...(clients ?? []).map((c) => c.name),
+      ...(rawNames ?? []).map((r) => r.matched_client_name_raw).filter((n): n is string => Boolean(n)),
+    ])
+  ).sort((a, b) => a.localeCompare(b));
 
   const firstYear = Math.min(
     firstTx?.[0]?.trans_date ? Number(firstTx[0].trans_date.slice(0, 4)) : currentYear,
@@ -154,6 +164,7 @@ export default async function BankPage({
             <BankEntryPopup
               accounts={(accounts ?? []).map((a) => ({ id: a.id, name: a.nickname ?? a.bank_name }))}
               clients={clients ?? []}
+              nameSuggestions={nameSuggestions}
             />
           </div>
         </div>
@@ -163,6 +174,7 @@ export default async function BankPage({
             transactions={transactions ?? []}
             accounts={(accounts ?? []).map((a) => ({ id: a.id, name: a.nickname ?? a.bank_name }))}
             clients={clients ?? []}
+            nameSuggestions={nameSuggestions}
           />
         </div>
       </div>

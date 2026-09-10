@@ -6,6 +6,7 @@
 // 네이티브 form(FormData) 제출용이라 부모 <form onSubmit>에서 new FormData(form)으로 읽으면 된다.
 export function MatchedClientField({
   clients,
+  nameSuggestions,
   defaultClientId,
   defaultNameRaw,
   selectClassName,
@@ -13,12 +14,15 @@ export function MatchedClientField({
   datalistId = "matched-client-name-suggestions",
 }: {
   clients: { id: string; name: string }[];
+  /** 자동완성 목록 — 등록된 거래처 이름 + 예전에 수기로 입력했던 이름들. 안 주면 clients 이름만 씀. */
+  nameSuggestions?: string[];
   defaultClientId?: string | null;
   defaultNameRaw?: string | null;
   selectClassName?: string;
   inputClassName?: string;
   datalistId?: string;
 }) {
+  const suggestions = nameSuggestions ?? clients.map((c) => c.name);
   return (
     <div className="contents">
       <input
@@ -37,8 +41,8 @@ export function MatchedClientField({
         ))}
       </select>
       <datalist id={datalistId}>
-        {clients.map((c) => (
-          <option key={c.id} value={c.name} />
+        {suggestions.map((name) => (
+          <option key={name} value={name} />
         ))}
       </datalist>
     </div>

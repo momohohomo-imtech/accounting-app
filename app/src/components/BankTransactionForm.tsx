@@ -31,9 +31,11 @@ function emptyRow(defaultAccountId: string): Row {
 export function BankTransactionForm({
   accounts,
   clients,
+  nameSuggestions,
 }: {
   accounts: { id: string; name: string }[];
   clients: { id: string; name: string }[];
+  nameSuggestions: string[];
 }) {
   const confirm = useConfirm();
   const pending = useGlobalPending();
@@ -107,8 +109,8 @@ export function BankTransactionForm({
       </div>
 
       <datalist id={CLIENT_NAMES_DATALIST_ID}>
-        {clients.map((c) => (
-          <option key={c.id} value={c.name} />
+        {nameSuggestions.map((name) => (
+          <option key={name} value={name} />
         ))}
       </datalist>
 

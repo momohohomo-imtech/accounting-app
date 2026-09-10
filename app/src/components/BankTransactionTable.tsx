@@ -54,10 +54,12 @@ export function BankTransactionTable({
   transactions,
   accounts,
   clients,
+  nameSuggestions,
 }: {
   transactions: BankTxRow[];
   accounts: Option[];
   clients: Option[];
+  nameSuggestions: string[];
 }) {
   const confirm = useConfirm();
   const pending = useGlobalPending();
@@ -180,6 +182,7 @@ export function BankTransactionTable({
                   <input name="description" defaultValue={t.description ?? ""} placeholder="내용" className={inputClass} />
                   <MatchedClientField
                     clients={clients}
+                    nameSuggestions={nameSuggestions}
                     defaultClientId={t.matched_client_id}
                     defaultNameRaw={t.matched_client_name_raw}
                     selectClassName={inputClass}

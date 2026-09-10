@@ -10,9 +10,11 @@ import { cx } from "@/lib/cx";
 export function BankEntryPopup({
   accounts,
   clients,
+  nameSuggestions,
 }: {
   accounts: { id: string; name: string }[];
   clients: { id: string; name: string }[];
+  nameSuggestions: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"entry" | "transfer">("entry");
@@ -58,7 +60,7 @@ export function BankEntryPopup({
               </div>
 
               {tab === "entry" ? (
-                <BankTransactionForm accounts={accounts} clients={clients} />
+                <BankTransactionForm accounts={accounts} clients={clients} nameSuggestions={nameSuggestions} />
               ) : (
                 <BankTransferForm accounts={accounts} />
               )}
