@@ -129,7 +129,7 @@ export async function promoteBankTransactionToLedger(formData: FormData) {
 
   const { data: bankTx } = await supabase
     .from("bank_transactions")
-    .select("*, bank_accounts(nickname, bank_name)")
+    .select("*, bank_accounts(nickname, bank_name), clients(name)")
     .eq("id", id)
     .maybeSingle();
   if (!bankTx) return { error: "거래내역을 찾을 수 없습니다." };
@@ -138,6 +138,8 @@ export async function promoteBankTransactionToLedger(formData: FormData) {
 
   const isPurchase = bankTx.direction === "출금";
   const accountName = bankTx.bank_accounts?.nickname ?? bankTx.bank_accounts?.bank_name ?? "";
+  // 매칭 거래처 이름을 품목으로 — 매칭 거래처가 없으면 내용(적요)으로 대신한다.
+  const matchedClientName = bankTx.clients?.name ?? bankTx.matched_client_name_raw ?? null;
 
   const { data: inserted, error } = await supabase
     .from("transactions")
@@ -146,7 +148,7 @@ export async function promoteBankTransactionToLedger(formData: FormData) {
       type: isPurchase ? "매입" : "매출",
       client_id: bankTx.matched_client_id,
       client_name_raw: bankTx.matched_client_name_raw,
-      item_name: bankTx.description,
+      item_name: matchedClientName ?? bankTx.description,
       purchase_amount: isPurchase ? bankTx.amount : 0,
       purchase_vat: 0,
       sales_amount: isPurchase ? 0 : bankTx.amount,
@@ -155,7 +157,7 @@ export async function promoteBankTransactionToLedger(formData: FormData) {
       vat_included: false,
       tax_invoice_issued: false,
       needs_classification: true,
-      note1: `[은행] ${accountName}`,
+      note1: `[은행] ${accountName}${bankTx.description ? ` · ${bankTx.description}` : ""}`,
     })
     .select("id")
     .single();
