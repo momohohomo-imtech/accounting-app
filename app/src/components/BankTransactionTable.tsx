@@ -162,7 +162,7 @@ export function BankTransactionTable({
           editingId === t.id ? (
             <tr key={t.id} className="border-b border-slate-100 bg-slate-50 last:border-0">
               <td colSpan={8} className="py-3 pr-4">
-                <form onSubmit={handleSaveEdit} className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-6">
+                <form onSubmit={handleSaveEdit} className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-7">
                   <input type="hidden" name="id" value={t.id} />
                   <select name="bank_account_id" required defaultValue={t.bank_account_id} className={inputClass}>
                     {accounts.map((a) => (
@@ -185,7 +185,7 @@ export function BankTransactionTable({
                     selectClassName={inputClass}
                     inputClassName={inputClass}
                   />
-                  <div className="flex gap-2 lg:col-span-6">
+                  <div className="flex gap-2 lg:col-span-7">
                     <button
                       type="submit"
                       className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-700"

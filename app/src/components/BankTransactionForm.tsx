@@ -5,16 +5,16 @@ import { createBankTransactionsBulk } from "@/lib/actions/bank";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
-const MANUAL = "__manual__";
-const inputClass = "rounded-lg border border-slate-300 px-3 py-2 text-sm";
+const inputClass = "shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-sm";
+const CLIENT_NAMES_DATALIST_ID = "bank-transaction-client-names";
 
 type Row = {
   bank_account_id: string;
   direction: "입금" | "출금";
   amount: string;
   description: string;
-  clientMode: string;
   matched_client_name_raw: string;
+  matched_client_id: string;
 };
 
 function emptyRow(defaultAccountId: string): Row {
@@ -23,8 +23,8 @@ function emptyRow(defaultAccountId: string): Row {
     direction: "입금",
     amount: "",
     description: "",
-    clientMode: MANUAL,
     matched_client_name_raw: "",
+    matched_client_id: "",
   };
 }
 
@@ -65,8 +65,8 @@ export function BankTransactionForm({
       direction: r.direction,
       amount: Number(r.amount) || 0,
       description: r.description.trim() || null,
-      matched_client_id: r.clientMode === MANUAL ? null : r.clientMode,
-      matched_client_name_raw: r.clientMode === MANUAL ? r.matched_client_name_raw.trim() || null : null,
+      matched_client_id: r.matched_client_id || null,
+      matched_client_name_raw: r.matched_client_id ? null : r.matched_client_name_raw.trim() || null,
     }));
 
     const fd = new FormData();
@@ -106,14 +106,20 @@ export function BankTransactionForm({
         />
       </div>
 
-      <div className="space-y-2">
+      <datalist id={CLIENT_NAMES_DATALIST_ID}>
+        {clients.map((c) => (
+          <option key={c.id} value={c.name} />
+        ))}
+      </datalist>
+
+      <div className="space-y-2 overflow-x-auto">
         {rows.map((r, i) => (
-          <div key={i} className="grid grid-cols-1 gap-2 rounded-lg border border-slate-100 p-3 sm:grid-cols-2 lg:grid-cols-6">
+          <div key={i} className="flex flex-nowrap items-center gap-2 rounded-lg border border-slate-100 p-3">
             <select
               value={r.bank_account_id}
               onChange={(e) => updateRow(i, { bank_account_id: e.target.value })}
               required
-              className={inputClass}
+              className={`${inputClass} w-28`}
             >
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>
@@ -124,52 +130,49 @@ export function BankTransactionForm({
             <select
               value={r.direction}
               onChange={(e) => updateRow(i, { direction: e.target.value as "입금" | "출금" })}
-              className={inputClass}
+              className={`${inputClass} w-20`}
             >
               <option value="입금">입금</option>
               <option value="출금">출금</option>
             </select>
+            <input
+              value={r.description}
+              onChange={(e) => updateRow(i, { description: e.target.value })}
+              placeholder="내용"
+              className={`${inputClass} w-32`}
+            />
             <input
               type="number"
               value={r.amount}
               onChange={(e) => updateRow(i, { amount: e.target.value })}
               placeholder="금액"
               required
-              className={inputClass}
+              className={`${inputClass} w-28`}
             />
             <input
-              value={r.description}
-              onChange={(e) => updateRow(i, { description: e.target.value })}
-              placeholder="내용"
-              className={inputClass}
+              value={r.matched_client_name_raw}
+              onChange={(e) => updateRow(i, { matched_client_name_raw: e.target.value })}
+              list={CLIENT_NAMES_DATALIST_ID}
+              placeholder="거래처 수기 작성"
+              className={`${inputClass} w-32`}
             />
-            <div className="flex flex-col gap-1">
-              <select
-                value={r.clientMode}
-                onChange={(e) => updateRow(i, { clientMode: e.target.value })}
-                className={inputClass}
-              >
-                <option value={MANUAL}>수기 작성</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              {r.clientMode === MANUAL && (
-                <input
-                  value={r.matched_client_name_raw}
-                  onChange={(e) => updateRow(i, { matched_client_name_raw: e.target.value })}
-                  placeholder="거래처 직접 입력"
-                  className={inputClass}
-                />
-              )}
-            </div>
+            <select
+              value={r.matched_client_id}
+              onChange={(e) => updateRow(i, { matched_client_id: e.target.value })}
+              className={`${inputClass} w-32`}
+            >
+              <option value="">선택 안함</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
             {rows.length > 1 && (
               <button
                 type="button"
                 onClick={() => removeRow(i)}
-                className="justify-self-start text-xs text-red-500 hover:text-red-700"
+                className="shrink-0 text-xs text-red-500 hover:text-red-700"
               >
                 이 줄 삭제
               </button>
