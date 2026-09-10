@@ -5,6 +5,7 @@ import { updateBankTransactionRecord, deleteBankTransactionRecord } from "@/lib/
 import { formatWon, formatDate } from "@/lib/format";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { MatchedClientField } from "@/components/MatchedClientField";
 
 type BankTxRow = {
   id: string;
@@ -15,6 +16,7 @@ type BankTxRow = {
   amount: number;
   matched_client_id: string | null;
   matched_client_name_raw: string | null;
+  transfer_group_id: string | null;
   bank_accounts?: { nickname: string | null; bank_name: string } | null;
   clients?: { name: string } | null;
 };
@@ -109,7 +111,7 @@ export function BankTransactionTable({
           <th className="pb-2 pr-4">{headerButton("trans_date", "날짜")}</th>
           <th className="pb-2 pr-4">{headerButton("account", "계좌")}</th>
           <th className="pb-2 pr-4">{headerButton("direction", "구분")}</th>
-          <th className="pb-2 pr-4">{headerButton("description", "적요")}</th>
+          <th className="pb-2 pr-4">{headerButton("description", "내용")}</th>
           <th className="pb-2 pr-4">{headerButton("client", "매칭 거래처")}</th>
           <th className="pb-2 pr-4 text-right">{headerButton("amount", "금액")}</th>
           <th className="pb-2 text-right">관리</th>
@@ -135,20 +137,13 @@ export function BankTransactionTable({
                     <option value="출금">출금</option>
                   </select>
                   <input type="number" name="amount" required defaultValue={t.amount} className={inputClass} />
-                  <input name="description" defaultValue={t.description ?? ""} placeholder="적요" className={inputClass} />
-                  <select name="matched_client_id" defaultValue={t.matched_client_id ?? ""} className={inputClass}>
-                    <option value="">매칭 거래처 없음</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    name="matched_client_name_raw"
-                    defaultValue={t.matched_client_name_raw ?? ""}
-                    placeholder="거래처 직접 입력"
-                    className={inputClass}
+                  <input name="description" defaultValue={t.description ?? ""} placeholder="내용" className={inputClass} />
+                  <MatchedClientField
+                    clients={clients}
+                    defaultClientId={t.matched_client_id}
+                    defaultNameRaw={t.matched_client_name_raw}
+                    selectClassName={inputClass}
+                    inputClassName={inputClass}
                   />
                   <div className="flex gap-2 lg:col-span-6">
                     <button
@@ -180,6 +175,9 @@ export function BankTransactionTable({
                 >
                   {t.direction}
                 </span>
+                {t.transfer_group_id && (
+                  <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">이체</span>
+                )}
               </td>
               <td className="py-2 pr-4 text-slate-700">{t.description ?? "-"}</td>
               <td className="py-2 pr-4 text-slate-700">{t.clients?.name ?? t.matched_client_name_raw ?? "-"}</td>

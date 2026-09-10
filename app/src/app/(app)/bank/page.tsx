@@ -5,13 +5,14 @@ import {
   createBankAccountRecord,
   updateBankAccountRecord,
   deleteBankAccountRecord,
-  createBankTransactionRecord,
 } from "@/lib/actions/bank";
 import type { FieldConfig } from "@/components/crud/types";
 import { formatWon } from "@/lib/format";
 import { BankTransactionTable } from "@/components/BankTransactionTable";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { BankTransactionFilter } from "@/components/BankTransactionFilter";
+import { BankTransactionForm } from "@/components/BankTransactionForm";
+import { BankTransferForm } from "@/components/BankTransferForm";
 
 const accountFields: FieldConfig[] = [
   { name: "bank_name", label: "은행명", required: true },
@@ -124,62 +125,14 @@ export default async function BankPage({
       </CollapsibleSection>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 font-semibold text-slate-900">거래내역 등록</h2>
-        <form action={createBankTransactionRecord} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">계좌</label>
-            <select name="bank_account_id" required className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
-              {(accounts ?? []).map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.nickname ?? a.bank_name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">날짜</label>
-            <input type="date" name="trans_date" required className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">구분</label>
-            <select name="direction" className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
-              <option value="입금">입금</option>
-              <option value="출금">출금</option>
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">금액</label>
-            <input type="number" name="amount" required className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">적요</label>
-            <input name="description" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">매칭 거래처 (등록됨)</label>
-            <select name="matched_client_id" className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
-              <option value="">선택 안함</option>
-              {(clients ?? []).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">매칭 거래처 (자유 입력)</label>
-            <input
-              name="matched_client_name_raw"
-              placeholder="등록 안 된 거래처는 직접 입력"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <div className="sm:col-span-2 lg:col-span-3">
-            <button className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
-              등록
-            </button>
-          </div>
-        </form>
+        <BankTransferForm accounts={(accounts ?? []).map((a) => ({ id: a.id, name: a.nickname ?? a.bank_name }))} />
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <BankTransactionForm
+          accounts={(accounts ?? []).map((a) => ({ id: a.id, name: a.nickname ?? a.bank_name }))}
+          clients={clients ?? []}
+        />
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-semibold text-slate-900">거래내역</h2>

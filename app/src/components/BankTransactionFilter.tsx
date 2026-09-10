@@ -1,7 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { fieldClass } from "@/components/ui/field";
+
+// fieldClass는 w-full이 있어서 flex-nowrap 줄에서 select끼리 폭을 다투다 넘쳐버림 —
+// 이 필터는 내용 길이에 맞는 좁은 폭이 필요해 별도 클래스를 쓴다(w-full 없음).
+const compactSelectClass =
+  "shrink-0 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-900 hover:border-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/10";
 
 const PERIOD_OPTIONS = [
   { value: "", label: "전체 기간" },
@@ -40,7 +44,7 @@ export function BankTransactionFilter({
       <select
         value={selectedYear}
         onChange={(e) => navigate(e.target.value, selectedPeriod, showDeposit, showWithdrawal)}
-        className={`${fieldClass} shrink-0`}
+        className={compactSelectClass}
       >
         {years.map((y) => (
           <option key={y} value={y}>
@@ -51,7 +55,7 @@ export function BankTransactionFilter({
       <select
         value={selectedPeriod}
         onChange={(e) => navigate(selectedYear, e.target.value, showDeposit, showWithdrawal)}
-        className={`${fieldClass} shrink-0`}
+        className={compactSelectClass}
       >
         {PERIOD_OPTIONS.map((p) => (
           <option key={p.value} value={p.value}>
