@@ -33,8 +33,11 @@ export default async function BankPage({
   const { year, period, deposit, withdrawal, excludeAccounts } = await searchParams;
   const supabase = await createClient();
   const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
   const selectedYear = year ? Number(year) : currentYear;
-  const selectedPeriod = period ?? "";
+  // period 파라미터가 아예 없으면(맨 처음 들어왔을 때) 이번 달을 기본값으로 —
+  // "전체 기간"을 직접 고른 경우엔 "all"이 명시적으로 붙어있어서 이 기본값과 구분된다.
+  const selectedPeriod = period ?? String(currentMonth);
   const showDeposit = deposit !== "0";
   const showWithdrawal = withdrawal !== "0";
   const excludedAccountIds = excludeAccounts ? excludeAccounts.split(",").filter(Boolean) : [];
@@ -49,7 +52,7 @@ export default async function BankPage({
     const lastDay = new Date(selectedYear, endMonth, 0).getDate();
     rangeStart = `${selectedYear}-${pad(startMonth)}-01`;
     rangeEnd = `${selectedYear}-${pad(endMonth)}-${pad(lastDay)}`;
-  } else if (selectedPeriod) {
+  } else if (selectedPeriod && selectedPeriod !== "all") {
     const m = Number(selectedPeriod);
     const lastDay = new Date(selectedYear, m, 0).getDate();
     rangeStart = `${selectedYear}-${pad(m)}-01`;

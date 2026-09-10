@@ -8,7 +8,7 @@ const compactSelectClass =
   "shrink-0 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-900 hover:border-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/10";
 
 const PERIOD_OPTIONS = [
-  { value: "", label: "전체 기간" },
+  { value: "all", label: "전체 기간" },
   { value: "q1", label: "1분기 (1~3월)" },
   { value: "q2", label: "2분기 (4~6월)" },
   { value: "q3", label: "3분기 (7~9월)" },
@@ -43,8 +43,7 @@ export function BankTransactionFilter({
     withdrawal: boolean,
     excluded: Set<string>
   ) {
-    const params = new URLSearchParams({ year: String(year) });
-    if (period) params.set("period", period);
+    const params = new URLSearchParams({ year: String(year), period });
     if (!deposit) params.set("deposit", "0");
     if (!withdrawal) params.set("withdrawal", "0");
     if (excluded.size > 0) params.set("excludeAccounts", Array.from(excluded).join(","));
