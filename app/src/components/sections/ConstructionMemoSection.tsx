@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { ConstructionMemoFilter } from "@/components/ConstructionMemoFilter";
 import { ConstructionMemoList } from "@/components/ConstructionMemoList";
-import type { ConstructionMemoProjectOption } from "@/components/ConstructionMemoFormPopup";
+import type { SiteOption } from "@/components/ProjectPicker";
 import {
   createConstructionMemo,
   updateConstructionMemo,
@@ -30,19 +30,22 @@ export async function ConstructionMemoSection({
   month?: string;
 }) {
   const supabase = await createClient();
-  const [{ data: projectsRaw }, { data: sites }, { data: memosRaw }] = await Promise.all([
-    supabase.from("projects").select("id, name, site_id, sites(name)").order("name"),
-    supabase.from("sites").select("id, name").order("name"),
+  const [{ data: projectsRaw }, { data: sitesRaw }, { data: memosRaw }] = await Promise.all([
+    // status/year/project_code는 ProjectPicker가 "완료 프로젝트 보기" 토글에 씀 —
+    // 메모 추가 팝업에서 완료 프로젝트도 고를 수 있어야 해서 필요함.
+    supabase.from("projects").select("id, name, site_id, status, year, project_code").order("name"),
+    supabase.from("sites").select("id, name, clients(name)").order("name"),
     supabase
       .from("construction_memos")
       .select("id, content, created_at, updated_at, project_id, projects(name, site_id, sites(name))")
       .order("created_at", { ascending: false }),
   ]);
 
-  const projectOptions: ConstructionMemoProjectOption[] = (projectsRaw ?? []).map((p) => {
-    const site = one(p.sites) as { name: string } | undefined;
-    return { id: p.id, name: p.name, siteName: site?.name ?? "미지정" };
-  });
+  const siteOptions: SiteOption[] = (sitesRaw ?? []).map((s) => ({
+    id: s.id,
+    name: s.name,
+    client_name: (one(s.clients) as { name: string } | undefined)?.name ?? null,
+  }));
 
   const allMemos: MemoRow[] = (memosRaw ?? []).map((m) => {
     const project = one(m.projects) as { name: string; site_id: string; sites?: unknown } | undefined;
@@ -83,7 +86,7 @@ export async function ConstructionMemoSection({
           basePath="/quality-construction"
           years={years}
           selectedYear={selectedYear}
-          sites={sites ?? []}
+          sites={siteOptions}
           selectedSiteId={selectedSiteId}
           selectedMonth={selectedMonth}
         />
@@ -91,7 +94,8 @@ export async function ConstructionMemoSection({
 
       <ConstructionMemoList
         memos={memos}
-        projects={projectOptions}
+        sites={siteOptions}
+        projects={projectsRaw ?? []}
         createAction={createConstructionMemo}
         updateAction={updateConstructionMemo}
         deleteAction={deleteConstructionMemo}

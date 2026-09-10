@@ -4,7 +4,8 @@ import { useState } from "react";
 import { formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
-import { ConstructionMemoFormPopup, type ConstructionMemoProjectOption } from "@/components/ConstructionMemoFormPopup";
+import { ConstructionMemoFormPopup } from "@/components/ConstructionMemoFormPopup";
+import type { ProjectOption, SiteOption } from "@/components/ProjectPicker";
 
 type Memo = {
   id: string;
@@ -20,13 +21,15 @@ type Popup = { mode: "create" } | { mode: "edit"; memo: Memo };
 
 export function ConstructionMemoList({
   memos,
+  sites,
   projects,
   createAction,
   updateAction,
   deleteAction,
 }: {
   memos: Memo[];
-  projects: ConstructionMemoProjectOption[];
+  sites: SiteOption[];
+  projects: ProjectOption[];
   createAction: (formData: FormData) => unknown;
   updateAction: (formData: FormData) => unknown;
   deleteAction: (formData: FormData) => unknown;
@@ -99,6 +102,7 @@ export function ConstructionMemoList({
       {popup?.mode === "create" && (
         <ConstructionMemoFormPopup
           mode="create"
+          sites={sites}
           projects={projects}
           createAction={createAction}
           updateAction={updateAction}
@@ -108,6 +112,7 @@ export function ConstructionMemoList({
       {popup?.mode === "edit" && (
         <ConstructionMemoFormPopup
           mode="edit"
+          sites={sites}
           projects={projects}
           initial={{
             id: popup.memo.id,

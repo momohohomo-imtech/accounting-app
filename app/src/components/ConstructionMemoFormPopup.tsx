@@ -7,13 +7,13 @@ import { fieldClass, labelClass } from "@/components/ui/field";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
-
-export type ConstructionMemoProjectOption = { id: string; name: string; siteName: string };
+import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components/ProjectPicker";
 
 type EditTarget = { id: string; content: string; projectName: string; siteName: string };
 
 export function ConstructionMemoFormPopup({
   mode,
+  sites,
   projects,
   initial,
   createAction,
@@ -21,7 +21,8 @@ export function ConstructionMemoFormPopup({
   onClose,
 }: {
   mode: "create" | "edit";
-  projects: ConstructionMemoProjectOption[];
+  sites: SiteOption[];
+  projects: ProjectOption[];
   initial?: EditTarget;
   createAction: (formData: FormData) => unknown;
   updateAction: (formData: FormData) => unknown;
@@ -70,24 +71,14 @@ export function ConstructionMemoFormPopup({
           </div>
           <form onSubmit={handleSubmit} className="space-y-3">
             {mode === "create" ? (
-              <div className="flex flex-col gap-1">
-                <label className={labelClass}>프로젝트</label>
-                <select
-                  value={projectId}
-                  onChange={(e) => setProjectId(e.target.value)}
-                  required
-                  className={fieldClass}
-                >
-                  <option value="" disabled>
-                    프로젝트를 선택하세요
-                  </option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.siteName} · {p.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <ProjectPicker
+                sites={sites}
+                projects={projects}
+                value={projectId}
+                onChange={setProjectId}
+                label="프로젝트"
+                emptyLabel="프로젝트를 선택하세요"
+              />
             ) : (
               <div className="text-sm text-slate-500">
                 {initial?.siteName} · {initial?.projectName}
