@@ -111,6 +111,31 @@ export function BankTransactionTable({
   }
 
   async function handleTogglePromote(id: string, checked: boolean) {
+    if (!checked) {
+      // 체크 해제 = 매입/매출장에 자동 등록됐던 내용이 통째로 삭제됨 — 되돌릴 수 없어서 3단계로 확인받는다.
+      if (
+        !(await confirm(
+          "이 체크를 해제하면 매입/매출장에 자동으로 올라갔던 내역이 삭제됩니다. 계속할까요?",
+          { danger: true, confirmLabel: "계속" }
+        ))
+      )
+        return;
+      if (
+        !(await confirm(
+          "그 사이 매입/매출장에서 카테고리를 지정했거나 내용을 수정했더라도 전부 함께 삭제됩니다. 계속할까요?",
+          { danger: true, confirmLabel: "계속" }
+        ))
+      )
+        return;
+      if (
+        !(await confirm("마지막 확인입니다 — 삭제하면 되돌릴 수 없습니다. 정말 삭제하시겠습니까?", {
+          danger: true,
+          confirmLabel: "삭제",
+        }))
+      )
+        return;
+    }
+
     const fd = new FormData();
     fd.append("id", id);
     await pending.run(() =>
