@@ -10,6 +10,7 @@ import {
 import type { FieldConfig } from "@/components/crud/types";
 import { formatWon } from "@/lib/format";
 import { BankTransactionTable } from "@/components/BankTransactionTable";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 
 const accountFields: FieldConfig[] = [
   { name: "bank_name", label: "은행명", required: true },
@@ -38,33 +39,46 @@ export default async function BankPage() {
     const delta = t.direction === "입금" ? t.amount : -t.amount;
     balanceByAccount.set(t.bank_account_id, (balanceByAccount.get(t.bank_account_id) ?? 0) + delta);
   }
+  const totalBalance = Array.from(balanceByAccount.values()).reduce((s, v) => s + v, 0);
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-900">은행 계좌 / 거래내역</h1>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h1 className="text-2xl font-bold text-slate-900">은행 계좌 / 거래내역</h1>
+        <p className="text-sm text-slate-500">
+          총 잔액 합계{" "}
+          <span className={`font-mono text-base font-bold ${totalBalance < 0 ? "text-red-600" : "text-slate-900"}`}>
+            {formatWon(totalBalance)}
+          </span>
+        </p>
+      </div>
 
       {(accounts ?? []).length > 0 && (
         <div className="flex flex-wrap gap-4">
-          {(accounts ?? []).map((a) => (
-            <div key={a.id} className="min-w-[180px] flex-1 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">{a.nickname ?? a.bank_name}</p>
-              <p className="mt-2 font-mono text-2xl font-bold text-slate-900">{formatWon(balanceByAccount.get(a.id) ?? 0)}</p>
-            </div>
-          ))}
+          {(accounts ?? []).map((a) => {
+            const balance = balanceByAccount.get(a.id) ?? 0;
+            return (
+              <div key={a.id} className="min-w-[180px] flex-1 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="text-sm text-slate-500">{a.nickname ?? a.bank_name}</p>
+                <p className={`mt-2 font-mono text-2xl font-bold ${balance < 0 ? "text-red-600" : "text-slate-900"}`}>
+                  {formatWon(balance)}
+                </p>
+              </div>
+            );
+          })}
         </div>
       )}
 
       <CreatePanel title="은행 계좌" fields={accountFields} createAction={createBankAccountRecord} />
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 font-semibold text-slate-900">계좌 목록</h2>
+      <CollapsibleSection title="계좌 목록" defaultOpen={false}>
         <EntityTable
           fields={accountFields}
           rows={accounts ?? []}
           updateAction={updateBankAccountRecord}
           deleteAction={deleteBankAccountRecord}
         />
-      </div>
+      </CollapsibleSection>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="mb-3 font-semibold text-slate-900">거래내역 등록</h2>
