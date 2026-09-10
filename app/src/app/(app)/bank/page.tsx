@@ -11,6 +11,7 @@ import type { FieldConfig } from "@/components/crud/types";
 import { formatWon } from "@/lib/format";
 import { BankTransactionTable } from "@/components/BankTransactionTable";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
+import { BankTransactionFilter } from "@/components/BankTransactionFilter";
 
 const accountFields: FieldConfig[] = [
   { name: "bank_name", label: "은행명", required: true },
@@ -20,18 +21,59 @@ const accountFields: FieldConfig[] = [
   { name: "sort_order", label: "정렬순서", type: "number" },
 ];
 
-export default async function BankPage() {
+export default async function BankPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ year?: string; quarter?: string; month?: string; direction?: string }>;
+}) {
+  const { year, quarter, month, direction } = await searchParams;
   const supabase = await createClient();
-  const [{ data: accounts }, { data: clients }, { data: transactions }, { data: allTx }] = await Promise.all([
+  const currentYear = new Date().getFullYear();
+  const selectedYear = year ? Number(year) : currentYear;
+  const selectedQuarter = quarter ?? "";
+  const selectedMonth = month ?? "";
+  const selectedDirection = direction ?? "";
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  let rangeStart = `${selectedYear}-01-01`;
+  let rangeEnd = `${selectedYear}-12-31`;
+  if (selectedMonth) {
+    const m = Number(selectedMonth);
+    const lastDay = new Date(selectedYear, m, 0).getDate();
+    rangeStart = `${selectedYear}-${pad(m)}-01`;
+    rangeEnd = `${selectedYear}-${pad(m)}-${pad(lastDay)}`;
+  } else if (selectedQuarter) {
+    const q = Number(selectedQuarter);
+    const startMonth = (q - 1) * 3 + 1;
+    const endMonth = startMonth + 2;
+    const lastDay = new Date(selectedYear, endMonth, 0).getDate();
+    rangeStart = `${selectedYear}-${pad(startMonth)}-01`;
+    rangeEnd = `${selectedYear}-${pad(endMonth)}-${pad(lastDay)}`;
+  }
+
+  let transactionsQuery = supabase
+    .from("bank_transactions")
+    .select("*, bank_accounts(nickname, bank_name), clients(name)")
+    .gte("trans_date", rangeStart)
+    .lte("trans_date", rangeEnd)
+    .order("trans_date", { ascending: false });
+  if (selectedDirection) transactionsQuery = transactionsQuery.eq("direction", selectedDirection);
+
+  const [{ data: accounts }, { data: clients }, { data: transactions }, { data: allTx }, { data: firstTx }] = await Promise.all([
     supabase.from("bank_accounts").select("*").order("sort_order").order("created_at", { ascending: false }),
     supabase.from("clients").select("id, name").order("name"),
-    supabase
-      .from("bank_transactions")
-      .select("*, bank_accounts(nickname, bank_name), clients(name)")
-      .order("trans_date", { ascending: false })
-      .limit(100),
+    transactionsQuery,
     supabase.from("bank_transactions").select("bank_account_id, direction, amount"),
+    supabase.from("bank_transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
   ]);
+
+  const firstYear = Math.min(
+    firstTx?.[0]?.trans_date ? Number(firstTx[0].trans_date.slice(0, 4)) : currentYear,
+    currentYear
+  );
+  const years = Array.from({ length: currentYear - firstYear + 1 }, (_, i) => currentYear - i);
+  if (!years.includes(selectedYear)) years.unshift(selectedYear);
+  years.sort((a, b) => b - a);
 
   const balanceByAccount = new Map<string, number>();
   for (const a of accounts ?? []) balanceByAccount.set(a.id, a.opening_balance ?? 0);
@@ -138,7 +180,18 @@ export default async function BankPage() {
           </div>
         </form>
 
-        <div className="mt-5 overflow-x-auto">
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold text-slate-900">거래내역</h2>
+          <BankTransactionFilter
+            years={years}
+            selectedYear={selectedYear}
+            selectedQuarter={selectedQuarter}
+            selectedMonth={selectedMonth}
+            selectedDirection={selectedDirection}
+          />
+        </div>
+
+        <div className="mt-3 overflow-x-auto">
           <BankTransactionTable
             transactions={transactions ?? []}
             accounts={(accounts ?? []).map((a) => ({ id: a.id, name: a.nickname ?? a.bank_name }))}
