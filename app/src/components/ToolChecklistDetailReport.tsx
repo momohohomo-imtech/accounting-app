@@ -149,7 +149,8 @@ export function ToolChecklistDetailReport({
           )}
           {formMode === "donghee" && (
             <span className="text-xs font-medium text-amber-600">
-              ⚠ 인쇄 대화상자에서 용지 방향을 반드시 &quot;가로&quot;로 선택해주세요
+              ⚠ 내용을 세로 용지에 맞게 90도 돌려서 인쇄합니다 — 인쇄 대화상자 용지
+              방향은 &quot;세로&quot;(기본값) 그대로 두세요
             </span>
           )}
           <PrintButton />
@@ -182,24 +183,29 @@ export function ToolChecklistDetailReport({
         accessPassItems.length === 0 ? (
           <p className="py-6 text-center text-slate-400">반입반출증용으로 표시된 품목이 없습니다.</p>
         ) : (
-          // 동희오토 양식은 원래 A5 규격이라, 인쇄 시 용지를 가로로 돌려 왼쪽/오른쪽에
-          // 2장씩 들어가게 배치함 — 예전엔 이걸 CSS(@page 이름 지정)로 자동 전환했는데,
-          // 크롬이 세로↔가로 페이지를 오갈 때마다 빈 페이지를 끼워 넣는 문제가 있어서
-          // (globals.css 참고) 포기하고, 아래 안내문구로 사용자가 인쇄 대화상자에서
-          // 직접 "가로"를 선택하게 함. 품목이 5개(장당 고정 줄 수)를 넘으면 왼쪽·오른쪽에
-          // 서로 다른 품목을 담은 다음 장으로 이어지고, 그래도 남으면 다음 페이지로
-          // 계속됨 — 예전처럼 왼쪽·오른쪽에 같은 내용을 복제하지 않음. 짝이 없는 마지막
-          // 홀수 장은 예전엔 폭을 98%로 키운 "혼자" 레이아웃을 따로 뒀었는데, 페이지마다
-          // 폭이 달라져 보이는 문제가 있었음 — 그래서 항상 오른쪽에 빈 양식(품목 없는
-          // DongheeAccessPassPermitTable)을 채워 넣어, 모든 페이지가 예외 없이 49%씩
-          // 2장 레이아웃을 쓰게 통일함(둘을 합쳐 98% — 절취선 자리 2%가 물리적 한계치,
-          // 이 이상은 두 장이 겹침). 가운데 절취선(인쇄에도 나옴 — 잘라 쓰라는
-          // 안내선)이 정확히 중앙(49%+1% 여백=50%)에 오도록 `justify-between`으로 배치.
+          // 동희오토 양식은 원래 A5 규격이라 왼쪽/오른쪽에 2장씩 두면 A4 가로 한 장에
+          // 딱 맞는데, 인쇄 용지 자체를 가로로 돌리는(=@page 이름 지정) 방식은 크롬이
+          // 세로↔가로 페이지를 오갈 때마다 빈 페이지를 끼워 넣는 버그가 있어서
+          // 포기함(globals.css 참고). 대신 용지는 계속 기본(세로)으로 두고, 이
+          // 페이지 하나짜리 묶음 자체를 인쐄 시에만 CSS로 90도 돌려서(원본 캔버스를
+          // 가로 usable 크기인 277mm×190mm로 만든 다음 정확히 그 자리에 맞게
+          // translate) 세로 용지 안에 가로 내용이 들어가게 함 — 인쇄된 종이를 보는
+          // 사람이 손으로 90도 돌려서 보면 됨. `transform-origin:top left`에
+          // `translate(190mm,0) rotate(90deg)`를 순서대로 적용하면 회전 후 정확히
+          // (0,0)~(190mm,277mm) 자리로 들어옴(세로 용지의 인쇄 가능 영역과 정확히
+          // 일치 — 가로/세로 usable 크기가 서로 완전히 뒤바뀐 값이라 딱 맞아떨어짐).
+          // 품목이 5개(장당 고정 줄 수)를 넘으면 왼쪽·오른쪽에 서로 다른 품목을 담은
+          // 다음 장으로 이어지고, 그래도 남으면 다음 페이지로 계속됨 — 예전처럼
+          // 왼쪽·오른쪽에 같은 내용을 복제하지 않음. 짝이 없는 마지막 홀수 장은 항상
+          // 오른쪽에 빈 양식(품목 없는 DongheeAccessPassPermitTable)을 채워 넣어 모든
+          // 페이지가 예외 없이 49%씩 2장 레이아웃을 쓰게 통일함(둘을 합쳐 98% —
+          // 절취선 자리 2%가 물리적 한계치). 가운데 절취선(인쇄에도 나옴)이 정확히
+          // 중앙(49%+1% 여백=50%)에 오도록 `justify-between`으로 배치.
           <div className="space-y-4 print:space-y-0">
             {dongheePages.map((page, pageIdx) => (
               <div
                 key={pageIdx}
-                className={`flex justify-between print:break-inside-avoid ${
+                className={`flex justify-between print:break-inside-avoid print:w-[277mm] print:h-[190mm] print:origin-top-left donghee-print-rotate ${
                   pageIdx < dongheePages.length - 1 ? "print:break-after-page" : ""
                 }`}
               >

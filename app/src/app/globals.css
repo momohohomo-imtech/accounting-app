@@ -43,10 +43,21 @@ textarea {
    가로로 돌렸었는데, 크롬이 기본(세로) 페이지에서 이 가로 페이지로 들어가고
    나올 때마다 빈 페이지를 하나씩 끼워 넣는 문제가 있었음(예: 실제로는 2페이지면
    되는데 앞뒤로 빈 페이지가 붙어서 4장이 찍힘) — 크롬 인쇄 엔진 자체의 한계라
-   CSS로는 못 고침. 그래서 자동 방향 전환을 포기하고, 인쇄 대화상자에서 사용자가
-   직접 "가로"를 선택하도록 안내함(ToolChecklistDetailReport의 동희 모드 안내
-   문구 참고) — 이러면 페이지 전체가 처음부터 끝까지 같은 방향이라 빈 페이지가
-   안 생김. */
+   CSS로는 못 고침. 그래서 용지 방향 전환 자체를 포기하고, 용지는 계속 기본(세로)
+   그대로 두는 대신 내용 쪽을 인쇄 시에만 90도 돌림(ToolChecklistDetailReport의
+   donghee-print-rotate).
+   `transform: translate(190mm, 0) rotate(90deg)`처럼 함수 두 개를 이어 쓰면
+   (Tailwind 임의값이든 순수 CSS든 상관없이) 빌드 CSS 압축기가 두 함수 사이 공백을
+   지워버려서 `translate(190mm)rotate(90deg)`라는 깨진 값이 나오는 버그가 있었음
+   — 그래서 두 변환을 손으로 미리 하나의 matrix()로 합쳐서 씀(함수 하나라 압축기가
+   합칠 대상이 없어서 안전함). matrix(a,b,c,d,tx,ty)의 tx/ty는 단위 없는 숫자(px
+   취급)라 190mm를 px로 환산(190 * 96/25.4 ≈ 718.11)해서 넣음 — transform-origin이
+   top left(0 0)일 때 이 행렬이 정확히 translate(190mm,0) rotate(90deg)와 같음. */
+@media print {
+  .donghee-print-rotate {
+    transform: matrix(0, 1, -1, 0, 718.11, 0);
+  }
+}
 
 @media print {
   aside {
