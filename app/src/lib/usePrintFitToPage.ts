@@ -44,6 +44,11 @@ export function usePrintFitToPage<T extends HTMLElement>(pageHeightMm = 270, dis
     return () => {
       window.removeEventListener("beforeprint", beforePrint);
       window.removeEventListener("afterprint", afterPrint);
+      // beforeprint가 zoom을 걸어둔 상태에서 afterprint 전에 disabled가 true로
+      // 바뀌면(예: 동희 모드로 전환) 리스너만 떼고 zoom은 안 지워져서, 이후 동희
+      // 인쇄에 이전(다른 양식) 콘텐츠 기준으로 계산된 배율이 그대로 눌러붙어 있었음
+      // — 이펙트가 재실행/언마운트될 때마다 항상 같이 지워서 이 잔존 배율을 없앰.
+      el.style.removeProperty("zoom");
     };
   }, [pageHeightMm, disabled]);
 
