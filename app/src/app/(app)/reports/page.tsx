@@ -20,6 +20,8 @@ import { ClassificationPendingTable } from "@/components/ClassificationPendingTa
 import { CategoryAggregateTable } from "@/components/CategoryAggregateTable";
 import { CategoryDetailReport } from "@/components/CategoryDetailReport";
 import { ProjectProfitTable } from "@/components/ProjectProfitTable";
+import { SiteProfitTable } from "@/components/SiteProfitTable";
+import { SiteProfitReport } from "@/components/SiteProfitReport";
 import { RevenueVerificationTable } from "@/components/RevenueVerificationTable";
 import { TransactionEditPopup } from "@/components/TransactionEditPopup";
 import { WorkLogSummaryTable } from "@/components/WorkLogSummaryTable";
@@ -75,6 +77,7 @@ export default async function ReportsPage({
     vendorAgency?: string;
     category?: string;
     site?: string;
+    siteReport?: string;
     editTx?: string;
     wlMonths?: string;
     wlSite?: string;
@@ -89,6 +92,7 @@ export default async function ReportsPage({
     vendorAgency,
     category,
     site,
+    siteReport,
     editTx,
     wlMonths,
     wlSite,
@@ -249,6 +253,35 @@ export default async function ReportsPage({
   const bySite = Array.from(siteMap.values())
     .map((s) => ({ ...s, profit: s.sales - s.purchase }))
     .sort((a, b) => b.sales + b.purchase - (a.sales + a.purchase));
+
+  // 현장별 손익 팝업(현장 내역서) — bySite와 동일한 방식(프로젝트의 현장명 매칭)으로
+  // 그 현장에 속한 거래(매출+매입)를 전부 모음.
+  const siteDetailRows = siteReport
+    ? transactions
+        .filter((t) => {
+          const proj = one(t.projects);
+          const s = proj ? one(proj.sites) : null;
+          return (s?.name ?? null) === siteReport;
+        })
+        .map((t) => {
+          const proj = one(t.projects) as { name: string; status: string | null } | null;
+          const cat = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
+          const pm = one(t.payment_methods) as { name: string } | null;
+          return {
+            id: t.id,
+            kind: t.type as "매출" | "매입",
+            trans_date: t.trans_date as string | null,
+            project_name: proj?.name ?? null,
+            project_status: proj?.status ?? null,
+            item_name: t.item_name,
+            amount: t.type === "매출" ? t.sales_amount + t.sales_vat : t.purchase_amount + t.purchase_vat,
+            category_name: cat?.name ?? null,
+            category_project_only: cat?.project_only ?? false,
+            category_color: cat?.color ?? null,
+            payment_method_name: pm?.name ?? null,
+          };
+        })
+    : [];
 
   // 거래처별 매입/매출 집계
   function clientBreakdown(type: "매입" | "매출") {
@@ -666,7 +699,7 @@ export default async function ReportsPage({
         </CollapsibleSection>
 
         <CollapsibleSection
-          title="현장별 손익 — 어느 현장에서 얼마를 벌고 썼는지"
+          title="현장별 손익 — 어느 현장에서 얼마를 벌고 썼는지 (클릭하면 현장 내역서)"
           className={hiddenClass("bySite")}
           defaultOpen={printSection === "bySite"}
           headerExtra={sectionControls("bySite", {
@@ -675,11 +708,7 @@ export default async function ReportsPage({
             rows: bySite.map((s) => [s.name, s.sales, s.purchase, s.profit]),
           })}
         >
-          <SimpleTable
-            rows={bySite.map((s) => [s.name, formatWon(s.sales), formatWon(s.purchase), formatWon(s.profit)])}
-            headers={["현장", "매출", "매입", "손익"]}
-            empty="현장 데이터가 없습니다."
-          />
+          <SiteProfitTable rows={bySite} year={selectedYear} />
         </CollapsibleSection>
        </div>
       </CollapsibleSection>
@@ -919,12 +948,27 @@ export default async function ReportsPage({
         </div>
       )}
 
+      {siteReport && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:static print:bg-transparent print:p-0">
+          <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
+            <SiteProfitReport
+              siteName={siteReport}
+              year={selectedYear}
+              rows={siteDetailRows}
+              closeHref={`/reports?year=${selectedYear}`}
+            />
+          </div>
+        </div>
+      )}
+
       <TransactionEditPopup
         editTx={editTx}
         redirectTo={
           category
             ? `/reports?year=${selectedYear}&category=${encodeURIComponent(category)}`
-            : `/reports?year=${selectedYear}${includeVendorAgency ? "&vendorAgency=1" : ""}&vendor=${encodeURIComponent(vendor ?? "")}`
+            : siteReport
+              ? `/reports?year=${selectedYear}&siteReport=${encodeURIComponent(siteReport)}`
+              : `/reports?year=${selectedYear}${includeVendorAgency ? "&vendorAgency=1" : ""}&vendor=${encodeURIComponent(vendor ?? "")}`
         }
       />
     </div>
