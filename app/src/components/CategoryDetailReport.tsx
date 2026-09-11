@@ -7,6 +7,14 @@ import { formatWon, formatDate } from "@/lib/format";
 import { CategoryReportActions } from "@/components/CategoryReportActions";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 import { projectStatusLabel } from "@/lib/projectStatus";
+import { Button } from "@/components/ui/Button";
+import { fieldClass } from "@/components/ui/field";
+import { resolveCategoryColor } from "@/lib/categoryColor";
+import { useConfirm } from "@/components/ConfirmProvider";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { updateAgencyPurchase } from "@/lib/actions/projectAgencyPurchases";
+
+type Category = { id: string; name: string; project_only: boolean; color: string | null };
 
 type DetailRow = {
   id: string;
@@ -17,6 +25,8 @@ type DetailRow = {
   project_status: string | null;
   item_name: string | null;
   amount: number;
+  category_id?: string | null;
+  memo?: string | null;
 };
 
 type SortKey = "trans_date" | "client_name" | "project_name" | "item_name" | "amount";
@@ -36,17 +46,150 @@ function sortValue(r: DetailRow, key: SortKey): string | number {
   }
 }
 
+// 대행구매 항목은 별도 테이블(project_agency_purchases)이라 매입(거래) 항목처럼
+// 전용 수정 팝업으로 보내는 대신, 이 행 자체를 인라인 편집 폼으로 바꿔서 처리함
+// (ProjectAgencyPurchaseList의 AgencyRow와 같은 방식).
+function AgencyDetailRow({ row, categories, clientNames }: { row: DetailRow; categories: Category[]; clientNames: string[] }) {
+  const confirm = useConfirm();
+  const pending = useGlobalPending();
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [clientName, setClientName] = useState(row.client_name ?? "");
+  const [itemName, setItemName] = useState(row.item_name ?? "");
+  const [categoryId, setCategoryId] = useState(row.category_id ?? "");
+  const [amount, setAmount] = useState(String(row.amount));
+  const [memo, setMemo] = useState(row.memo ?? "");
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    if (!(await confirm("수정 내용을 저장하시겠습니까?"))) return;
+    const fd = new FormData();
+    fd.append("id", row.id);
+    fd.append("item_name", itemName);
+    fd.append("amount", amount);
+    fd.append("category_id", categoryId);
+    fd.append("memo", memo);
+    fd.append("client_name", clientName);
+    const result = await pending.run(() => updateAgencyPurchase(fd));
+    if (result?.error) {
+      setError(result.error);
+      return;
+    }
+    setEditing(false);
+    router.refresh();
+  }
+
+  if (editing) {
+    return (
+      <tr className="border-b border-slate-100 bg-slate-50 align-top last:border-0">
+        <td className="py-2 pr-4 text-slate-500">대행구매</td>
+        <td className="py-2 pr-4 text-slate-400">-</td>
+        <td className="py-2 pr-4">
+          <input
+            list={`category-agency-clients-${row.id}`}
+            value={clientName}
+            onChange={(e) => setClientName(e.target.value)}
+            className={`${fieldClass} w-full`}
+          />
+          <datalist id={`category-agency-clients-${row.id}`}>
+            {clientNames.map((n) => (
+              <option key={n} value={n} />
+            ))}
+          </datalist>
+        </td>
+        <td className="py-2 pr-4 text-slate-700">
+          {row.project_name ?? <span className="font-medium text-red-600">일반경비</span>}
+        </td>
+        <td className="py-2 pr-4">
+          <input
+            value={itemName}
+            onChange={(e) => setItemName(e.target.value)}
+            placeholder="품목명"
+            className={`${fieldClass} w-full`}
+          />
+          <select
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+            className={`${fieldClass} mt-1 w-full text-xs`}
+          >
+            <option value="">미분류</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id} style={{ color: resolveCategoryColor(c) }}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <input
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+            placeholder="메모"
+            className={`${fieldClass} mt-1 w-full text-xs`}
+          />
+        </td>
+        <td className="py-2 pr-4 text-right">
+          <input
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            type="number"
+            step="1"
+            className={`${fieldClass} w-full text-right`}
+          />
+        </td>
+        <td className="py-2 text-right print:hidden">
+          <div className="flex justify-end gap-1">
+            <Button size="xs" type="button" onClick={save}>
+              저장
+            </Button>
+            <Button variant="secondary" size="xs" type="button" onClick={() => setEditing(false)}>
+              취소
+            </Button>
+          </div>
+          {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+        </td>
+      </tr>
+    );
+  }
+
+  return (
+    <tr className="border-b border-slate-100 last:border-0">
+      <td className="py-2 pr-4">
+        <span className="text-slate-500">대행구매</span>
+      </td>
+      <td className="py-2 pr-4 text-slate-600">-</td>
+      <td className="py-2 pr-4 text-slate-700">{row.client_name ?? "-"}</td>
+      <td className="py-2 pr-4 text-slate-700">
+        {row.project_name ?? <span className="font-medium text-red-600">일반경비</span>}
+      </td>
+      <td className="py-2 pr-4 text-slate-700">{row.item_name ?? "-"}</td>
+      <td className="py-2 pr-4 text-right font-mono text-slate-900">{formatWon(row.amount)}</td>
+      <td className="py-2 text-right print:hidden">
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="text-xs text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
+        >
+          수정
+        </button>
+      </td>
+    </tr>
+  );
+}
+
 export function CategoryDetailReport({
   categoryName,
   year,
   purchaseRows,
   agencyRows,
+  categories,
+  clientNames,
   closeHref,
 }: {
   categoryName: string;
   year: number;
   purchaseRows: DetailRow[];
   agencyRows: DetailRow[];
+  categories: Category[];
+  clientNames: string[];
   closeHref: string;
 }) {
   const router = useRouter();
@@ -167,30 +310,32 @@ export function CategoryDetailReport({
             </tr>
           </thead>
           <tbody>
-            {sortedRows.map((r) => (
-              <tr key={`${r.kind}-${r.id}`} className="border-b border-slate-100 last:border-0">
-                <td className="py-2 pr-4">
-                  <span className={r.kind === "대행구매" ? "text-slate-500" : "text-slate-700"}>{r.kind}</span>
-                </td>
-                <td className="py-2 pr-4 text-slate-600">{r.trans_date ? formatDate(r.trans_date) : "-"}</td>
-                <td className="py-2 pr-4 text-slate-700">{r.client_name ?? "-"}</td>
-                <td className="py-2 pr-4 text-slate-700">
-                  {r.project_name ?? <span className="font-medium text-red-600">일반경비</span>}
-                </td>
-                <td className="py-2 pr-4 text-slate-700">{r.item_name ?? "-"}</td>
-                <td className="py-2 pr-4 text-right font-mono text-slate-900">{formatWon(r.amount)}</td>
-                <td className="py-2 text-right print:hidden">
-                  {r.kind === "매입" && (
+            {sortedRows.map((r) =>
+              r.kind === "대행구매" ? (
+                <AgencyDetailRow key={`${r.kind}-${r.id}`} row={r} categories={categories} clientNames={clientNames} />
+              ) : (
+                <tr key={`${r.kind}-${r.id}`} className="border-b border-slate-100 last:border-0">
+                  <td className="py-2 pr-4">
+                    <span className="text-slate-700">{r.kind}</span>
+                  </td>
+                  <td className="py-2 pr-4 text-slate-600">{r.trans_date ? formatDate(r.trans_date) : "-"}</td>
+                  <td className="py-2 pr-4 text-slate-700">{r.client_name ?? "-"}</td>
+                  <td className="py-2 pr-4 text-slate-700">
+                    {r.project_name ?? <span className="font-medium text-red-600">일반경비</span>}
+                  </td>
+                  <td className="py-2 pr-4 text-slate-700">{r.item_name ?? "-"}</td>
+                  <td className="py-2 pr-4 text-right font-mono text-slate-900">{formatWon(r.amount)}</td>
+                  <td className="py-2 text-right print:hidden">
                     <Link
                       href={editHrefFor(r.id)}
                       className="text-xs text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
                     >
                       수정
                     </Link>
-                  )}
-                </td>
-              </tr>
-            ))}
+                  </td>
+                </tr>
+              )
+            )}
             {sortedRows.length === 0 && (
               <tr>
                 <td colSpan={7} className="py-6 text-center text-slate-400">

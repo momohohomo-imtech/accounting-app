@@ -107,6 +107,8 @@ export default async function ReportsPage({
     { data: savedInsights },
     { data: creditPayments },
     { data: agencyPurchases },
+    { data: expenseCategories },
+    { data: clientRows },
   ] = await Promise.all([
       supabase
         .from("transactions")
@@ -129,10 +131,14 @@ export default async function ReportsPage({
       supabase
         .from("project_agency_purchases")
         .select(
-          "id, project_id, item_name, amount, client_name, memo, expense_categories(name, project_only, color), projects!inner(year, name, status)"
+          "id, project_id, item_name, amount, client_name, memo, category_id, expense_categories(name, project_only, color), projects!inner(year, name, status)"
         )
         .eq("projects.year", selectedYear),
+      supabase.from("expense_categories").select("id, name, project_only, color").order("sort_order"),
+      supabase.from("clients").select("name").order("name"),
     ]);
+
+  const clientNames = (clientRows ?? []).map((c) => c.name);
 
   const transactions = ((rawTx ?? []) as unknown as Row[]).filter((t) =>
     isLedgerVisible(t, (creditPayments ?? []) as CreditPayment[])
@@ -416,6 +422,8 @@ export default async function ReportsPage({
             project_status: proj?.status ?? null,
             item_name: a.item_name,
             amount: a.amount,
+            category_id: a.category_id as string | null,
+            memo: a.memo as string | null,
           };
         })
     : [];
@@ -903,6 +911,8 @@ export default async function ReportsPage({
               year={selectedYear}
               purchaseRows={categoryPurchaseRows}
               agencyRows={categoryAgencyRows}
+              categories={expenseCategories ?? []}
+              clientNames={clientNames}
               closeHref={`/reports?year=${selectedYear}${site ? `&site=${site}` : ""}`}
             />
           </div>
