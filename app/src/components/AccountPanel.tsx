@@ -104,7 +104,7 @@ function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) 
   async function handleToggleSuspend() {
     const hoursNum = Number(hours);
     const durationLabel = account.suspended && hoursNum > 0 ? ` (${hoursNum}시간 동안만)` : "";
-    const verb = account.suspended ? "정지를 해제" : "일시 정지";
+    const verb = account.suspended ? "비활성화를 해제" : "비활성화";
     if (!(await confirm(`${account.name}(${account.email}) 계정을 ${verb}${durationLabel}하시겠습니까?`))) return;
     setPending(true);
     setMessage(null);
@@ -152,13 +152,11 @@ function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) 
               {isSelf && <span className="ml-1 text-xs font-normal text-slate-400">(나)</span>}
             </p>
           )}
-          {account.role === "tax_agent" && (
-            <p className={`mt-0.5 text-xs font-medium ${account.suspended ? "text-red-600" : "text-emerald-600"}`}>
-              {account.suspended ? "정지됨 — 로그인 불가" : "정상 — 로그인 가능"}
-            </p>
-          )}
-          {account.role === "tax_agent" && !account.suspended && account.resuspendAt && (
-            <p className="mt-0.5 text-xs text-amber-600">{formatDateTime(account.resuspendAt)}에 자동으로 다시 정지됩니다</p>
+          <p className={`mt-0.5 text-xs font-medium ${account.suspended ? "text-red-600" : "text-emerald-600"}`}>
+            {account.suspended ? "비활성화됨 — 로그인 불가" : "정상 — 로그인 가능"}
+          </p>
+          {!account.suspended && account.resuspendAt && (
+            <p className="mt-0.5 text-xs text-amber-600">{formatDateTime(account.resuspendAt)}에 자동으로 다시 비활성화됩니다</p>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -199,30 +197,27 @@ function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) 
           >
             비밀번호 변경
           </Button>
-          {account.role === "tax_agent" && (
-            <>
-              {account.suspended && (
-                <input
-                  type="number"
-                  min={1}
-                  value={hours}
-                  onChange={(e) => setHours(e.target.value)}
-                  placeholder="시간(선택)"
-                  title="입력하면 그 시간 뒤에 자동으로 다시 정지됩니다. 비워두면 무기한 해제됩니다."
-                  className={`${fieldClass} w-24`}
-                />
-              )}
-              <Button
-                type="button"
-                variant={account.suspended ? "primary" : "danger"}
-                size="sm"
-                onClick={handleToggleSuspend}
-                disabled={pending}
-              >
-                {account.suspended ? "정지 해제" : "계정 정지"}
-              </Button>
-            </>
+          {account.suspended && (
+            <input
+              type="number"
+              min={1}
+              value={hours}
+              onChange={(e) => setHours(e.target.value)}
+              placeholder="시간(선택)"
+              title="입력하면 그 시간 뒤에 자동으로 다시 비활성화됩니다. 비워두면 무기한 해제됩니다."
+              className={`${fieldClass} w-24`}
+            />
           )}
+          <Button
+            type="button"
+            variant={account.suspended ? "primary" : "danger"}
+            size="sm"
+            onClick={handleToggleSuspend}
+            disabled={pending || isSelf}
+            title={isSelf ? "본인 계정은 비활성화할 수 없습니다" : undefined}
+          >
+            {account.suspended ? "비활성화 해제" : "비활성화"}
+          </Button>
           {confirmDelete ? (
             <>
               <span className="text-xs font-medium text-red-600">정말 삭제?</span>
@@ -399,8 +394,10 @@ export function AccountPanel({
         )}
       </CardHeader>
       <p className="mb-3 text-xs text-slate-400">
-        본 계정(admin)에서만 보이는 영역입니다. 계정을 추가·삭제하거나, 이름/역할을 바꾸거나, 비밀번호를 재설정할 수
-        있어요. 세무사 계정은 필요할 때 로그인을 일시적으로 막을 수도 있습니다.
+        본 계정(admin)에서만 보이는 영역입니다. 계정을 추가하거나, 이름/역할을 바꾸거나, 비밀번호를 재설정할 수
+        있어요. 필요할 때 로그인을 막는 &ldquo;비활성화&rdquo;도 가능합니다 — 이미 거래·메모 등 기록을 남긴 계정은
+        완전 삭제가 안 되니(과거 기록의 작성자 정보가 끊어지는 걸 막기 위한 보호 장치) 그럴 땐 삭제 대신
+        비활성화를 써주세요.
       </p>
       {!adminApiConfigured && (
         <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">

@@ -146,7 +146,14 @@ export async function deleteAccount(formData: FormData): Promise<{ error?: strin
     }
 
     const { error } = await admin.auth.admin.deleteUser(userId);
-    if (error) return { error: error.message };
+    if (error) {
+      // 이 계정으로 등록된 거래/메모/첨부파일 등이 하나라도 있으면(created_by 외래키),
+      // DB가 참조 무결성 때문에 삭제를 거부한다 — 실사용 계정은 거의 항상 여기 걸림.
+      // 완전 삭제 대신 비활성화(로그인 차단)를 쓰도록 안내한다.
+      return {
+        error: `이 계정으로 이미 등록된 거래·메모 등 기록이 있어 완전히 삭제할 수 없습니다. 대신 "비활성화"로 로그인만 막아주세요. (${error.message})`,
+      };
+    }
     revalidatePath("/backups");
     return {};
   } catch (err) {
@@ -160,9 +167,17 @@ export async function suspendAccount(formData: FormData): Promise<{ error?: stri
 
   const userId = String(formData.get("user_id") ?? "");
   if (!userId) return { error: "계정을 찾을 수 없습니다." };
+  if (userId === guard.userId) return { error: "본인 계정은 비활성화할 수 없습니다." };
 
   try {
     const admin = createAdminClient();
+    const { data: rows } = await admin.from("users").select("id, role");
+    const target = (rows ?? []).find((r) => r.id === userId);
+    const adminCount = (rows ?? []).filter((r) => r.role === "admin").length;
+    if (target?.role === "admin" && adminCount <= 1) {
+      return { error: "마지막 관리자 계정은 비활성화할 수 없습니다." };
+    }
+
     const { error } = await admin.auth.admin.updateUserById(userId, { ban_duration: TAX_AGENT_SUSPEND_DURATION });
     if (error) return { error: error.message };
     await admin.from("users").update({ resuspend_at: null }).eq("id", userId);
