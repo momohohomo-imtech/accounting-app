@@ -46,6 +46,7 @@ function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) 
   const [role, setRole] = useState<Role>(account.role);
   const [changingPassword, setChangingPassword] = useState(false);
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -78,6 +79,10 @@ function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) 
       setMessage("비밀번호는 6자 이상이어야 합니다.");
       return;
     }
+    if (password !== passwordConfirm) {
+      setMessage("비밀번호가 서로 일치하지 않습니다.");
+      return;
+    }
     if (!(await confirm(`${account.name}(${account.email}) 계정의 비밀번호를 변경하시겠습니까?`))) return;
     setPending(true);
     setMessage(null);
@@ -91,6 +96,7 @@ function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) 
     } else {
       setMessage("비밀번호가 변경되었습니다.");
       setPassword("");
+      setPasswordConfirm("");
       setChangingPassword(false);
     }
   }
@@ -184,7 +190,11 @@ function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) 
             type="button"
             variant="secondary"
             size="sm"
-            onClick={() => setChangingPassword((v) => !v)}
+            onClick={() => {
+              setChangingPassword((v) => !v);
+              setPassword("");
+              setPasswordConfirm("");
+            }}
             disabled={pending}
           >
             비밀번호 변경
@@ -239,17 +249,34 @@ function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) 
       </div>
 
       {changingPassword && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="새 비밀번호 (6자 이상)"
-            className={`${fieldClass} max-w-xs`}
-          />
-          <Button type="button" size="sm" onClick={handleSetPassword} disabled={pending}>
-            저장
-          </Button>
+        <div className="mt-3 border-t border-slate-100 pt-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="새 비밀번호 (6자 이상)"
+              className={`${fieldClass} max-w-xs`}
+            />
+            <input
+              type="password"
+              value={passwordConfirm}
+              onChange={(e) => setPasswordConfirm(e.target.value)}
+              placeholder="새 비밀번호 확인"
+              className={`${fieldClass} max-w-xs`}
+            />
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSetPassword}
+              disabled={pending || !password || password !== passwordConfirm}
+            >
+              저장
+            </Button>
+          </div>
+          {password && passwordConfirm && password !== passwordConfirm && (
+            <p className="mt-1 text-xs text-red-600">비밀번호가 서로 일치하지 않습니다.</p>
+          )}
         </div>
       )}
 
@@ -264,6 +291,7 @@ function AddAccountForm({ onDone }: { onDone: () => void }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState<Role>("staff");
   const [pending, setPending] = useState(false);
@@ -271,6 +299,14 @@ function AddAccountForm({ onDone }: { onDone: () => void }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (password.length < 6) {
+      setError("비밀번호는 6자 이상이어야 합니다.");
+      return;
+    }
+    if (password !== passwordConfirm) {
+      setError("비밀번호가 서로 일치하지 않습니다.");
+      return;
+    }
     if (!(await confirm(`${email} 계정을 추가하시겠습니까?`))) return;
     setPending(true);
     setError(null);
@@ -311,13 +347,26 @@ function AddAccountForm({ onDone }: { onDone: () => void }) {
           />
         </div>
         <div className="flex flex-col gap-1">
+          <label className={labelClass}>초기 비밀번호 확인</label>
+          <input
+            type="password"
+            value={passwordConfirm}
+            onChange={(e) => setPasswordConfirm(e.target.value)}
+            required
+            className={fieldClass}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
           <label className={labelClass}>역할</label>
           <RoleSelect value={role} onChange={setRole} />
         </div>
       </div>
+      {password && passwordConfirm && password !== passwordConfirm && (
+        <p className="text-xs text-red-600">비밀번호가 서로 일치하지 않습니다.</p>
+      )}
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={pending}>
+        <Button type="submit" size="sm" disabled={pending || !password || password !== passwordConfirm}>
           추가
         </Button>
         <Button type="button" variant="secondary" size="sm" onClick={onDone} disabled={pending}>
