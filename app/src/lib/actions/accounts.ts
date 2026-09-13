@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/actions/authGuard";
 import { TAX_AGENT_SUSPEND_DURATION } from "@/lib/taxAgentSuspend";
+import { PROTECTED_OWNER_EMAIL } from "@/lib/protectedAccount";
 
 export type Role = "admin" | "staff" | "tax_agent";
 const ROLES: Role[] = ["admin", "staff", "tax_agent"];
@@ -123,6 +124,12 @@ export async function updateAccount(formData: FormData): Promise<{ error?: strin
 
   try {
     const admin = createAdminClient();
+    if (role !== "admin") {
+      const { data: targetRow } = await admin.from("users").select("email").eq("id", id).maybeSingle();
+      if (targetRow?.email === PROTECTED_OWNER_EMAIL) {
+        return { error: "이 계정은 항상 관리자로 유지되어야 해서 다른 역할로 바꿀 수 없습니다." };
+      }
+    }
     const { error } = await admin.from("users").update({ name, role }).eq("id", id);
     if (error) return { error: error.message };
     revalidatePath("/backups");
@@ -161,8 +168,11 @@ export async function deleteAccount(formData: FormData): Promise<{ error?: strin
 
   try {
     const admin = createAdminClient();
-    const { data: rows } = await admin.from("users").select("id, role");
+    const { data: rows } = await admin.from("users").select("id, email, role");
     const target = (rows ?? []).find((r) => r.id === userId);
+    if (target?.email === PROTECTED_OWNER_EMAIL) {
+      return { error: "이 계정은 삭제할 수 없습니다." };
+    }
     const adminCount = (rows ?? []).filter((r) => r.role === "admin").length;
     if (target?.role === "admin" && adminCount <= 1) {
       return { error: "마지막 관리자 계정은 삭제할 수 없습니다." };
@@ -206,8 +216,11 @@ export async function suspendAccount(formData: FormData): Promise<{ error?: stri
 
   try {
     const admin = createAdminClient();
-    const { data: rows } = await admin.from("users").select("id, role");
+    const { data: rows } = await admin.from("users").select("id, email, role");
     const target = (rows ?? []).find((r) => r.id === userId);
+    if (target?.email === PROTECTED_OWNER_EMAIL) {
+      return { error: "이 계정은 비활성화할 수 없습니다." };
+    }
     const adminCount = (rows ?? []).filter((r) => r.role === "admin").length;
     if (target?.role === "admin" && adminCount <= 1) {
       return { error: "마지막 관리자 계정은 비활성화할 수 없습니다." };

@@ -15,6 +15,7 @@ import {
   type Account,
   type Role,
 } from "@/lib/actions/accounts";
+import { PROTECTED_OWNER_EMAIL } from "@/lib/protectedAccount";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
@@ -25,9 +26,22 @@ function formatDateTime(iso: string) {
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-function RoleSelect({ value, onChange }: { value: Role; onChange: (v: Role) => void }) {
+function RoleSelect({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: Role;
+  onChange: (v: Role) => void;
+  disabled?: boolean;
+}) {
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value as Role)} className={`${fieldClass} w-28`}>
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value as Role)}
+      disabled={disabled}
+      className={`${fieldClass} w-28`}
+    >
       {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
         <option key={r} value={r}>
           {ROLE_LABEL[r]}
@@ -38,6 +52,8 @@ function RoleSelect({ value, onChange }: { value: Role; onChange: (v: Role) => v
 }
 
 function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) {
+  const isProtected = account.email === PROTECTED_OWNER_EMAIL;
+  const locked = isSelf || isProtected;
   const router = useRouter();
   const confirm = useConfirm();
   const globalPending = useGlobalPending();
@@ -143,7 +159,7 @@ function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) 
           {editingInfo ? (
             <div className="flex flex-wrap items-center gap-2">
               <input value={name} onChange={(e) => setName(e.target.value)} className={`${fieldClass} w-40`} />
-              <RoleSelect value={role} onChange={setRole} />
+              <RoleSelect value={role} onChange={setRole} disabled={isProtected} />
             </div>
           ) : (
             <p className="font-medium text-slate-900">
@@ -153,6 +169,9 @@ function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) 
             </p>
           )}
           {isSelf && <p className="mt-0.5 text-xs text-slate-400">본인 계정은 삭제·비활성화할 수 없습니다.</p>}
+          {isProtected && !isSelf && (
+            <p className="mt-0.5 text-xs text-slate-400">대표 계정은 삭제·비활성화·역할 변경이 불가능합니다.</p>
+          )}
           {account.authMissing ? (
             <p className="mt-0.5 text-xs font-medium text-slate-500">
               로그인 정보 없음 — 연결이 끊긴 기록(이미 로그인 불가, 데이터만 남아있음)
@@ -222,8 +241,8 @@ function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) 
                 variant={account.suspended ? "primary" : "danger"}
                 size="sm"
                 onClick={handleToggleSuspend}
-                disabled={pending || isSelf}
-                title={isSelf ? "본인 계정은 비활성화할 수 없습니다" : undefined}
+                disabled={pending || locked}
+                title={locked ? "이 계정은 비활성화할 수 없습니다" : undefined}
               >
                 {account.suspended ? "비활성화 해제" : "비활성화"}
               </Button>
@@ -245,8 +264,8 @@ function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) 
               variant="danger"
               size="sm"
               onClick={() => setConfirmDelete(true)}
-              disabled={pending || isSelf}
-              title={isSelf ? "본인 계정은 삭제할 수 없습니다" : undefined}
+              disabled={pending || locked}
+              title={locked ? "이 계정은 삭제할 수 없습니다" : undefined}
             >
               삭제
             </Button>
