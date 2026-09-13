@@ -16,6 +16,9 @@ export type Account = {
   role: Role;
   suspended: boolean;
   resuspendAt: string | null;
+  // public.users엔 있지만 auth.users엔 없는 상태(과거 수기 등록 등으로 어긋난 데이터) —
+  // 로그인 자체가 이미 불가능한 "유령" 행이라 비활성화/재활성화 대상이 아님.
+  authMissing: boolean;
 };
 
 export async function getAccounts(): Promise<Account[]> {
@@ -31,7 +34,19 @@ export async function getAccounts(): Promise<Account[]> {
     return await Promise.all(
       rows.map(async (r) => {
         const { data } = await admin.auth.admin.getUserById(r.id);
-        const bannedUntil = data.user?.banned_until;
+        if (!data.user) {
+          return {
+            id: r.id,
+            email: r.email,
+            name: r.name,
+            role: r.role as Role,
+            suspended: false,
+            resuspendAt: null,
+            authMissing: true,
+          };
+        }
+
+        const bannedUntil = data.user.banned_until;
         let suspended = Boolean(bannedUntil && new Date(bannedUntil).getTime() > Date.now());
         let resuspendAt: string | null = r.resuspend_at;
 
@@ -43,11 +58,19 @@ export async function getAccounts(): Promise<Account[]> {
           resuspendAt = null;
         }
 
-        return { id: r.id, email: r.email, name: r.name, role: r.role as Role, suspended, resuspendAt };
+        return { id: r.id, email: r.email, name: r.name, role: r.role as Role, suspended, resuspendAt, authMissing: false };
       })
     );
   } catch {
-    return rows.map((r) => ({ id: r.id, email: r.email, name: r.name, role: r.role as Role, suspended: false, resuspendAt: null }));
+    return rows.map((r) => ({
+      id: r.id,
+      email: r.email,
+      name: r.name,
+      role: r.role as Role,
+      suspended: false,
+      resuspendAt: null,
+      authMissing: false,
+    }));
   }
 }
 
@@ -147,6 +170,18 @@ export async function deleteAccount(formData: FormData): Promise<{ error?: strin
 
     const { error } = await admin.auth.admin.deleteUser(userId);
     if (error) {
+      // auth.users에 이 id가 아예 없는 상태(과거 수기 등록 등으로 어긋난 데이터) —
+      // 로그인 자체가 불가능한 유령 행이므로 public.users 행만 직접 지운다.
+      if (/not found/i.test(error.message)) {
+        const { error: rowError } = await admin.from("users").delete().eq("id", userId);
+        if (rowError) {
+          return {
+            error: `이 계정은 로그인 정보가 없는 상태(연결이 끊긴 기록)인데, 이미 등록된 거래·메모 등 기록이 있어 완전히 지울 수는 없습니다. 다만 로그인 자체가 이미 불가능해서 위험하지는 않습니다. (${rowError.message})`,
+          };
+        }
+        revalidatePath("/backups");
+        return {};
+      }
       // 이 계정으로 등록된 거래/메모/첨부파일 등이 하나라도 있으면(created_by 외래키),
       // DB가 참조 무결성 때문에 삭제를 거부한다 — 실사용 계정은 거의 항상 여기 걸림.
       // 완전 삭제 대신 비활성화(로그인 차단)를 쓰도록 안내한다.
@@ -179,7 +214,12 @@ export async function suspendAccount(formData: FormData): Promise<{ error?: stri
     }
 
     const { error } = await admin.auth.admin.updateUserById(userId, { ban_duration: TAX_AGENT_SUSPEND_DURATION });
-    if (error) return { error: error.message };
+    if (error) {
+      if (/not found/i.test(error.message)) {
+        return { error: "이 계정은 로그인 정보가 없는 상태(연결이 끊긴 기록)라 비활성화할 대상이 없습니다 — 이미 로그인이 불가능합니다." };
+      }
+      return { error: error.message };
+    }
     await admin.from("users").update({ resuspend_at: null }).eq("id", userId);
     revalidatePath("/backups");
     return {};
@@ -200,7 +240,12 @@ export async function unsuspendAccount(formData: FormData): Promise<{ error?: st
   try {
     const admin = createAdminClient();
     const { error } = await admin.auth.admin.updateUserById(userId, { ban_duration: "none" });
-    if (error) return { error: error.message };
+    if (error) {
+      if (/not found/i.test(error.message)) {
+        return { error: "이 계정은 로그인 정보가 없는 상태(연결이 끊긴 기록)입니다." };
+      }
+      return { error: error.message };
+    }
     await admin.from("users").update({ resuspend_at: resuspendAt }).eq("id", userId);
     revalidatePath("/backups");
     return {};

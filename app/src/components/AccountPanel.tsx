@@ -152,9 +152,16 @@ function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) 
               {isSelf && <span className="ml-1 text-xs font-normal text-slate-400">(나)</span>}
             </p>
           )}
-          <p className={`mt-0.5 text-xs font-medium ${account.suspended ? "text-red-600" : "text-emerald-600"}`}>
-            {account.suspended ? "비활성화됨 — 로그인 불가" : "정상 — 로그인 가능"}
-          </p>
+          {isSelf && <p className="mt-0.5 text-xs text-slate-400">본인 계정은 삭제·비활성화할 수 없습니다.</p>}
+          {account.authMissing ? (
+            <p className="mt-0.5 text-xs font-medium text-slate-500">
+              로그인 정보 없음 — 연결이 끊긴 기록(이미 로그인 불가, 데이터만 남아있음)
+            </p>
+          ) : (
+            <p className={`mt-0.5 text-xs font-medium ${account.suspended ? "text-red-600" : "text-emerald-600"}`}>
+              {account.suspended ? "비활성화됨 — 로그인 불가" : "정상 — 로그인 가능"}
+            </p>
+          )}
           {!account.suspended && account.resuspendAt && (
             <p className="mt-0.5 text-xs text-amber-600">{formatDateTime(account.resuspendAt)}에 자동으로 다시 비활성화됩니다</p>
           )}
@@ -197,27 +204,31 @@ function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) 
           >
             비밀번호 변경
           </Button>
-          {account.suspended && (
-            <input
-              type="number"
-              min={1}
-              value={hours}
-              onChange={(e) => setHours(e.target.value)}
-              placeholder="시간(선택)"
-              title="입력하면 그 시간 뒤에 자동으로 다시 비활성화됩니다. 비워두면 무기한 해제됩니다."
-              className={`${fieldClass} w-24`}
-            />
+          {!account.authMissing && (
+            <>
+              {account.suspended && (
+                <input
+                  type="number"
+                  min={1}
+                  value={hours}
+                  onChange={(e) => setHours(e.target.value)}
+                  placeholder="시간(선택)"
+                  title="입력하면 그 시간 뒤에 자동으로 다시 비활성화됩니다. 비워두면 무기한 해제됩니다."
+                  className={`${fieldClass} w-24`}
+                />
+              )}
+              <Button
+                type="button"
+                variant={account.suspended ? "primary" : "danger"}
+                size="sm"
+                onClick={handleToggleSuspend}
+                disabled={pending || isSelf}
+                title={isSelf ? "본인 계정은 비활성화할 수 없습니다" : undefined}
+              >
+                {account.suspended ? "비활성화 해제" : "비활성화"}
+              </Button>
+            </>
           )}
-          <Button
-            type="button"
-            variant={account.suspended ? "primary" : "danger"}
-            size="sm"
-            onClick={handleToggleSuspend}
-            disabled={pending || isSelf}
-            title={isSelf ? "본인 계정은 비활성화할 수 없습니다" : undefined}
-          >
-            {account.suspended ? "비활성화 해제" : "비활성화"}
-          </Button>
           {confirmDelete ? (
             <>
               <span className="text-xs font-medium text-red-600">정말 삭제?</span>
