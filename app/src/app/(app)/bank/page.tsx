@@ -9,6 +9,7 @@ import { formatWon } from "@/lib/format";
 import { BankTransactionTable } from "@/components/BankTransactionTable";
 import { BankTransactionFilter } from "@/components/BankTransactionFilter";
 import { BankAccountsPopup } from "@/components/BankAccountsPopup";
+import { BankAccountMemo } from "@/components/BankAccountMemo";
 import { BankEntryPopup } from "@/components/BankEntryPopup";
 
 const accountFields: FieldConfig[] = [
@@ -142,6 +143,7 @@ export default async function BankPage({
                 <p className={`mt-2 font-mono text-2xl font-bold ${balance < 0 ? "text-red-600" : "text-slate-900"}`}>
                   {formatWon(balance)}
                 </p>
+                <BankAccountMemo accountId={a.id} initialMemo={a.memo ?? ""} />
               </div>
             );
           })}

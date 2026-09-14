@@ -39,6 +39,14 @@ export async function updateBankAccountRecord(formData: FormData) {
   revalidatePath("/bank");
 }
 
+export async function updateBankAccountMemo(formData: FormData) {
+  const supabase = await createClient();
+  const id = String(formData.get("id"));
+  const memo = String(formData.get("memo") ?? "") || null;
+  await supabase.from("bank_accounts").update({ memo }).eq("id", id);
+  revalidatePath("/bank");
+}
+
 export async function deleteBankAccountRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
