@@ -132,8 +132,13 @@ export function DailyWorkerUsageStatementTable({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [wageMultiplier, setWageMultiplier] = useState<1 | 1.5 | 2>(1);
   const [openBlocks, setOpenBlocks] = useState<Set<string>>(new Set());
+  const [dateSortDir, setDateSortDir] = useState<"asc" | "desc">("desc");
 
-  const blocks = useMemo(() => buildStatementBlocks(rows), [rows]);
+  const blocks = useMemo(() => {
+    const built = buildStatementBlocks(rows);
+    // 블록 내부(연속일 소계)는 항상 날짜순 유지 — 전체 블록이 나열되는 순서만 토글.
+    return dateSortDir === "desc" ? built : [...built].reverse();
+  }, [rows, dateSortDir]);
   const rowNoById = useMemo(() => {
     const map = new Map<string, number>();
     let n = 0;
@@ -177,7 +182,15 @@ export function DailyWorkerUsageStatementTable({
       <thead>
         <tr className="border-b border-slate-300 text-slate-500">
           <th className="py-1.5 pr-2 text-center">번호</th>
-          <th className="py-1.5 pr-2 text-center">사용일자</th>
+          <th className="py-1.5 pr-2 text-center">
+            <button
+              type="button"
+              onClick={() => setDateSortDir((d) => (d === "desc" ? "asc" : "desc"))}
+              className="inline-flex items-center gap-0.5 print:pointer-events-none"
+            >
+              사용일자 <span className="text-[10px]">{dateSortDir === "desc" ? "▼" : "▲"}</span>
+            </button>
+          </th>
           <th className="py-1.5 pr-2 text-center">이름</th>
           <th className="py-1.5 pr-2 text-center">주민번호</th>
           <th className="py-1.5 pr-2 text-center">전화번호</th>
