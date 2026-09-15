@@ -16,6 +16,7 @@ export type VendorHistoryItem = {
   project_name: string | null;
   needs_classification: boolean;
   amount: number;
+  vatExcludedAmount: number;
   status: "미정산" | "즉시결제" | "정산완료" | "정산 합계";
   methodName: string | null;
 };
@@ -70,13 +71,22 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
     const rows: (string | number)[][] = [];
     for (const g of filtered) {
       for (const it of g.items) {
-        rows.push([it.status, g.label, formatDate(it.trans_date), it.project_name ?? "일반경비", it.item_name ?? "-", it.methodName ?? "", it.amount]);
+        rows.push([
+          it.status,
+          g.label,
+          formatDate(it.trans_date),
+          it.project_name ?? "일반경비",
+          it.item_name ?? "-",
+          it.methodName ?? "",
+          it.vatExcludedAmount,
+          it.amount,
+        ]);
       }
     }
     const label = year === "all" ? "전체" : month === "all" ? `${year}년` : `${year}-${month}`;
     await downloadXlsx(
       `외상이력_${label}.xlsx`,
-      ["상태", "거래처", "날짜", "프로젝트", "품목", "결제수단", "금액"],
+      ["상태", "거래처", "날짜", "프로젝트", "품목", "결제수단", "VAT 제외 금액", "금액"],
       rows,
       "외상이력"
     );
@@ -135,6 +145,15 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
                     {g.items.length}건 · 합계 <span className="font-semibold text-slate-900">{formatWon(total)}</span>
                   </span>
                 </CardHeader>
+                <div className="flex items-center gap-3 pb-1 text-[10px] text-slate-400">
+                  <span className="w-24 shrink-0" />
+                  <span className="w-16 shrink-0" />
+                  <span className="w-28 shrink-0" />
+                  <span className="flex-1" />
+                  <span className="w-20 shrink-0" />
+                  <span className="w-28 shrink-0 text-right">VAT 제외</span>
+                  <span className="w-28 shrink-0 text-right">합계</span>
+                </div>
                 <ul className="divide-y divide-slate-100">
                   {g.items.map((it) => (
                     <li key={it.id} className="flex items-center gap-3 py-2 text-sm">
@@ -153,6 +172,7 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
                       </span>
                       <span className="flex-1 truncate text-slate-700">{it.item_name ?? "-"}</span>
                       <span className="w-20 shrink-0 truncate text-right text-slate-400">{it.methodName ?? ""}</span>
+                      <span className="w-28 shrink-0 text-right text-slate-400">{formatWon(it.vatExcludedAmount)}</span>
                       <span className="w-28 shrink-0 text-right font-medium text-slate-900">{formatWon(it.amount)}</span>
                       <LinkButton
                         href={`/transactions?tab=credit&editTx=${it.id}`}

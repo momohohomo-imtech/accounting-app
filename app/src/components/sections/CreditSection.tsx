@@ -105,6 +105,7 @@ export async function CreditSection() {
       project_name: tx.projects?.name ?? null,
       needs_classification: tx.needs_classification,
       amount: transactionTotal(tx),
+      vatExcludedAmount: tx.type === "매출" ? tx.sales_amount : tx.purchase_amount,
       status,
       methodName: tx.payment_methods?.name ?? null,
     });
