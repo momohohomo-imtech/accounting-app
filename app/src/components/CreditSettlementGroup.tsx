@@ -32,6 +32,10 @@ export function CreditSettlementGroup({
   }
 
   const groupTotal = items.reduce((s, i) => s + i.remaining, 0);
+  const groupVatExcludedTotal = items.reduce(
+    (s, i) => s + (i.tx.type === "매출" ? i.tx.sales_amount : i.tx.purchase_amount),
+    0
+  );
   const selectedTotal = items.filter((i) => selected.has(i.tx.id)).reduce((s, i) => s + i.remaining, 0);
 
   return (
@@ -39,7 +43,9 @@ export function CreditSettlementGroup({
       <CardHeader>
         <CardTitle>{label}</CardTitle>
         <span className="text-sm text-slate-500">
-          미정산 합계 <span className="font-semibold text-slate-900">{formatWon(groupTotal)}</span>
+          미정산 합계{" "}
+          <span className="font-medium text-blue-600">VAT 제외 {formatWon(groupVatExcludedTotal)}</span>{" "}
+          <span className="font-semibold text-slate-900">{formatWon(groupTotal)}</span>
         </span>
       </CardHeader>
 

@@ -26,6 +26,10 @@ export type VendorHistoryGroup = {
   items: VendorHistoryItem[];
 };
 
+// 헤더 라벨 줄과 실제 데이터 행이 정확히 같은 트랙 폭을 써야 정렬이 어긋나지 않음
+// (한쪽이라도 auto 트랙을 쓰면 남는 공간 계산이 달라져 밀림) — 두 곳 모두 이 상수를 그대로 쓸 것.
+const HISTORY_GRID_COLS = "6rem 4rem 7rem minmax(0,1fr) 5rem 7rem 7rem 3.5rem 3.5rem";
+
 const STATUS_VARIANT = {
   미정산: "amber",
   즉시결제: "slate",
@@ -147,7 +151,7 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
                 </CardHeader>
                 <div
                   className="grid items-center gap-3 pb-1 text-[10px] text-slate-400"
-                  style={{ gridTemplateColumns: "6rem 4rem 7rem minmax(0,1fr) 5rem 7rem 7rem" }}
+                  style={{ gridTemplateColumns: HISTORY_GRID_COLS }}
                 >
                   <span />
                   <span />
@@ -156,13 +160,15 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
                   <span />
                   <span className="text-right text-blue-600">VAT 제외</span>
                   <span className="text-right">합계</span>
+                  <span />
+                  <span />
                 </div>
                 <ul className="divide-y divide-slate-100">
                   {g.items.map((it) => (
                     <li
                       key={it.id}
                       className="grid items-center gap-3 py-2 text-sm"
-                      style={{ gridTemplateColumns: "6rem 4rem 7rem minmax(0,1fr) 5rem 7rem 7rem auto auto" }}
+                      style={{ gridTemplateColumns: HISTORY_GRID_COLS }}
                     >
                       <span className="text-slate-500">{formatDate(it.trans_date)}</span>
                       <Badge variant={STATUS_VARIANT[it.status]} className="justify-center">
