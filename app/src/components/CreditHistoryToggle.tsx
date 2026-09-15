@@ -145,23 +145,30 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
                     {g.items.length}건 · 합계 <span className="font-semibold text-slate-900">{formatWon(total)}</span>
                   </span>
                 </CardHeader>
-                <div className="flex items-center gap-3 pb-1 text-[10px] text-slate-400">
-                  <span className="w-24 shrink-0" />
-                  <span className="w-16 shrink-0" />
-                  <span className="w-28 shrink-0" />
-                  <span className="flex-1" />
-                  <span className="w-20 shrink-0" />
-                  <span className="w-28 shrink-0 text-right">VAT 제외</span>
-                  <span className="w-28 shrink-0 text-right">합계</span>
+                <div
+                  className="grid items-center gap-3 pb-1 text-[10px] text-slate-400"
+                  style={{ gridTemplateColumns: "6rem 4rem 7rem minmax(0,1fr) 5rem 7rem 7rem" }}
+                >
+                  <span />
+                  <span />
+                  <span />
+                  <span />
+                  <span />
+                  <span className="text-right text-blue-600">VAT 제외</span>
+                  <span className="text-right">합계</span>
                 </div>
                 <ul className="divide-y divide-slate-100">
                   {g.items.map((it) => (
-                    <li key={it.id} className="flex items-center gap-3 py-2 text-sm">
-                      <span className="w-24 shrink-0 text-slate-500">{formatDate(it.trans_date)}</span>
-                      <Badge variant={STATUS_VARIANT[it.status]} className="w-16 shrink-0 justify-center">
+                    <li
+                      key={it.id}
+                      className="grid items-center gap-3 py-2 text-sm"
+                      style={{ gridTemplateColumns: "6rem 4rem 7rem minmax(0,1fr) 5rem 7rem 7rem auto auto" }}
+                    >
+                      <span className="text-slate-500">{formatDate(it.trans_date)}</span>
+                      <Badge variant={STATUS_VARIANT[it.status]} className="justify-center">
                         {it.status}
                       </Badge>
-                      <span className="w-28 shrink-0 truncate text-slate-500">
+                      <span className="truncate text-slate-500">
                         {it.needs_classification ? (
                           <span className="inline-flex rounded-full bg-green-600 px-2 py-0.5 text-xs font-medium text-white">
                             분류 대기 중
@@ -170,10 +177,10 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
                           (it.project_name ?? <span className="font-medium text-red-600">일반경비</span>)
                         )}
                       </span>
-                      <span className="flex-1 truncate text-slate-700">{it.item_name ?? "-"}</span>
-                      <span className="w-20 shrink-0 truncate text-right text-slate-400">{it.methodName ?? ""}</span>
-                      <span className="w-28 shrink-0 text-right text-slate-400">{formatWon(it.vatExcludedAmount)}</span>
-                      <span className="w-28 shrink-0 text-right font-medium text-slate-900">{formatWon(it.amount)}</span>
+                      <span className="truncate text-slate-700">{it.item_name ?? "-"}</span>
+                      <span className="truncate text-right text-slate-400">{it.methodName ?? ""}</span>
+                      <span className="text-right text-blue-600">{formatWon(it.vatExcludedAmount)}</span>
+                      <span className="text-right font-medium text-slate-900">{formatWon(it.amount)}</span>
                       <LinkButton
                         href={`/transactions?tab=credit&editTx=${it.id}`}
                         variant="secondary"
