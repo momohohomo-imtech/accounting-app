@@ -49,6 +49,8 @@ export type FieldConfig = {
   exclusiveWith?: string;
   /** Render the whole row with a light background color keyed by this field's raw value (table view only). A value not present in the map gets no special background. */
   rowBackgroundByValue?: Record<string, RowBgColor>;
+  /** Render a small colored dot after this cell's text, colored by the row's value at this field name (a RowBgColor). Table view only. */
+  dotColorField?: string;
   /** Show a checkbox (above the table) letting the user show/hide this column — state is remembered per table. */
   toggleable?: boolean;
   /** Initial shown/hidden state for a `toggleable` column before the user changes it. Defaults to true. */

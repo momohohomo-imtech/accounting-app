@@ -26,14 +26,23 @@ const TABS = [
   { key: "purchase_orders", label: "발주서" },
 ];
 
-// 프로젝트 목록 행 배경색 — 완료 수금대기는 파랑, 공사 완료는 녹색, 검토중/기타는 옅은 회색.
-// 타 프로젝트 귀속(및 그 귀속 대상 프로젝트)은 같은 귀속 그룹끼리 같은 색으로 묶어서
-// 한눈에 알아볼 수 있게 하고, 서로 다른 그룹은 아래 팔레트를 돌려가며 다른 색을 쓴다.
-const MERGE_GROUP_PALETTE: RowBgColor[] = ["purple", "amber", "teal", "pink", "indigo", "cyan", "orange", "fuchsia"];
+// 프로젝트 목록 행 배경색 — 상태 기준: 진행중 옅은 빨강, 완료 수금대기 파랑, 공사 완료 녹색,
+// 검토중/기타 옅은 회색. 타 프로젝트 귀속 행은 자기 상태색 대신 귀속 대상(부모) 프로젝트의
+// 상태색을 그대로 물려받는다(부모와 같은 배경으로 묶여 보이게).
+function statusRowColor(status: string | null | undefined): RowBgColor | undefined {
+  if (status === "done") return "green";
+  if (status === "review" || status === "etc") return "gray";
+  if (status === "ongoing") return "red";
+  if (status === PROJECT_STATUS_AWAITING_PAYMENT) return "blue";
+  return undefined;
+}
 // rowColorKey 필드는 색상 이름을 그대로 값으로 쓰므로(예: "green" → "green") 항등 매핑이면 충분.
 const ROW_COLOR_IDENTITY_MAP: Record<string, RowBgColor> = Object.fromEntries(
-  (["green", "gray", "blue", ...MERGE_GROUP_PALETTE] as RowBgColor[]).map((c) => [c, c])
+  (["green", "gray", "blue", "red"] as RowBgColor[]).map((c) => [c, c])
 );
+// 귀속 그룹(부모 프로젝트 id 기준) 표시용 — 프로젝트명 옆 동그라미 색. 같은 부모로 묶인 행끼리
+// 같은 색, 서로 다른 그룹은 이 팔레트를 돌려가며 다른 색을 쓴다.
+const MERGE_GROUP_PALETTE: RowBgColor[] = ["purple", "amber", "teal", "pink", "indigo", "cyan", "orange", "fuchsia"];
 
 export default async function ProjectsPage({
   searchParams,
@@ -162,6 +171,7 @@ async function ProjectListSection({
       required: true,
       width: "13%",
       tertiaryColorField: "contractMismatch",
+      dotColorField: "mergeGroupColor",
     },
     {
       name: "parent_project_id",
@@ -286,28 +296,25 @@ async function ProjectListSection({
     };
   });
 
-  // 귀속 그룹(부모 프로젝트 id 기준) 색상 배정 — 처음 등장하는 순서대로 팔레트를 돌려 배정.
+  // 귀속 그룹(부모 프로젝트 id 기준) 동그라미 색 배정 — 처음 등장하는 순서대로 팔레트를 돌려 배정.
   const groupRootIds = Array.from(
     new Set(tableRows.filter((p) => p.parent_project_id).map((p) => p.parent_project_id as string))
   );
   const groupColorByRootId = new Map<string, RowBgColor>(
     groupRootIds.map((id, i) => [id, MERGE_GROUP_PALETTE[i % MERGE_GROUP_PALETTE.length]])
   );
+  const statusByProjectId = new Map(tableRows.map((p) => [p.id, p.status as string | null]));
 
   const coloredRows = tableRows.map((p) => {
-    let rowColorKey: RowBgColor | undefined;
-    if (p.parent_project_id) {
-      rowColorKey = groupColorByRootId.get(p.parent_project_id as string);
-    } else if (groupColorByRootId.has(p.id)) {
-      rowColorKey = groupColorByRootId.get(p.id);
-    } else if (p.status === "done") {
-      rowColorKey = "green";
-    } else if (p.status === "review" || p.status === "etc") {
-      rowColorKey = "gray";
-    } else if (p.status === PROJECT_STATUS_AWAITING_PAYMENT) {
-      rowColorKey = "blue";
-    }
-    return { ...p, rowColorKey };
+    const mergeGroupColor = p.parent_project_id
+      ? groupColorByRootId.get(p.parent_project_id as string)
+      : groupColorByRootId.get(p.id);
+    // 귀속(merged) 상태는 자기 상태색이 없으니 귀속 대상 프로젝트의 상태색을 그대로 물려받는다.
+    const effectiveStatus =
+      p.status === "merged" && p.parent_project_id
+        ? (statusByProjectId.get(p.parent_project_id as string) ?? p.status)
+        : p.status;
+    return { ...p, rowColorKey: statusRowColor(effectiveStatus), mergeGroupColor };
   });
 
   const awaitingPaymentProjects = tableRows.filter((p) => p.status === PROJECT_STATUS_AWAITING_PAYMENT);

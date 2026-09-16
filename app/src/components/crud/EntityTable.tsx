@@ -63,6 +63,27 @@ function rowBgClass(row: Row, fields: FieldConfig[]): string | undefined {
   return undefined;
 }
 
+const DOT_COLOR_CLASS: Record<RowBgColor, string> = {
+  red: "bg-red-500",
+  blue: "bg-blue-500",
+  green: "bg-green-500",
+  gray: "bg-slate-400",
+  purple: "bg-purple-500",
+  amber: "bg-amber-500",
+  teal: "bg-teal-500",
+  pink: "bg-pink-500",
+  indigo: "bg-indigo-500",
+  cyan: "bg-cyan-500",
+  orange: "bg-orange-500",
+  fuchsia: "bg-fuchsia-500",
+};
+
+function dotColorClass(row: Row, f: FieldConfig): string | undefined {
+  if (!f.dotColorField) return undefined;
+  const color = row[f.dotColorField] as RowBgColor | undefined;
+  return color ? DOT_COLOR_CLASS[color] : undefined;
+}
+
 function tableStorageKey(fields: FieldConfig[]) {
   return `entityTableColWidths:${fields.map((f) => f.name).join(",")}`;
 }
@@ -339,10 +360,19 @@ export function EntityTable({
                 >
                   {f.display === "progress" ? (
                     <ProgressCell value={Number(row[f.name]) || 0} />
-                  ) : cellColorClass(row, f) ? (
-                    <span className={cellColorClass(row, f)}>{displayValue(row, f)}</span>
                   ) : (
-                    displayValue(row, f)
+                    <>
+                      {cellColorClass(row, f) ? (
+                        <span className={cellColorClass(row, f)}>{displayValue(row, f)}</span>
+                      ) : (
+                        displayValue(row, f)
+                      )}
+                      {dotColorClass(row, f) && (
+                        <span
+                          className={`ml-1.5 inline-block h-2 w-2 rounded-full align-middle ${dotColorClass(row, f)}`}
+                        />
+                      )}
+                    </>
                   )}
                 </Td>
               ))}
