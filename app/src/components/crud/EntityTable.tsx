@@ -111,6 +111,7 @@ export function EntityTable({
   deleteAction,
   extraActions,
   editPopup,
+  groupByField,
 }: {
   fields: FieldConfig[];
   rows: Row[];
@@ -119,6 +120,13 @@ export function EntityTable({
   extraActions?: Record<string, ReactNode>;
   /** Show the edit form in a modal instead of expanding the row inline. */
   editPopup?: boolean;
+  /**
+   * Row field name holding another row's id (e.g. a "parent" reference). When set, a row whose
+   * value at this field matches another visible row's id is always kept directly under that row —
+   * sorting reorders these parent+children groups relative to each other (by the parent's value),
+   * never splits a group apart.
+   */
+  groupByField?: string;
 }) {
   const confirm = useConfirm();
   const pending = useGlobalPending();
@@ -230,9 +238,26 @@ export function EntityTable({
   }
 
   const sortedRows = useMemo(() => {
-    if (!sortField) return rows;
-    const copy = [...rows];
-    copy.sort((a, b) => {
+    // groupByField가 있으면 그 필드로 다른 행을 가리키는 행(자식)을 항상 그 행(부모) 바로
+    // 아래에 묶어두고, 정렬은 그룹(부모+자식들)을 통째로 부모 기준값으로 재배치한다 — 자식이
+    // 그룹에서 떨어져 나가 다른 곳에 꽂히는 일이 없게.
+    const rowById = new Map(rows.map((r) => [r.id, r]));
+    const childrenByParentId = new Map<string, Row[]>();
+    const childIds = new Set<string>();
+    if (groupByField) {
+      for (const r of rows) {
+        const parentId = r[groupByField] as string | null | undefined;
+        if (parentId && rowById.has(parentId)) {
+          childIds.add(r.id);
+          const list = childrenByParentId.get(parentId) ?? [];
+          list.push(r);
+          childrenByParentId.set(parentId, list);
+        }
+      }
+    }
+
+    function compare(a: Row, b: Row) {
+      if (!sortField) return 0;
       const va = displayValue(a, sortField);
       const vb = displayValue(b, sortField);
       const na = Number(a[sortField.name]);
@@ -242,9 +267,18 @@ export function EntityTable({
           ? na - nb
           : va.localeCompare(vb);
       return sortDir === "asc" ? cmp : -cmp;
-    });
-    return copy;
-  }, [rows, sortField, sortDir]);
+    }
+
+    const blocks = rows
+      .filter((r) => !childIds.has(r.id))
+      .map((anchor) => ({
+        anchor,
+        children: [...(childrenByParentId.get(anchor.id) ?? [])].sort(compare),
+      }));
+    if (sortField) blocks.sort((a, b) => compare(a.anchor, b.anchor));
+
+    return blocks.flatMap((b) => [b.anchor, ...b.children]);
+  }, [rows, sortField, sortDir, groupByField]);
 
   const editingRow = editPopup ? sortedRows.find((r) => r.id === editingId) : undefined;
   useEscapeKey(Boolean(editingRow), () => setEditingId(null));

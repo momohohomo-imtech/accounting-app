@@ -362,6 +362,7 @@ async function ProjectListSection({
           <EntityTable
             fields={fields}
             rows={coloredRows}
+            groupByField="parent_project_id"
             updateAction={updateProjectRecord}
             deleteAction={deleteProjectRecord}
             editPopup
