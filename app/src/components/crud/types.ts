@@ -1,5 +1,19 @@
 export type ProjectSearchOption = { value: string; label: string; year: number; siteLabel: string };
 
+export type RowBgColor =
+  | "red"
+  | "blue"
+  | "green"
+  | "gray"
+  | "purple"
+  | "amber"
+  | "teal"
+  | "pink"
+  | "indigo"
+  | "cyan"
+  | "orange"
+  | "fuchsia";
+
 export type FieldConfig = {
   name: string;
   label: string;
@@ -34,7 +48,7 @@ export type FieldConfig = {
   /** For type "checkbox": checking this field unchecks the named sibling checkbox field in the form (mutual exclusivity). */
   exclusiveWith?: string;
   /** Render the whole row with a light background color keyed by this field's raw value (table view only). A value not present in the map gets no special background. */
-  rowBackgroundByValue?: Record<string, "red" | "blue">;
+  rowBackgroundByValue?: Record<string, RowBgColor>;
   /** Show a checkbox (above the table) letting the user show/hide this column — state is remembered per table. */
   toggleable?: boolean;
   /** Initial shown/hidden state for a `toggleable` column before the user changes it. Defaults to true. */

@@ -5,7 +5,7 @@ import type { CreditPayment } from "@/lib/types";
 import { CreatePanel } from "@/components/crud/CreatePanel";
 import { EntityTable } from "@/components/crud/EntityTable";
 import { createProjectRecord, updateProjectRecord, deleteProjectRecord } from "@/lib/actions/projects";
-import type { FieldConfig } from "@/components/crud/types";
+import type { FieldConfig, RowBgColor } from "@/components/crud/types";
 import { PageTabs } from "@/components/PageTabs";
 import { SitesSection } from "@/components/sections/SitesSection";
 import { QuotesSection } from "@/components/sections/QuotesSection";
@@ -13,7 +13,7 @@ import { PurchaseOrdersSection } from "@/components/sections/PurchaseOrdersSecti
 import { YearFilter } from "@/components/YearFilter";
 import { ProjectProfitReport } from "@/components/ProjectProfitReport";
 import { LinkButton } from "@/components/ui/Button";
-import { PROJECT_STATUS_OPTIONS, PROJECT_STATUS_COLLECTED, PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
+import { PROJECT_STATUS_OPTIONS, PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
 import { formatWon } from "@/lib/format";
 import { ProjectListExportButtons } from "@/components/ProjectListExportButtons";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
@@ -26,13 +26,13 @@ const TABS = [
   { key: "purchase_orders", label: "발주서" },
 ];
 
-// 프로젝트 목록 행 배경색 — 완료 수금대기는 파랑으로 따로 강조하고, 수금 완료 전
-// 나머지 상태는 전부 옅은 빨강, 수금 완료는 배경 없음(정상).
-const STATUS_ROW_BACKGROUND: Record<string, "red" | "blue"> = Object.fromEntries(
-  PROJECT_STATUS_OPTIONS.filter((o) => o.value !== PROJECT_STATUS_COLLECTED).map((o) => [
-    o.value,
-    o.value === PROJECT_STATUS_AWAITING_PAYMENT ? "blue" : "red",
-  ])
+// 프로젝트 목록 행 배경색 — 완료 수금대기는 파랑, 공사 완료는 녹색, 검토중/기타는 옅은 회색.
+// 타 프로젝트 귀속(및 그 귀속 대상 프로젝트)은 같은 귀속 그룹끼리 같은 색으로 묶어서
+// 한눈에 알아볼 수 있게 하고, 서로 다른 그룹은 아래 팔레트를 돌려가며 다른 색을 쓴다.
+const MERGE_GROUP_PALETTE: RowBgColor[] = ["purple", "amber", "teal", "pink", "indigo", "cyan", "orange", "fuchsia"];
+// rowColorKey 필드는 색상 이름을 그대로 값으로 쓰므로(예: "green" → "green") 항등 매핑이면 충분.
+const ROW_COLOR_IDENTITY_MAP: Record<string, RowBgColor> = Object.fromEntries(
+  (["green", "gray", "blue", ...MERGE_GROUP_PALETTE] as RowBgColor[]).map((c) => [c, c])
 );
 
 export default async function ProjectsPage({
@@ -179,7 +179,13 @@ async function ProjectListSection({
       type: "select",
       options: PROJECT_STATUS_OPTIONS,
       width: "6%",
-      rowBackgroundByValue: STATUS_ROW_BACKGROUND,
+    },
+    {
+      name: "rowColorKey",
+      label: "행 색상",
+      readOnly: true,
+      hideInTable: true,
+      rowBackgroundByValue: ROW_COLOR_IDENTITY_MAP,
     },
     {
       name: "is_service",
@@ -280,6 +286,30 @@ async function ProjectListSection({
     };
   });
 
+  // 귀속 그룹(부모 프로젝트 id 기준) 색상 배정 — 처음 등장하는 순서대로 팔레트를 돌려 배정.
+  const groupRootIds = Array.from(
+    new Set(tableRows.filter((p) => p.parent_project_id).map((p) => p.parent_project_id as string))
+  );
+  const groupColorByRootId = new Map<string, RowBgColor>(
+    groupRootIds.map((id, i) => [id, MERGE_GROUP_PALETTE[i % MERGE_GROUP_PALETTE.length]])
+  );
+
+  const coloredRows = tableRows.map((p) => {
+    let rowColorKey: RowBgColor | undefined;
+    if (p.parent_project_id) {
+      rowColorKey = groupColorByRootId.get(p.parent_project_id as string);
+    } else if (groupColorByRootId.has(p.id)) {
+      rowColorKey = groupColorByRootId.get(p.id);
+    } else if (p.status === "done") {
+      rowColorKey = "green";
+    } else if (p.status === "review" || p.status === "etc") {
+      rowColorKey = "gray";
+    } else if (p.status === PROJECT_STATUS_AWAITING_PAYMENT) {
+      rowColorKey = "blue";
+    }
+    return { ...p, rowColorKey };
+  });
+
   const awaitingPaymentProjects = tableRows.filter((p) => p.status === PROJECT_STATUS_AWAITING_PAYMENT);
   const awaitingPaymentContractSum = awaitingPaymentProjects.reduce((sum, p) => sum + (p.contract_amount ?? 0), 0);
 
@@ -324,7 +354,7 @@ async function ProjectListSection({
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm print:border-0 print:p-0 print:shadow-none">
           <EntityTable
             fields={fields}
-            rows={tableRows}
+            rows={coloredRows}
             updateAction={updateProjectRecord}
             deleteAction={deleteProjectRecord}
             editPopup

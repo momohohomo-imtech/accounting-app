@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { FieldConfig } from "./types";
+import type { FieldConfig, RowBgColor } from "./types";
 import { EntityForm } from "./EntityForm";
 import { Table, THead, Tr, Td } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
@@ -40,7 +40,20 @@ function cellColorClass(row: Row, f: FieldConfig): string | undefined {
   return undefined;
 }
 
-const ROW_BG_CLASS = { red: "bg-red-50", blue: "bg-blue-50" } as const;
+const ROW_BG_CLASS: Record<RowBgColor, string> = {
+  red: "bg-red-50",
+  blue: "bg-blue-50",
+  green: "bg-green-50",
+  gray: "bg-slate-100",
+  purple: "bg-purple-50",
+  amber: "bg-amber-50",
+  teal: "bg-teal-50",
+  pink: "bg-pink-50",
+  indigo: "bg-indigo-50",
+  cyan: "bg-cyan-50",
+  orange: "bg-orange-50",
+  fuchsia: "bg-fuchsia-50",
+};
 
 function rowBgClass(row: Row, fields: FieldConfig[]): string | undefined {
   for (const f of fields) {
