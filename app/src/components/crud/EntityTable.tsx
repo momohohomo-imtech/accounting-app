@@ -55,7 +55,26 @@ const ROW_BG_CLASS: Record<RowBgColor, string> = {
   fuchsia: "bg-fuchsia-50",
 };
 
+const STRONG_ROW_BG_CLASS: Record<RowBgColor, string> = {
+  red: "bg-red-200",
+  blue: "bg-blue-200",
+  green: "bg-green-200",
+  gray: "bg-slate-300",
+  purple: "bg-purple-200",
+  amber: "bg-amber-200",
+  teal: "bg-teal-200",
+  pink: "bg-pink-200",
+  indigo: "bg-indigo-200",
+  cyan: "bg-cyan-200",
+  orange: "bg-orange-200",
+  fuchsia: "bg-fuchsia-200",
+};
+
 function rowBgClass(row: Row, fields: FieldConfig[]): string | undefined {
+  for (const f of fields) {
+    const strong = f.strongRowBackgroundByValue?.[row[f.name] as string];
+    if (strong) return STRONG_ROW_BG_CLASS[strong];
+  }
   for (const f of fields) {
     const color = f.rowBackgroundByValue?.[row[f.name] as string];
     if (color) return ROW_BG_CLASS[color];

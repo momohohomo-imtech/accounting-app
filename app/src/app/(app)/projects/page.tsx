@@ -44,6 +44,26 @@ const ROW_COLOR_IDENTITY_MAP: Record<string, RowBgColor> = Object.fromEntries(
 // 같은 색, 서로 다른 그룹은 이 팔레트를 돌려가며 다른 색을 쓴다.
 const MERGE_GROUP_PALETTE: RowBgColor[] = ["purple", "amber", "teal", "pink", "indigo", "cyan", "orange", "fuchsia"];
 
+// 확인 필요/우선순위 등 사용자가 직접 지정하는 강조색 — 지정되면 자동 상태색 대신 이 색(진한
+// 배경)을 쓴다. 프로젝트 수정 팝업에서 색상 선택기로 고른다.
+const HIGHLIGHT_COLOR_OPTIONS: { value: RowBgColor; label: string }[] = [
+  { value: "red", label: "빨강" },
+  { value: "orange", label: "주황" },
+  { value: "amber", label: "노랑" },
+  { value: "green", label: "초록" },
+  { value: "teal", label: "청록" },
+  { value: "cyan", label: "시안" },
+  { value: "blue", label: "파랑" },
+  { value: "indigo", label: "남색" },
+  { value: "purple", label: "보라" },
+  { value: "fuchsia", label: "자홍" },
+  { value: "pink", label: "분홍" },
+  { value: "gray", label: "회색" },
+];
+const HIGHLIGHT_COLOR_IDENTITY_MAP: Record<string, RowBgColor> = Object.fromEntries(
+  HIGHLIGHT_COLOR_OPTIONS.map((o) => [o.value, o.value])
+);
+
 export default async function ProjectsPage({
   searchParams,
 }: {
@@ -196,6 +216,14 @@ async function ProjectListSection({
       readOnly: true,
       hideInTable: true,
       rowBackgroundByValue: ROW_COLOR_IDENTITY_MAP,
+    },
+    {
+      name: "highlight_color",
+      label: "강조색 (확인 필요·우선순위 표시)",
+      type: "color-swatch",
+      options: HIGHLIGHT_COLOR_OPTIONS,
+      hideInTable: true,
+      strongRowBackgroundByValue: HIGHLIGHT_COLOR_IDENTITY_MAP,
     },
     {
       name: "is_service",

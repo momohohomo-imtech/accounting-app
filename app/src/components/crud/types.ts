@@ -19,7 +19,7 @@ export type FieldConfig = {
   label: string;
   /** Shorter header shown in table view; falls back to `label` when omitted. */
   tableLabel?: string;
-  type?: "text" | "textarea" | "date" | "tel" | "number" | "select" | "checkbox" | "time" | "project-search";
+  type?: "text" | "textarea" | "date" | "tel" | "number" | "select" | "checkbox" | "time" | "project-search" | "color-swatch";
   required?: boolean;
   /** `color` on an option renders that option's text in that color in the table view. */
   options?: { value: string; label: string; color?: "red" | "blue" | "green" }[];
@@ -49,6 +49,8 @@ export type FieldConfig = {
   exclusiveWith?: string;
   /** Render the whole row with a light background color keyed by this field's raw value (table view only). A value not present in the map gets no special background. */
   rowBackgroundByValue?: Record<string, RowBgColor>;
+  /** Like `rowBackgroundByValue` but with a more saturated shade, and checked first (wins over any `rowBackgroundByValue` match on the same row). Meant for a user-chosen override. */
+  strongRowBackgroundByValue?: Record<string, RowBgColor>;
   /** Render a small colored dot after this cell's text, colored by the row's value at this field name (a RowBgColor). Table view only. */
   dotColorField?: string;
   /** Show a checkbox (above the table) letting the user show/hide this column — state is remembered per table. */
