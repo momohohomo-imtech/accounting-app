@@ -239,6 +239,22 @@ export default async function ReportsPage({
     profitRate: projectSummaryQuoteAmount > 0 ? (projectSummaryProfit / projectSummaryQuoteAmount) * 100 : null,
   };
 
+  // 상단 박스의 "예상 순이익율" — 대시보드의 "총 예상 매출"/"이익 예상"과 동일한 기준(연도
+  // 전체, site 필터와 무관)으로 계산. PendingPaymentProfitSection.tsx의 이익 예상 계산과
+  // 같은 방식(발주액 기준 프로젝트 손익 − 프로젝트 미배정 일반경비 − 직원급여/상여/4대보험)을 그대로 따름.
+  const PAYROLL_CATEGORY_NAME = "직원급여/상여/4대보험"; // PendingPaymentProfitSection.tsx와 동일한 이름 유지 필요
+  const totalExpectedRevenue = byProjectAll.reduce((s, p) => s + (p.contract_amount ?? 0), 0);
+  const yearProfitSum = byProjectAll.filter((p) => p.quote_amount != null).reduce((s, p) => s + p.profit, 0);
+  const nullProjectPurchaseTx = transactions.filter((t) => !t.project_id && t.type === "매입");
+  const generalExpense = nullProjectPurchaseTx
+    .filter((t) => one(t.expense_categories)?.name !== PAYROLL_CATEGORY_NAME)
+    .reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
+  const payrollCost = nullProjectPurchaseTx
+    .filter((t) => one(t.expense_categories)?.name === PAYROLL_CATEGORY_NAME)
+    .reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
+  const yearProfitEstimate = yearProfitSum - generalExpense - payrollCost;
+  const yearProfitEstimateRate = totalExpectedRevenue > 0 ? (yearProfitEstimate / totalExpectedRevenue) * 100 : null;
+
   // 현장별 손익 (프로젝트 없는 일반경비는 별도 묶음)
   const siteMap = new Map<string, { name: string; sales: number; purchase: number }>();
   for (const t of transactions) {
@@ -756,7 +772,7 @@ export default async function ReportsPage({
             {projectSummary.profitRate === null ? "-" : `${projectSummary.profitRate.toFixed(2)}%`}
           </p>
 
-          <div className="mb-4 grid grid-cols-2 gap-4 print:mb-2 print:gap-2 print:break-inside-avoid">
+          <div className="mb-4 grid grid-cols-3 gap-4 print:mb-2 print:gap-2 print:break-inside-avoid">
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:border-0 print:p-0 print:shadow-none">
               <p className="text-sm text-slate-500 print:text-xs">총 발주액</p>
               <p className="mt-1 font-mono text-2xl font-bold text-slate-900 print:text-lg">
@@ -767,6 +783,12 @@ export default async function ReportsPage({
               <p className="text-sm text-slate-500 print:text-xs">총 이익금</p>
               <p className="mt-1 font-mono text-2xl font-bold text-slate-900 print:text-lg">
                 {formatWon(projectSummary.profit)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:border-0 print:p-0 print:shadow-none">
+              <p className="text-sm text-slate-500 print:text-xs">예상 순이익율 (연간 전체 기준)</p>
+              <p className="mt-1 font-mono text-2xl font-bold text-red-600 print:text-lg">
+                {yearProfitEstimateRate === null ? "-" : `${yearProfitEstimateRate.toFixed(2)}%`}
               </p>
             </div>
           </div>
