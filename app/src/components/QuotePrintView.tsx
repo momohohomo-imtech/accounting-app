@@ -264,7 +264,7 @@ export function QuotePrintView({
                 <td className="py-2 pr-2 text-right font-mono">
                   {it.adjustedUnitPrice != null ? formatWon(it.adjustedUnitPrice) : "-"}
                 </td>
-                <td className="py-2 pr-2 text-right font-mono">{formatWon(it.confirmed)}</td>
+                <td className="py-2 pr-2 text-right font-mono">{it.confirmed === 0 ? "-" : formatWon(it.confirmed)}</td>
                 <td className="py-2 text-slate-500">{it.note ?? "-"}</td>
               </tr>
             ))}

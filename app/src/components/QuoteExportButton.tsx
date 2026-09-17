@@ -60,7 +60,7 @@ export function QuoteExportButton({
       r.unit ?? "-",
       r.quantity ?? "-",
       r.adjustedUnitPrice ?? "-",
-      r.confirmed,
+      r.confirmed === 0 ? "-" : r.confirmed,
       r.note ?? "-",
     ]);
     data.push(["", "", "", "", "", "합계", total, ""]);
