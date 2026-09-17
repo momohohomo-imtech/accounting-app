@@ -203,28 +203,28 @@ export function QuotePrintView({
             <table className="w-full text-xs">
               <tbody>
                 <tr className="border-b border-slate-200">
-                  <td className="w-16 px-3 py-1.5 text-slate-500">등록번호</td>
-                  <td className="px-3 py-1.5 text-slate-900">{bizRegNo || "-"}</td>
+                  <td className="w-20 whitespace-nowrap px-3 py-1.5 text-slate-500">등록번호</td>
+                  <td className="whitespace-nowrap px-3 py-1.5 text-slate-900">{bizRegNo || "-"}</td>
                 </tr>
                 <tr className="border-b border-slate-200">
-                  <td className="px-3 py-1.5 text-slate-500">상호</td>
-                  <td className="px-3 py-1.5 text-slate-900">
+                  <td className="w-20 whitespace-nowrap px-3 py-1.5 text-slate-500">상호</td>
+                  <td className="whitespace-nowrap px-3 py-1.5 text-slate-900">
                     {companyName || "-"} {representativeName && <span>(대표 {representativeName})</span>}
                   </td>
                 </tr>
                 <tr className="border-b border-slate-200">
-                  <td className="px-3 py-1.5 text-slate-500">주소</td>
-                  <td className="px-3 py-1.5 text-slate-900">{address || "-"}</td>
+                  <td className="w-20 whitespace-nowrap px-3 py-1.5 text-slate-500">주소</td>
+                  <td className="whitespace-nowrap px-3 py-1.5 text-slate-900">{address || "-"}</td>
                 </tr>
                 <tr className="border-b border-slate-200">
-                  <td className="px-3 py-1.5 text-slate-500">업태/종목</td>
-                  <td className="px-3 py-1.5 text-slate-900">
+                  <td className="w-20 whitespace-nowrap px-3 py-1.5 text-slate-500">업태/종목</td>
+                  <td className="whitespace-nowrap px-3 py-1.5 text-slate-900">
                     {bizType || "-"} / {bizItem || "-"}
                   </td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-1.5 text-slate-500">전화/팩스</td>
-                  <td className="px-3 py-1.5 text-slate-900">
+                  <td className="w-20 whitespace-nowrap px-3 py-1.5 text-slate-500">전화/팩스</td>
+                  <td className="whitespace-nowrap px-3 py-1.5 text-slate-900">
                     {phone || "-"} / {fax || "-"}
                   </td>
                 </tr>
