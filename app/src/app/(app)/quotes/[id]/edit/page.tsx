@@ -8,7 +8,7 @@ export default async function EditQuotePage({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const supabase = await createClient();
   const [{ data: quote }, { data: items }, { data: clients }, { data: sites }, { data: projects }] = await Promise.all([
-    supabase.from("quotes").select("*, clients(name), projects(name, project_code)").eq("id", id).single(),
+    supabase.from("quotes").select("*, clients(name)").eq("id", id).single(),
     supabase.from("quote_items").select("*").eq("quote_id", id).order("sort_order", { ascending: true }),
     supabase.from("clients").select("id, name").order("name"),
     supabase.from("sites").select("id, name, clients(name)").order("name"),
@@ -24,7 +24,6 @@ export default async function EditQuotePage({ params }: { params: Promise<{ id: 
   }));
 
   const clientName = (one(quote.clients) as { name: string } | null)?.name ?? quote.client_name_raw;
-  const projectInfo = one(quote.projects) as { name: string; project_code: string | null } | null;
 
   return (
     <div className="space-y-6">
@@ -70,7 +69,6 @@ export default async function EditQuotePage({ params }: { params: Promise<{ id: 
           quote_number: quote.quote_number,
           title: quote.title,
           clientName,
-          projectLabel: projectInfo ? `${projectInfo.project_code ?? ""} ${projectInfo.name}`.trim() : null,
           valid_until: quote.valid_until,
           memo: quote.memo,
           created_at: quote.created_at,

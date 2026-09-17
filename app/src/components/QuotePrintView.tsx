@@ -50,7 +50,6 @@ export function QuotePrintView({
     quote_number: string | null;
     title: string;
     clientName: string | null;
-    projectLabel: string | null;
     valid_until: string | null;
     memo: string | null;
     created_at: string;
@@ -152,7 +151,7 @@ export function QuotePrintView({
         <PrintButton />
       </div>
 
-      <div className="hidden rounded-2xl border border-slate-200 bg-white p-6 print:flex print:min-h-[297mm] print:flex-col print:rounded-none print:border-0 print:p-0">
+      <div className="hidden rounded-2xl border border-slate-200 bg-white p-6 print:flex print:min-h-[277mm] print:flex-col print:rounded-none print:border-0 print:p-0">
         <div className="flex items-center gap-2.5">
           <Image src="/logo-lockup.png" alt="" width={30} height={24} className="h-6 w-auto" />
           <span className="ml-auto font-mono text-[11px] tracking-widest text-slate-400">QUOTATION</span>
@@ -174,19 +173,13 @@ export function QuotePrintView({
             <span className="font-medium text-slate-900">{formatDate(quote.created_at)}</span>
           </p>
           <p>
-            <span className="text-slate-500">건명: </span>
+            <span className="text-slate-500">공사명: </span>
             <span className="font-medium text-slate-900">{quote.title}</span>
           </p>
           <p>
             <span className="text-slate-500">유효기한: </span>
             <span className="font-medium text-slate-900">{quote.valid_until ? formatDate(quote.valid_until) : "-"}</span>
           </p>
-          {quote.projectLabel && (
-            <p className="col-span-2">
-              <span className="text-slate-500">연결 프로젝트: </span>
-              <span className="font-medium text-slate-900">{quote.projectLabel}</span>
-            </p>
-          )}
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-3">
