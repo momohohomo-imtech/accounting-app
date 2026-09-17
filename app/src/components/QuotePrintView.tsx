@@ -9,6 +9,8 @@ import { PrintButton } from "@/components/PrintButton";
 import { QuoteExportButton } from "@/components/QuoteExportButton";
 import { fieldClass, labelClass } from "@/components/ui/field";
 
+const MIN_PRINT_ROWS = 9;
+
 type QuoteItemRow = {
   id: string;
   item_name: string | null;
@@ -109,7 +111,7 @@ export function QuotePrintView({
         <PrintButton />
       </div>
 
-      <div className="hidden rounded-2xl border border-slate-200 bg-white p-6 print:block print:rounded-none print:border-0 print:p-0">
+      <div className="hidden rounded-2xl border border-slate-200 bg-white p-6 print:flex print:min-h-[297mm] print:flex-col print:rounded-none print:border-0 print:p-0">
         <div className="flex items-center gap-2.5">
           <Image src="/logo-lockup.png" alt="" width={30} height={24} className="h-6 w-auto" />
           <span className="ml-auto font-mono text-[11px] tracking-widest text-slate-400">QUOTATION</span>
@@ -191,7 +193,7 @@ export function QuotePrintView({
         </div>
 
         <div className="mt-5 flex items-center justify-between rounded-lg border-2 border-brand bg-brand-soft px-4 py-3">
-          <span className="text-sm font-semibold text-slate-700">합계금액 (공급가액+세액)</span>
+          <span className="text-sm font-semibold text-slate-700">합계금액 (VAT 별도)</span>
           <span className="text-sm font-bold text-slate-900">
             {numberToKoreanAmount(total)} (<span className="font-mono">{formatWon(total)}</span>)
           </span>
@@ -227,39 +229,39 @@ export function QuotePrintView({
                 <td className="py-2 text-slate-500">{it.note ?? "-"}</td>
               </tr>
             ))}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={8} className="py-6 text-center text-slate-400">
-                  등록된 품목이 없습니다.
-                </td>
+            {/* 내역이 몇 줄이든 인쇄 서식은 항상 9줄 — 빈 줄은 No 표기 없이 공란으로 채움. */}
+            {Array.from({ length: Math.max(0, MIN_PRINT_ROWS - rows.length) }).map((_, i) => (
+              <tr key={`blank-${i}`} className="border-b border-slate-100">
+                <td className="py-2 pr-2">&nbsp;</td>
+                <td className="py-2 pr-2">&nbsp;</td>
+                <td className="py-2 pr-2">&nbsp;</td>
+                <td className="py-2 pr-2">&nbsp;</td>
+                <td className="py-2 pr-2">&nbsp;</td>
+                <td className="py-2 pr-2">&nbsp;</td>
+                <td className="py-2 pr-2">&nbsp;</td>
+                <td className="py-2">&nbsp;</td>
               </tr>
-            )}
+            ))}
           </tbody>
-          {rows.length > 0 && (
-            <tfoot>
-              <tr className="border-t-2 border-slate-300">
-                <td colSpan={6} className="py-2 text-right font-semibold text-slate-900">
-                  합계
-                </td>
-                <td className="py-2 text-right font-mono font-bold text-slate-900">{formatWon(total)}</td>
-                <td />
-              </tr>
-            </tfoot>
-          )}
+          <tfoot>
+            <tr className="border-t-2 border-slate-300">
+              <td colSpan={6} className="py-2 text-right font-semibold text-slate-900">
+                합계
+              </td>
+              <td className="py-2 text-right font-mono font-bold text-slate-900">{formatWon(total)}</td>
+              <td />
+            </tr>
+          </tfoot>
         </table>
 
-        {quote.memo && (
-          <div className="mt-6 rounded-lg border border-slate-200 p-3 text-sm">
-            <p className="mb-1 text-xs font-semibold text-slate-500">비고</p>
-            <p className="whitespace-pre-wrap text-slate-700">{quote.memo}</p>
-          </div>
-        )}
+        <div className="mt-6 min-h-[70px] rounded-lg border border-slate-200 p-3 text-sm">
+          <p className="mb-1 text-xs font-semibold text-slate-500">비고</p>
+          <p className="whitespace-pre-wrap text-slate-700">{quote.memo}</p>
+        </div>
 
-        <div className="mt-10 flex items-center justify-center gap-2 text-sm text-slate-900">
+        <div className="mt-auto flex items-center justify-center gap-2 pt-10 text-sm text-slate-900">
           <Image src="/logo-lockup.png" alt="" width={20} height={16} className="h-4 w-auto" />
-          <p className="font-semibold">
-            {companyName || "-"} {representativeName && <span>대표 {representativeName} (인)</span>}
-          </p>
+          <p className="font-semibold">{companyName || "-"}</p>
         </div>
       </div>
     </div>
