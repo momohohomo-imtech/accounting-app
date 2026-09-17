@@ -678,6 +678,9 @@ export default async function ReportsPage({
               <p className="mt-2 font-mono text-2xl font-bold text-red-600">
                 {yearProfitEstimateRate === null ? "-" : `${yearProfitEstimateRate.toFixed(2)}%`}
               </p>
+              <p className="mt-1 text-[11px] leading-tight text-slate-400">
+                {selectedYear}년 이익 예상 ÷ 총 예상 매출(수주액) — site 필터와 무관한 연간 전체 기준
+              </p>
             </div>
           </div>
         </div>
