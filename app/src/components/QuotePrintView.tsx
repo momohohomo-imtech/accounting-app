@@ -198,7 +198,7 @@ export function QuotePrintView({
           </div>
           <div className="rounded-lg border border-slate-300">
             <p className="border-b border-slate-300 bg-brand-soft px-3 py-1.5 text-xs font-semibold text-slate-600">
-              공급자
+              공급자&nbsp;&nbsp;&nbsp;&nbsp;
             </p>
             <table className="w-full text-xs">
               <tbody>
