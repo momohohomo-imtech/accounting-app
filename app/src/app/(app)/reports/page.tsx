@@ -658,7 +658,7 @@ export default async function ReportsPage({
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div>
               <p className="text-sm text-slate-500">{selectedYear}년 총 매출액</p>
               <p className="mt-2 font-mono text-2xl font-bold text-slate-900">{formatWon(yearTotal.sales)}</p>
@@ -671,6 +671,12 @@ export default async function ReportsPage({
               <p className="text-sm text-slate-500">{selectedYear}년 순손익</p>
               <p className="mt-2 font-mono text-2xl font-bold text-slate-900">
                 {formatWon(yearTotal.sales - yearTotal.purchase)}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">예상 순이익율</p>
+              <p className="mt-2 font-mono text-2xl font-bold text-red-600">
+                {yearProfitEstimateRate === null ? "-" : `${yearProfitEstimateRate.toFixed(2)}%`}
               </p>
             </div>
           </div>
@@ -772,7 +778,7 @@ export default async function ReportsPage({
             {projectSummary.profitRate === null ? "-" : `${projectSummary.profitRate.toFixed(2)}%`}
           </p>
 
-          <div className="mb-4 grid grid-cols-3 gap-4 print:mb-2 print:gap-2 print:break-inside-avoid">
+          <div className="mb-4 grid grid-cols-2 gap-4 print:mb-2 print:gap-2 print:break-inside-avoid">
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:border-0 print:p-0 print:shadow-none">
               <p className="text-sm text-slate-500 print:text-xs">총 발주액</p>
               <p className="mt-1 font-mono text-2xl font-bold text-slate-900 print:text-lg">
@@ -783,12 +789,6 @@ export default async function ReportsPage({
               <p className="text-sm text-slate-500 print:text-xs">총 이익금</p>
               <p className="mt-1 font-mono text-2xl font-bold text-slate-900 print:text-lg">
                 {formatWon(projectSummary.profit)}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:border-0 print:p-0 print:shadow-none">
-              <p className="text-sm text-slate-500 print:text-xs">예상 순이익율 (연간 전체 기준)</p>
-              <p className="mt-1 font-mono text-2xl font-bold text-red-600 print:text-lg">
-                {yearProfitEstimateRate === null ? "-" : `${yearProfitEstimateRate.toFixed(2)}%`}
               </p>
             </div>
           </div>
