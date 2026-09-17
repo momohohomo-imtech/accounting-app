@@ -76,6 +76,8 @@ export default async function EditQuotePage({ params }: { params: Promise<{ id: 
           created_at: quote.created_at,
         }}
         items={items ?? []}
+        quoteId={quote.id}
+        companyInfo={quote.company_info}
       />
     </div>
   );

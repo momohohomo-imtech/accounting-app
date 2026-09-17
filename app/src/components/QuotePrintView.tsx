@@ -8,8 +8,23 @@ import { computeConfirmedAmount, isVisibleQuoteItem } from "@/lib/quoteCalc";
 import { PrintButton } from "@/components/PrintButton";
 import { QuoteExportButton } from "@/components/QuoteExportButton";
 import { fieldClass, labelClass } from "@/components/ui/field";
+import { updateQuoteCompanyInfo, type QuoteCompanyInfo } from "@/lib/actions/quotes";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { Button } from "@/components/ui/Button";
 
 const MIN_PRINT_ROWS = 8;
+
+// 저장된 회사 정보가 없는(company_info가 null인) 견적서 — 새 견적서 포함 — 는 항상 이 기본값으로 보임.
+const DEFAULT_COMPANY_INFO: QuoteCompanyInfo = {
+  companyName: "아이엠테크",
+  representativeName: "",
+  bizRegNo: "521-32-01642",
+  address: "인천 남동구 호구포로 44번길 77",
+  bizType: "제조업",
+  bizItem: "컨베이어 장치 제조업",
+  phone: "",
+  fax: "032-232-0914",
+};
 
 type QuoteItemRow = {
   id: string;
@@ -28,6 +43,8 @@ type QuoteItemRow = {
 export function QuotePrintView({
   quote,
   items,
+  quoteId,
+  companyInfo,
 }: {
   quote: {
     quote_number: string | null;
@@ -39,15 +56,35 @@ export function QuotePrintView({
     created_at: string;
   };
   items: QuoteItemRow[];
+  quoteId: string;
+  /** 이 견적서에 저장된 공급자 정보 — null이면(새 견적서 등) 기본값을 씀. */
+  companyInfo: QuoteCompanyInfo | null;
 }) {
-  const [companyName, setCompanyName] = useState("아이엠테크");
-  const [representativeName, setRepresentativeName] = useState("");
-  const [bizRegNo, setBizRegNo] = useState("521-32-01642");
-  const [address, setAddress] = useState("인천 남동구 호구포로 44번길 77");
-  const [bizType, setBizType] = useState("제조업");
-  const [bizItem, setBizItem] = useState("컨베이어 장치 제조업");
-  const [phone, setPhone] = useState("");
-  const [fax, setFax] = useState("032-232-0914");
+  const pending = useGlobalPending();
+  const initial = companyInfo ?? DEFAULT_COMPANY_INFO;
+  const [companyName, setCompanyName] = useState(initial.companyName);
+  const [representativeName, setRepresentativeName] = useState(initial.representativeName);
+  const [bizRegNo, setBizRegNo] = useState(initial.bizRegNo);
+  const [address, setAddress] = useState(initial.address);
+  const [bizType, setBizType] = useState(initial.bizType);
+  const [bizItem, setBizItem] = useState(initial.bizItem);
+  const [phone, setPhone] = useState(initial.phone);
+  const [fax, setFax] = useState(initial.fax);
+
+  async function handleSaveCompanyInfo() {
+    await pending.run(() =>
+      updateQuoteCompanyInfo(quoteId, {
+        companyName,
+        representativeName,
+        bizRegNo,
+        address,
+        bizType,
+        bizItem,
+        phone,
+        fax,
+      })
+    );
+  }
 
   const rows = items.filter(isVisibleQuoteItem).map((it) => {
     const confirmed = computeConfirmedAmount(it.amount, it.handling_fee_pct);
@@ -105,8 +142,12 @@ export function QuotePrintView({
 
       <div className="flex flex-wrap items-center justify-end gap-2 print:hidden">
         <p className="mr-auto text-xs text-slate-400">
-          PDF로 저장하려면 인쇄 대화상자의 대상(프린터)에서 &ldquo;PDF로 저장&rdquo;을 선택하세요.
+          이 견적서에만 저장되며, 새 견적서는 항상 기본값(아이엠테크)으로 시작합니다. PDF로 저장하려면 인쇄
+          대화상자의 대상(프린터)에서 &ldquo;PDF로 저장&rdquo;을 선택하세요.
         </p>
+        <Button type="button" variant="secondary" size="sm" onClick={handleSaveCompanyInfo}>
+          공급자 정보 저장
+        </Button>
         <QuoteExportButton quote={quote} rows={rows} total={total} />
         <PrintButton />
       </div>
