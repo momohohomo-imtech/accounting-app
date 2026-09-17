@@ -147,7 +147,12 @@ export function QuotePrintView({
         <Button type="button" variant="secondary" size="sm" onClick={handleSaveCompanyInfo}>
           공급자 정보 저장
         </Button>
-        <QuoteExportButton quote={quote} rows={rows} total={total} />
+        <QuoteExportButton
+          quote={quote}
+          companyInfo={{ companyName, representativeName, bizRegNo, address, bizType, bizItem, phone, fax }}
+          rows={rows}
+          total={total}
+        />
         <PrintButton />
       </div>
 
