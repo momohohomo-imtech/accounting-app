@@ -9,7 +9,7 @@ import { PrintButton } from "@/components/PrintButton";
 import { QuoteExportButton } from "@/components/QuoteExportButton";
 import { fieldClass, labelClass } from "@/components/ui/field";
 
-const MIN_PRINT_ROWS = 9;
+const MIN_PRINT_ROWS = 8;
 
 type QuoteItemRow = {
   id: string;
