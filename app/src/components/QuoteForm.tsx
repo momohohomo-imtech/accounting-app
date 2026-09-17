@@ -429,6 +429,7 @@ export function QuoteForm({
             <span className="w-[3ch] text-center">No</span>
             <span className="w-[20ch]">품명</span>
             <span className="w-[5ch]">규격</span>
+            <span className="w-[6ch]">단위</span>
             <span className="w-[10ch] text-center">fee%</span>
             <span className="w-[10ch]">수량</span>
             <span className="w-[15ch]">단가</span>
@@ -464,6 +465,12 @@ export function QuoteForm({
                   onChange={(e) => updateItem(i, { spec: e.target.value })}
                   placeholder="규격"
                   className={`${compactInputClass} w-[5ch]`}
+                />
+                <input
+                  value={it.unit}
+                  onChange={(e) => updateItem(i, { unit: e.target.value })}
+                  placeholder="단위"
+                  className={`${compactInputClass} w-[6ch]`}
                 />
                 <input
                   type="number"
