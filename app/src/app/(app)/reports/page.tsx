@@ -15,6 +15,7 @@ import { isLedgerVisible } from "@/lib/credit";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import type { ReportAiInsight, CreditPayment } from "@/lib/types";
 import { VendorAggregateTable } from "@/components/VendorAggregateTable";
+import { PurchaseItemSearchTable } from "@/components/PurchaseItemSearchTable";
 import { VendorAgencyToggle } from "@/components/VendorAgencyToggle";
 import { ClassificationPendingTable } from "@/components/ClassificationPendingTable";
 import { CategoryAggregateTable } from "@/components/CategoryAggregateTable";
@@ -606,6 +607,32 @@ export default async function ReportsPage({
 
   const vendorExportRows = byVendor.map((v) => [v.name, v.count, v.amount]);
 
+  // 매입 품목 검색 — 올해 매입 거래 전부를 품목명으로 찾아볼 수 있게(검색어는 화면에서 입력).
+  const purchaseItemRows = transactions
+    .filter((t) => t.type === "매입")
+    .map((t) => {
+      const client = one(t.clients) as { name: string } | null;
+      const proj = one(t.projects) as { name: string } | null;
+      const cat = one(t.expense_categories) as { name: string } | null;
+      return {
+        id: t.id,
+        trans_date: t.trans_date,
+        clientName: client?.name ?? t.client_name_raw ?? "-",
+        projectName: proj?.name ?? "일반경비",
+        categoryName: cat?.name ?? "미분류",
+        itemName: t.item_name ?? "-",
+        amount: t.purchase_amount + t.purchase_vat,
+      };
+    });
+  const purchaseItemExportRows = purchaseItemRows.map((r) => [
+    formatDate(r.trans_date),
+    r.clientName,
+    r.projectName,
+    r.categoryName,
+    r.itemName,
+    r.amount,
+  ]);
+
   const classificationExportRows = classificationPendingRows.map((r) => [
     formatDate(r.date),
     r.type,
@@ -817,7 +844,7 @@ export default async function ReportsPage({
       <CollapsibleSection
         title={groupTitle("거래처·카테고리 집계")}
         bare
-        defaultOpen={groupDefaultOpen(["vendors", "classification", "categories", "customers"])}
+        defaultOpen={groupDefaultOpen(["vendors", "purchaseItems", "classification", "categories", "customers"])}
       >
        <div className="space-y-6 mt-3">
         <CollapsibleSection
@@ -831,6 +858,19 @@ export default async function ReportsPage({
           )}
         >
           <VendorAggregateTable rows={byVendor} year={selectedYear} vendorAgency={includeVendorAgency} />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title="매입 품목 검색 — 품목명으로 올해 매입 내역 찾기"
+          className={hiddenClass("purchaseItems")}
+          defaultOpen={printSection === "purchaseItems"}
+          headerExtra={sectionControls("purchaseItems", {
+            filename: `매입_품목_${selectedYear}.xlsx`,
+            headers: ["날짜", "거래처", "프로젝트", "카테고리", "품목", "금액"],
+            rows: purchaseItemExportRows,
+          })}
+        >
+          <PurchaseItemSearchTable rows={purchaseItemRows} />
         </CollapsibleSection>
 
         <CollapsibleSection
