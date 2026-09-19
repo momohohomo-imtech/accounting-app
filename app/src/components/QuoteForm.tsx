@@ -14,9 +14,6 @@ import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 type ClientOption = { id: string; name: string };
 
-// 이윤+잡비 기본값 — 발주금 대비 25%를 기본으로 깔고, 품목마다 필요하면 직접 조정.
-const DEFAULT_HANDLING_FEE_PCT = 25;
-
 function emptyItem(): QuoteItemInput {
   return {
     item_name: "",
@@ -24,7 +21,7 @@ function emptyItem(): QuoteItemInput {
     quantity: null,
     unit_price: null,
     amount: 0,
-    handling_fee_pct: DEFAULT_HANDLING_FEE_PCT,
+    handling_fee_pct: 0,
     note: "",
     unit: "",
     group_label: null,
@@ -81,7 +78,7 @@ export function QuoteForm({
   const [grouping, setGrouping] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [groupUnit, setGroupUnit] = useState("");
-  const [groupFeePct, setGroupFeePct] = useState(String(DEFAULT_HANDLING_FEE_PCT));
+  const [groupFeePct, setGroupFeePct] = useState("0");
   const [groupUnitPrice, setGroupUnitPrice] = useState("");
   const [groupQuantity, setGroupQuantity] = useState("1");
 
@@ -143,7 +140,7 @@ export function QuoteForm({
     const sum = Array.from(selected).reduce((s, i) => s + (items[i]?.amount || 0), 0);
     setGroupName("");
     setGroupUnit("");
-    setGroupFeePct(String(DEFAULT_HANDLING_FEE_PCT));
+    setGroupFeePct("0");
     setGroupUnitPrice(String(sum));
     setGroupQuantity("1");
     setGrouping(true);
