@@ -141,6 +141,9 @@ export async function deleteQuoteRecord(formData: FormData) {
   revalidatePath("/projects");
 }
 
+// 이윤+잡비 기본값 — 발주금 대비 25%를 기본으로 깔고, 견적서 화면에서 품목별로 직접 조정 가능.
+const DEFAULT_HANDLING_FEE_PCT = 25;
+
 // 기존 프로젝트의 매입 내역 + 대행구매 내역을 그대로 견적 품목 초안으로 불러오기.
 export async function fetchProjectPurchaseItems(projectId: string): Promise<QuoteItemInput[]> {
   const supabase = await createClient();
@@ -160,7 +163,7 @@ export async function fetchProjectPurchaseItems(projectId: string): Promise<Quot
     quantity: t.quantity,
     unit_price: t.unit_price,
     amount: t.purchase_amount + t.purchase_vat,
-    handling_fee_pct: 0,
+    handling_fee_pct: DEFAULT_HANDLING_FEE_PCT,
     note: "",
     unit: "",
     group_label: null,
@@ -173,7 +176,7 @@ export async function fetchProjectPurchaseItems(projectId: string): Promise<Quot
     quantity: null,
     unit_price: null,
     amount: a.amount,
-    handling_fee_pct: 0,
+    handling_fee_pct: DEFAULT_HANDLING_FEE_PCT,
     note: a.memo ?? "",
     unit: "",
     group_label: null,
