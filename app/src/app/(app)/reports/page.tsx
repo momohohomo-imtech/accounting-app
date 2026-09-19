@@ -622,6 +622,7 @@ export default async function ReportsPage({
         categoryName: cat?.name ?? "미분류",
         itemName: t.item_name ?? "-",
         amount: t.purchase_amount + t.purchase_vat,
+        editHref: `/reports?year=${selectedYear}${site ? `&site=${site}` : ""}&editTx=${t.id}`,
       };
     });
   const purchaseItemExportRows = purchaseItemRows.map((r) => [

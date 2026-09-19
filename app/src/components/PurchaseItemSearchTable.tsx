@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { formatWon, formatDate } from "@/lib/format";
 
 export type PurchaseItemRow = {
@@ -11,6 +12,7 @@ export type PurchaseItemRow = {
   categoryName: string;
   itemName: string;
   amount: number;
+  editHref: string;
 };
 
 type SortKey = "trans_date" | "clientName" | "projectName" | "categoryName" | "itemName" | "amount";
@@ -80,7 +82,8 @@ export function PurchaseItemSearchTable({ rows }: { rows: PurchaseItemRow[] }) {
                 <th className="pb-2 pr-4">{headerButton("projectName", "프로젝트")}</th>
                 <th className="pb-2 pr-4">{headerButton("categoryName", "카테고리")}</th>
                 <th className="pb-2 pr-4">{headerButton("itemName", "품목")}</th>
-                <th className="pb-2 text-right">{headerButton("amount", "금액")}</th>
+                <th className="pb-2 pr-4 text-right">{headerButton("amount", "금액")}</th>
+                <th className="pb-2 text-right print:hidden">관리</th>
               </tr>
             </thead>
             <tbody>
@@ -91,12 +94,20 @@ export function PurchaseItemSearchTable({ rows }: { rows: PurchaseItemRow[] }) {
                   <td className="py-2 pr-4 text-slate-700">{r.projectName}</td>
                   <td className="py-2 pr-4 text-slate-700">{r.categoryName}</td>
                   <td className="py-2 pr-4 text-slate-700">{r.itemName}</td>
-                  <td className="py-2 text-right font-mono text-slate-900">{formatWon(r.amount)}</td>
+                  <td className="py-2 pr-4 text-right font-mono text-slate-900">{formatWon(r.amount)}</td>
+                  <td className="py-2 text-right print:hidden">
+                    <Link
+                      href={r.editHref}
+                      className="text-xs text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
+                    >
+                      수정
+                    </Link>
+                  </td>
                 </tr>
               ))}
               {sorted.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-400">
+                  <td colSpan={7} className="py-8 text-center text-slate-400">
                     검색 결과가 없습니다.
                   </td>
                 </tr>
@@ -109,6 +120,7 @@ export function PurchaseItemSearchTable({ rows }: { rows: PurchaseItemRow[] }) {
                     {sorted.length}건 합계
                   </td>
                   <td className="py-2 text-right font-mono font-bold text-slate-900">{formatWon(total)}</td>
+                  <td className="print:hidden" />
                 </tr>
               </tfoot>
             )}
