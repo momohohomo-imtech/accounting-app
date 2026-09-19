@@ -9,9 +9,32 @@ import { ModalPrintButton } from "@/components/ModalPrintButton";
 export type CategoryAmount = { name: string; amount: number };
 
 export const REMAINDER_LABEL = "잔여 (발주액 중 미지출분)";
+// 그래프·보고서 상단에서만 참고용으로 보여주는 이윤+잡비 비율 — 실제 이익금/이익율 계산에는
+// 영향 없음(순수 표시용).
+export const HANDLING_FEE_PCT = 25;
 
 function sliceColor(name: string) {
   return name === REMAINDER_LABEL ? "#cbd5e1" : autoSiteColorHex(name);
+}
+
+// 카테고리별 매입 + 이윤·잡비(발주액 대비 %) + 잔여로 나눠서 그래프 데이터를 만듦 —
+// 팝업 그래프·인쇄용 그래프가 항상 같은 기준으로 보이게 여기 한 곳에서 계산.
+export function buildChartData(
+  data: CategoryAmount[],
+  quoteTotal: number,
+  handlingFeePct: number = HANDLING_FEE_PCT
+): { chartData: CategoryAmount[]; chartBase: number } {
+  const total = data.reduce((s, d) => s + d.amount, 0);
+  const chartBase = quoteTotal > 0 ? quoteTotal : total;
+  const handlingFeeAmount = quoteTotal > 0 ? Math.round((quoteTotal * handlingFeePct) / 100) : 0;
+  const afterCategories = Math.max(0, chartBase - total);
+  const feeSlice = Math.min(handlingFeeAmount, afterCategories);
+  const remainder = afterCategories - feeSlice;
+
+  const chartData = [...data];
+  if (feeSlice > 0) chartData.push({ name: `이윤+잡비 (${handlingFeePct}%)`, amount: feeSlice });
+  if (remainder > 0) chartData.push({ name: REMAINDER_LABEL, amount: remainder });
+  return { chartData, chartBase };
 }
 
 function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
@@ -143,11 +166,9 @@ export function ProjectPurchaseChartButton({
   const topCategory = data[0];
 
   // 그래프는 카테고리별 지출 비중을 "전체 지출 대비"가 아니라 "발주액 대비"로 보여줌 —
-  // 카테고리 합계가 발주액보다 적으면 나머지를 "잔여" 조각으로 채워서, 이 프로젝트에서
-  // 각 비용이 발주액의 몇 %를 차지하는지 한눈에 보이게 함.
-  const chartBase = quoteTotal > 0 ? quoteTotal : total;
-  const remainder = Math.max(0, chartBase - total);
-  const chartData = remainder > 0 ? [...data, { name: REMAINDER_LABEL, amount: remainder }] : data;
+  // 카테고리 합계가 발주액보다 적으면 나머지 중 이윤+잡비(25%) 몫을 먼저 떼어 보여주고,
+  // 그래도 남으면 "잔여" 조각으로 채워서 각 비용이 발주액의 몇 %를 차지하는지 한눈에 보이게 함.
+  const { chartData, chartBase } = buildChartData(data, quoteTotal);
 
   const bottomStats: [string, string][] = [
     ["발주액", formatWon(quoteTotal)],
