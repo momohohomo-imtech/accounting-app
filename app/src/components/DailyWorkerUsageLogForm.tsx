@@ -25,6 +25,7 @@ export function DailyWorkerUsageLogForm({
   const formRef = useRef<HTMLFormElement>(null);
   const [dateInput, setDateInput] = useState("");
   const [dates, setDates] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   function addDate() {
     if (!dateInput || dates.includes(dateInput)) return;
@@ -38,7 +39,12 @@ export function DailyWorkerUsageLogForm({
     e.preventDefault();
     const form = e.currentTarget;
     if (dates.length === 0) return;
-    await pending.run(() => Promise.resolve(createDailyWorkerUsageLogRecord(new FormData(form))));
+    setError(null);
+    const result = await pending.run(() => Promise.resolve(createDailyWorkerUsageLogRecord(new FormData(form))));
+    if (result?.error) {
+      setError(result.error);
+      return;
+    }
     formRef.current?.reset();
     setDates([]);
     setDateInput("");
@@ -118,6 +124,7 @@ export function DailyWorkerUsageLogForm({
         </div>
       </div>
 
+      {error && <p className="text-sm text-red-600">{error}</p>}
       <button
         type="submit"
         className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"

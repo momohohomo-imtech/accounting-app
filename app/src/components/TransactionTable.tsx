@@ -20,6 +20,7 @@ import { fieldClass } from "@/components/ui/field";
 import { cx } from "@/lib/cx";
 import type { Transaction } from "@/lib/types";
 import type { ProjectTreeNode } from "@/components/ProjectTreeFilter";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 type SortKey =
   | "trans_date"
@@ -111,6 +112,8 @@ export function TransactionTable({
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const pending = useGlobalPending();
   const [bulkField, setBulkField] = useState<BulkField>("project");
   const [bulkYear, setBulkYear] = useState("");
   const [bulkSiteId, setBulkSiteId] = useState("");
@@ -429,22 +432,47 @@ export function TransactionTable({
                     수정
                   </LinkButton>
                   {confirmDeleteId === t.id ? (
-                    <form action={deleteTransactionRecord} className="flex items-center gap-1">
-                      <input type="hidden" name="id" value={t.id} />
+                    <div className="flex items-center gap-1">
                       <span className="text-xs font-medium text-red-600">정말 삭제?</span>
-                      <Button variant="danger" size="xs" type="submit">
+                      <Button
+                        variant="danger"
+                        size="xs"
+                        type="button"
+                        onClick={async () => {
+                          const fd = new FormData();
+                          fd.append("id", t.id);
+                          const result = await pending.run(() => deleteTransactionRecord(fd));
+                          if (result?.error) {
+                            setDeleteError(result.error);
+                            return;
+                          }
+                          setDeleteError(null);
+                          setConfirmDeleteId(null);
+                        }}
+                      >
                         확인
                       </Button>
-                      <Button variant="secondary" size="xs" type="button" onClick={() => setConfirmDeleteId(null)}>
+                      <Button
+                        variant="secondary"
+                        size="xs"
+                        type="button"
+                        onClick={() => {
+                          setConfirmDeleteId(null);
+                          setDeleteError(null);
+                        }}
+                      >
                         취소
                       </Button>
-                    </form>
+                    </div>
                   ) : (
                     <Button variant="danger" size="xs" type="button" onClick={() => setConfirmDeleteId(t.id)}>
                       삭제
                     </Button>
                   )}
                 </div>
+                {confirmDeleteId === t.id && deleteError && (
+                  <p className="mt-1 text-right text-xs text-red-600">{deleteError}</p>
+                )}
               </Td>
             </Tr>
           ))}

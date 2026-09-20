@@ -16,20 +16,23 @@ function parse(formData: FormData) {
 
 export async function createClientRecord(formData: FormData) {
   const supabase = await createClient();
-  await supabase.from("clients").insert(parse(formData));
+  const { error } = await supabase.from("clients").insert(parse(formData));
+  if (error) return { error: error.message };
   revalidatePath("/transactions");
 }
 
 export async function updateClientRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("clients").update(parse(formData)).eq("id", id);
+  const { error } = await supabase.from("clients").update(parse(formData)).eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/transactions");
 }
 
 export async function deleteClientRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("clients").delete().eq("id", id);
+  const { error } = await supabase.from("clients").delete().eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/transactions");
 }

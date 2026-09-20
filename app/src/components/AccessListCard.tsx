@@ -59,12 +59,13 @@ export function AccessListCard({
   workers: WorkerOption[];
   employees: EmployeeOption[];
   updateAction: (formData: FormData) => Promise<{ error?: string } | undefined>;
-  deleteAction: (formData: FormData) => void;
+  deleteAction: (formData: FormData) => unknown;
 }) {
   const router = useRouter();
   const confirm = useConfirm();
   const globalPending = useGlobalPending();
   const [confirming, setConfirming] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -333,23 +334,37 @@ export function AccessListCard({
             members={members}
           />
           {confirming ? (
-            <form action={deleteAction} className="flex items-center gap-1">
-              <input type="hidden" name="id" value={id} />
+            <div className="flex items-center gap-1">
               <span className="text-xs font-medium text-red-600">정말 삭제?</span>
               <button
-                type="submit"
+                type="button"
+                onClick={async () => {
+                  const fd = new FormData();
+                  fd.append("id", id);
+                  const result = await globalPending.run(() => Promise.resolve(deleteAction(fd)));
+                  if (result && typeof result === "object" && "error" in result && result.error) {
+                    setDeleteError(String(result.error));
+                    return;
+                  }
+                  setDeleteError(null);
+                  setConfirming(false);
+                }}
                 className="rounded-lg border border-red-300 bg-red-600 px-2.5 py-1 text-xs text-white hover:bg-red-700"
               >
                 확인
               </button>
               <button
                 type="button"
-                onClick={() => setConfirming(false)}
+                onClick={() => {
+                  setConfirming(false);
+                  setDeleteError(null);
+                }}
                 className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-100"
               >
                 취소
               </button>
-            </form>
+              {deleteError && <span className="text-xs text-red-600">{deleteError}</span>}
+            </div>
           ) : (
             <button
               type="button"

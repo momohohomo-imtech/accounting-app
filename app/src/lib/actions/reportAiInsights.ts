@@ -13,13 +13,15 @@ export async function saveReportAiInsight(formData: FormData) {
   const title = String(formData.get("title") ?? "");
   const messages = JSON.parse(String(formData.get("messages") ?? "[]"));
 
-  await supabase.from("report_ai_insights").insert({ year, title, messages, created_by: user?.id ?? null });
+  const { error } = await supabase.from("report_ai_insights").insert({ year, title, messages, created_by: user?.id ?? null });
+  if (error) return { error: error.message };
   revalidatePath("/reports");
 }
 
 export async function deleteReportAiInsight(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("report_ai_insights").delete().eq("id", id);
+  const { error } = await supabase.from("report_ai_insights").delete().eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/reports");
 }

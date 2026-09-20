@@ -18,8 +18,8 @@ export function ReportAIInsights({
 }: {
   summary: Record<string, unknown> & { year: number };
   savedInsights: ReportAiInsight[];
-  saveAction: (formData: FormData) => Promise<void>;
-  deleteAction: (formData: FormData) => Promise<void>;
+  saveAction: (formData: FormData) => Promise<{ error?: string } | undefined>;
+  deleteAction: (formData: FormData) => Promise<{ error?: string } | undefined>;
 }) {
   const router = useRouter();
   const pending = useGlobalPending();
@@ -59,12 +59,17 @@ export function ReportAIInsights({
   async function handleSave() {
     if (messages.length === 0 || saving) return;
     setSaving(true);
+    setError(null);
     try {
       const fd = new FormData();
       fd.append("year", String(summary.year));
       fd.append("title", messages[0].text.slice(0, 60));
       fd.append("messages", JSON.stringify(messages));
-      await pending.run(() => saveAction(fd));
+      const result = await pending.run(() => saveAction(fd));
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
       router.refresh();
     } finally {
       setSaving(false);
@@ -72,9 +77,14 @@ export function ReportAIInsights({
   }
 
   async function handleDelete(id: string) {
+    setError(null);
     const fd = new FormData();
     fd.append("id", id);
-    await pending.run(() => deleteAction(fd));
+    const result = await pending.run(() => deleteAction(fd));
+    if (result?.error) {
+      setError(result.error);
+      return;
+    }
     setConfirmDeleteId(null);
     router.refresh();
   }

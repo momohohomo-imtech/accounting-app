@@ -28,14 +28,16 @@ function parseTransaction(formData: FormData) {
 
 export async function createBankAccountRecord(formData: FormData) {
   const supabase = await createClient();
-  await supabase.from("bank_accounts").insert(parseAccount(formData));
+  const { error } = await supabase.from("bank_accounts").insert(parseAccount(formData));
+  if (error) return { error: error.message };
   revalidatePath("/bank");
 }
 
 export async function updateBankAccountRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("bank_accounts").update(parseAccount(formData)).eq("id", id);
+  const { error } = await supabase.from("bank_accounts").update(parseAccount(formData)).eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/bank");
 }
 
@@ -43,20 +45,23 @@ export async function updateBankAccountMemo(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
   const memo = String(formData.get("memo") ?? "") || null;
-  await supabase.from("bank_accounts").update({ memo }).eq("id", id);
+  const { error } = await supabase.from("bank_accounts").update({ memo }).eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/bank");
 }
 
 export async function deleteBankAccountRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("bank_accounts").delete().eq("id", id);
+  const { error } = await supabase.from("bank_accounts").delete().eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/bank");
 }
 
 export async function createBankTransactionRecord(formData: FormData) {
   const supabase = await createClient();
-  await supabase.from("bank_transactions").insert(parseTransaction(formData));
+  const { error } = await supabase.from("bank_transactions").insert(parseTransaction(formData));
+  if (error) return { error: error.message };
   revalidatePath("/bank");
 }
 
@@ -80,7 +85,8 @@ export async function createBankTransactionsBulk(formData: FormData) {
     return { error: "입력값을 처리하지 못했습니다." };
   }
   if (!Array.isArray(rows) || rows.length === 0) return { error: "등록할 내역이 없습니다." };
-  if (rows.some((r) => !r.bank_account_id || !r.amount)) {
+  // 0원 항목도 유효한 값 — 계좌 미선택이거나 금액이 아예 숫자가 아닌 경우만 막는다.
+  if (rows.some((r) => !r.bank_account_id || typeof r.amount !== "number" || Number.isNaN(r.amount))) {
     return { error: "계좌와 금액을 모두 입력해주세요." };
   }
 
@@ -187,8 +193,10 @@ export async function unpromoteBankTransactionFromLedger(formData: FormData) {
     .eq("id", id)
     .maybeSingle();
   if (bankTx?.promoted_transaction_id) {
-    await supabase.from("transactions").delete().eq("id", bankTx.promoted_transaction_id);
-    await supabase.from("bank_transactions").update({ promoted_transaction_id: null }).eq("id", id);
+    const del = await supabase.from("transactions").delete().eq("id", bankTx.promoted_transaction_id);
+    if (del.error) return { error: del.error.message };
+    const upd = await supabase.from("bank_transactions").update({ promoted_transaction_id: null }).eq("id", id);
+    if (upd.error) return { error: upd.error.message };
   }
   revalidatePath("/bank");
   revalidatePath("/transactions");
@@ -197,7 +205,8 @@ export async function unpromoteBankTransactionFromLedger(formData: FormData) {
 export async function updateBankTransactionRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("bank_transactions").update(parseTransaction(formData)).eq("id", id);
+  const { error } = await supabase.from("bank_transactions").update(parseTransaction(formData)).eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/bank");
 }
 
@@ -212,13 +221,16 @@ export async function deleteBankTransactionRecord(formData: FormData) {
     .maybeSingle();
   if (row?.promoted_transaction_id) {
     // 매입/매출장으로 올라가 있던 자동 등록 내역도 같이 지운다.
-    await supabase.from("transactions").delete().eq("id", row.promoted_transaction_id);
+    const { error } = await supabase.from("transactions").delete().eq("id", row.promoted_transaction_id);
+    if (error) return { error: error.message };
   }
   if (row?.transfer_group_id) {
     // 이체로 자동 생성된 짝이 있으면 같이 지운다 — 한쪽만 남으면 잔액이 어긋나므로.
-    await supabase.from("bank_transactions").delete().eq("transfer_group_id", row.transfer_group_id);
+    const { error } = await supabase.from("bank_transactions").delete().eq("transfer_group_id", row.transfer_group_id);
+    if (error) return { error: error.message };
   } else {
-    await supabase.from("bank_transactions").delete().eq("id", id);
+    const { error } = await supabase.from("bank_transactions").delete().eq("id", id);
+    if (error) return { error: error.message };
   }
   revalidatePath("/bank");
   revalidatePath("/transactions");

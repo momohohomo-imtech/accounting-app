@@ -16,14 +16,15 @@ export async function createDailyWorkerUsageLogRecord(formData: FormData) {
   const rows = useDates.flatMap((use_date) =>
     workerIds.map((daily_worker_id) => ({ use_date, daily_worker_id, note, daily_wage, site_id }))
   );
-  await supabase.from("daily_worker_usage_logs").insert(rows);
+  const { error } = await supabase.from("daily_worker_usage_logs").insert(rows);
+  if (error) return { error: error.message };
   revalidatePath("/daily-workers");
 }
 
 export async function updateDailyWorkerUsageLogRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase
+  const { error } = await supabase
     .from("daily_worker_usage_logs")
     .update({
       use_date: String(formData.get("use_date") ?? ""),
@@ -33,12 +34,14 @@ export async function updateDailyWorkerUsageLogRecord(formData: FormData) {
       site_id: String(formData.get("site_id") ?? "") || null,
     })
     .eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/daily-workers");
 }
 
 export async function deleteDailyWorkerUsageLogRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("daily_worker_usage_logs").delete().eq("id", id);
+  const { error } = await supabase.from("daily_worker_usage_logs").delete().eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/daily-workers");
 }

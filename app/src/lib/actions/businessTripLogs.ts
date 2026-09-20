@@ -38,23 +38,26 @@ export async function createBusinessTripLog(formData: FormData) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  await supabase.from("business_trip_logs").insert({ ...parse(formData), created_by: user?.id ?? null });
+  const { error } = await supabase.from("business_trip_logs").insert({ ...parse(formData), created_by: user?.id ?? null });
+  if (error) return { error: error.message };
   revalidatePath("/worklogs");
 }
 
 export async function updateBusinessTripLog(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase
+  const { error } = await supabase
     .from("business_trip_logs")
     .update({ ...parse(formData), updated_at: new Date().toISOString() })
     .eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/worklogs");
 }
 
 export async function deleteBusinessTripLog(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("business_trip_logs").delete().eq("id", id);
+  const { error } = await supabase.from("business_trip_logs").delete().eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/worklogs");
 }

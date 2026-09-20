@@ -135,7 +135,7 @@ export function EntityTable({
   fields: FieldConfig[];
   rows: Row[];
   updateAction: (formData: FormData) => unknown;
-  deleteAction: (formData: FormData) => void;
+  deleteAction: (formData: FormData) => unknown;
   extraActions?: Record<string, ReactNode>;
   /** Show the edit form in a modal instead of expanding the row inline. */
   editPopup?: boolean;
@@ -152,6 +152,7 @@ export function EntityTable({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
@@ -436,27 +437,51 @@ export function EntityTable({
                     수정
                   </Button>
                   {confirmDeleteId === row.id ? (
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs font-medium text-red-600">정말 삭제?</span>
-                      <Button
-                        variant="danger"
-                        size="xs"
-                        type="button"
-                        onClick={async () => {
-                          const fd = new FormData();
-                          fd.append("id", row.id);
-                          await pending.run(() => Promise.resolve(deleteAction(fd)));
-                          setConfirmDeleteId(null);
-                        }}
-                      >
-                        확인
-                      </Button>
-                      <Button variant="secondary" size="xs" type="button" onClick={() => setConfirmDeleteId(null)}>
-                        취소
-                      </Button>
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs font-medium text-red-600">정말 삭제?</span>
+                        <Button
+                          variant="danger"
+                          size="xs"
+                          type="button"
+                          onClick={async () => {
+                            const fd = new FormData();
+                            fd.append("id", row.id);
+                            const result = await pending.run(() => Promise.resolve(deleteAction(fd)));
+                            if (result && typeof result === "object" && "error" in result && result.error) {
+                              setDeleteError(String(result.error));
+                              return;
+                            }
+                            setDeleteError(null);
+                            setConfirmDeleteId(null);
+                          }}
+                        >
+                          확인
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="xs"
+                          type="button"
+                          onClick={() => {
+                            setConfirmDeleteId(null);
+                            setDeleteError(null);
+                          }}
+                        >
+                          취소
+                        </Button>
+                      </div>
+                      {deleteError && <span className="max-w-[200px] text-right text-xs text-red-600">{deleteError}</span>}
                     </div>
                   ) : (
-                    <Button variant="danger" size="xs" type="button" onClick={() => setConfirmDeleteId(row.id)}>
+                    <Button
+                      variant="danger"
+                      size="xs"
+                      type="button"
+                      onClick={() => {
+                        setConfirmDeleteId(row.id);
+                        setDeleteError(null);
+                      }}
+                    >
                       삭제
                     </Button>
                   )}

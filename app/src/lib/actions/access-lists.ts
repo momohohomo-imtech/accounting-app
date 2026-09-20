@@ -19,14 +19,15 @@ export async function createAccessListRecord(formData: FormData) {
     .select("id")
     .single();
 
-  if (!error && data) {
-    const members = [
-      ...workerIds.map((daily_worker_id) => ({ access_list_id: data.id, daily_worker_id, employee_id: null })),
-      ...employeeIds.map((employee_id) => ({ access_list_id: data.id, daily_worker_id: null, employee_id })),
-    ];
-    if (members.length > 0) {
-      await supabase.from("access_list_workers").insert(members);
-    }
+  if (error || !data) return { error: error?.message ?? "출입명단 생성에 실패했습니다." };
+
+  const members = [
+    ...workerIds.map((daily_worker_id) => ({ access_list_id: data.id, daily_worker_id, employee_id: null })),
+    ...employeeIds.map((employee_id) => ({ access_list_id: data.id, daily_worker_id: null, employee_id })),
+  ];
+  if (members.length > 0) {
+    const { error: membersError } = await supabase.from("access_list_workers").insert(members);
+    if (membersError) return { error: membersError.message };
   }
 
   revalidatePath("/daily-workers");
@@ -93,6 +94,7 @@ export async function updateAccessListRecord(formData: FormData) {
 export async function deleteAccessListRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("access_lists").delete().eq("id", id);
+  const { error } = await supabase.from("access_lists").delete().eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/daily-workers");
 }

@@ -66,6 +66,7 @@ export function BankTransactionTable({
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -101,15 +102,22 @@ export function BankTransactionTable({
     e.preventDefault();
     const form = e.currentTarget;
     if (!(await confirm("수정 내용을 저장하시겠습니까?"))) return;
-    await pending.run(() => Promise.resolve(updateBankTransactionRecord(new FormData(form))));
+    setActionError(null);
+    const result = await pending.run(() => Promise.resolve(updateBankTransactionRecord(new FormData(form))));
+    if (result?.error) {
+      setActionError(result.error);
+      return;
+    }
     setEditingId(null);
   }
 
   async function handleConfirmDelete(id: string) {
     if (!(await confirm("이 거래내역을 삭제하시겠습니까?", { danger: true, confirmLabel: "삭제" }))) return;
+    setActionError(null);
     const fd = new FormData();
     fd.append("id", id);
-    await pending.run(() => Promise.resolve(deleteBankTransactionRecord(fd)));
+    const result = await pending.run(() => Promise.resolve(deleteBankTransactionRecord(fd)));
+    if (result?.error) setActionError(result.error);
   }
 
   async function handleTogglePromote(id: string, checked: boolean) {
@@ -138,14 +146,18 @@ export function BankTransactionTable({
         return;
     }
 
+    setActionError(null);
     const fd = new FormData();
     fd.append("id", id);
-    await pending.run(() =>
+    const result = await pending.run(() =>
       Promise.resolve(checked ? promoteBankTransactionToLedger(fd) : unpromoteBankTransactionFromLedger(fd))
     );
+    if (result?.error) setActionError(result.error);
   }
 
   return (
+    <>
+    {actionError && <p className="mb-2 text-sm text-red-600">{actionError}</p>}
     <table className="w-full min-w-[700px] text-sm">
       <thead>
         <tr className="border-b border-slate-200 text-left text-slate-500">
@@ -280,5 +292,6 @@ export function BankTransactionTable({
         )}
       </tbody>
     </table>
+    </>
   );
 }

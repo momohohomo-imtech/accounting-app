@@ -137,7 +137,8 @@ export async function updateQuoteCompanyInfo(id: string, companyInfo: QuoteCompa
 export async function deleteQuoteRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id") ?? "");
-  await supabase.from("quotes").delete().eq("id", id);
+  const { error } = await supabase.from("quotes").delete().eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/projects");
 }
 

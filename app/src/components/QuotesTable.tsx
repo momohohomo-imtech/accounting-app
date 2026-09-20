@@ -6,6 +6,7 @@ import { deleteQuoteRecord } from "@/lib/actions/quotes";
 import { formatWon, formatDate } from "@/lib/format";
 import { quoteStatusLabel } from "@/lib/quoteStatus";
 import { Button, LinkButton } from "@/components/ui/Button";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 export type QuoteRow = {
   id: string;
@@ -38,9 +39,11 @@ function sortValue(r: QuoteRow, key: SortKey): string | number {
 }
 
 export function QuotesTable({ rows }: { rows: QuoteRow[] }) {
+  const pending = useGlobalPending();
   const [sortKey, setSortKey] = useState<SortKey>("created_at");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -106,21 +109,46 @@ export function QuotesTable({ rows }: { rows: QuoteRow[] }) {
                     수정
                   </LinkButton>
                   {confirmDeleteId === q.id ? (
-                    <form action={deleteQuoteRecord} className="flex items-center gap-1">
-                      <input type="hidden" name="id" value={q.id} />
-                      <Button variant="danger" size="xs" type="submit">
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="danger"
+                        size="xs"
+                        type="button"
+                        onClick={async () => {
+                          const fd = new FormData();
+                          fd.append("id", q.id);
+                          const result = await pending.run(() => deleteQuoteRecord(fd));
+                          if (result?.error) {
+                            setDeleteError(result.error);
+                            return;
+                          }
+                          setDeleteError(null);
+                          setConfirmDeleteId(null);
+                        }}
+                      >
                         확인
                       </Button>
-                      <Button variant="secondary" size="xs" type="button" onClick={() => setConfirmDeleteId(null)}>
+                      <Button
+                        variant="secondary"
+                        size="xs"
+                        type="button"
+                        onClick={() => {
+                          setConfirmDeleteId(null);
+                          setDeleteError(null);
+                        }}
+                      >
                         취소
                       </Button>
-                    </form>
+                    </div>
                   ) : (
                     <Button variant="danger" size="xs" type="button" onClick={() => setConfirmDeleteId(q.id)}>
                       삭제
                     </Button>
                   )}
                 </div>
+                {confirmDeleteId === q.id && deleteError && (
+                  <p className="mt-1 text-right text-xs text-red-600">{deleteError}</p>
+                )}
               </td>
             </tr>
           ))}

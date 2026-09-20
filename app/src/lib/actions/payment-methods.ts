@@ -12,20 +12,23 @@ function parse(formData: FormData) {
 
 export async function createPaymentMethodRecord(formData: FormData) {
   const supabase = await createClient();
-  await supabase.from("payment_methods").insert(parse(formData));
+  const { error } = await supabase.from("payment_methods").insert(parse(formData));
+  if (error) return { error: error.message };
   revalidatePath("/transactions");
 }
 
 export async function updatePaymentMethodRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("payment_methods").update(parse(formData)).eq("id", id);
+  const { error } = await supabase.from("payment_methods").update(parse(formData)).eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/transactions");
 }
 
 export async function deletePaymentMethodRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("payment_methods").delete().eq("id", id);
+  const { error } = await supabase.from("payment_methods").delete().eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/transactions");
 }

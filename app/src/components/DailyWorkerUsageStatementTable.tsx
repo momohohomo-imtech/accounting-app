@@ -133,6 +133,7 @@ export function DailyWorkerUsageStatementTable({
   const [wageMultiplier, setWageMultiplier] = useState<1 | 1.5 | 2>(1);
   const [openBlocks, setOpenBlocks] = useState<Set<string>>(new Set());
   const [dateSortDir, setDateSortDir] = useState<"asc" | "desc">("desc");
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const blocks = useMemo(() => {
     const built = buildStatementBlocks(rows);
@@ -165,19 +166,28 @@ export function DailyWorkerUsageStatementTable({
       const base = Number(fd.get("daily_wage") ?? 0);
       fd.set("daily_wage", String(base * wageMultiplier));
     }
-    await pending.run(() => Promise.resolve(updateDailyWorkerUsageLogRecord(fd)));
+    setActionError(null);
+    const result = await pending.run(() => Promise.resolve(updateDailyWorkerUsageLogRecord(fd)));
+    if (result?.error) {
+      setActionError(result.error);
+      return;
+    }
     setEditingId(null);
     setWageMultiplier(1);
   }
 
   async function handleConfirmDelete(id: string) {
     if (!(await confirm("이 사용내역을 삭제하시겠습니까?", { danger: true, confirmLabel: "삭제" }))) return;
+    setActionError(null);
     const fd = new FormData();
     fd.append("id", id);
-    await pending.run(() => Promise.resolve(deleteDailyWorkerUsageLogRecord(fd)));
+    const result = await pending.run(() => Promise.resolve(deleteDailyWorkerUsageLogRecord(fd)));
+    if (result?.error) setActionError(result.error);
   }
 
   return (
+    <>
+    {actionError && <p className="mb-2 text-sm text-red-600 print:hidden">{actionError}</p>}
     <table className="w-full text-sm">
       <thead>
         <tr className="border-b border-slate-300 text-slate-500">
@@ -367,5 +377,6 @@ export function DailyWorkerUsageStatementTable({
         </tfoot>
       )}
     </table>
+    </>
   );
 }
