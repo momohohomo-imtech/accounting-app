@@ -290,7 +290,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
       <CollapsibleSection title="매입내역 · 대행구매액" defaultOpen printAlways bare className="order-2 print:order-3">
         <div className="space-y-4">
           <ProjectPurchaseTable
-            rows={rows.map((t) => {
+            rows={(purchaseRowsRaw ?? []).map((t) => {
               const category = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
               return {
                 id: t.id,
@@ -300,9 +300,15 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
                 category: category?.name ?? "미분류",
                 categoryColor: category ? resolveCategoryColor(category) : undefined,
                 amount: t.purchase_amount + t.purchase_vat,
+                unsettled: !isLedgerVisible(t, (creditPayments ?? []) as CreditPayment[]),
               };
             })}
           />
+          {(purchaseRowsRaw ?? []).some((t) => !isLedgerVisible(t, (creditPayments ?? []) as CreditPayment[])) && (
+            <p className="text-xs text-amber-600">
+              &quot;외상 미정산&quot; 항목은 참고용 표시이며, 정산 전까지 매입 합계·이익금 계산에는 포함되지 않습니다.
+            </p>
+          )}
 
           <div className="print:mt-2 print:border-t print:border-slate-400 print:pt-2">
             <ProjectAgencyPurchaseList
