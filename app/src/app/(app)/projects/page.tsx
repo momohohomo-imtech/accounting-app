@@ -247,13 +247,22 @@ async function ProjectListSection({
       defaultVisible: true,
     },
     {
-      name: "contract_amount",
-      label: "수주액",
-      type: "number",
+      name: "contractAmountExpected",
+      label: "수주예상액",
+      readOnly: true,
       format: "currency",
       width: "8%",
+      colorField: "contract_amount_estimated",
+      secondaryColorField: "contract_amount_minimum",
       toggleable: true,
       defaultVisible: false,
+    },
+    {
+      name: "contract_amount",
+      label: "수주액 (수기 입력, 다른 보고서용 · 표에는 수주예상액으로 표시됨)",
+      type: "number",
+      format: "currency",
+      hideInTable: true,
     },
     {
       name: "contract_amount_estimated",
@@ -315,12 +324,15 @@ async function ProjectListSection({
     const profit = p.quote_amount ? p.quote_amount - (purchaseByProject.get(p.id) ?? 0) - agencyAmount : null;
     // 이익율은 발주액 대비 비율 — 손익보고서 팝업/보고서 페이지와 동일한 계산 기준.
     const profitRate = p.quote_amount && profit !== null ? `${((profit / p.quote_amount) * 100).toFixed(1)}%` : "-";
+    // 수주예상액 = 발주액 - 구매 대행비.
+    const contractAmountExpected = (p.quote_amount ?? 0) - agencyAmount;
     return {
       ...p,
       site_name: (one(p.sites) as { name: string } | undefined)?.name,
       profit,
       profitRate,
       contractMismatch,
+      contractAmountExpected,
     };
   });
 
@@ -346,10 +358,10 @@ async function ProjectListSection({
   });
 
   const awaitingPaymentProjects = tableRows.filter((p) => p.status === PROJECT_STATUS_AWAITING_PAYMENT);
-  const awaitingPaymentContractSum = awaitingPaymentProjects.reduce((sum, p) => sum + (p.contract_amount ?? 0), 0);
+  const awaitingPaymentContractSum = awaitingPaymentProjects.reduce((sum, p) => sum + p.contractAmountExpected, 0);
 
   const filteredQuoteSum = tableRows.reduce((sum, p) => sum + (p.quote_amount ?? 0), 0);
-  const filteredContractSum = tableRows.reduce((sum, p) => sum + (p.contract_amount ?? 0), 0);
+  const filteredContractSum = tableRows.reduce((sum, p) => sum + p.contractAmountExpected, 0);
   const filteredProfitSum = tableRows.reduce((sum, p) => sum + (p.profit ?? 0), 0);
 
   return (
@@ -362,7 +374,7 @@ async function ProjectListSection({
             title={<span className="text-red-600">공사완료 예상 미수액</span>}
             className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 print:hidden"
           >
-            <p className="text-xs text-red-600">완료 수금대기 {awaitingPaymentProjects.length}건의 수주액 합계</p>
+            <p className="text-xs text-red-600">완료 수금대기 {awaitingPaymentProjects.length}건의 수주예상액 합계</p>
             <p className="mt-1 font-mono text-xl font-bold text-red-600">{formatWon(awaitingPaymentContractSum)}</p>
           </CollapsibleSection>
         )}
@@ -414,7 +426,7 @@ async function ProjectListSection({
               발주액 <span className="font-mono font-semibold text-slate-900">{formatWon(filteredQuoteSum)}</span>
             </span>
             <span>
-              수주액 <span className="font-mono font-semibold text-slate-900">{formatWon(filteredContractSum)}</span>
+              수주예상액 <span className="font-mono font-semibold text-slate-900">{formatWon(filteredContractSum)}</span>
             </span>
             <span>
               이익금 <span className="font-mono font-semibold text-slate-900">{formatWon(filteredProfitSum)}</span>
