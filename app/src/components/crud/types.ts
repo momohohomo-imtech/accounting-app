@@ -19,7 +19,7 @@ export type FieldConfig = {
   label: string;
   /** Shorter header shown in table view; falls back to `label` when omitted. */
   tableLabel?: string;
-  type?: "text" | "textarea" | "date" | "tel" | "number" | "select" | "checkbox" | "time" | "project-search" | "color-swatch";
+  type?: "text" | "textarea" | "date" | "tel" | "email" | "number" | "select" | "checkbox" | "time" | "project-search" | "color-swatch";
   required?: boolean;
   /** `color` on an option renders that option's text in that color in the table view. */
   options?: { value: string; label: string; color?: "red" | "blue" | "green" }[];

@@ -24,6 +24,22 @@ export async function ClientsSection({ showHeading = true }: { showHeading?: boo
       ],
     },
     { name: "phone", label: "연락처", type: "tel" },
+    {
+      name: "biz_reg_no",
+      label: "사업자등록번호",
+      placeholder: "000-00-00000",
+      hideInTable: true,
+    },
+    { name: "representative_name", label: "대표자명", hideInTable: true },
+    { name: "biz_address", label: "사업장 소재지", hideInTable: true },
+    { name: "biz_type", label: "업태", hideInTable: true },
+    { name: "biz_item", label: "종목", hideInTable: true },
+    {
+      name: "tax_email",
+      label: "세금계산서 수신 이메일",
+      type: "email",
+      hideInTable: true,
+    },
     { name: "default_item_name", label: "기본 품목", placeholder: "예: A제품 (거래 등록 시 자동 입력)" },
     {
       name: "default_category_id",
