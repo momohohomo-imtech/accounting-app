@@ -59,6 +59,7 @@ export async function createTransactionRecord(formData: FormData) {
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
   revalidatePath("/reports");
+  revalidatePath("/projects");
 }
 
 export async function updateTransactionRecord(formData: FormData) {
@@ -98,6 +99,7 @@ export async function updateTransactionRecord(formData: FormData) {
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
   revalidatePath("/reports");
+  revalidatePath("/projects");
 }
 
 export type BulkTransactionInput = {
@@ -156,6 +158,7 @@ export async function bulkImportTransactions(rows: BulkTransactionInput[]) {
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
   revalidatePath("/reports");
+  revalidatePath("/projects");
 }
 
 export async function bulkUpdateProjectId(formData: FormData) {
@@ -173,6 +176,7 @@ export async function bulkUpdateProjectId(formData: FormData) {
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
   revalidatePath("/reports");
+  revalidatePath("/projects");
 }
 
 export async function bulkUpdateClientId(formData: FormData) {
@@ -238,6 +242,7 @@ export async function deleteTransactionRecord(formData: FormData) {
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
   revalidatePath("/reports");
+  revalidatePath("/projects");
 }
 
 export async function updateTransactionNote(formData: FormData) {
@@ -302,4 +307,5 @@ export async function settleCreditTransactions(formData: FormData) {
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
   revalidatePath("/reports");
+  revalidatePath("/projects");
 }
