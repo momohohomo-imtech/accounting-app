@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { isLedgerVisible } from "@/lib/credit";
-import type { CreditPayment } from "@/lib/types";
+import type { CreditPayment, ExpenseCategory, Transaction } from "@/lib/types";
 import { formatWon, formatDate } from "@/lib/format";
 import { projectStatusLabel } from "@/lib/projectStatus";
 import { ProjectReportActions } from "@/components/ProjectReportActions";
@@ -19,7 +19,7 @@ import { ReportPrintChart } from "@/components/ReportPrintChart";
 import { ReportChartProvider } from "@/components/ReportChartProvider";
 import { ReportChartToggle } from "@/components/ReportChartToggle";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
-import { fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
+import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import { purchaseCostOf } from "@/lib/vatBasis";
 
 export async function ProjectProfitReport({ projectId, closeHref }: { projectId: string; closeHref: string }) {
@@ -39,36 +39,56 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
   // 작업일지(달력)에서 이 프로젝트(+귀속 하위 프로젝트)가 직접 선택된 날짜 수만 집계.
   // 작업일지 줄마다 현장뿐 아니라 프로젝트도 선택하게 바뀌기 전에 입력된 과거 항목은
   // project_id가 비어있어서 잡히지 않음 — 프로젝트를 선택하며 입력한 날부터 정확해짐.
-  const { data: workLogDateRows } = await supabase.from("work_logs").select("log_date").in("project_id", groupIds);
+  // 아래 조회들은 서로 기다릴 필요가 없어서 한꺼번에 보낸다.
+  const [
+    { data: workLogDateRows },
+    purchaseRowsRaw,
+    { data: agencyRows },
+    { data: expenseCategories },
+    { data: clientRows },
+    { data: attachmentRows },
+  ] = await Promise.all([
+    supabase.from("work_logs").select("log_date").in("project_id", groupIds),
+    fetchAllRows<Transaction & { clients: { name: string } | null; expense_categories: ExpenseCategory | null }>((from, to) =>
+      supabase
+        .from("transactions")
+        .select("*, clients(name), expense_categories(*)")
+        .in("project_id", groupIds)
+        .eq("type", "매입")
+        .order("trans_date", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
+    supabase
+      .from("project_agency_purchases")
+      .select("*, expense_categories(name, project_only, color)")
+      .in("project_id", groupIds)
+      .order("created_at", { ascending: true }),
+    supabase.from("expense_categories").select("id, name, project_only, color").order("sort_order"),
+    supabase.from("clients").select("name").order("name"),
+    supabase
+      .from("attachments")
+      .select("id, file_name, mime_type, file_size, memo, storage_path")
+      .in("project_id", groupIds)
+      .order("created_at", { ascending: false }),
+  ]);
   const workDayCount = new Set((workLogDateRows ?? []).map((r) => r.log_date)).size;
-
-  const { data: purchaseRowsRaw } = await supabase
-    .from("transactions")
-    .select("*, clients(name), expense_categories(*)")
-    .in("project_id", groupIds)
-    .eq("type", "매입")
-    .order("trans_date", { ascending: true });
-
-  const creditPayments = await fetchAllCreditPayments(supabase);
-  // 외상(미완납)은 완납 전까지 장부에서 제외 — 대시보드·보고서와 동일한 기준.
-  const purchaseRows = (purchaseRowsRaw ?? []).filter((t) => isLedgerVisible(t, creditPayments));
-
-  const { data: agencyRows } = await supabase
-    .from("project_agency_purchases")
-    .select("*, expense_categories(name, project_only, color)")
-    .in("project_id", groupIds)
-    .order("created_at", { ascending: true });
-
-  const { data: expenseCategories } = await supabase.from("expense_categories").select("id, name, project_only, color").order("sort_order");
-
-  const { data: clientRows } = await supabase.from("clients").select("name").order("name");
   const clientNames = (clientRows ?? []).map((c) => c.name);
 
-  const { data: attachmentRows } = await supabase
-    .from("attachments")
-    .select("id, file_name, mime_type, file_size, memo, storage_path")
-    .in("project_id", groupIds)
-    .order("created_at", { ascending: false });
+  // 외상(미완납)은 완납 전까지 장부에서 제외 — 대시보드·보고서와 동일한 기준.
+  // 정산 이력은 회사 전체가 아니라 이 프로젝트의 외상 매입 건 것만 가져온다.
+  const creditIds = purchaseRowsRaw.filter((t) => t.payment_type === "credit").map((t) => t.id);
+  const creditPayments = creditIds.length
+    ? await fetchAllRows<CreditPayment>((from, to) =>
+        supabase
+          .from("credit_payments")
+          .select("*")
+          .in("transaction_id", creditIds)
+          .order("id", { ascending: true })
+          .range(from, to)
+      )
+    : [];
+  const purchaseRows = purchaseRowsRaw.filter((t) => isLedgerVisible(t, creditPayments));
 
   const attachments = await Promise.all(
     (attachmentRows ?? []).map(async (a) => {
@@ -292,7 +312,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
       <CollapsibleSection title="매입내역 · 대행구매액" defaultOpen printAlways bare className="order-2 print:order-3">
         <div className="space-y-4">
           <ProjectPurchaseTable
-            rows={(purchaseRowsRaw ?? []).map((t) => {
+            rows={purchaseRowsRaw.map((t) => {
               const category = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
               return {
                 id: t.id,
@@ -302,11 +322,11 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
                 category: category?.name ?? "미분류",
                 categoryColor: category ? resolveCategoryColor(category) : undefined,
                 amount: t.purchase_amount + t.purchase_vat,
-                unsettled: !isLedgerVisible(t, (creditPayments ?? []) as CreditPayment[]),
+                unsettled: !isLedgerVisible(t, creditPayments),
               };
             })}
           />
-          {(purchaseRowsRaw ?? []).some((t) => !isLedgerVisible(t, (creditPayments ?? []) as CreditPayment[])) && (
+          {purchaseRowsRaw.some((t) => !isLedgerVisible(t, creditPayments)) && (
             <p className="text-xs text-amber-600">
               &quot;외상 미정산&quot; 항목은 참고용 표시이며, 정산 전까지 매입 합계·이익금 계산에는 포함되지 않습니다.
             </p>
