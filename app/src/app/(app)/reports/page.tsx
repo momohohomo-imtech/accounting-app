@@ -1024,7 +1024,7 @@ export default async function ReportsPage({
         </CollapsibleSection>
 
         <CollapsibleSection
-          title="프로젝트 요약 — 공사완료 · 완료 수금대기 · 수금완료 (A4 인쇄용 재무제표)"
+          title="프로젝트 요약"
           className={hiddenClass("projectSummary")}
           defaultOpen={printSection === "projectSummary"}
           headerExtra={sectionControls("projectSummary", {
