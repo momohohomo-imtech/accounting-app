@@ -114,71 +114,77 @@ export function BankTransactionForm({
         ))}
       </datalist>
 
-      <div className="space-y-2 overflow-x-auto">
+      <div className="space-y-2">
         {rows.map((r, i) => (
-          <div key={i} className="flex flex-nowrap items-center gap-2 rounded-lg border border-slate-100 p-3">
-            <select
-              value={r.bank_account_id}
-              onChange={(e) => updateRow(i, { bank_account_id: e.target.value })}
-              required
-              className={`${inputClass} w-28`}
-            >
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={r.direction}
-              onChange={(e) => updateRow(i, { direction: e.target.value as "입금" | "출금" })}
-              className={`${inputClass} w-20`}
-            >
-              <option value="입금">입금</option>
-              <option value="출금">출금</option>
-            </select>
-            <input
-              value={r.description}
-              onChange={(e) => updateRow(i, { description: e.target.value })}
-              placeholder="내용"
-              className={`${inputClass} w-32`}
-            />
-            <input
-              type="number"
-              value={r.amount}
-              onChange={(e) => updateRow(i, { amount: e.target.value })}
-              placeholder="금액"
-              required
-              className={`${inputClass} w-28`}
-            />
-            <input
-              value={r.matched_client_name_raw}
-              onChange={(e) => updateRow(i, { matched_client_name_raw: e.target.value })}
-              list={CLIENT_NAMES_DATALIST_ID}
-              placeholder="거래처 수기 작성"
-              className={`${inputClass} w-32`}
-            />
-            <select
-              value={r.matched_client_id}
-              onChange={(e) => updateRow(i, { matched_client_id: e.target.value })}
-              className={`${inputClass} w-32`}
-            >
-              <option value="">선택 안함</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            {rows.length > 1 && (
-              <button
-                type="button"
-                onClick={() => removeRow(i)}
-                className="shrink-0 text-xs text-red-500 hover:text-red-700"
+          <div key={i} className="space-y-2 rounded-lg border border-slate-100 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={r.bank_account_id}
+                onChange={(e) => updateRow(i, { bank_account_id: e.target.value })}
+                required
+                className={`${inputClass} w-28`}
               >
-                이 줄 삭제
-              </button>
-            )}
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={r.direction}
+                onChange={(e) => updateRow(i, { direction: e.target.value as "입금" | "출금" })}
+                className={`${inputClass} w-20`}
+              >
+                <option value="입금">입금</option>
+                <option value="출금">출금</option>
+              </select>
+              <input
+                type="number"
+                value={r.amount}
+                onChange={(e) => updateRow(i, { amount: e.target.value })}
+                placeholder="금액"
+                required
+                className={`${inputClass} w-28 flex-1`}
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                value={r.description}
+                onChange={(e) => updateRow(i, { description: e.target.value })}
+                placeholder="내용"
+                className={`${inputClass} w-full flex-1`}
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                value={r.matched_client_name_raw}
+                onChange={(e) => updateRow(i, { matched_client_name_raw: e.target.value })}
+                list={CLIENT_NAMES_DATALIST_ID}
+                placeholder="거래처 수기 작성"
+                className={`${inputClass} w-32 flex-1`}
+              />
+              <select
+                value={r.matched_client_id}
+                onChange={(e) => updateRow(i, { matched_client_id: e.target.value })}
+                className={`${inputClass} w-32 flex-1`}
+              >
+                <option value="">선택 안함</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              {rows.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeRow(i)}
+                  className="shrink-0 text-xs text-red-500 hover:text-red-700"
+                >
+                  이 줄 삭제
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>
