@@ -846,7 +846,7 @@ export default async function ReportsPage({
       <CollapsibleSection
         title="연간 결산 요약 — 전체 프로젝트 한눈에 보기 (A4 한 장)"
         className={hiddenClass("annualSummary")}
-        defaultOpen={true}
+        defaultOpen={printSection === "annualSummary"}
         headerExtra={printLink("annualSummary")}
       >
         <AnnualSettlementSummary
