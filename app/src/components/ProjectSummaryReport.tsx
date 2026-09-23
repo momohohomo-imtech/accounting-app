@@ -121,6 +121,7 @@ export function ProjectSummaryReport({ rows }: { rows: ProjectSummaryRow[] }) {
                 </div>
                 <h3 className="text-lg font-semibold text-slate-900 print:text-base">
                   {p.name}
+                  <span className="ml-2 font-normal text-slate-500">작업일수: {p.workDayCount}일</span>
                   {p.childNames.length > 0 && (
                     <span className="ml-2 text-xs font-normal text-slate-400 print:text-[9px]">
                       (귀속 합산: {p.childNames.join(", ")})
@@ -134,7 +135,6 @@ export function ProjectSummaryReport({ rows }: { rows: ProjectSummaryRow[] }) {
                     기간: {formatDate(p.startDate)} ~ {formatDate(p.endDate)}
                   </span>
                   <span>발주서일자: {formatDate(p.orderDate)}</span>
-                  <span>작업일수: {p.workDayCount}일</span>
                 </div>
               </div>
 
