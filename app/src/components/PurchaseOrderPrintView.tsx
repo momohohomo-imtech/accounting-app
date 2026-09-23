@@ -243,8 +243,8 @@ export function PurchaseOrderPrintView({
                 <col />
                 <col className="w-24" />
                 <col className="w-14" />
-                <col className="w-24" />
                 <col className="w-28" />
+                <col className="w-32" />
               </colgroup>
               <thead>
                 <tr className="border-b border-t-2 border-slate-900 text-left text-slate-500">
@@ -263,8 +263,8 @@ export function PurchaseOrderPrintView({
                     <td className="truncate py-[6px] pr-2">{it.item_name ?? "-"}</td>
                     <td className="truncate py-[6px] pr-2 text-slate-500">{it.spec ?? "-"}</td>
                     <td className="py-[6px] pr-2 text-right tabular-nums">{it.quantity ?? "-"}</td>
-                    <td className="py-[6px] pr-2 text-right tabular-nums">{it.unit_price ? formatWon(it.unit_price) : "-"}</td>
-                    <td className="py-[6px] text-right tabular-nums">{formatWon(it.amount)}</td>
+                    <td className="whitespace-nowrap py-[6px] pr-2 text-right tabular-nums">{it.unit_price ? formatWon(it.unit_price) : "-"}</td>
+                    <td className="whitespace-nowrap py-[6px] text-right tabular-nums">{formatWon(it.amount)}</td>
                   </tr>
                 ))}
                 {Array.from({ length: blankRows }).map((_, i) => (
@@ -283,7 +283,7 @@ export function PurchaseOrderPrintView({
                   <td colSpan={5} className="py-[6px] text-right font-semibold text-slate-900">
                     {pages.length > 1 ? "페이지 소계" : "합계"}
                   </td>
-                  <td className="py-[6px] text-right tabular-nums text-sm font-bold text-slate-900">{formatWon(pageSubtotal)}</td>
+                  <td className="whitespace-nowrap py-[6px] text-right tabular-nums text-sm font-bold text-slate-900">{formatWon(pageSubtotal)}</td>
                 </tr>
               </tfoot>
             </table>
