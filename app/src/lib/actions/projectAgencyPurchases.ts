@@ -11,11 +11,16 @@ export async function addAgencyPurchase(formData: FormData) {
 
   const projectId = String(formData.get("project_id") ?? "");
   const itemName = String(formData.get("item_name") ?? "") || null;
-  const amount = Number(formData.get("amount") ?? 0);
+  const amountRaw = formData.get("amount");
+  // 메모식으로 금액 없이(0원) 등록하는 경우가 있어서 — 비워두면 0으로, 숫자가 아닌
+  // 값만 막는다(0원 자체는 항상 유효).
+  const amount = amountRaw === null || amountRaw === "" ? 0 : Number(amountRaw);
+  if (!projectId || Number.isNaN(amount)) {
+    return { error: "품목명과 금액을 확인해주세요." };
+  }
   const categoryId = String(formData.get("category_id") ?? "") || null;
   const memo = String(formData.get("memo") ?? "") || null;
   const clientName = String(formData.get("client_name") ?? "") || null;
-  if (!projectId || !amount) return { error: "품목명과 금액을 확인해주세요." };
 
   const { error } = await supabase.from("project_agency_purchases").insert({
     project_id: projectId,
@@ -36,11 +41,14 @@ export async function updateAgencyPurchase(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id") ?? "");
   const itemName = String(formData.get("item_name") ?? "") || null;
-  const amount = Number(formData.get("amount") ?? 0);
+  const amountRaw = formData.get("amount");
+  const amount = amountRaw === null || amountRaw === "" ? 0 : Number(amountRaw);
+  if (!id || Number.isNaN(amount)) {
+    return { error: "품목명과 금액을 확인해주세요." };
+  }
   const categoryId = String(formData.get("category_id") ?? "") || null;
   const memo = String(formData.get("memo") ?? "") || null;
   const clientName = String(formData.get("client_name") ?? "") || null;
-  if (!id || !amount) return { error: "품목명과 금액을 확인해주세요." };
 
   const { error } = await supabase
     .from("project_agency_purchases")

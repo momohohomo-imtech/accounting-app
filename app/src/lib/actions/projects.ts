@@ -22,6 +22,8 @@ function parse(formData: FormData) {
     contract_amount_minimum: !estimated && formData.get("contract_amount_minimum") === "on",
     order_date: String(formData.get("order_date") ?? "") || null,
     memo: String(formData.get("memo") ?? "") || null,
+    // 확인 필요/우선순위 등 사용자가 직접 지정하는 강조색 — 지정되면 자동 상태색 대신 이 색을 씀.
+    highlight_color: String(formData.get("highlight_color") ?? "") || null,
   };
 }
 

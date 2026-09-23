@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { formatWon, formatDate } from "@/lib/format";
+import { Badge } from "@/components/ui/Badge";
 
 type PurchaseRow = {
   id: string;
@@ -11,6 +12,8 @@ type PurchaseRow = {
   category: string;
   categoryColor?: string;
   amount: number;
+  // 외상(미완납) 건 — 정산 전까지 매입 합계·이익금 계산에서는 빠지지만 목록에는 참고용으로 표시.
+  unsettled?: boolean;
 };
 
 type SortKey = "date" | "vendor" | "item" | "category" | "amount";
@@ -78,10 +81,17 @@ export function ProjectPurchaseTable({ rows }: { rows: PurchaseRow[] }) {
         </thead>
         <tbody>
           {sorted.map((r) => (
-            <tr key={r.id} className="border-b border-slate-100 last:border-0">
+            <tr key={r.id} className={`border-b border-slate-100 last:border-0 ${r.unsettled ? "bg-amber-50/60" : ""}`}>
               <td className="py-2 pr-4 text-slate-600 print:py-0.5">{formatDate(r.date)}</td>
               <td className="truncate py-2 pr-4 text-slate-700 print:py-0.5">{r.vendor}</td>
-              <td className="truncate py-2 pr-4 text-slate-700 print:py-0.5">{r.item}</td>
+              <td className="truncate py-2 pr-4 text-slate-700 print:py-0.5">
+                {r.item}
+                {r.unsettled && (
+                  <Badge variant="amber" className="ml-2 align-middle print:hidden">
+                    외상 미정산
+                  </Badge>
+                )}
+              </td>
               <td
                 className={`truncate py-2 pr-4 print:py-0.5 ${r.category === "미분류" ? "text-red-600" : "text-slate-700"}`}
                 style={r.category === "미분류" ? undefined : { color: r.categoryColor }}

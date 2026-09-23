@@ -11,6 +11,7 @@ import { ModalPortal } from "@/components/ModalPortal";
 import { ModalPrintButton } from "@/components/ModalPrintButton";
 import { Button } from "@/components/ui/Button";
 import { useEscapeKey } from "@/lib/useEscapeKey";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -23,15 +24,22 @@ function Field({ label, value }: { label: string; value: string }) {
 
 export function BusinessTripLogViewPopup({ log, onClose }: { log: BusinessTripLog; onClose: () => void }) {
   const router = useRouter();
+  const pending = useGlobalPending();
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   // 수정 중이면 ESC로 팝업 전체를 바로 닫지 않고 수정 취소부터 — 실수로 입력 내용을 날리지 않게.
   useEscapeKey(true, () => (editing ? setEditing(false) : onClose()));
 
   async function handleDelete() {
+    setDeleteError(null);
     const fd = new FormData();
     fd.append("id", log.id);
-    await deleteBusinessTripLog(fd);
+    const result = await pending.run(() => deleteBusinessTripLog(fd));
+    if (result?.error) {
+      setDeleteError(result.error);
+      return;
+    }
     router.refresh();
     onClose();
   }
@@ -68,9 +76,18 @@ export function BusinessTripLogViewPopup({ log, onClose }: { log: BusinessTripLo
                       <Button type="button" variant="danger" size="xs" onClick={handleDelete}>
                         확인
                       </Button>
-                      <Button type="button" variant="secondary" size="xs" onClick={() => setConfirmingDelete(false)}>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="xs"
+                        onClick={() => {
+                          setConfirmingDelete(false);
+                          setDeleteError(null);
+                        }}
+                      >
                         취소
                       </Button>
+                      {deleteError && <span className="text-xs text-red-600">{deleteError}</span>}
                     </>
                   ) : (
                     <Button type="button" variant="danger" size="xs" onClick={() => setConfirmingDelete(true)}>

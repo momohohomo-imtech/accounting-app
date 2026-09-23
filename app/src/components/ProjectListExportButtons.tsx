@@ -16,7 +16,7 @@ type ExportRow = {
   end_date: string | null;
   order_date: string | null;
   quote_amount: number | null;
-  contract_amount: number | null;
+  contractAmountExpected: number;
   contract_amount_estimated: boolean;
   contract_amount_minimum: boolean;
   profit: number | null;
@@ -37,7 +37,7 @@ export function ProjectListExportButtons({ year, rows }: { year: number; rows: E
       formatDate(p.end_date),
       formatDate(p.order_date),
       p.quote_amount ?? 0,
-      p.contract_amount ?? 0,
+      p.contractAmountExpected,
       p.contract_amount_estimated ? "예상" : p.contract_amount_minimum ? "최소" : "",
       p.profit ?? 0,
       p.progress_pct ?? 0,
@@ -56,7 +56,7 @@ export function ProjectListExportButtons({ year, rows }: { year: number; rows: E
         "완료일",
         "발주서일자",
         "발주액",
-        "수주액",
+        "수주예상액",
         "수주액구분",
         "이익금",
         "진행률(%)",

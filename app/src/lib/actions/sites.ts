@@ -14,21 +14,24 @@ function parse(formData: FormData) {
 
 export async function createSiteRecord(formData: FormData) {
   const supabase = await createClient();
-  await supabase.from("sites").insert(parse(formData));
+  const { error } = await supabase.from("sites").insert(parse(formData));
+  if (error) return { error: error.message };
   revalidatePath("/projects");
 }
 
 export async function updateSiteRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("sites").update(parse(formData)).eq("id", id);
+  const { error } = await supabase.from("sites").update(parse(formData)).eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/projects");
 }
 
 export async function deleteSiteRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("sites").delete().eq("id", id);
+  const { error } = await supabase.from("sites").delete().eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/projects");
 }
 
@@ -37,7 +40,8 @@ export async function updateSiteColor(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
   const color = String(formData.get("color") ?? "") || null;
-  await supabase.from("sites").update({ color }).eq("id", id);
+  const { error } = await supabase.from("sites").update({ color }).eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/worklogs");
   revalidatePath("/reports");
 }

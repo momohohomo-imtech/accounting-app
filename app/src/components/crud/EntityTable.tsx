@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { FieldConfig } from "./types";
+import type { FieldConfig, RowBgColor } from "./types";
 import { EntityForm } from "./EntityForm";
 import { Table, THead, Tr, Td } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
@@ -40,14 +40,67 @@ function cellColorClass(row: Row, f: FieldConfig): string | undefined {
   return undefined;
 }
 
-const ROW_BG_CLASS = { red: "bg-red-50", blue: "bg-blue-50" } as const;
+const ROW_BG_CLASS: Record<RowBgColor, string> = {
+  red: "bg-red-50",
+  blue: "bg-blue-50",
+  green: "bg-green-50",
+  gray: "bg-slate-100",
+  purple: "bg-purple-50",
+  amber: "bg-amber-50",
+  teal: "bg-teal-50",
+  pink: "bg-pink-50",
+  indigo: "bg-indigo-50",
+  cyan: "bg-cyan-50",
+  orange: "bg-orange-50",
+  fuchsia: "bg-fuchsia-50",
+};
+
+const STRONG_ROW_BG_CLASS: Record<RowBgColor, string> = {
+  red: "bg-red-200",
+  blue: "bg-blue-200",
+  green: "bg-green-200",
+  gray: "bg-slate-300",
+  purple: "bg-purple-200",
+  amber: "bg-amber-200",
+  teal: "bg-teal-200",
+  pink: "bg-pink-200",
+  indigo: "bg-indigo-200",
+  cyan: "bg-cyan-200",
+  orange: "bg-orange-200",
+  fuchsia: "bg-fuchsia-200",
+};
 
 function rowBgClass(row: Row, fields: FieldConfig[]): string | undefined {
+  for (const f of fields) {
+    const strong = f.strongRowBackgroundByValue?.[row[f.name] as string];
+    if (strong) return STRONG_ROW_BG_CLASS[strong];
+  }
   for (const f of fields) {
     const color = f.rowBackgroundByValue?.[row[f.name] as string];
     if (color) return ROW_BG_CLASS[color];
   }
   return undefined;
+}
+
+const DOT_COLOR_CLASS: Record<RowBgColor, string> = {
+  red: "bg-red-500",
+  blue: "bg-blue-500",
+  green: "bg-green-500",
+  gray: "bg-slate-400",
+  purple: "bg-purple-500",
+  amber: "bg-amber-500",
+  teal: "bg-teal-500",
+  pink: "bg-pink-500",
+  indigo: "bg-indigo-500",
+  cyan: "bg-cyan-500",
+  orange: "bg-orange-500",
+  fuchsia: "bg-fuchsia-500",
+};
+
+function dotColorClass(row: Row, f: FieldConfig): string | undefined {
+  if (!f.dotColorField) return undefined;
+  const color = row[f.dotColorField] as RowBgColor | undefined;
+  return color ? DOT_COLOR_CLASS[color] : undefined;
 }
 
 function tableStorageKey(fields: FieldConfig[]) {
@@ -77,20 +130,29 @@ export function EntityTable({
   deleteAction,
   extraActions,
   editPopup,
+  groupByField,
 }: {
   fields: FieldConfig[];
   rows: Row[];
   updateAction: (formData: FormData) => unknown;
-  deleteAction: (formData: FormData) => void;
+  deleteAction: (formData: FormData) => unknown;
   extraActions?: Record<string, ReactNode>;
   /** Show the edit form in a modal instead of expanding the row inline. */
   editPopup?: boolean;
+  /**
+   * Row field name holding another row's id (e.g. a "parent" reference). When set, a row whose
+   * value at this field matches another visible row's id is always kept directly under that row —
+   * sorting reorders these parent+children groups relative to each other (by the parent's value),
+   * never splits a group apart.
+   */
+  groupByField?: string;
 }) {
   const confirm = useConfirm();
   const pending = useGlobalPending();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
@@ -196,9 +258,26 @@ export function EntityTable({
   }
 
   const sortedRows = useMemo(() => {
-    if (!sortField) return rows;
-    const copy = [...rows];
-    copy.sort((a, b) => {
+    // groupByField가 있으면 그 필드로 다른 행을 가리키는 행(자식)을 항상 그 행(부모) 바로
+    // 아래에 묶어두고, 정렬은 그룹(부모+자식들)을 통째로 부모 기준값으로 재배치한다 — 자식이
+    // 그룹에서 떨어져 나가 다른 곳에 꽂히는 일이 없게.
+    const rowById = new Map(rows.map((r) => [r.id, r]));
+    const childrenByParentId = new Map<string, Row[]>();
+    const childIds = new Set<string>();
+    if (groupByField) {
+      for (const r of rows) {
+        const parentId = r[groupByField] as string | null | undefined;
+        if (parentId && rowById.has(parentId)) {
+          childIds.add(r.id);
+          const list = childrenByParentId.get(parentId) ?? [];
+          list.push(r);
+          childrenByParentId.set(parentId, list);
+        }
+      }
+    }
+
+    function compare(a: Row, b: Row) {
+      if (!sortField) return 0;
       const va = displayValue(a, sortField);
       const vb = displayValue(b, sortField);
       const na = Number(a[sortField.name]);
@@ -208,9 +287,18 @@ export function EntityTable({
           ? na - nb
           : va.localeCompare(vb);
       return sortDir === "asc" ? cmp : -cmp;
-    });
-    return copy;
-  }, [rows, sortField, sortDir]);
+    }
+
+    const blocks = rows
+      .filter((r) => !childIds.has(r.id))
+      .map((anchor) => ({
+        anchor,
+        children: [...(childrenByParentId.get(anchor.id) ?? [])].sort(compare),
+      }));
+    if (sortField) blocks.sort((a, b) => compare(a.anchor, b.anchor));
+
+    return blocks.flatMap((b) => [b.anchor, ...b.children]);
+  }, [rows, sortField, sortDir, groupByField]);
 
   const editingRow = editPopup ? sortedRows.find((r) => r.id === editingId) : undefined;
   useEscapeKey(Boolean(editingRow), () => setEditingId(null));
@@ -326,10 +414,19 @@ export function EntityTable({
                 >
                   {f.display === "progress" ? (
                     <ProgressCell value={Number(row[f.name]) || 0} />
-                  ) : cellColorClass(row, f) ? (
-                    <span className={cellColorClass(row, f)}>{displayValue(row, f)}</span>
                   ) : (
-                    displayValue(row, f)
+                    <>
+                      {cellColorClass(row, f) ? (
+                        <span className={cellColorClass(row, f)}>{displayValue(row, f)}</span>
+                      ) : (
+                        displayValue(row, f)
+                      )}
+                      {dotColorClass(row, f) && (
+                        <span
+                          className={`ml-1.5 inline-block h-2 w-2 rounded-full align-middle ${dotColorClass(row, f)}`}
+                        />
+                      )}
+                    </>
                   )}
                 </Td>
               ))}
@@ -340,27 +437,51 @@ export function EntityTable({
                     수정
                   </Button>
                   {confirmDeleteId === row.id ? (
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs font-medium text-red-600">정말 삭제?</span>
-                      <Button
-                        variant="danger"
-                        size="xs"
-                        type="button"
-                        onClick={async () => {
-                          const fd = new FormData();
-                          fd.append("id", row.id);
-                          await pending.run(() => Promise.resolve(deleteAction(fd)));
-                          setConfirmDeleteId(null);
-                        }}
-                      >
-                        확인
-                      </Button>
-                      <Button variant="secondary" size="xs" type="button" onClick={() => setConfirmDeleteId(null)}>
-                        취소
-                      </Button>
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs font-medium text-red-600">정말 삭제?</span>
+                        <Button
+                          variant="danger"
+                          size="xs"
+                          type="button"
+                          onClick={async () => {
+                            const fd = new FormData();
+                            fd.append("id", row.id);
+                            const result = await pending.run(() => Promise.resolve(deleteAction(fd)));
+                            if (result && typeof result === "object" && "error" in result && result.error) {
+                              setDeleteError(String(result.error));
+                              return;
+                            }
+                            setDeleteError(null);
+                            setConfirmDeleteId(null);
+                          }}
+                        >
+                          확인
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="xs"
+                          type="button"
+                          onClick={() => {
+                            setConfirmDeleteId(null);
+                            setDeleteError(null);
+                          }}
+                        >
+                          취소
+                        </Button>
+                      </div>
+                      {deleteError && <span className="max-w-[200px] text-right text-xs text-red-600">{deleteError}</span>}
                     </div>
                   ) : (
-                    <Button variant="danger" size="xs" type="button" onClick={() => setConfirmDeleteId(row.id)}>
+                    <Button
+                      variant="danger"
+                      size="xs"
+                      type="button"
+                      onClick={() => {
+                        setConfirmDeleteId(row.id);
+                        setDeleteError(null);
+                      }}
+                    >
                       삭제
                     </Button>
                   )}

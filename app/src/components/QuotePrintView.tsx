@@ -8,6 +8,23 @@ import { computeConfirmedAmount, isVisibleQuoteItem } from "@/lib/quoteCalc";
 import { PrintButton } from "@/components/PrintButton";
 import { QuoteExportButton } from "@/components/QuoteExportButton";
 import { fieldClass, labelClass } from "@/components/ui/field";
+import { updateQuoteCompanyInfo, type QuoteCompanyInfo } from "@/lib/actions/quotes";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { Button } from "@/components/ui/Button";
+
+const MIN_PRINT_ROWS = 8;
+
+// 저장된 회사 정보가 없는(company_info가 null인) 견적서 — 새 견적서 포함 — 는 항상 이 기본값으로 보임.
+const DEFAULT_COMPANY_INFO: QuoteCompanyInfo = {
+  companyName: "아이엠테크",
+  representativeName: "",
+  bizRegNo: "521-32-01642",
+  address: "인천 남동구 호구포로 44번길 77",
+  bizType: "제조업",
+  bizItem: "컨베이어 장치 제조업",
+  phone: "",
+  fax: "032-232-0914",
+};
 
 type QuoteItemRow = {
   id: string;
@@ -26,26 +43,47 @@ type QuoteItemRow = {
 export function QuotePrintView({
   quote,
   items,
+  quoteId,
+  companyInfo,
 }: {
   quote: {
     quote_number: string | null;
     title: string;
     clientName: string | null;
-    projectLabel: string | null;
     valid_until: string | null;
     memo: string | null;
     created_at: string;
   };
   items: QuoteItemRow[];
+  quoteId: string;
+  /** 이 견적서에 저장된 공급자 정보 — null이면(새 견적서 등) 기본값을 씀. */
+  companyInfo: QuoteCompanyInfo | null;
 }) {
-  const [companyName, setCompanyName] = useState("아이엠테크");
-  const [representativeName, setRepresentativeName] = useState("");
-  const [bizRegNo, setBizRegNo] = useState("521-32-01642");
-  const [address, setAddress] = useState("인천 남동구 호구포로 44번길 77");
-  const [bizType, setBizType] = useState("제조업");
-  const [bizItem, setBizItem] = useState("컨베이어 장치 제조업");
-  const [phone, setPhone] = useState("");
-  const [fax, setFax] = useState("032-232-0914");
+  const pending = useGlobalPending();
+  const initial = companyInfo ?? DEFAULT_COMPANY_INFO;
+  const [companyName, setCompanyName] = useState(initial.companyName);
+  const [representativeName, setRepresentativeName] = useState(initial.representativeName);
+  const [bizRegNo, setBizRegNo] = useState(initial.bizRegNo);
+  const [address, setAddress] = useState(initial.address);
+  const [bizType, setBizType] = useState(initial.bizType);
+  const [bizItem, setBizItem] = useState(initial.bizItem);
+  const [phone, setPhone] = useState(initial.phone);
+  const [fax, setFax] = useState(initial.fax);
+
+  async function handleSaveCompanyInfo() {
+    await pending.run(() =>
+      updateQuoteCompanyInfo(quoteId, {
+        companyName,
+        representativeName,
+        bizRegNo,
+        address,
+        bizType,
+        bizItem,
+        phone,
+        fax,
+      })
+    );
+  }
 
   const rows = items.filter(isVisibleQuoteItem).map((it) => {
     const confirmed = computeConfirmedAmount(it.amount, it.handling_fee_pct);
@@ -103,13 +141,22 @@ export function QuotePrintView({
 
       <div className="flex flex-wrap items-center justify-end gap-2 print:hidden">
         <p className="mr-auto text-xs text-slate-400">
-          PDF로 저장하려면 인쇄 대화상자의 대상(프린터)에서 &ldquo;PDF로 저장&rdquo;을 선택하세요.
+          이 견적서에만 저장되며, 새 견적서는 항상 기본값(아이엠테크)으로 시작합니다. PDF로 저장하려면 인쇄
+          대화상자의 대상(프린터)에서 &ldquo;PDF로 저장&rdquo;을 선택하세요.
         </p>
-        <QuoteExportButton quote={quote} rows={rows} total={total} />
+        <Button type="button" variant="secondary" size="sm" onClick={handleSaveCompanyInfo}>
+          공급자 정보 저장
+        </Button>
+        <QuoteExportButton
+          quote={quote}
+          companyInfo={{ companyName, representativeName, bizRegNo, address, bizType, bizItem, phone, fax }}
+          rows={rows}
+          total={total}
+        />
         <PrintButton />
       </div>
 
-      <div className="hidden rounded-2xl border border-slate-200 bg-white p-6 print:block print:rounded-none print:border-0 print:p-0">
+      <div className="hidden rounded-2xl border border-slate-200 bg-white p-6 print:flex print:min-h-[277mm] print:flex-col print:rounded-none print:border-0 print:p-0">
         <div className="flex items-center gap-2.5">
           <Image src="/logo-lockup.png" alt="" width={30} height={24} className="h-6 w-auto" />
           <span className="ml-auto font-mono text-[11px] tracking-widest text-slate-400">QUOTATION</span>
@@ -131,19 +178,13 @@ export function QuotePrintView({
             <span className="font-medium text-slate-900">{formatDate(quote.created_at)}</span>
           </p>
           <p>
-            <span className="text-slate-500">건명: </span>
+            <span className="text-slate-500">공사명: </span>
             <span className="font-medium text-slate-900">{quote.title}</span>
           </p>
           <p>
             <span className="text-slate-500">유효기한: </span>
             <span className="font-medium text-slate-900">{quote.valid_until ? formatDate(quote.valid_until) : "-"}</span>
           </p>
-          {quote.projectLabel && (
-            <p className="col-span-2">
-              <span className="text-slate-500">연결 프로젝트: </span>
-              <span className="font-medium text-slate-900">{quote.projectLabel}</span>
-            </p>
-          )}
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-3">
@@ -155,33 +196,33 @@ export function QuotePrintView({
           </div>
           <div className="rounded-lg border border-slate-300">
             <p className="border-b border-slate-300 bg-brand-soft px-3 py-1.5 text-xs font-semibold text-slate-600">
-              공급자
+              공급자&nbsp;&nbsp;&nbsp;&nbsp;
             </p>
             <table className="w-full text-xs">
               <tbody>
                 <tr className="border-b border-slate-200">
-                  <td className="w-16 px-3 py-1.5 text-slate-500">등록번호</td>
-                  <td className="px-3 py-1.5 text-slate-900">{bizRegNo || "-"}</td>
+                  <td className="w-20 whitespace-nowrap px-3 py-1.5 text-slate-500">등록번호</td>
+                  <td className="whitespace-nowrap px-3 py-1.5 text-slate-900">{bizRegNo || "-"}</td>
                 </tr>
                 <tr className="border-b border-slate-200">
-                  <td className="px-3 py-1.5 text-slate-500">상호</td>
-                  <td className="px-3 py-1.5 text-slate-900">
+                  <td className="w-20 whitespace-nowrap px-3 py-1.5 text-slate-500">상호</td>
+                  <td className="whitespace-nowrap px-3 py-1.5 text-slate-900">
                     {companyName || "-"} {representativeName && <span>(대표 {representativeName})</span>}
                   </td>
                 </tr>
                 <tr className="border-b border-slate-200">
-                  <td className="px-3 py-1.5 text-slate-500">주소</td>
-                  <td className="px-3 py-1.5 text-slate-900">{address || "-"}</td>
+                  <td className="w-20 whitespace-nowrap px-3 py-1.5 text-slate-500">주소</td>
+                  <td className="whitespace-nowrap px-3 py-1.5 text-slate-900">{address || "-"}</td>
                 </tr>
                 <tr className="border-b border-slate-200">
-                  <td className="px-3 py-1.5 text-slate-500">업태/종목</td>
-                  <td className="px-3 py-1.5 text-slate-900">
+                  <td className="w-20 whitespace-nowrap px-3 py-1.5 text-slate-500">업태/종목</td>
+                  <td className="whitespace-nowrap px-3 py-1.5 text-slate-900">
                     {bizType || "-"} / {bizItem || "-"}
                   </td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-1.5 text-slate-500">전화/팩스</td>
-                  <td className="px-3 py-1.5 text-slate-900">
+                  <td className="w-20 whitespace-nowrap px-3 py-1.5 text-slate-500">전화/팩스</td>
+                  <td className="whitespace-nowrap px-3 py-1.5 text-slate-900">
                     {phone || "-"} / {fax || "-"}
                   </td>
                 </tr>
@@ -191,7 +232,7 @@ export function QuotePrintView({
         </div>
 
         <div className="mt-5 flex items-center justify-between rounded-lg border-2 border-brand bg-brand-soft px-4 py-3">
-          <span className="text-sm font-semibold text-slate-700">합계금액 (공급가액+세액)</span>
+          <span className="text-sm font-semibold text-slate-700">합계금액 (VAT 별도)</span>
           <span className="text-sm font-bold text-slate-900">
             {numberToKoreanAmount(total)} (<span className="font-mono">{formatWon(total)}</span>)
           </span>
@@ -223,43 +264,43 @@ export function QuotePrintView({
                 <td className="py-2 pr-2 text-right font-mono">
                   {it.adjustedUnitPrice != null ? formatWon(it.adjustedUnitPrice) : "-"}
                 </td>
-                <td className="py-2 pr-2 text-right font-mono">{formatWon(it.confirmed)}</td>
+                <td className="py-2 pr-2 text-right font-mono">{it.confirmed === 0 ? "-" : formatWon(it.confirmed)}</td>
                 <td className="py-2 text-slate-500">{it.note ?? "-"}</td>
               </tr>
             ))}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={8} className="py-6 text-center text-slate-400">
-                  등록된 품목이 없습니다.
-                </td>
+            {/* 내역이 몇 줄이든 인쇄 서식은 항상 9줄 — 빈 줄은 No 표기 없이 공란으로 채움. */}
+            {Array.from({ length: Math.max(0, MIN_PRINT_ROWS - rows.length) }).map((_, i) => (
+              <tr key={`blank-${i}`} className="border-b border-slate-100">
+                <td className="py-2 pr-2">&nbsp;</td>
+                <td className="py-2 pr-2">&nbsp;</td>
+                <td className="py-2 pr-2">&nbsp;</td>
+                <td className="py-2 pr-2">&nbsp;</td>
+                <td className="py-2 pr-2">&nbsp;</td>
+                <td className="py-2 pr-2">&nbsp;</td>
+                <td className="py-2 pr-2">&nbsp;</td>
+                <td className="py-2">&nbsp;</td>
               </tr>
-            )}
+            ))}
           </tbody>
-          {rows.length > 0 && (
-            <tfoot>
-              <tr className="border-t-2 border-slate-300">
-                <td colSpan={6} className="py-2 text-right font-semibold text-slate-900">
-                  합계
-                </td>
-                <td className="py-2 text-right font-mono font-bold text-slate-900">{formatWon(total)}</td>
-                <td />
-              </tr>
-            </tfoot>
-          )}
+          <tfoot>
+            <tr className="border-t-2 border-slate-300">
+              <td colSpan={6} className="py-2 text-right font-semibold text-slate-900">
+                합계
+              </td>
+              <td className="py-2 text-right font-mono font-bold text-slate-900">{formatWon(total)}</td>
+              <td />
+            </tr>
+          </tfoot>
         </table>
 
-        {quote.memo && (
-          <div className="mt-6 rounded-lg border border-slate-200 p-3 text-sm">
-            <p className="mb-1 text-xs font-semibold text-slate-500">비고</p>
-            <p className="whitespace-pre-wrap text-slate-700">{quote.memo}</p>
-          </div>
-        )}
+        <div className="mt-6 min-h-[70px] rounded-lg border border-slate-200 p-3 text-sm">
+          <p className="mb-1 text-xs font-semibold text-slate-500">비고</p>
+          <p className="whitespace-pre-wrap text-slate-700">{quote.memo}</p>
+        </div>
 
-        <div className="mt-10 flex items-center justify-center gap-2 text-sm text-slate-900">
+        <div className="mt-auto flex items-center justify-center gap-2 pt-10 text-sm text-slate-900">
           <Image src="/logo-lockup.png" alt="" width={20} height={16} className="h-4 w-auto" />
-          <p className="font-semibold">
-            {companyName || "-"} {representativeName && <span>대표 {representativeName} (인)</span>}
-          </p>
+          <p className="font-semibold">{companyName || "-"}</p>
         </div>
       </div>
     </div>

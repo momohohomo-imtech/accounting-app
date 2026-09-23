@@ -6,6 +6,7 @@ import { formatWon, formatDate } from "@/lib/format";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button, LinkButton } from "@/components/ui/Button";
 import { fieldClass, labelClass } from "@/components/ui/field";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import type { PaymentMethod, Transaction } from "@/lib/types";
 
 export type OutstandingItem = { tx: Transaction; remaining: number };
@@ -19,8 +20,10 @@ export function CreditSettlementGroup({
   items: OutstandingItem[];
   paymentMethods: PaymentMethod[];
 }) {
+  const pending = useGlobalPending();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -32,6 +35,10 @@ export function CreditSettlementGroup({
   }
 
   const groupTotal = items.reduce((s, i) => s + i.remaining, 0);
+  const groupVatExcludedTotal = items.reduce(
+    (s, i) => s + (i.tx.type === "매출" ? i.tx.sales_amount : i.tx.purchase_amount),
+    0
+  );
   const selectedTotal = items.filter((i) => selected.has(i.tx.id)).reduce((s, i) => s + i.remaining, 0);
 
   return (
@@ -39,7 +46,9 @@ export function CreditSettlementGroup({
       <CardHeader>
         <CardTitle>{label}</CardTitle>
         <span className="text-sm text-slate-500">
-          미정산 합계 <span className="font-semibold text-slate-900">{formatWon(groupTotal)}</span>
+          미정산 합계{" "}
+          <span className="font-medium text-blue-600">VAT 제외 {formatWon(groupVatExcludedTotal)}</span>{" "}
+          <span className="font-semibold text-slate-900">{formatWon(groupTotal)}</span>
         </span>
       </CardHeader>
 
@@ -63,21 +72,47 @@ export function CreditSettlementGroup({
               )}
             </span>
             <span className="flex-1 truncate text-slate-700">{tx.item_name ?? "-"}</span>
+            <span className="shrink-0 text-blue-600">
+              {formatWon(tx.type === "매출" ? tx.sales_amount : tx.purchase_amount)}
+            </span>
             <span className="shrink-0 font-medium text-slate-900">{formatWon(remaining)}</span>
             <LinkButton href={`/transactions?tab=credit&editTx=${tx.id}`} variant="secondary" size="xs">
               수정
             </LinkButton>
             {confirmDeleteId === tx.id ? (
-              <form action={deleteTransactionRecord} className="flex shrink-0 items-center gap-1">
-                <input type="hidden" name="id" value={tx.id} />
+              <div className="flex shrink-0 items-center gap-1">
                 <span className="text-xs font-medium text-red-600">정말 삭제?</span>
-                <Button variant="danger" size="xs" type="submit">
+                <Button
+                  variant="danger"
+                  size="xs"
+                  type="button"
+                  onClick={async () => {
+                    const fd = new FormData();
+                    fd.append("id", tx.id);
+                    const result = await pending.run(() => deleteTransactionRecord(fd));
+                    if (result?.error) {
+                      setDeleteError(result.error);
+                      return;
+                    }
+                    setDeleteError(null);
+                    setConfirmDeleteId(null);
+                  }}
+                >
                   확인
                 </Button>
-                <Button variant="secondary" size="xs" type="button" onClick={() => setConfirmDeleteId(null)}>
+                <Button
+                  variant="secondary"
+                  size="xs"
+                  type="button"
+                  onClick={() => {
+                    setConfirmDeleteId(null);
+                    setDeleteError(null);
+                  }}
+                >
                   취소
                 </Button>
-              </form>
+                {deleteError && <span className="text-xs text-red-600">{deleteError}</span>}
+              </div>
             ) : (
               <Button variant="danger" size="xs" type="button" onClick={() => setConfirmDeleteId(tx.id)}>
                 삭제

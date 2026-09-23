@@ -104,6 +104,7 @@ export async function updatePurchaseOrder(id: string, input: PurchaseOrderInput)
 export async function deletePurchaseOrderRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id") ?? "");
-  await supabase.from("purchase_orders").delete().eq("id", id);
+  const { error } = await supabase.from("purchase_orders").delete().eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/projects");
 }

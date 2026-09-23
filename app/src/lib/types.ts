@@ -3,6 +3,12 @@ export type Client = {
   name: string;
   type: "vendor" | "customer" | "both";
   phone: string | null;
+  biz_reg_no: string | null;
+  representative_name: string | null;
+  biz_address: string | null;
+  biz_type: string | null;
+  biz_item: string | null;
+  tax_email: string | null;
   memo: string | null;
   created_at: string;
 };

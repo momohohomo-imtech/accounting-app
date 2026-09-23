@@ -339,11 +339,12 @@ export function BusinessTripLogForm({
 }: {
   initial?: BusinessTripLog;
   defaultWorkDate?: string;
-  action: (formData: FormData) => Promise<void> | void;
+  action: (formData: FormData) => Promise<{ error?: string } | undefined> | void;
   onSaved: () => void;
   onCancel: () => void;
 }) {
   const pending = useGlobalPending();
+  const [error, setError] = useState<string | null>(null);
   const today = new Date().toISOString().slice(0, 10);
   const workDate = initial?.work_date ?? defaultWorkDate ?? today;
 
@@ -388,6 +389,7 @@ export function BusinessTripLogForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setError(null);
     const fd = new FormData();
     if (initial) fd.append("id", initial.id);
     fd.append("client_name", clientName);
@@ -403,8 +405,12 @@ export function BusinessTripLogForm({
       expenses: p.expenses.filter((e) => e.vendor.trim() || e.amount.trim() || e.note.trim()),
     }));
     fd.append("projects_json", JSON.stringify(cleanedProjects));
-    await pending.run(() => Promise.resolve(action(fd)));
+    const result = await pending.run(() => Promise.resolve(action(fd)));
     setSaving(false);
+    if (result?.error) {
+      setError(result.error);
+      return;
+    }
     onSaved();
   }
 
@@ -479,6 +485,7 @@ export function BusinessTripLogForm({
         ))}
       </div>
 
+      {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex items-center gap-2 border-t border-slate-100 pt-4">
         <Button type="submit" disabled={saving}>
           {saving ? "저장 중..." : "저장"}

@@ -20,21 +20,24 @@ function revalidateAll() {
 
 export async function createExpenseCategoryRecord(formData: FormData) {
   const supabase = await createClient();
-  await supabase.from("expense_categories").insert(parse(formData));
+  const { error } = await supabase.from("expense_categories").insert(parse(formData));
+  if (error) return { error: error.message };
   revalidateAll();
 }
 
 export async function updateExpenseCategoryRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("expense_categories").update(parse(formData)).eq("id", id);
+  const { error } = await supabase.from("expense_categories").update(parse(formData)).eq("id", id);
+  if (error) return { error: error.message };
   revalidateAll();
 }
 
 export async function deleteExpenseCategoryRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("expense_categories").delete().eq("id", id);
+  const { error } = await supabase.from("expense_categories").delete().eq("id", id);
+  if (error) return { error: error.message };
   revalidateAll();
 }
 
@@ -43,6 +46,7 @@ export async function updateExpenseCategoryColor(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
   const color = String(formData.get("color") ?? "") || null;
-  await supabase.from("expense_categories").update({ color }).eq("id", id);
+  const { error } = await supabase.from("expense_categories").update({ color }).eq("id", id);
+  if (error) return { error: error.message };
   revalidateAll();
 }

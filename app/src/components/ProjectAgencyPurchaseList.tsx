@@ -316,7 +316,7 @@ export function ProjectAgencyPurchaseList({
         </datalist>
         <input name="item_name" placeholder="품목명" className={`${fieldClass} w-40`} />
         <CategorySelect name="category_id" value={newCategoryId} onChange={setNewCategoryId} categories={categories} />
-        <input name="amount" type="number" step="1" placeholder="금액" required className={`${fieldClass} w-32`} />
+        <input name="amount" type="number" step="1" placeholder="금액 (비워두면 0원)" className={`${fieldClass} w-32`} />
         <input name="memo" placeholder="메모 (무슨 물품/사항인지)" className={`${fieldClass} w-full min-w-[12rem] flex-1`} />
         <Button type="submit" size="xs" disabled={pending}>
           + 추가

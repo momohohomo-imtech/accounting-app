@@ -114,10 +114,31 @@ export async function updateQuote(id: string, input: QuoteInput): Promise<{ erro
   return {};
 }
 
+export type QuoteCompanyInfo = {
+  companyName: string;
+  representativeName: string;
+  bizRegNo: string;
+  address: string;
+  bizType: string;
+  bizItem: string;
+  phone: string;
+  fax: string;
+};
+
+// 견적서 인쇄화면의 공급자 정보를 이 견적서에만 저장 — 다른/새 견적서의 기본값엔 영향 없음.
+export async function updateQuoteCompanyInfo(id: string, companyInfo: QuoteCompanyInfo): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("quotes").update({ company_info: companyInfo }).eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath(`/quotes/${id}/edit`);
+  return {};
+}
+
 export async function deleteQuoteRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id") ?? "");
-  await supabase.from("quotes").delete().eq("id", id);
+  const { error } = await supabase.from("quotes").delete().eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/projects");
 }
 

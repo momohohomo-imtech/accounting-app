@@ -8,13 +8,17 @@ import { YearFilter } from "@/components/YearFilter";
 import { ReportProjectSiteFilter } from "@/components/ReportProjectSiteFilter";
 import { ReportProjectPicker } from "@/components/ReportProjectPicker";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
+import { AnnualSettlementSummary } from "@/components/AnnualSettlementSummary";
+import { ProjectSummaryReport, type ProjectSummaryRow } from "@/components/ProjectSummaryReport";
+import { projectStatusLabel } from "@/lib/projectStatus";
 import { AutoPrint } from "@/components/AutoPrint";
 import { ReportAIInsights } from "@/components/ReportAIInsights";
 import { saveReportAiInsight, deleteReportAiInsight } from "@/lib/actions/reportAiInsights";
-import { isLedgerVisible } from "@/lib/credit";
+import { isLedgerVisible, remainingBalance } from "@/lib/credit";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import type { ReportAiInsight, CreditPayment } from "@/lib/types";
 import { VendorAggregateTable } from "@/components/VendorAggregateTable";
+import { PurchaseItemSearchTable } from "@/components/PurchaseItemSearchTable";
 import { VendorAgencyToggle } from "@/components/VendorAgencyToggle";
 import { ClassificationPendingTable } from "@/components/ClassificationPendingTable";
 import { CategoryAggregateTable } from "@/components/CategoryAggregateTable";
@@ -113,6 +117,10 @@ export default async function ReportsPage({
     { data: agencyPurchases },
     { data: expenseCategories },
     { data: clientRows },
+    { data: projectWorkLogRows },
+    { data: bankAccounts },
+    { data: bankTxAll },
+    { data: creditPurchaseTxAll },
   ] = await Promise.all([
       supabase
         .from("transactions")
@@ -123,7 +131,9 @@ export default async function ReportsPage({
         .lte("trans_date", `${selectedYear}-12-31`),
       supabase
         .from("projects")
-        .select("id, name, status, progress_pct, site_id, quote_amount, contract_amount, settlement_finalized, sites(name)")
+        .select(
+          "id, project_code, name, status, progress_pct, site_id, parent_project_id, quote_amount, contract_amount, settlement_finalized, start_date, end_date, order_date, memo, sites(name)"
+        )
         .eq("year", selectedYear),
       supabase.from("transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
       supabase
@@ -140,6 +150,21 @@ export default async function ReportsPage({
         .eq("projects.year", selectedYear),
       supabase.from("expense_categories").select("id, name, project_only, color").order("sort_order"),
       supabase.from("clients").select("name").order("name"),
+      // 프로젝트 요약(재무제표)의 작업일수용 — 연도 범위 안, 프로젝트가 지정된 작업일지만.
+      supabase
+        .from("work_logs")
+        .select("log_date, project_id")
+        .not("project_id", "is", null)
+        .gte("log_date", `${selectedYear}-01-01`)
+        .lte("log_date", `${selectedYear}-12-31`),
+      // 현재 자금 내역용 — 선택 연도와 무관하게 항상 "현재 시점" 기준이라 연도 필터를 안 건다.
+      supabase.from("bank_accounts").select("id, opening_balance"),
+      supabase.from("bank_transactions").select("bank_account_id, direction, amount"),
+      supabase
+        .from("transactions")
+        .select("id, type, sales_amount, sales_vat, purchase_amount, purchase_vat")
+        .eq("type", "매입")
+        .eq("payment_type", "credit"),
     ]);
 
   const clientNames = (clientRows ?? []).map((c) => c.name);
@@ -147,6 +172,22 @@ export default async function ReportsPage({
   const transactions = ((rawTx ?? []) as unknown as Row[]).filter((t) =>
     isLedgerVisible(t, (creditPayments ?? []) as CreditPayment[])
   );
+
+  // 현재 자금 내역 — 선택 연도와 무관한 "현재" 스냅샷. 은행 총 잔액(마이너스 통장 있으면
+  // 음수 가능)에서 아직 안 갚은 외상 매입 총액(VAT 포함, 완납 전까지 남은 잔액만)을 뺀
+  // 실질 자금. 외상 매출(우리가 받을 돈)은 지출이 아니라서 안 뺀다.
+  const bankBalanceByAccount = new Map<string, number>();
+  for (const a of bankAccounts ?? []) bankBalanceByAccount.set(a.id, a.opening_balance ?? 0);
+  for (const t of bankTxAll ?? []) {
+    const delta = t.direction === "입금" ? t.amount : -t.amount;
+    bankBalanceByAccount.set(t.bank_account_id, (bankBalanceByAccount.get(t.bank_account_id) ?? 0) + delta);
+  }
+  const bankTotalBalance = Array.from(bankBalanceByAccount.values()).reduce((s, v) => s + v, 0);
+  const outstandingCreditPurchaseTotal = (creditPurchaseTxAll ?? []).reduce(
+    (s, t) => s + remainingBalance(t, (creditPayments ?? []) as CreditPayment[]),
+    0
+  );
+  const currentFunds = bankTotalBalance - outstandingCreditPurchaseTotal;
 
   const firstYear = Math.min(
     firstTx?.[0]?.trans_date ? Number(firstTx[0].trans_date.slice(0, 4)) : currentYear,
@@ -213,6 +254,97 @@ export default async function ReportsPage({
 
   const byProject = site ? byProjectAll.filter((p) => p.site_id === site) : byProjectAll;
 
+  // 프로젝트 요약(A4 재무제표) 대상 — 공사완료·완료 수금대기·수금완료 3개 상태만.
+  // 귀속(parent_project_id가 있는) 프로젝트는 절대 단독으로 카드를 만들지 않고 항상
+  // 어미(상위) 프로젝트 쪽에 발주액·매입·대행구매·카테고리 내역을 합산해서 보여준다
+  // (같은 해에 등록된 귀속 프로젝트만 대상 — 연도가 다르면 못 합침, 기존 한계와 동일).
+  // 매입내역 전체가 아니라 카테고리별 합산 금액만 쓰므로 프로젝트별로 매입/대행구매를
+  // 카테고리 단위로 다시 묶는다(전체 집계용 byCategory/agencyByCategory와 같은 방식,
+  // 프로젝트(+귀속 하위) 그룹 단위로만 좁힌 버전).
+  const PROJECT_SUMMARY_STATUSES = ["done", "done_awaiting_payment", "collected"];
+  const childrenByParentId = new Map<string, typeof byProjectAll>();
+  for (const p of byProjectAll) {
+    if (!p.parent_project_id) continue;
+    const arr = childrenByParentId.get(p.parent_project_id) ?? [];
+    arr.push(p);
+    childrenByParentId.set(p.parent_project_id, arr);
+  }
+  const projectSummaryRows: ProjectSummaryRow[] = byProject
+    .filter((p) => !p.parent_project_id && PROJECT_SUMMARY_STATUSES.includes(p.status ?? ""))
+    .map((p) => {
+      const group = [p, ...(childrenByParentId.get(p.id) ?? [])];
+      const groupIds = new Set(group.map((g) => g.id));
+
+      const catMap = new Map<string, { name: string; amount: number; color?: string }>();
+      let purchaseSupply = 0;
+      let purchaseVat = 0;
+      for (const t of transactions.filter((t) => t.project_id && groupIds.has(t.project_id) && t.type === "매입")) {
+        const cat = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
+        const name = cat?.name ?? "미분류";
+        const entry = catMap.get(name) ?? { name, amount: 0, color: cat ? resolveCategoryColor(cat) : undefined };
+        entry.amount += t.purchase_amount + t.purchase_vat;
+        catMap.set(name, entry);
+        purchaseSupply += t.purchase_amount;
+        purchaseVat += t.purchase_vat;
+      }
+      let agencyAmount = 0;
+      for (const a of (agencyPurchases ?? []).filter((a) => groupIds.has(a.project_id))) {
+        const cat = one(a.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
+        const name = cat?.name ?? "미분류";
+        const entry = catMap.get(name) ?? { name, amount: 0, color: cat ? resolveCategoryColor(cat) : undefined };
+        entry.amount += a.amount;
+        catMap.set(name, entry);
+        agencyAmount += a.amount;
+      }
+      const quoteAmount = group.reduce((s, g) => s + g.quoteAmount, 0);
+      const purchaseTotal = purchaseSupply + purchaseVat;
+      const profit = quoteAmount - purchaseTotal - agencyAmount;
+      const margin = quoteAmount > 0 ? (profit / quoteAmount) * 100 : null;
+      const workDayCount = new Set(
+        (projectWorkLogRows ?? []).filter((r) => r.project_id && groupIds.has(r.project_id)).map((r) => r.log_date)
+      ).size;
+      return {
+        id: p.id,
+        projectCode: p.project_code ?? null,
+        name: p.name,
+        siteName: (one(p.sites) as { name: string } | null)?.name ?? null,
+        status: p.status,
+        startDate: p.start_date ?? null,
+        endDate: p.end_date ?? null,
+        orderDate: p.order_date ?? null,
+        memo: p.memo ?? null,
+        workDayCount,
+        childNames: group.length > 1 ? group.slice(1).map((g) => g.name) : [],
+        quoteAmount,
+        agencyAmount,
+        purchaseTotal,
+        purchaseSupply,
+        purchaseVat,
+        contractAmountExpected: quoteAmount - agencyAmount,
+        profit,
+        margin,
+        categoryBreakdown: Array.from(catMap.values()).sort((a, b) => b.amount - a.amount),
+      };
+    })
+    .sort((a, b) => (a.projectCode ?? "").localeCompare(b.projectCode ?? "") || a.name.localeCompare(b.name, "ko"));
+
+  const projectSummaryExportRows = projectSummaryRows.map((p) => [
+    p.projectCode ?? "-",
+    p.name,
+    p.siteName ?? "-",
+    projectStatusLabel(p.status),
+    p.workDayCount,
+    p.quoteAmount,
+    p.agencyAmount,
+    p.purchaseSupply,
+    p.purchaseVat,
+    p.purchaseTotal,
+    p.contractAmountExpected,
+    p.profit,
+    p.margin === null ? 0 : Math.round(p.margin * 100) / 100,
+    p.memo ?? "",
+  ]);
+
   // 매출 검증: 수주액(실수령액으로 입력해둔 금액)과 실제 매출 원장(세금계산서 기준) 합계를
   // 대조 — 수주액 필드만 입력되고 원장에 매출이 안 찍혔거나, 반대로 원장엔 매출이 있는데
   // 수주액이 비어있거나, 금액이 서로 다른 경우를 찾아낸다.
@@ -238,6 +370,22 @@ export default async function ReportsPage({
     profit: projectSummaryProfit,
     profitRate: projectSummaryQuoteAmount > 0 ? (projectSummaryProfit / projectSummaryQuoteAmount) * 100 : null,
   };
+
+  // 상단 박스의 "예상 순이익율" — 대시보드의 "총 예상 매출"/"이익 예상"과 동일한 기준(연도
+  // 전체, site 필터와 무관)으로 계산. PendingPaymentProfitSection.tsx의 이익 예상 계산과
+  // 같은 방식(발주액 기준 프로젝트 손익 − 프로젝트 미배정 일반경비 − 직원급여/상여/4대보험)을 그대로 따름.
+  const PAYROLL_CATEGORY_NAME = "직원급여/상여/4대보험"; // PendingPaymentProfitSection.tsx와 동일한 이름 유지 필요
+  const totalExpectedRevenue = byProjectAll.reduce((s, p) => s + (p.contract_amount ?? 0), 0);
+  const yearProfitSum = byProjectAll.filter((p) => p.quote_amount != null).reduce((s, p) => s + p.profit, 0);
+  const nullProjectPurchaseTx = transactions.filter((t) => !t.project_id && t.type === "매입");
+  const generalExpense = nullProjectPurchaseTx
+    .filter((t) => one(t.expense_categories)?.name !== PAYROLL_CATEGORY_NAME)
+    .reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
+  const payrollCost = nullProjectPurchaseTx
+    .filter((t) => one(t.expense_categories)?.name === PAYROLL_CATEGORY_NAME)
+    .reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
+  const yearProfitEstimate = yearProfitSum - generalExpense - payrollCost;
+  const yearProfitEstimateRate = totalExpectedRevenue > 0 ? (yearProfitEstimate / totalExpectedRevenue) * 100 : null;
 
   // 현장별 손익 (프로젝트 없는 일반경비는 별도 묶음)
   const siteMap = new Map<string, { name: string; sales: number; purchase: number }>();
@@ -590,6 +738,33 @@ export default async function ReportsPage({
 
   const vendorExportRows = byVendor.map((v) => [v.name, v.count, v.amount]);
 
+  // 매입 품목 검색 — 올해 매입 거래 전부를 품목명으로 찾아볼 수 있게(검색어는 화면에서 입력).
+  const purchaseItemRows = transactions
+    .filter((t) => t.type === "매입")
+    .map((t) => {
+      const client = one(t.clients) as { name: string } | null;
+      const proj = one(t.projects) as { name: string } | null;
+      const cat = one(t.expense_categories) as { name: string } | null;
+      return {
+        id: t.id,
+        trans_date: t.trans_date,
+        clientName: client?.name ?? t.client_name_raw ?? "-",
+        projectName: proj?.name ?? "일반경비",
+        categoryName: cat?.name ?? "미분류",
+        itemName: t.item_name ?? "-",
+        amount: t.purchase_amount + t.purchase_vat,
+        editHref: `/reports?year=${selectedYear}${site ? `&site=${site}` : ""}&editTx=${t.id}`,
+      };
+    });
+  const purchaseItemExportRows = purchaseItemRows.map((r) => [
+    formatDate(r.trans_date),
+    r.clientName,
+    r.projectName,
+    r.categoryName,
+    r.itemName,
+    r.amount,
+  ]);
+
   const classificationExportRows = classificationPendingRows.map((r) => [
     formatDate(r.date),
     r.type,
@@ -642,7 +817,7 @@ export default async function ReportsPage({
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div>
               <p className="text-sm text-slate-500">{selectedYear}년 총 매출액</p>
               <p className="mt-2 font-mono text-2xl font-bold text-slate-900">{formatWon(yearTotal.sales)}</p>
@@ -657,16 +832,74 @@ export default async function ReportsPage({
                 {formatWon(yearTotal.sales - yearTotal.purchase)}
               </p>
             </div>
+            <div>
+              <p className="text-sm text-slate-500">예상 순이익율</p>
+              <p className="mt-2 font-mono text-2xl font-bold text-red-600">
+                {yearProfitEstimateRate === null ? "-" : `${yearProfitEstimateRate.toFixed(2)}%`}
+              </p>
+              <p className="mt-1 text-[11px] leading-tight text-slate-400">
+                {selectedYear}년 이익 예상 ÷ 총 예상 매출(수주액) — site 필터와 무관한 연간 전체 기준
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
       <CollapsibleSection
+        title="연간 결산 요약 — 전체 프로젝트 한눈에 보기 (A4 한 장)"
+        className={hiddenClass("annualSummary")}
+        defaultOpen={printSection === "annualSummary"}
+        headerExtra={printLink("annualSummary")}
+      >
+        <AnnualSettlementSummary
+          year={selectedYear}
+          totalSales={yearTotal.sales}
+          totalPurchase={yearTotal.purchase}
+          projectCount={byProject.length}
+          bySite={bySite}
+          byVendor={byVendorPurchaseOnly}
+          byCategory={byCategory}
+        />
+      </CollapsibleSection>
+
+      <CollapsibleSection
         title={groupTitle("재무 개요")}
         bare
-        defaultOpen={groupDefaultOpen(["quarterly", "monthly", "bySite"])}
+        defaultOpen={groupDefaultOpen(["currentFunds", "quarterly", "monthly", "bySite"])}
       >
        <div className="space-y-6 mt-3">
+        <div className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${hiddenClass("currentFunds")}`}>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="font-semibold text-slate-900">현재 자금 내역</h2>
+              <p className="text-xs text-slate-400">선택 연도와 무관하게 현재 시점 기준 — 은행 총 잔액 − 외상 매입 총액(VAT 포함)</p>
+            </div>
+            {sectionControls("currentFunds", {
+              filename: "현재_자금_내역.xlsx",
+              headers: ["은행 총 잔액", "외상 매입 총액", "실질 자금"],
+              rows: [[bankTotalBalance, outstandingCreditPurchaseTotal, currentFunds]],
+            })}
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+              <p className="text-sm text-slate-500">은행 총 잔액</p>
+              <p className={`mt-1 font-mono text-2xl font-bold ${bankTotalBalance < 0 ? "text-red-600" : "text-slate-900"}`}>
+                {formatWon(bankTotalBalance)}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">외상 매입 총액 (VAT 포함, 미정산분)</p>
+              <p className="mt-1 font-mono text-2xl font-bold text-slate-500">-{formatWon(outstandingCreditPurchaseTotal)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">실질 자금</p>
+              <p className={`mt-1 font-mono text-2xl font-bold ${currentFunds < 0 ? "text-red-600" : "text-slate-900"}`}>
+                {formatWon(currentFunds)}
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${hiddenClass("quarterly")}`}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-semibold text-slate-900">분기별 매입·매출·손익</h2>
@@ -716,7 +949,7 @@ export default async function ReportsPage({
       <CollapsibleSection
         title={groupTitle("프로젝트")}
         bare
-        defaultOpen={groupDefaultOpen(["projects", "revenue"])}
+        defaultOpen={groupDefaultOpen(["projects", "revenue", "projectSummary"])}
       >
        <div className="space-y-6 mt-3">
 
@@ -744,7 +977,12 @@ export default async function ReportsPage({
                 <ReportProjectPicker
                   year={selectedYear}
                   site={site}
-                  projects={[...byProject].sort((a, b) => a.name.localeCompare(b.name, "ko"))}
+                  // 귀속(parent_project_id가 있는) 프로젝트는 목록에서 빼고 항상 어미 프로젝트만
+                  // 고를 수 있게 함 — 어미 프로젝트를 고르면 ProjectProfitReport가 귀속 하위까지
+                  // 알아서 합쳐서 보여줌(하위 프로젝트를 단독으로 열면 그 하위 몫만 나와 불완전함).
+                  projects={[...byProject]
+                    .filter((p) => !p.parent_project_id)
+                    .sort((a, b) => a.name.localeCompare(b.name, "ko"))}
                 />
               )}
             </>
@@ -786,13 +1024,41 @@ export default async function ReportsPage({
       >
         <RevenueVerificationTable rows={revenueVerificationRows} />
         </CollapsibleSection>
+
+        <CollapsibleSection
+          title="프로젝트 요약"
+          className={hiddenClass("projectSummary")}
+          defaultOpen={printSection === "projectSummary"}
+          headerExtra={sectionControls("projectSummary", {
+            filename: `프로젝트_요약_${selectedYear}.xlsx`,
+            headers: [
+              "프로젝트번호",
+              "프로젝트명",
+              "현장",
+              "상태",
+              "작업일수",
+              "발주액",
+              "대행구매액",
+              "매입 공급가액",
+              "매입 부가세",
+              "매입합계",
+              "수주예상액",
+              "이익금",
+              "이익율(%)",
+              "메모",
+            ],
+            rows: projectSummaryExportRows,
+          })}
+        >
+          <ProjectSummaryReport rows={projectSummaryRows} />
+        </CollapsibleSection>
        </div>
       </CollapsibleSection>
 
       <CollapsibleSection
         title={groupTitle("거래처·카테고리 집계")}
         bare
-        defaultOpen={groupDefaultOpen(["vendors", "classification", "categories", "customers"])}
+        defaultOpen={groupDefaultOpen(["vendors", "purchaseItems", "classification", "categories", "customers"])}
       >
        <div className="space-y-6 mt-3">
         <CollapsibleSection
@@ -806,6 +1072,19 @@ export default async function ReportsPage({
           )}
         >
           <VendorAggregateTable rows={byVendor} year={selectedYear} vendorAgency={includeVendorAgency} />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title="매입 품목 검색 — 품목명으로 올해 매입 내역 찾기"
+          className={hiddenClass("purchaseItems")}
+          defaultOpen={printSection === "purchaseItems"}
+          headerExtra={sectionControls("purchaseItems", {
+            filename: `매입_품목_${selectedYear}.xlsx`,
+            headers: ["날짜", "거래처", "프로젝트", "카테고리", "품목", "금액"],
+            rows: purchaseItemExportRows,
+          })}
+        >
+          <PurchaseItemSearchTable rows={purchaseItemRows} />
         </CollapsibleSection>
 
         <CollapsibleSection

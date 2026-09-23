@@ -1,6 +1,7 @@
 import type { FieldConfig } from "./types";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { ParentProjectField } from "@/components/ParentProjectField";
+import { ColorSwatchField } from "@/components/ColorSwatchField";
 
 export function EntityForm({
   fields,
@@ -55,6 +56,8 @@ export function EntityForm({
                 defaultValue={value}
                 required={f.required}
               />
+            ) : f.type === "color-swatch" ? (
+              <ColorSwatchField name={f.name} options={f.options ?? []} defaultValue={value} />
             ) : f.type === "select" ? (
               <select name={f.name} defaultValue={value} required={f.required} className={fieldClass}>
                 {f.options?.map((o) => (

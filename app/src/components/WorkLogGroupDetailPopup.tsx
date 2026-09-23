@@ -26,15 +26,21 @@ function MemoRow({ entry }: { entry: WorkLogDetailEntry }) {
   const [editing, setEditing] = useState(false);
   const [memo, setMemo] = useState(entry.content ?? "");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const pending = useGlobalPending();
 
   async function save() {
     setSaving(true);
+    setError(null);
     const fd = new FormData();
     fd.append("id", entry.id);
     fd.append("content", memo);
-    await pending.run(() => updateWorkLogMemo(fd));
+    const result = await pending.run(() => updateWorkLogMemo(fd));
     setSaving(false);
+    if (result?.error) {
+      setError(result.error);
+      return;
+    }
     setEditing(false);
   }
 
@@ -65,6 +71,7 @@ function MemoRow({ entry }: { entry: WorkLogDetailEntry }) {
               취소
             </Button>
           </div>
+          {error && <p className="w-full text-xs text-red-600">{error}</p>}
         </div>
       ) : (
         entry.content && <p className="mt-1 whitespace-pre-wrap text-xs text-slate-500">{entry.content}</p>
@@ -95,6 +102,7 @@ export function WorkLogGroupDetailPopup({
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(title);
   const [renaming, setRenaming] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
   useEscapeKey(true, () => (editingTitle ? setEditingTitle(false) : onClose()));
 
   useEffect(() => {
@@ -121,13 +129,18 @@ export function WorkLogGroupDetailPopup({
     )
       return;
     setRenaming(true);
+    setRenameError(null);
     const fd = new FormData();
     fd.append("site_id", siteId);
     fd.append("old_title", title);
     fd.append("new_title", newTitle);
     fd.append("year", String(year));
-    await pending.run(() => renameWorkLogTitle(fd));
+    const result = await pending.run(() => renameWorkLogTitle(fd));
     setRenaming(false);
+    if (result?.error) {
+      setRenameError(result.error);
+      return;
+    }
     router.refresh();
     onClose();
   }
@@ -154,28 +167,31 @@ export function WorkLogGroupDetailPopup({
               {siteName}
             </p>
             {editingTitle ? (
-              <div className="mt-1 flex items-center gap-1.5">
-                <input
-                  value={titleDraft}
-                  onChange={(e) => setTitleDraft(e.target.value)}
-                  className={`${fieldClass} h-8 w-44 text-sm`}
-                  autoFocus
-                />
-                <Button type="button" size="xs" disabled={renaming} onClick={saveTitle}>
-                  저장
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="xs"
-                  disabled={renaming}
-                  onClick={() => {
-                    setEditingTitle(false);
-                    setTitleDraft(title);
-                  }}
-                >
-                  취소
-                </Button>
+              <div className="mt-1 flex flex-col gap-1">
+                <div className="flex items-center gap-1.5">
+                  <input
+                    value={titleDraft}
+                    onChange={(e) => setTitleDraft(e.target.value)}
+                    className={`${fieldClass} h-8 w-44 text-sm`}
+                    autoFocus
+                  />
+                  <Button type="button" size="xs" disabled={renaming} onClick={saveTitle}>
+                    저장
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="xs"
+                    disabled={renaming}
+                    onClick={() => {
+                      setEditingTitle(false);
+                      setTitleDraft(title);
+                    }}
+                  >
+                    취소
+                  </Button>
+                </div>
+                {renameError && <p className="text-xs text-red-600">{renameError}</p>}
               </div>
             ) : (
               <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">

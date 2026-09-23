@@ -1,8 +1,10 @@
 "use client";
 
 import { downloadXlsx } from "@/lib/xlsxExport";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatWon } from "@/lib/format";
+import { numberToKoreanAmount } from "@/lib/numberToKorean";
 import { Button } from "@/components/ui/Button";
+import type { QuoteCompanyInfo } from "@/lib/actions/quotes";
 
 type Row = {
   id: string;
@@ -17,17 +19,39 @@ type Row = {
 
 export function QuoteExportButton({
   quote,
+  companyInfo,
   rows,
   total,
 }: {
-  quote: { quote_number: string | null; title: string; clientName: string | null; created_at: string };
+  quote: {
+    quote_number: string | null;
+    title: string;
+    clientName: string | null;
+    valid_until: string | null;
+    memo: string | null;
+    created_at: string;
+  };
+  companyInfo: QuoteCompanyInfo;
   rows: Row[];
   total: number;
 }) {
   async function handleExport() {
     const leadingRows: (string | number)[][] = [
       [`견적서 ${quote.quote_number ?? ""}`],
-      [`건명: ${quote.title}`, `거래처: ${quote.clientName ?? "-"}`, `견적일자: ${formatDate(quote.created_at)}`],
+      [
+        `공사명: ${quote.title}`,
+        `거래처: ${quote.clientName ?? "-"}`,
+        `견적일자: ${formatDate(quote.created_at)}`,
+        `유효기한: ${quote.valid_until ? formatDate(quote.valid_until) : "-"}`,
+      ],
+      [
+        `공급자: ${companyInfo.companyName || "-"}${companyInfo.representativeName ? ` (대표 ${companyInfo.representativeName})` : ""}`,
+        `사업자등록번호: ${companyInfo.bizRegNo || "-"}`,
+        `주소: ${companyInfo.address || "-"}`,
+        `업태/종목: ${companyInfo.bizType || "-"} / ${companyInfo.bizItem || "-"}`,
+        `전화/팩스: ${companyInfo.phone || "-"} / ${companyInfo.fax || "-"}`,
+      ],
+      [`합계금액 (VAT 별도): ${numberToKoreanAmount(total)} (${formatWon(total)})`],
     ];
     const data: (string | number)[][] = rows.map((r, i) => [
       i + 1,
@@ -36,10 +60,11 @@ export function QuoteExportButton({
       r.unit ?? "-",
       r.quantity ?? "-",
       r.adjustedUnitPrice ?? "-",
-      r.confirmed,
+      r.confirmed === 0 ? "-" : r.confirmed,
       r.note ?? "-",
     ]);
     data.push(["", "", "", "", "", "합계", total, ""]);
+    if (quote.memo) data.push([`비고: ${quote.memo}`]);
 
     await downloadXlsx(
       `견적서_${quote.quote_number ?? quote.title}.xlsx`,

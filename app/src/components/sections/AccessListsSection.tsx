@@ -10,6 +10,15 @@ import { YearMonthFilter } from "@/components/YearMonthFilter";
 
 const FLOOR_YEAR = 2026;
 
+// 서버 렌더링 폼(action={fn})은 fn이 void를 반환해야 함 — createAccessListRecord는 이제
+// 실패 시 {error}를 반환하므로, 이 폼(클라이언트 상태가 없어 에러를 화면에 못 띄움)에서는
+// 결과를 버리는 얇은 래퍼로 감싼다. 실패해도 revalidatePath가 안 불려서 목록이 그대로라
+// (사용자 입장에서 "생성이 안 됐다"는 게 드러남) 완전히 조용히 묻히진 않음.
+async function createAccessList(formData: FormData) {
+  "use server";
+  await createAccessListRecord(formData);
+}
+
 export async function AccessListsSection({ year, month }: { year?: string; month?: string }) {
   const supabase = await createClient();
   const now = new Date();
@@ -61,7 +70,7 @@ export async function AccessListsSection({ year, month }: { year?: string; month
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h3 className="mb-3 font-semibold text-slate-900">출입명단 생성</h3>
-        <form action={createAccessListRecord} className="space-y-3">
+        <form action={createAccessList} className="space-y-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-slate-500">원청 회사명</label>

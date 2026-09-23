@@ -24,20 +24,23 @@ function parse(formData: FormData) {
 
 export async function createDailyWorkerRecord(formData: FormData) {
   const supabase = await createClient();
-  await supabase.from("daily_workers").insert(parse(formData));
+  const { error } = await supabase.from("daily_workers").insert(parse(formData));
+  if (error) return { error: error.message };
   revalidatePath("/daily-workers");
 }
 
 export async function updateDailyWorkerRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("daily_workers").update(parse(formData)).eq("id", id);
+  const { error } = await supabase.from("daily_workers").update(parse(formData)).eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/daily-workers");
 }
 
 export async function deleteDailyWorkerRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("daily_workers").delete().eq("id", id);
+  const { error } = await supabase.from("daily_workers").delete().eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/daily-workers");
 }

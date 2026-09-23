@@ -28,6 +28,7 @@ export function WorkLogForm({
   const confirm = useConfirm();
   const globalPending = useGlobalPending();
   const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const contentListId = "worklog-content-suggestions";
   const logYear = Number(dateKey.slice(0, 4));
 
@@ -38,8 +39,14 @@ export function WorkLogForm({
         const form = e.currentTarget;
         if (!(await confirm("저장하시겠습니까?"))) return;
         setPending(true);
-        const { redirectTo } = await globalPending.run(() => saveDayWorkLogs(new FormData(form)));
-        router.push(redirectTo, { scroll: false });
+        setError(null);
+        const result = await globalPending.run(() => saveDayWorkLogs(new FormData(form)));
+        setPending(false);
+        if (result.error || !result.redirectTo) {
+          setError(result.error ?? "저장 중 오류가 발생했습니다.");
+          return;
+        }
+        router.push(result.redirectTo, { scroll: false });
       }}
       className="space-y-4"
     >
@@ -62,6 +69,7 @@ export function WorkLogForm({
           <option key={c} value={c} />
         ))}
       </datalist>
+      {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex justify-end gap-2 pt-2">
         <Button type="submit" disabled={pending}>
           저장

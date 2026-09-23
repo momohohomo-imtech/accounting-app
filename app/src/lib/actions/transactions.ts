@@ -58,6 +58,8 @@ export async function createTransactionRecord(formData: FormData) {
 
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  revalidatePath("/projects");
 }
 
 export async function updateTransactionRecord(formData: FormData) {
@@ -96,6 +98,8 @@ export async function updateTransactionRecord(formData: FormData) {
 
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  revalidatePath("/projects");
 }
 
 export type BulkTransactionInput = {
@@ -153,6 +157,8 @@ export async function bulkImportTransactions(rows: BulkTransactionInput[]) {
 
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  revalidatePath("/projects");
 }
 
 export async function bulkUpdateProjectId(formData: FormData) {
@@ -170,6 +176,7 @@ export async function bulkUpdateProjectId(formData: FormData) {
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
   revalidatePath("/reports");
+  revalidatePath("/projects");
 }
 
 export async function bulkUpdateClientId(formData: FormData) {
@@ -230,9 +237,12 @@ export async function bulkUpdateItemName(formData: FormData) {
 export async function deleteTransactionRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("transactions").delete().eq("id", id);
+  const { error } = await supabase.from("transactions").delete().eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  revalidatePath("/projects");
 }
 
 export async function updateTransactionNote(formData: FormData) {
@@ -297,4 +307,5 @@ export async function settleCreditTransactions(formData: FormData) {
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
   revalidatePath("/reports");
+  revalidatePath("/projects");
 }

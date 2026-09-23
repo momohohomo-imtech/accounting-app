@@ -8,7 +8,7 @@ import { ProjectReportActions } from "@/components/ProjectReportActions";
 import { ProjectMemoProvider } from "@/components/ProjectMemoProvider";
 import { ReportCloseButton } from "@/components/ReportCloseButton";
 import { ReportMemoField } from "@/components/ReportMemoField";
-import { ProjectPurchaseChartButton } from "@/components/ProjectPurchaseChartButton";
+import { ProjectPurchaseChartButton, HANDLING_FEE_PCT } from "@/components/ProjectPurchaseChartButton";
 import { ProjectPurchaseTable } from "@/components/ProjectPurchaseTable";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import { ProjectAgencyPurchaseList } from "@/components/ProjectAgencyPurchaseList";
@@ -112,6 +112,9 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
   const profit = quoteTotal ? quoteTotal - purchaseTotal - agencyTotal : null;
   // 이익율은 발주액 대비 비율
   const margin = quoteTotal && profit !== null ? (profit / quoteTotal) * 100 : null;
+  // 그래프·보고서 상단 참고용 — 발주액의 25%를 이윤+잡비로 가정했을 때 금액(실제 이익금/이익율
+  // 계산에는 영향 없는 순수 표시용 수치).
+  const handlingFeeAmount = quoteTotal > 0 ? Math.round((quoteTotal * HANDLING_FEE_PCT) / 100) : 0;
 
   const exportRows = rows.map((t) => [
     formatDate(t.trans_date),
@@ -226,7 +229,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
         </div>
       )}
 
-      <div className="order-5 print:order-2 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 print:grid-cols-4 print:gap-2 print:border-b print:pt-2 print:pb-2 print:break-inside-avoid">
+      <div className="order-5 print:order-2 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 print:grid-cols-4 print:gap-2 print:border-b print:pt-2 print:pb-2 print:break-inside-avoid">
         <div>
           <p className="text-xs text-slate-500 print:text-[9px]">발주액 (원청 발주금액)</p>
           <p className="font-mono text-sm font-bold whitespace-nowrap text-slate-900 print:text-xs">{formatWon(quoteTotal)}</p>
@@ -278,12 +281,16 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
             {margin === null ? "-" : `${margin.toFixed(2)}%`}
           </p>
         </div>
+        <div>
+          <p className="text-xs text-slate-500 print:text-[9px]">이윤+잡비 ({HANDLING_FEE_PCT}%, 참고용)</p>
+          <p className="font-mono text-sm font-bold whitespace-nowrap text-slate-900 print:text-xs">{formatWon(handlingFeeAmount)}</p>
+        </div>
       </div>
 
       <CollapsibleSection title="매입내역 · 대행구매액" defaultOpen printAlways bare className="order-2 print:order-3">
         <div className="space-y-4">
           <ProjectPurchaseTable
-            rows={rows.map((t) => {
+            rows={(purchaseRowsRaw ?? []).map((t) => {
               const category = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
               return {
                 id: t.id,
@@ -293,9 +300,15 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
                 category: category?.name ?? "미분류",
                 categoryColor: category ? resolveCategoryColor(category) : undefined,
                 amount: t.purchase_amount + t.purchase_vat,
+                unsettled: !isLedgerVisible(t, (creditPayments ?? []) as CreditPayment[]),
               };
             })}
           />
+          {(purchaseRowsRaw ?? []).some((t) => !isLedgerVisible(t, (creditPayments ?? []) as CreditPayment[])) && (
+            <p className="text-xs text-amber-600">
+              &quot;외상 미정산&quot; 항목은 참고용 표시이며, 정산 전까지 매입 합계·이익금 계산에는 포함되지 않습니다.
+            </p>
+          )}
 
           <div className="print:mt-2 print:border-t print:border-slate-400 print:pt-2">
             <ProjectAgencyPurchaseList

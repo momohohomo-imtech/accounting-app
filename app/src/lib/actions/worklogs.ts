@@ -3,11 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
-export async function saveDayWorkLogs(formData: FormData) {
+export async function saveDayWorkLogs(formData: FormData): Promise<{ redirectTo: string | null; error: string | null }> {
   const supabase = await createClient();
   const logDate = String(formData.get("log_date"));
 
-  await supabase.from("work_logs").delete().eq("log_date", logDate);
+  const del = await supabase.from("work_logs").delete().eq("log_date", logDate);
+  if (del.error) return { redirectTo: null, error: del.error.message };
 
   const rows = [];
   for (let i = 0; i < 5; i++) {
@@ -19,14 +20,17 @@ export async function saveDayWorkLogs(formData: FormData) {
     if (!title && !siteId) continue;
     rows.push({ log_date: logDate, title, site_id: siteId, project_id: projectId, sort_order: i });
   }
-  if (rows.length) await supabase.from("work_logs").insert(rows);
+  if (rows.length) {
+    const ins = await supabase.from("work_logs").insert(rows);
+    if (ins.error) return { redirectTo: null, error: ins.error.message };
+  }
 
   const [year, month] = logDate.split("-");
   revalidatePath("/worklogs");
   // 커스텀 확인 팝업(비동기) 도입 이후로는 네이티브 <form action>을 통해 호출되지 않고
   // 클라이언트에서 직접 호출하므로, 여기서 redirect()를 던지면 깨짐 — 경로만 반환하고
   // 이동은 호출한 쪽(WorkLogForm)에서 router.push로 처리.
-  return { redirectTo: `/worklogs?year=${Number(year)}&month=${Number(month)}` };
+  return { redirectTo: `/worklogs?year=${Number(year)}&month=${Number(month)}`, error: null };
 }
 
 export type WorkLogDetailEntry = { id: string; log_date: string; content: string | null };
@@ -76,7 +80,8 @@ export async function updateWorkLogMemo(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
   const content = String(formData.get("content") ?? "").trim() || null;
-  await supabase.from("work_logs").update({ content }).eq("id", id);
+  const { error } = await supabase.from("work_logs").update({ content }).eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/worklogs");
   revalidatePath("/reports");
 }
@@ -93,7 +98,7 @@ export async function renameWorkLogTitle(formData: FormData) {
   const oldTitle = String(formData.get("old_title") ?? "").trim();
   const newTitle = String(formData.get("new_title") ?? "").trim();
   const year = Number(formData.get("year"));
-  if (!oldTitle || !newTitle || !year) return;
+  if (!oldTitle || !newTitle || !year) return { error: "입력값을 확인해주세요." };
 
   const start = `${year}-01-01`;
   const end = `${year}-12-31`;
@@ -105,11 +110,8 @@ export async function renameWorkLogTitle(formData: FormData) {
     .gte("log_date", start)
     .lte("log_date", end);
 
-  if (siteId) {
-    await base.eq("site_id", siteId);
-  } else {
-    await base.is("site_id", null);
-  }
+  const { error } = siteId ? await base.eq("site_id", siteId) : await base.is("site_id", null);
+  if (error) return { error: error.message };
 
   revalidatePath("/worklogs");
   revalidatePath("/reports");

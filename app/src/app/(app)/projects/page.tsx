@@ -5,7 +5,7 @@ import type { CreditPayment } from "@/lib/types";
 import { CreatePanel } from "@/components/crud/CreatePanel";
 import { EntityTable } from "@/components/crud/EntityTable";
 import { createProjectRecord, updateProjectRecord, deleteProjectRecord } from "@/lib/actions/projects";
-import type { FieldConfig } from "@/components/crud/types";
+import type { FieldConfig, RowBgColor } from "@/components/crud/types";
 import { PageTabs } from "@/components/PageTabs";
 import { SitesSection } from "@/components/sections/SitesSection";
 import { QuotesSection } from "@/components/sections/QuotesSection";
@@ -13,7 +13,7 @@ import { PurchaseOrdersSection } from "@/components/sections/PurchaseOrdersSecti
 import { YearFilter } from "@/components/YearFilter";
 import { ProjectProfitReport } from "@/components/ProjectProfitReport";
 import { LinkButton } from "@/components/ui/Button";
-import { PROJECT_STATUS_OPTIONS, PROJECT_STATUS_COLLECTED, PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
+import { PROJECT_STATUS_OPTIONS, PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
 import { formatWon } from "@/lib/format";
 import { ProjectListExportButtons } from "@/components/ProjectListExportButtons";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
@@ -26,13 +26,42 @@ const TABS = [
   { key: "purchase_orders", label: "발주서" },
 ];
 
-// 프로젝트 목록 행 배경색 — 완료 수금대기는 파랑으로 따로 강조하고, 수금 완료 전
-// 나머지 상태는 전부 옅은 빨강, 수금 완료는 배경 없음(정상).
-const STATUS_ROW_BACKGROUND: Record<string, "red" | "blue"> = Object.fromEntries(
-  PROJECT_STATUS_OPTIONS.filter((o) => o.value !== PROJECT_STATUS_COLLECTED).map((o) => [
-    o.value,
-    o.value === PROJECT_STATUS_AWAITING_PAYMENT ? "blue" : "red",
-  ])
+// 프로젝트 목록 행 배경색 — 상태 기준: 진행중 옅은 빨강, 완료 수금대기 파랑, 공사 완료 녹색,
+// 검토중/기타 옅은 회색. 타 프로젝트 귀속 행은 자기 상태색 대신 귀속 대상(부모) 프로젝트의
+// 상태색을 그대로 물려받는다(부모와 같은 배경으로 묶여 보이게).
+function statusRowColor(status: string | null | undefined): RowBgColor | undefined {
+  if (status === "done") return "green";
+  if (status === "review" || status === "etc") return "gray";
+  if (status === "ongoing") return "red";
+  if (status === PROJECT_STATUS_AWAITING_PAYMENT) return "blue";
+  return undefined;
+}
+// rowColorKey 필드는 색상 이름을 그대로 값으로 쓰므로(예: "green" → "green") 항등 매핑이면 충분.
+const ROW_COLOR_IDENTITY_MAP: Record<string, RowBgColor> = Object.fromEntries(
+  (["green", "gray", "blue", "red"] as RowBgColor[]).map((c) => [c, c])
+);
+// 귀속 그룹(부모 프로젝트 id 기준) 표시용 — 프로젝트명 옆 동그라미 색. 같은 부모로 묶인 행끼리
+// 같은 색, 서로 다른 그룹은 이 팔레트를 돌려가며 다른 색을 쓴다.
+const MERGE_GROUP_PALETTE: RowBgColor[] = ["purple", "amber", "teal", "pink", "indigo", "cyan", "orange", "fuchsia"];
+
+// 확인 필요/우선순위 등 사용자가 직접 지정하는 강조색 — 지정되면 자동 상태색 대신 이 색(진한
+// 배경)을 쓴다. 프로젝트 수정 팝업에서 색상 선택기로 고른다.
+const HIGHLIGHT_COLOR_OPTIONS: { value: RowBgColor; label: string }[] = [
+  { value: "red", label: "빨강" },
+  { value: "orange", label: "주황" },
+  { value: "amber", label: "노랑" },
+  { value: "green", label: "초록" },
+  { value: "teal", label: "청록" },
+  { value: "cyan", label: "시안" },
+  { value: "blue", label: "파랑" },
+  { value: "indigo", label: "남색" },
+  { value: "purple", label: "보라" },
+  { value: "fuchsia", label: "자홍" },
+  { value: "pink", label: "분홍" },
+  { value: "gray", label: "회색" },
+];
+const HIGHLIGHT_COLOR_IDENTITY_MAP: Record<string, RowBgColor> = Object.fromEntries(
+  HIGHLIGHT_COLOR_OPTIONS.map((o) => [o.value, o.value])
 );
 
 export default async function ProjectsPage({
@@ -162,6 +191,7 @@ async function ProjectListSection({
       required: true,
       width: "13%",
       tertiaryColorField: "contractMismatch",
+      dotColorField: "mergeGroupColor",
     },
     {
       name: "parent_project_id",
@@ -179,7 +209,21 @@ async function ProjectListSection({
       type: "select",
       options: PROJECT_STATUS_OPTIONS,
       width: "6%",
-      rowBackgroundByValue: STATUS_ROW_BACKGROUND,
+    },
+    {
+      name: "rowColorKey",
+      label: "행 색상",
+      readOnly: true,
+      hideInTable: true,
+      rowBackgroundByValue: ROW_COLOR_IDENTITY_MAP,
+    },
+    {
+      name: "highlight_color",
+      label: "강조색 (확인 필요·우선순위 표시)",
+      type: "color-swatch",
+      options: HIGHLIGHT_COLOR_OPTIONS,
+      hideInTable: true,
+      strongRowBackgroundByValue: HIGHLIGHT_COLOR_IDENTITY_MAP,
     },
     {
       name: "is_service",
@@ -203,13 +247,22 @@ async function ProjectListSection({
       defaultVisible: true,
     },
     {
-      name: "contract_amount",
-      label: "수주액",
-      type: "number",
+      name: "contractAmountExpected",
+      label: "수주예상액",
+      readOnly: true,
       format: "currency",
       width: "8%",
+      colorField: "contract_amount_estimated",
+      secondaryColorField: "contract_amount_minimum",
       toggleable: true,
       defaultVisible: false,
+    },
+    {
+      name: "contract_amount",
+      label: "수주액 (수기 입력, 다른 보고서용 · 표에는 수주예상액으로 표시됨)",
+      type: "number",
+      format: "currency",
+      hideInTable: true,
     },
     {
       name: "contract_amount_estimated",
@@ -233,6 +286,16 @@ async function ProjectListSection({
       width: "8%",
       colorField: "contract_amount_estimated",
       secondaryColorField: "contract_amount_minimum",
+      toggleable: true,
+      defaultVisible: false,
+    },
+    {
+      name: "totalPurchase",
+      label: "총 매입 (매입+구매대행)",
+      tableLabel: "총 매입",
+      readOnly: true,
+      format: "currency",
+      width: "8%",
       toggleable: true,
       defaultVisible: false,
     },
@@ -268,24 +331,53 @@ async function ProjectListSection({
     const contractMismatch =
       !p.settlement_finalized &&
       (p.contract_amount ?? 0) > 0 && (p.quote_amount ?? 0) - (p.contract_amount ?? 0) - agencyAmount !== 0;
-    const profit = p.quote_amount ? p.quote_amount - (purchaseByProject.get(p.id) ?? 0) - agencyAmount : null;
+    const purchaseAmount = purchaseByProject.get(p.id) ?? 0;
+    const profit = p.quote_amount ? p.quote_amount - purchaseAmount - agencyAmount : null;
     // 이익율은 발주액 대비 비율 — 손익보고서 팝업/보고서 페이지와 동일한 계산 기준.
     const profitRate = p.quote_amount && profit !== null ? `${((profit / p.quote_amount) * 100).toFixed(1)}%` : "-";
+    // 수주예상액 = 발주액 - 구매 대행비.
+    const contractAmountExpected = (p.quote_amount ?? 0) - agencyAmount;
+    // 총 매입 = 매입 합계 + 구매대행 합계.
+    const totalPurchase = purchaseAmount + agencyAmount;
     return {
       ...p,
       site_name: (one(p.sites) as { name: string } | undefined)?.name,
       profit,
       profitRate,
       contractMismatch,
+      contractAmountExpected,
+      totalPurchase,
     };
   });
 
+  // 귀속 그룹(부모 프로젝트 id 기준) 동그라미 색 배정 — 처음 등장하는 순서대로 팔레트를 돌려 배정.
+  const groupRootIds = Array.from(
+    new Set(tableRows.filter((p) => p.parent_project_id).map((p) => p.parent_project_id as string))
+  );
+  const groupColorByRootId = new Map<string, RowBgColor>(
+    groupRootIds.map((id, i) => [id, MERGE_GROUP_PALETTE[i % MERGE_GROUP_PALETTE.length]])
+  );
+  const statusByProjectId = new Map(tableRows.map((p) => [p.id, p.status as string | null]));
+
+  const coloredRows = tableRows.map((p) => {
+    const mergeGroupColor = p.parent_project_id
+      ? groupColorByRootId.get(p.parent_project_id as string)
+      : groupColorByRootId.get(p.id);
+    // 귀속(merged) 상태는 자기 상태색이 없으니 귀속 대상 프로젝트의 상태색을 그대로 물려받는다.
+    const effectiveStatus =
+      p.status === "merged" && p.parent_project_id
+        ? (statusByProjectId.get(p.parent_project_id as string) ?? p.status)
+        : p.status;
+    return { ...p, rowColorKey: statusRowColor(effectiveStatus), mergeGroupColor };
+  });
+
   const awaitingPaymentProjects = tableRows.filter((p) => p.status === PROJECT_STATUS_AWAITING_PAYMENT);
-  const awaitingPaymentContractSum = awaitingPaymentProjects.reduce((sum, p) => sum + (p.contract_amount ?? 0), 0);
+  const awaitingPaymentContractSum = awaitingPaymentProjects.reduce((sum, p) => sum + p.contractAmountExpected, 0);
 
   const filteredQuoteSum = tableRows.reduce((sum, p) => sum + (p.quote_amount ?? 0), 0);
-  const filteredContractSum = tableRows.reduce((sum, p) => sum + (p.contract_amount ?? 0), 0);
+  const filteredContractSum = tableRows.reduce((sum, p) => sum + p.contractAmountExpected, 0);
   const filteredProfitSum = tableRows.reduce((sum, p) => sum + (p.profit ?? 0), 0);
+  const filteredPurchaseSum = tableRows.reduce((sum, p) => sum + p.totalPurchase, 0);
 
   return (
     <div className="space-y-6">
@@ -297,7 +389,7 @@ async function ProjectListSection({
             title={<span className="text-red-600">공사완료 예상 미수액</span>}
             className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 print:hidden"
           >
-            <p className="text-xs text-red-600">완료 수금대기 {awaitingPaymentProjects.length}건의 수주액 합계</p>
+            <p className="text-xs text-red-600">완료 수금대기 {awaitingPaymentProjects.length}건의 수주예상액 합계</p>
             <p className="mt-1 font-mono text-xl font-bold text-red-600">{formatWon(awaitingPaymentContractSum)}</p>
           </CollapsibleSection>
         )}
@@ -324,22 +416,29 @@ async function ProjectListSection({
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm print:border-0 print:p-0 print:shadow-none">
           <EntityTable
             fields={fields}
-            rows={tableRows}
+            rows={coloredRows}
+            groupByField="parent_project_id"
             updateAction={updateProjectRecord}
             deleteAction={deleteProjectRecord}
             editPopup
             extraActions={Object.fromEntries(
-              (projects ?? []).map((p) => [
-                p.id,
-                <LinkButton
-                  key={p.id}
-                  href={`/projects?tab=list&year=${selectedYear}${siteId ? `&site_id=${siteId}` : ""}${status ? `&status=${encodeURIComponent(status)}` : ""}&report=${p.id}`}
-                  variant="secondary"
-                  size="xs"
-                >
-                  보고서
-                </LinkButton>,
-              ])
+              (projects ?? []).map((p) => {
+                // 귀속(parent_project_id가 있는) 프로젝트는 보고서를 열어도 항상 어미
+                // 프로젝트 보고서로 이동 — 하위 프로젝트만 단독으로 열면 귀속 합산 전
+                // 불완전한 수치가 보임(ProjectProfitReport는 어미 id로 열어야 하위까지 합침).
+                const reportId = p.parent_project_id ?? p.id;
+                return [
+                  p.id,
+                  <LinkButton
+                    key={p.id}
+                    href={`/projects?tab=list&year=${selectedYear}${siteId ? `&site_id=${siteId}` : ""}${status ? `&status=${encodeURIComponent(status)}` : ""}&report=${reportId}`}
+                    variant="secondary"
+                    size="xs"
+                  >
+                    보고서
+                  </LinkButton>,
+                ];
+              })
             )}
           />
           <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-slate-100 pt-3 text-sm text-slate-600">
@@ -348,10 +447,13 @@ async function ProjectListSection({
               발주액 <span className="font-mono font-semibold text-slate-900">{formatWon(filteredQuoteSum)}</span>
             </span>
             <span>
-              수주액 <span className="font-mono font-semibold text-slate-900">{formatWon(filteredContractSum)}</span>
+              수주예상액 <span className="font-mono font-semibold text-slate-900">{formatWon(filteredContractSum)}</span>
             </span>
             <span>
               이익금 <span className="font-mono font-semibold text-slate-900">{formatWon(filteredProfitSum)}</span>
+            </span>
+            <span>
+              총 매입 <span className="font-mono font-semibold text-slate-900">{formatWon(filteredPurchaseSum)}</span>
             </span>
           </div>
         </div>
