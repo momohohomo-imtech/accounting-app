@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
       const { data: signed } = await supabase.storage.from("backups").createSignedUrl(fileName, 60 * 60 * 24);
       await sendEmail({
         to: emailTo,
-        subject: `[현장관리 시스템] ${new Date().toLocaleDateString("ko-KR")} 자동 백업 완료`,
+        subject: `[IM테크 회계 관리 시스템] ${new Date().toLocaleDateString("ko-KR")} 자동 백업 완료`,
         html: `
           <p>오늘의 자동 백업이 완료되었습니다.</p>
           <p>파일명: ${fileName}<br/>크기: ${sizeMb.toFixed(2)}MB</p>
