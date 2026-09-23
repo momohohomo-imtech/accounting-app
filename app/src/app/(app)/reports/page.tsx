@@ -13,7 +13,7 @@ import { projectStatusLabel } from "@/lib/projectStatus";
 import { AutoPrint } from "@/components/AutoPrint";
 import { ReportAIInsights } from "@/components/ReportAIInsights";
 import { saveReportAiInsight, deleteReportAiInsight } from "@/lib/actions/reportAiInsights";
-import { isLedgerVisible } from "@/lib/credit";
+import { isLedgerVisible, remainingBalance } from "@/lib/credit";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import type { ReportAiInsight, CreditPayment } from "@/lib/types";
 import { VendorAggregateTable } from "@/components/VendorAggregateTable";
@@ -117,6 +117,9 @@ export default async function ReportsPage({
     { data: expenseCategories },
     { data: clientRows },
     { data: projectWorkLogRows },
+    { data: bankAccounts },
+    { data: bankTxAll },
+    { data: creditPurchaseTxAll },
   ] = await Promise.all([
       supabase
         .from("transactions")
@@ -153,6 +156,14 @@ export default async function ReportsPage({
         .not("project_id", "is", null)
         .gte("log_date", `${selectedYear}-01-01`)
         .lte("log_date", `${selectedYear}-12-31`),
+      // 현재 자금 내역용 — 선택 연도와 무관하게 항상 "현재 시점" 기준이라 연도 필터를 안 건다.
+      supabase.from("bank_accounts").select("id, opening_balance"),
+      supabase.from("bank_transactions").select("bank_account_id, direction, amount"),
+      supabase
+        .from("transactions")
+        .select("id, type, sales_amount, sales_vat, purchase_amount, purchase_vat")
+        .eq("type", "매입")
+        .eq("payment_type", "credit"),
     ]);
 
   const clientNames = (clientRows ?? []).map((c) => c.name);
@@ -160,6 +171,22 @@ export default async function ReportsPage({
   const transactions = ((rawTx ?? []) as unknown as Row[]).filter((t) =>
     isLedgerVisible(t, (creditPayments ?? []) as CreditPayment[])
   );
+
+  // 현재 자금 내역 — 선택 연도와 무관한 "현재" 스냅샷. 은행 총 잔액(마이너스 통장 있으면
+  // 음수 가능)에서 아직 안 갚은 외상 매입 총액(VAT 포함, 완납 전까지 남은 잔액만)을 뺀
+  // 실질 자금. 외상 매출(우리가 받을 돈)은 지출이 아니라서 안 뺀다.
+  const bankBalanceByAccount = new Map<string, number>();
+  for (const a of bankAccounts ?? []) bankBalanceByAccount.set(a.id, a.opening_balance ?? 0);
+  for (const t of bankTxAll ?? []) {
+    const delta = t.direction === "입금" ? t.amount : -t.amount;
+    bankBalanceByAccount.set(t.bank_account_id, (bankBalanceByAccount.get(t.bank_account_id) ?? 0) + delta);
+  }
+  const bankTotalBalance = Array.from(bankBalanceByAccount.values()).reduce((s, v) => s + v, 0);
+  const outstandingCreditPurchaseTotal = (creditPurchaseTxAll ?? []).reduce(
+    (s, t) => s + remainingBalance(t, (creditPayments ?? []) as CreditPayment[]),
+    0
+  );
+  const currentFunds = bankTotalBalance - outstandingCreditPurchaseTotal;
 
   const firstYear = Math.min(
     firstTx?.[0]?.trans_date ? Number(firstTx[0].trans_date.slice(0, 4)) : currentYear,
@@ -818,9 +845,41 @@ export default async function ReportsPage({
       <CollapsibleSection
         title={groupTitle("재무 개요")}
         bare
-        defaultOpen={groupDefaultOpen(["quarterly", "monthly", "bySite"])}
+        defaultOpen={groupDefaultOpen(["currentFunds", "quarterly", "monthly", "bySite"])}
       >
        <div className="space-y-6 mt-3">
+        <div className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${hiddenClass("currentFunds")}`}>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="font-semibold text-slate-900">현재 자금 내역</h2>
+              <p className="text-xs text-slate-400">선택 연도와 무관하게 현재 시점 기준 — 은행 총 잔액 − 외상 매입 총액(VAT 포함)</p>
+            </div>
+            {sectionControls("currentFunds", {
+              filename: "현재_자금_내역.xlsx",
+              headers: ["은행 총 잔액", "외상 매입 총액", "실질 자금"],
+              rows: [[bankTotalBalance, outstandingCreditPurchaseTotal, currentFunds]],
+            })}
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+              <p className="text-sm text-slate-500">은행 총 잔액</p>
+              <p className={`mt-1 font-mono text-2xl font-bold ${bankTotalBalance < 0 ? "text-red-600" : "text-slate-900"}`}>
+                {formatWon(bankTotalBalance)}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">외상 매입 총액 (VAT 포함, 미정산분)</p>
+              <p className="mt-1 font-mono text-2xl font-bold text-slate-500">-{formatWon(outstandingCreditPurchaseTotal)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">실질 자금</p>
+              <p className={`mt-1 font-mono text-2xl font-bold ${currentFunds < 0 ? "text-red-600" : "text-slate-900"}`}>
+                {formatWon(currentFunds)}
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${hiddenClass("quarterly")}`}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-semibold text-slate-900">분기별 매입·매출·손익</h2>
