@@ -36,8 +36,29 @@ export function PurchaseItemSearchTable({ rows }: { rows: PurchaseItemRow[] }) {
   }
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return q ? rows.filter((r) => r.itemName.toLowerCase().includes(q)) : [];
+    const raw = query.trim();
+    if (!raw) return [];
+
+    // "8월", "4월"처럼 "N월"이 포함되면 그 달로도 좁혀서 찾는다 — 나머지 글자는
+    // 그대로 품목명 검색어로 씀(예: "판넬 8월" = 8월에 산 "판넬" 포함 품목).
+    const monthMatch = raw.match(/(\d{1,2})\s*월/);
+    let month: number | null = null;
+    let textQuery = raw;
+    if (monthMatch) {
+      const m = Number(monthMatch[1]);
+      if (m >= 1 && m <= 12) {
+        month = m;
+        textQuery = raw.slice(0, monthMatch.index) + raw.slice(monthMatch.index! + monthMatch[0].length);
+        textQuery = textQuery.trim();
+      }
+    }
+    const q = textQuery.toLowerCase();
+
+    return rows.filter((r) => {
+      if (month !== null && Number(r.trans_date.slice(5, 7)) !== month) return false;
+      if (q && !r.itemName.toLowerCase().includes(q)) return false;
+      return true;
+    });
   }, [rows, query]);
 
   const sorted = useMemo(() => {
@@ -67,11 +88,14 @@ export function PurchaseItemSearchTable({ rows }: { rows: PurchaseItemRow[] }) {
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="품목명 검색"
+        placeholder="품목명 또는 'OO월' 검색"
         className="mb-3 w-48 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-slate-500 focus:outline-none print:hidden"
       />
       {query.trim() === "" ? (
-        <p className="py-8 text-center text-sm text-slate-400 print:hidden">품목명을 입력하면 올해 매입 내역에서 검색합니다.</p>
+        <p className="py-8 text-center text-sm text-slate-400 print:hidden">
+          품목명을 입력하거나 &quot;8월&quot;처럼 입력하면 올해 매입 내역에서 검색합니다. 둘을 같이 쓰면(예: &quot;판넬
+          8월&quot;) 그 달에 산 해당 품목만 찾습니다.
+        </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[700px] text-sm">
