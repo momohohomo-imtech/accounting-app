@@ -18,6 +18,7 @@ import { formatWon } from "@/lib/format";
 import { ProjectListExportButtons } from "@/components/ProjectListExportButtons";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { ProjectsPageMemo } from "@/components/ProjectsPageMemo";
+import { TotalPurchaseSummary } from "@/components/TotalPurchaseSummary";
 
 const TABS = [
   { key: "list", label: "프로젝트" },
@@ -363,6 +364,11 @@ async function ProjectListSection({
   const filteredQuoteSum = tableRows.reduce((sum, p) => sum + (p.quote_amount ?? 0), 0);
   const filteredContractSum = tableRows.reduce((sum, p) => sum + p.contractAmountExpected, 0);
   const filteredProfitSum = tableRows.reduce((sum, p) => sum + (p.profit ?? 0), 0);
+  // 총 매입 = 매입 합계 + 구매대행 합계 (필터된 프로젝트 기준).
+  const filteredPurchaseSum = tableRows.reduce(
+    (sum, p) => sum + (purchaseByProject.get(p.id) ?? 0) + (agencyByProject.get(p.id) ?? 0),
+    0
+  );
 
   return (
     <div className="space-y-6">
@@ -437,6 +443,7 @@ async function ProjectListSection({
             <span>
               이익금 <span className="font-mono font-semibold text-slate-900">{formatWon(filteredProfitSum)}</span>
             </span>
+            <TotalPurchaseSummary amount={filteredPurchaseSum} />
           </div>
         </div>
       </div>
