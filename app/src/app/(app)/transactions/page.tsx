@@ -284,16 +284,6 @@ async function TransactionListSection({
 
   return (
     <div className="space-y-4">
-      <Card className="print:hidden">
-        <h2 className="mb-3 font-semibold text-slate-900">엑셀로 여러 거래 한 번에 등록 (AI 자동 인식)</h2>
-        <TransactionBulkImport
-          clients={importClients ?? []}
-          projects={importProjects ?? []}
-          paymentMethods={importPaymentMethods ?? []}
-          expenseCategories={importExpenseCategories ?? []}
-        />
-      </Card>
-
       <div className="flex flex-wrap items-end gap-3">
         <YearMonthFilter years={years} selectedYear={selectedYear} selectedMonth={selectedMonth} />
         <TransactionColumnToggles {...columnVisibility} />
@@ -338,6 +328,16 @@ async function TransactionListSection({
           <ProjectTreeFilter basePath="/transactions" projects={projectNodes} selectedProjectId={project_id ?? ""} />
         </Card>
       )}
+
+      <Card className="print:hidden">
+        <h2 className="mb-3 font-semibold text-slate-900">엑셀로 여러 거래 한 번에 등록 (AI 자동 인식)</h2>
+        <TransactionBulkImport
+          clients={importClients ?? []}
+          projects={importProjects ?? []}
+          paymentMethods={importPaymentMethods ?? []}
+          expenseCategories={importExpenseCategories ?? []}
+        />
+      </Card>
     </div>
   );
 }

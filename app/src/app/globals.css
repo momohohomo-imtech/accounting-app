@@ -46,6 +46,10 @@ body {
   background-color: inherit;
   box-shadow: inset -1px 0 0 var(--color-slate-200);
 }
+/* 머리글도 고정된 표(stickyHeader)에서 왼쪽 위 모서리 칸이 행들 위에 오게 */
+.sticky-col-table thead .sticky-col {
+  z-index: 20;
+}
 @media print {
   .sticky-col-table .sticky-col {
     position: static;
