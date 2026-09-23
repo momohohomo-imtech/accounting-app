@@ -65,7 +65,7 @@ function AttachmentRow({ item, onChanged }: { item: AttachmentItem; onChanged: (
         )}
         {item.memo && <p className="truncate text-xs text-slate-400">{item.memo}</p>}
       </div>
-      <span className="shrink-0 font-mono text-xs text-slate-400">{formatFileSize(item.file_size)}</span>
+      <span className="shrink-0 tabular-nums text-xs text-slate-400">{formatFileSize(item.file_size)}</span>
       {confirmDelete ? (
         <span className="flex shrink-0 items-center gap-1 print:hidden">
           <Button variant="danger" size="xs" type="button" disabled={pending} onClick={remove}>

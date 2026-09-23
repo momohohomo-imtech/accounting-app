@@ -57,7 +57,7 @@ function ResultRow({ label, value, unit = "won" }: { label: string; value: numbe
   return (
     <p className="flex items-baseline justify-between rounded-lg bg-slate-50 px-3 py-2">
       <span className="text-sm text-slate-500">{label}</span>
-      <span className="font-mono text-base font-bold text-slate-900">{display}</span>
+      <span className="tabular-nums text-base font-bold text-slate-900">{display}</span>
     </p>
   );
 }

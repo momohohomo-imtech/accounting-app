@@ -401,7 +401,7 @@ async function ProjectListSection({
             className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 print:hidden"
           >
             <p className="text-xs text-red-600">완료 수금대기 {awaitingPaymentProjects.length}건의 수주예상액 합계</p>
-            <p className="mt-1 font-mono text-xl font-bold text-red-600">{formatWon(awaitingPaymentContractSum)}</p>
+            <p className="mt-1 tabular-nums text-xl font-bold text-red-600">{formatWon(awaitingPaymentContractSum)}</p>
           </CollapsibleSection>
         )}
 
@@ -455,16 +455,16 @@ async function ProjectListSection({
           <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-slate-100 pt-3 text-sm text-slate-600">
             <span className="font-medium text-slate-500">필터된 {tableRows.length}건 합계</span>
             <span>
-              발주액 <span className="font-mono font-semibold text-slate-900">{formatWon(filteredQuoteSum)}</span>
+              발주액 <span className="tabular-nums font-semibold text-slate-900">{formatWon(filteredQuoteSum)}</span>
             </span>
             <span>
-              수주예상액 <span className="font-mono font-semibold text-slate-900">{formatWon(filteredContractSum)}</span>
+              수주예상액 <span className="tabular-nums font-semibold text-slate-900">{formatWon(filteredContractSum)}</span>
             </span>
             <span>
-              이익금 <span className="font-mono font-semibold text-slate-900">{formatWon(filteredProfitSum)}</span>
+              이익금 <span className="tabular-nums font-semibold text-slate-900">{formatWon(filteredProfitSum)}</span>
             </span>
             <span>
-              총 매입 <span className="font-mono font-semibold text-slate-900">{formatWon(filteredPurchaseSum)}</span>
+              총 매입 <span className="tabular-nums font-semibold text-slate-900">{formatWon(filteredPurchaseSum)}</span>
             </span>
           </div>
         </div>

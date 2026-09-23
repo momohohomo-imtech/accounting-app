@@ -92,7 +92,7 @@ export function QuotesTable({ rows }: { rows: QuoteRow[] }) {
         <tbody>
           {sorted.map((q) => (
             <tr key={q.id} className="border-b border-slate-100 last:border-0">
-              <td className="py-2 pr-4 font-mono text-slate-500">
+              <td className="py-2 pr-4 tabular-nums text-slate-500">
                 <Link href={`/quotes/${q.id}/edit`} className="underline decoration-slate-300 underline-offset-2 hover:text-slate-900">
                   {q.quote_number ?? "-"}
                 </Link>
@@ -101,7 +101,7 @@ export function QuotesTable({ rows }: { rows: QuoteRow[] }) {
               <td className="py-2 pr-4 text-slate-700">{q.clientName ?? "-"}</td>
               <td className="py-2 pr-4 text-slate-500">{q.projectLabel ?? "-"}</td>
               <td className="py-2 pr-4 text-slate-700">{quoteStatusLabel(q.status)}</td>
-              <td className="py-2 pr-4 text-right font-mono text-slate-900">{formatWon(q.total)}</td>
+              <td className="py-2 pr-4 text-right tabular-nums text-slate-900">{formatWon(q.total)}</td>
               <td className="py-2 pr-4 text-slate-500">{formatDate(q.created_at)}</td>
               <td className="py-2 text-right">
                 <div className="flex justify-end gap-1.5">

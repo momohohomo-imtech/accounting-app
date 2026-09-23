@@ -416,7 +416,7 @@ export function TransactionTable({
       )}
       {bulkError && <p className="text-sm text-red-600 print:hidden">{bulkError}</p>}
 
-      <Table className="min-w-[1020px]">
+      <Table stickyHeader className="min-w-[1020px]">
         <THead>
           <th className="w-8 pb-2 pr-2">
             <input

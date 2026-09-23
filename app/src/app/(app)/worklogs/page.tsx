@@ -287,7 +287,7 @@ async function WorkLogCalendarSection({
                       )}
                       <span
                         className={cx(
-                          "font-mono text-[11px]",
+                          "tabular-nums text-[11px]",
                           !cell.inMonth
                             ? "text-slate-300"
                             : isHoliday
@@ -383,7 +383,7 @@ async function WorkLogCalendarSection({
           <div className="space-y-1.5">
             {savedYears.map((y) => (
               <div key={y} className="flex flex-wrap items-center gap-1.5">
-                <span className="w-14 shrink-0 font-mono text-xs text-slate-500">{y}년</span>
+                <span className="w-14 shrink-0 tabular-nums text-xs text-slate-500">{y}년</span>
                 {Array.from(monthsByYear.get(y) ?? []).sort((a, b) => a - b).map((m) => (
                   <Link
                     key={m}

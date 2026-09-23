@@ -206,8 +206,8 @@ export function PayrollImport({ employees }: { employees: EmployeeRef[] }) {
                           />
                         </td>
                       ))}
-                      <td className="py-1 pr-2 text-right font-mono">{formatWon(net)}</td>
-                      <td className={cx("py-1 text-right font-mono", mismatch && "font-semibold text-red-600")}>
+                      <td className="py-1 pr-2 text-right tabular-nums">{formatWon(net)}</td>
+                      <td className={cx("py-1 text-right tabular-nums", mismatch && "font-semibold text-red-600")}>
                         {r.net_pay != null ? formatWon(r.net_pay) : "-"}
                       </td>
                     </tr>

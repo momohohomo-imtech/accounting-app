@@ -90,8 +90,8 @@ export function PieChart({ data, total }: { data: CategoryAmount[]; total: numbe
                 </span>
               )}
             </span>
-            <span className="shrink-0 font-mono text-xs text-slate-500 print:text-[9px]">{(s.pct * 100).toFixed(1)}%</span>
-            <span className="shrink-0 font-mono font-semibold text-slate-900">{formatWon(s.amount)}</span>
+            <span className="shrink-0 tabular-nums text-xs text-slate-500 print:text-[9px]">{(s.pct * 100).toFixed(1)}%</span>
+            <span className="shrink-0 tabular-nums font-semibold text-slate-900">{formatWon(s.amount)}</span>
           </div>
         ))}
         {data.length === 0 && <p className="text-sm text-slate-400">매입 내역이 없습니다.</p>}
@@ -116,7 +116,7 @@ export function BarChart({ data, max: maxOverride }: { data: CategoryAmount[]; m
           >
             {d.name}
           </span>
-          <span className="w-12 shrink-0 text-right font-mono text-xs text-slate-500 print:text-[9px]">
+          <span className="w-12 shrink-0 text-right tabular-nums text-xs text-slate-500 print:text-[9px]">
             {(base > 0 ? (d.amount / base) * 100 : 0).toFixed(1)}%
           </span>
           <div className="h-5 flex-1 overflow-hidden rounded bg-slate-100 print:h-3">
@@ -125,7 +125,7 @@ export function BarChart({ data, max: maxOverride }: { data: CategoryAmount[]; m
               style={{ width: `${(d.amount / barMax) * 100}%`, backgroundColor: sliceColor(d.name) }}
             />
           </div>
-          <span className="w-24 shrink-0 text-right font-mono text-sm font-semibold text-slate-900 print:text-[10px]">
+          <span className="w-24 shrink-0 text-right tabular-nums text-sm font-semibold text-slate-900 print:text-[10px]">
             {formatWon(d.amount)}
           </span>
         </div>
@@ -235,12 +235,12 @@ export function ProjectPurchaseChartButton({
               <div className="mb-4 flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-xl bg-slate-50 px-4 py-3">
                 <div>
                   <p className="text-xs text-slate-500">총 지출액</p>
-                  <p className="font-mono text-2xl font-bold text-slate-900">{formatWon(total)}</p>
+                  <p className="tabular-nums text-2xl font-bold text-slate-900">{formatWon(total)}</p>
                 </div>
                 {topCategory && (
                   <p className="text-sm text-slate-600">
                     최다 지출 카테고리: <span className="font-semibold text-slate-900">{topCategory.name}</span>
-                    <span className="ml-1 font-mono text-xs text-slate-500">
+                    <span className="ml-1 tabular-nums text-xs text-slate-500">
                       ({total > 0 ? ((topCategory.amount / total) * 100).toFixed(1) : "0"}%)
                     </span>
                   </p>
@@ -257,7 +257,7 @@ export function ProjectPurchaseChartButton({
                 {bottomStats.map(([label, value]) => (
                   <div key={label}>
                     <p className="text-xs text-slate-500">{label}</p>
-                    <p className="font-mono text-base font-bold text-slate-900">{value}</p>
+                    <p className="tabular-nums text-base font-bold text-slate-900">{value}</p>
                   </div>
                 ))}
               </div>

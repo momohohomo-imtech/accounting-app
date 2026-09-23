@@ -184,7 +184,7 @@ function AgencyRow({
       >
         {item.category_name ?? "미분류"}
       </td>
-      <td className="py-2 pr-4 text-right font-mono text-slate-900 print:py-0.5">{formatWon(item.amount)}</td>
+      <td className="py-2 pr-4 text-right tabular-nums text-slate-900 print:py-0.5">{formatWon(item.amount)}</td>
       <td className="py-2 pl-2 text-right print:hidden">
         {confirmDelete ? (
           <div className="flex justify-end gap-1">
@@ -279,7 +279,7 @@ export function ProjectAgencyPurchaseList({
     <div className="rounded-xl border border-slate-200 p-3 print:rounded-none print:border-0 print:p-0">
       <div className="mb-2 flex items-center justify-between print:mb-1">
         <p className="text-sm font-semibold text-slate-900 print:text-[10px]">대행구매액 (원청이 대신 구매해 공제한 품목)</p>
-        <span className="font-mono text-sm text-slate-700 print:text-[10px]">합계 {formatWon(total)}</span>
+        <span className="tabular-nums text-sm text-slate-700 print:text-[10px]">합계 {formatWon(total)}</span>
       </div>
 
       {items.length > 0 ? (

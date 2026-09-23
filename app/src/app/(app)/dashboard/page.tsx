@@ -26,7 +26,7 @@ const EXPECTED_RECEIVABLE_STATUSES = [
 ];
 
 function Money({ value, className }: { value: number; className?: string }) {
-  return <span className={cx("font-mono", moneyClass(value), className)}>{formatWon(value)}</span>;
+  return <span className={cx("tabular-nums", moneyClass(value), className)}>{formatWon(value)}</span>;
 }
 
 function SectionTitle({ children, note }: { children: ReactNode; note?: ReactNode }) {
@@ -232,7 +232,7 @@ export default async function DashboardPage({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">대시보드</h1>
-          <p className="mt-0.5 font-mono text-xs text-slate-400">
+          <p className="mt-0.5 tabular-nums text-xs text-slate-400">
             {today.year}.{mm}.{String(today.day).padStart(2, "0")} 기준
           </p>
         </div>
@@ -295,7 +295,7 @@ export default async function DashboardPage({
                       <span>
                         {r.label} {r.count}건
                       </span>
-                      <span className="font-mono">{formatWon(r.amount)}</span>
+                      <span className="tabular-nums">{formatWon(r.amount)}</span>
                     </li>
                   ))}
                 </ul>

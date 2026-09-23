@@ -664,7 +664,7 @@ export function TransactionForm({
 
         <p className="mt-3 text-right text-sm font-semibold text-slate-900">
           합계{vatAppliesNow && <span className="ml-1 text-xs font-normal text-slate-400">(VAT 포함)</span>}
-          <span className="ml-1 font-mono text-base">{formatWon(grandTotal)}</span>
+          <span className="ml-1 tabular-nums text-base">{formatWon(grandTotal)}</span>
         </p>
       </div>
 

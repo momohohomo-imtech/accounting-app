@@ -106,7 +106,7 @@ export function BusinessTripListClient({ logs }: { logs: BusinessTripLog[] }) {
                 </td>
                 <td className="p-3 text-slate-700">{log.client_name ?? "-"}</td>
                 <td className="p-3 text-slate-700">{log.work_types.join(", ") || "-"}</td>
-                <td className="p-3 text-right font-mono text-slate-900">{tripDayCount(log)}일</td>
+                <td className="p-3 text-right tabular-nums text-slate-900">{tripDayCount(log)}일</td>
                 <td className="p-3 text-right">
                   <Button type="button" variant="secondary" size="xs" onClick={() => setViewing(log)}>
                     보기

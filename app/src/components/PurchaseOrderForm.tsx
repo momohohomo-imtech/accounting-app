@@ -270,7 +270,7 @@ export function PurchaseOrderForm({
         </div>
 
         <p className="mt-3 text-right text-sm font-semibold text-slate-900">
-          합계 <span className="ml-1 font-mono text-base">{formatWon(total)}</span>
+          합계 <span className="ml-1 tabular-nums text-base">{formatWon(total)}</span>
         </p>
       </div>
 

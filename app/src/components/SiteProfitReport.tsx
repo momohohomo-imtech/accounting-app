@@ -113,7 +113,7 @@ export function SiteProfitReport({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-slate-900">
-          {siteName} 현장 내역서 <span className="font-mono text-sm font-normal text-slate-400">{year}년</span>
+          {siteName} 현장 내역서 <span className="tabular-nums text-sm font-normal text-slate-400">{year}년</span>
         </h2>
         <div className="flex items-center gap-3 print:hidden">
           <select
@@ -191,7 +191,7 @@ export function SiteProfitReport({
                     "-"
                   )}
                 </td>
-                <td className="py-2 pr-4 text-right font-mono text-slate-900">{formatWon(r.amount)}</td>
+                <td className="py-2 pr-4 text-right tabular-nums text-slate-900">{formatWon(r.amount)}</td>
                 <td className="py-2 text-right print:hidden">
                   <Link
                     href={editHrefFor(r.id)}
@@ -215,13 +215,13 @@ export function SiteProfitReport({
 
       <div className="flex flex-wrap items-center justify-end gap-6 border-t border-slate-100 pt-4">
         <span className="text-sm text-slate-600">
-          매출 합계 <span className="ml-2 font-mono text-lg font-bold text-slate-900">{formatWon(salesTotal)}</span>
+          매출 합계 <span className="ml-2 tabular-nums text-lg font-bold text-slate-900">{formatWon(salesTotal)}</span>
         </span>
         <span className="text-sm text-slate-600">
-          매입 합계 <span className="ml-2 font-mono text-lg font-bold text-slate-900">{formatWon(purchaseTotal)}</span>
+          매입 합계 <span className="ml-2 tabular-nums text-lg font-bold text-slate-900">{formatWon(purchaseTotal)}</span>
         </span>
         <span className="text-sm font-semibold text-slate-900">
-          손익 <span className="ml-2 font-mono text-xl font-bold text-slate-900">{formatWon(profit)}</span>
+          손익 <span className="ml-2 tabular-nums text-xl font-bold text-slate-900">{formatWon(profit)}</span>
         </span>
       </div>
     </div>

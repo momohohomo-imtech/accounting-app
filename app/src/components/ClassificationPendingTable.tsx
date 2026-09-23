@@ -85,7 +85,7 @@ export function ClassificationPendingTable({ rows }: { rows: ClassificationPendi
                   {r.itemName}
                 </Link>
               </td>
-              <td className="py-2 text-right font-mono text-slate-700">
+              <td className="py-2 text-right tabular-nums text-slate-700">
                 <Link href={r.editHref} className="block">
                   {formatWon(r.amount)}
                 </Link>

@@ -141,7 +141,7 @@ export function WorkLogSummaryTable({
                     {r.title}
                   </button>
                 </td>
-                <td className="py-2 pr-4 text-right font-mono text-slate-900">{r.days}일</td>
+                <td className="py-2 pr-4 text-right tabular-nums text-slate-900">{r.days}일</td>
                 <td className="py-2 text-xs text-slate-500">{r.dates.map(formatMonthDay).join(", ")}</td>
               </tr>
             );

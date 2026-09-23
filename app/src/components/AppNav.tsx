@@ -49,7 +49,7 @@ export function SidebarNav({ role }: { role: string | null }) {
           >
             <span
               className={cx(
-                "font-mono text-xs transition-colors",
+                "tabular-nums text-xs transition-colors",
                 active ? "text-white/70" : "text-slate-600 group-hover:text-slate-400"
               )}
             >

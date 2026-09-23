@@ -112,14 +112,14 @@ export function DailyWorkerUsageTable({ rows }: { rows: UsageRow[] }) {
             {byClient.map(([name, amount]) => (
               <div key={name} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
                 <span className="text-slate-600">{name}</span>
-                <span className="font-mono font-semibold text-slate-900">{formatWon(amount)}</span>
+                <span className="tabular-nums font-semibold text-slate-900">{formatWon(amount)}</span>
               </div>
             ))}
           </div>
           <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-sm text-slate-600">
             <span className="font-medium text-slate-500">전체 {rows.length}건</span>
             <span>
-              전체 합계 <span className="font-mono font-semibold text-slate-900">{formatWon(total)}</span>
+              전체 합계 <span className="tabular-nums font-semibold text-slate-900">{formatWon(total)}</span>
             </span>
           </div>
         </div>

@@ -153,7 +153,7 @@ export function VendorDetailReport({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-slate-900">
           {vendorName} {hasAgency ? "매입/대행구매 내역" : "매입 내역"}{" "}
-          <span className="font-mono text-sm font-normal text-slate-400">{year}년</span>
+          <span className="tabular-nums text-sm font-normal text-slate-400">{year}년</span>
         </h2>
         <div className="flex items-center gap-3 print:hidden">
           <label className="flex items-center gap-1.5 text-xs text-slate-600">
@@ -267,7 +267,7 @@ export function VendorDetailReport({
                   </td>
                 )}
                 {showItem && <td className="py-2 pr-4 text-slate-700">{r.item_name ?? "-"}</td>}
-                <td className="py-2 text-right font-mono text-slate-900">{formatWon(r.amount)}</td>
+                <td className="py-2 text-right tabular-nums text-slate-900">{formatWon(r.amount)}</td>
                 <td className="py-2 pl-4 text-right print:hidden">
                   {r.kind === "매입" && (
                     <Link
@@ -303,7 +303,7 @@ export function VendorDetailReport({
 
       <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
         <span className="text-sm font-semibold text-slate-900">
-          합계 <span className="ml-2 font-mono text-xl font-bold text-slate-900">{formatWon(total)}</span>
+          합계 <span className="ml-2 tabular-nums text-xl font-bold text-slate-900">{formatWon(total)}</span>
         </span>
       </div>
     </div>

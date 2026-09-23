@@ -68,9 +68,9 @@ export function SiteProfitTable({ rows, year }: { rows: SiteRow[]; year: number 
                   </Link>
                 )}
               </td>
-              <td className="py-2 pr-4 text-right font-mono text-slate-700">{formatWon(s.sales)}</td>
-              <td className="py-2 pr-4 text-right font-mono text-slate-700">{formatWon(s.purchase)}</td>
-              <td className="py-2 text-right font-mono font-medium text-slate-900">{formatWon(s.profit)}</td>
+              <td className="py-2 pr-4 text-right tabular-nums text-slate-700">{formatWon(s.sales)}</td>
+              <td className="py-2 pr-4 text-right tabular-nums text-slate-700">{formatWon(s.purchase)}</td>
+              <td className="py-2 text-right tabular-nums font-medium text-slate-900">{formatWon(s.profit)}</td>
             </tr>
           ))}
           {sorted.length === 0 && (

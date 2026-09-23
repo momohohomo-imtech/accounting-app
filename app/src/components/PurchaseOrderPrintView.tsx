@@ -140,7 +140,7 @@ export function PurchaseOrderPrintView({
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2">
                 <Image src="/logo-lockup.png" alt="" width={26} height={20} priority className="h-5 w-auto" />
-                <span className="font-mono text-[10px] tracking-widest text-slate-400">
+                <span className="tabular-nums text-[10px] tracking-widest text-slate-400">
                   PURCHASE ORDER{pages.length > 1 ? ` · ${pageIndex + 1}/${pages.length}` : ""}
                 </span>
               </div>
@@ -164,7 +164,7 @@ export function PurchaseOrderPrintView({
             <div className="mt-2 grid grid-cols-2 gap-x-8 gap-y-0.5 text-[13px]">
               <p>
                 <span className="text-slate-500">발주번호: </span>
-                <span className="font-mono font-medium text-slate-900">{purchaseOrder.po_number ?? "-"}</span>
+                <span className="tabular-nums font-medium text-slate-900">{purchaseOrder.po_number ?? "-"}</span>
               </p>
               <p>
                 <span className="text-slate-500">발주일자: </span>
@@ -233,7 +233,7 @@ export function PurchaseOrderPrintView({
                 발주금액{pages.length > 1 ? " (총액)" : ""} <span className="text-[13px] font-bold text-slate-700">(VAT 별도)</span>
               </span>
               <span className="text-[13px] font-bold text-slate-900">
-                {numberToKoreanAmount(total)} (<span className="font-mono">{formatWon(total)}</span>)
+                {numberToKoreanAmount(total)} (<span className="tabular-nums">{formatWon(total)}</span>)
               </span>
             </div>
 
@@ -262,9 +262,9 @@ export function PurchaseOrderPrintView({
                     <td className="py-[6px] pr-2 text-center text-slate-500">{i + 1}</td>
                     <td className="truncate py-[6px] pr-2">{it.item_name ?? "-"}</td>
                     <td className="truncate py-[6px] pr-2 text-slate-500">{it.spec ?? "-"}</td>
-                    <td className="py-[6px] pr-2 text-right font-mono">{it.quantity ?? "-"}</td>
-                    <td className="py-[6px] pr-2 text-right font-mono">{it.unit_price ? formatWon(it.unit_price) : "-"}</td>
-                    <td className="py-[6px] text-right font-mono">{formatWon(it.amount)}</td>
+                    <td className="py-[6px] pr-2 text-right tabular-nums">{it.quantity ?? "-"}</td>
+                    <td className="py-[6px] pr-2 text-right tabular-nums">{it.unit_price ? formatWon(it.unit_price) : "-"}</td>
+                    <td className="py-[6px] text-right tabular-nums">{formatWon(it.amount)}</td>
                   </tr>
                 ))}
                 {Array.from({ length: blankRows }).map((_, i) => (
@@ -283,7 +283,7 @@ export function PurchaseOrderPrintView({
                   <td colSpan={5} className="py-[6px] text-right font-semibold text-slate-900">
                     {pages.length > 1 ? "페이지 소계" : "합계"}
                   </td>
-                  <td className="py-[6px] text-right font-mono text-sm font-bold text-slate-900">{formatWon(pageSubtotal)}</td>
+                  <td className="py-[6px] text-right tabular-nums text-sm font-bold text-slate-900">{formatWon(pageSubtotal)}</td>
                 </tr>
               </tfoot>
             </table>

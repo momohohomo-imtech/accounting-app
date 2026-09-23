@@ -69,7 +69,7 @@ function Stat({ label, value, negative }: { label: string; value: string; negati
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-3 print:rounded-none print:border-slate-300 print:p-2">
       <p className="text-xs text-slate-500 print:text-[9px]">{label}</p>
-      <p className={`mt-1 font-mono text-xl font-bold print:text-sm ${negative ? "text-red-600" : "text-slate-900"}`}>
+      <p className={`mt-1 tabular-nums text-xl font-bold print:text-sm ${negative ? "text-red-600" : "text-slate-900"}`}>
         {value}
       </p>
     </div>
@@ -106,7 +106,7 @@ function MiniTable({
               {r.map((cell, j) => (
                 <td
                   key={j}
-                  className={`truncate py-1 pr-2 print:py-0.5 ${j > 0 ? "text-right font-mono text-slate-900" : "text-slate-700"}`}
+                  className={`truncate py-1 pr-2 print:py-0.5 ${j > 0 ? "text-right tabular-nums text-slate-900" : "text-slate-700"}`}
                   style={j === 0 && colored?.[i] ? { color: colored[i] } : undefined}
                 >
                   {cell}

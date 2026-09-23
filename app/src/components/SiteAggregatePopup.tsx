@@ -107,7 +107,7 @@ export function SiteAggregatePopup({
             {breakdown.map((b) => (
               <div key={b.title} className="flex items-center justify-between text-sm">
                 <span className="truncate pr-3 text-slate-700">{b.title}</span>
-                <span className="shrink-0 font-mono text-slate-900">{b.days}일</span>
+                <span className="shrink-0 tabular-nums text-slate-900">{b.days}일</span>
               </div>
             ))}
           </div>
