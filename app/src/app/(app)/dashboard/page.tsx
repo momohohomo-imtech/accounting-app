@@ -83,10 +83,8 @@ export default async function DashboardPage({
     { data: recentTxRaw },
     yearTxRaw,
     { data: firstTx },
-    { data: yearProjects },
-    o,
+    { data: yearProjectRows },
     { data: categoryRows },
-    { data: receivableProjects },
   ] = await Promise.all([
     supabase.from("transactions").select("*").gte("trans_date", monthStart).lte("trans_date", monthEnd),
     fetchAllRows<Transaction>((from, to) =>
@@ -104,6 +102,7 @@ export default async function DashboardPage({
       type: string;
       payment_type: string;
       trans_date: string;
+      project_id: string | null;
       category_id: string | null;
       sales_amount: number;
       sales_vat: number;
@@ -112,35 +111,42 @@ export default async function DashboardPage({
     }>((from, to) =>
       supabase
         .from("transactions")
-        .select("id, type, payment_type, trans_date, category_id, sales_amount, sales_vat, purchase_amount, purchase_vat")
+        .select("id, type, payment_type, trans_date, project_id, category_id, sales_amount, sales_vat, purchase_amount, purchase_vat")
         .gte("trans_date", `${selectedYear}-01-01`)
         .lte("trans_date", `${selectedYear}-12-31`)
         .order("id", { ascending: true })
         .range(from, to)
     ),
     supabase.from("transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
-    supabase.from("projects").select("contract_amount").eq("year", selectedYear),
-    loadProfitOutlook(selectedYear, creditPaymentsPromise),
-    // select("*") — 불공제 칸(082 마이그레이션) 실행 전에도 조회가 깨지지 않게.
+    // 선택 연도 프로젝트 — 수주액 합계·예상 미수액·이익 예상(loadProfitOutlook)이 같이 쓴다.
+    supabase.from("projects").select("id, name, status, quote_amount, contract_amount").eq("year", selectedYear),
+    // select("*") — 불공제·비과세 칸(082·083 마이그레이션) 실행 전에도 조회가 깨지지 않게.
     supabase.from("expense_categories").select("*"),
-    supabase
-      .from("projects")
-      .select("id, status, quote_amount")
-      .eq("year", selectedYear)
-      .in("status", EXPECTED_RECEIVABLE_STATUSES.map((s) => s.value)),
   ]);
+  const yearProjects = yearProjectRows ?? [];
+  const categoryById = new Map(((categoryRows ?? []) as ExpenseCategory[]).map((c) => [c.id, c]));
+  const categoryRel = (categoryId: string | null) => (categoryId ? categoryById.get(categoryId) ?? null : null);
 
-  const receivableProjectIds = (receivableProjects ?? []).map((p) => p.id);
-  const receivableAgencyRows = receivableProjectIds.length
-    ? await fetchAllRows<{ project_id: string; amount: number }>((from, to) =>
-        supabase
-          .from("project_agency_purchases")
-          .select("project_id, amount")
-          .in("project_id", receivableProjectIds)
-          .order("id", { ascending: true })
-          .range(from, to)
-      )
-    : [];
+  const receivableStatuses = new Set(EXPECTED_RECEIVABLE_STATUSES.map((st) => st.value));
+  const receivableProjects = yearProjects.filter((p) => receivableStatuses.has(p.status ?? ""));
+  const receivableProjectIds = receivableProjects.map((p) => p.id);
+  const [o, receivableAgencyRows] = await Promise.all([
+    loadProfitOutlook(selectedYear, {
+      payments,
+      yearProjects,
+      yearTx: yearTxRaw.map((t) => ({ ...t, expense_categories: categoryRel(t.category_id) })),
+    }),
+    receivableProjectIds.length
+      ? fetchAllRows<{ project_id: string; amount: number }>((from, to) =>
+          supabase
+            .from("project_agency_purchases")
+            .select("project_id, amount")
+            .in("project_id", receivableProjectIds)
+            .order("id", { ascending: true })
+            .range(from, to)
+        )
+      : Promise.resolve([]),
+  ]);
   const agencyByReceivableProject = new Map<string, number>();
   for (const a of receivableAgencyRows) {
     agencyByReceivableProject.set(a.project_id, (agencyByReceivableProject.get(a.project_id) ?? 0) + Number(a.amount));
@@ -166,7 +172,7 @@ export default async function DashboardPage({
   // 예상 미수액 — 아직 돈을 다 받지 않은 프로젝트(진행중·공사 완료·완료 수금대기)의 받을 금액.
   // 프로젝트 목록의 "수주예상액"과 같은 기준: 발주액 − 대행구매액.
   const expectedReceivableByStatus = EXPECTED_RECEIVABLE_STATUSES.map(({ value, label }) => {
-    const rows = (receivableProjects ?? []).filter((p) => p.status === value);
+    const rows = receivableProjects.filter((p) => p.status === value);
     return {
       label,
       count: rows.length,
@@ -178,13 +184,10 @@ export default async function DashboardPage({
   const awaitingPayment = expectedReceivableByStatus[EXPECTED_RECEIVABLE_STATUSES.findIndex((st) => st.value === PROJECT_STATUS_AWAITING_PAYMENT)];
 
   // 선택 연도 전체 프로젝트 수주액 합계 — 프로젝트 페이지 하단 "수주액" 합계와 같은 값.
-  const totalExpectedRevenue = (yearProjects ?? []).reduce((s, p) => s + (p.contract_amount ?? 0), 0);
+  const totalExpectedRevenue = yearProjects.reduce((s, p) => s + (p.contract_amount ?? 0), 0);
 
   // 부가세는 세금계산서(거래일) 기준이라 외상 미정산 건도 포함한다. 금액은 총액(부가세 포함)에서
   // 계산(lib/vatBasis.ts)하고, 매입세액 불공제 카테고리(승용차 등)는 공제 대상에서 빼서 따로 표시.
-  const categoryById = new Map(((categoryRows ?? []) as ExpenseCategory[]).map((c) => [c.id, c]));
-  const categoryRel = (categoryId: string | null) => (categoryId ? categoryById.get(categoryId) ?? null : null);
-
   // 참고: 장부 매출−매입(부가세 제외, 불공제 부가세는 비용) 기준 연간 예상 세금 — 위에서 받은
   // 연간 거래(외상 미정산 제외)로 바로 계산해서 같은 거래를 다시 조회하지 않는다.
   const ledgerTax = taxEstimate(

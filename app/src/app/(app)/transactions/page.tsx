@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { PageTabs } from "@/components/PageTabs";
@@ -113,6 +114,40 @@ export default async function TransactionsPage({
   );
 }
 
+// 상단 합계와 아래 목록이 같은 조건의 거래를 쓰므로, 한 요청 안에서는 한 번만 조회해서 나눠 쓴다
+// (React cache — 같은 인자면 같은 결과를 재사용). 외상 미완납 건은 장부에서 제외한 결과.
+const loadLedgerTransactions = cache(
+  async (start: string, end: string, type: string, projectId: string, paymentMethodId: string) => {
+    const supabase = await createClient();
+    const rawTransactions = await fetchAllRows<Transaction>((from, to) => {
+      let q = supabase
+        .from("transactions")
+        .select("*, clients(name), projects(name), payment_methods(*), expense_categories(*)")
+        .gte("trans_date", start)
+        .lte("trans_date", end)
+        .order("trans_date", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (type) q = q.eq("type", type);
+      if (projectId) q = q.eq("project_id", projectId);
+      if (paymentMethodId) q = q.eq("payment_method_id", paymentMethodId);
+      return q;
+    });
+    const creditIds = rawTransactions.filter((t) => t.payment_type === "credit").map((t) => t.id);
+    const relevantPayments = creditIds.length
+      ? await fetchAllRows<CreditPayment>((from, to) =>
+          supabase
+            .from("credit_payments")
+            .select("*")
+            .in("transaction_id", creditIds)
+            .order("id", { ascending: true })
+            .range(from, to)
+        )
+      : [];
+    return rawTransactions.filter((t) => isLedgerVisible(t, relevantPayments));
+  }
+);
+
 async function fetchTransactionTotals({
   year,
   month,
@@ -126,45 +161,11 @@ async function fetchTransactionTotals({
   project_id?: string;
   payment_method_id?: string;
 }) {
-  const supabase = await createClient();
   const { year: currentYear, month: currentMonth } = nowKst();
   const selectedYear = year ? Number(year) : currentYear;
   const selectedMonth = month ?? "current";
   const { start, end } = monthRange(selectedYear, selectedMonth, currentMonth);
-
-  const rows = await fetchAllRows<{
-    id: string;
-    type: string;
-    payment_type: string;
-    purchase_amount: number;
-    purchase_vat: number;
-    sales_amount: number;
-    sales_vat: number;
-  }>((from, to) => {
-    let q = supabase
-      .from("transactions")
-      .select("id, type, payment_type, purchase_amount, purchase_vat, sales_amount, sales_vat")
-      .gte("trans_date", start)
-      .lte("trans_date", end)
-      .order("id", { ascending: true })
-      .range(from, to);
-    if (type) q = q.eq("type", type);
-    if (project_id) q = q.eq("project_id", project_id);
-    if (payment_method_id) q = q.eq("payment_method_id", payment_method_id);
-    return q;
-  });
-  const creditIds = rows.filter((t) => t.payment_type === "credit").map((t) => t.id);
-  const payments = creditIds.length
-    ? await fetchAllRows<CreditPayment>((from, to) =>
-        supabase
-          .from("credit_payments")
-          .select("*")
-          .in("transaction_id", creditIds)
-          .order("id", { ascending: true })
-          .range(from, to)
-      )
-    : [];
-  const visible = rows.filter((t) => isLedgerVisible(t, payments));
+  const visible = await loadLedgerTransactions(start, end, type ?? "", project_id ?? "", payment_method_id ?? "");
 
   return {
     purchase: visible.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0),
@@ -204,7 +205,7 @@ async function TransactionListSection({
   const { start, end } = monthRange(selectedYear, selectedMonth, currentMonth);
 
   const [
-    rawTransactions,
+    transactions,
     { data: projectTree },
     { data: latestTx },
     { data: importClients },
@@ -212,20 +213,7 @@ async function TransactionListSection({
     { data: importPaymentMethods },
     { data: importExpenseCategories },
   ] = await Promise.all([
-    fetchAllRows<Transaction>((from, to) => {
-      let q = supabase
-        .from("transactions")
-        .select("*, clients(name), projects(name), payment_methods(*), expense_categories(*)")
-        .gte("trans_date", start)
-        .lte("trans_date", end)
-        .order("trans_date", { ascending: false })
-        .order("id", { ascending: true })
-        .range(from, to);
-      if (type) q = q.eq("type", type);
-      if (project_id) q = q.eq("project_id", project_id);
-      if (payment_method_id) q = q.eq("payment_method_id", payment_method_id);
-      return q;
-    }),
+    loadLedgerTransactions(start, end, type ?? "", project_id ?? "", payment_method_id ?? ""),
     supabase.from("projects").select("id, name, year, site_id, sites(name, clients(name))").order("name"),
     supabase.from("transactions").select("trans_date").order("trans_date", { ascending: false }).limit(1),
     supabase.from("clients").select("id, name").order("name"),
@@ -233,19 +221,6 @@ async function TransactionListSection({
     supabase.from("payment_methods").select("id, name, text_color, background_color").order("sort_order"),
     supabase.from("expense_categories").select("id, name").order("sort_order"),
   ]);
-
-  const creditIds = rawTransactions.filter((t) => t.payment_type === "credit").map((t) => t.id);
-  const relevantPayments = creditIds.length
-    ? await fetchAllRows<CreditPayment>((from, to) =>
-        supabase
-          .from("credit_payments")
-          .select("*")
-          .in("transaction_id", creditIds)
-          .order("id", { ascending: true })
-          .range(from, to)
-      )
-    : [];
-  const transactions = rawTransactions.filter((t) => isLedgerVisible(t, relevantPayments));
 
   const filteredNetTotal = transactions.reduce(
     (s, t) => s + (t.type === "매출" ? t.sales_amount + t.sales_vat : -(t.purchase_amount + t.purchase_vat)),

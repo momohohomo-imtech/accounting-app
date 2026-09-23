@@ -3,85 +3,45 @@ import { formatWon, moneyClass } from "@/lib/format";
 import { PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
 import { taxEstimate } from "@/lib/tax";
 import { isLedgerVisible } from "@/lib/credit";
-import type { CreditPayment } from "@/lib/types";
+import type { CreditPayment, ExpenseCategory } from "@/lib/types";
 import { one } from "@/lib/relations";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import { PAYROLL_CATEGORY_NAME } from "@/lib/vatExempt";
 import { purchaseCostOf, salesSupplyOf } from "@/lib/vatBasis";
 
+type YearTxRow = {
+  id: string;
+  type: string;
+  payment_type: string;
+  trans_date: string;
+  project_id: string | null;
+  sales_amount: number;
+  sales_vat: number;
+  purchase_amount: number;
+  purchase_vat: number;
+  expense_categories: ExpenseCategory | null;
+};
+type YearProjectRow = { id: string; name: string; quote_amount: number | null; status: string | null };
+
 // 대시보드의 이익·세금 추정치를 한 번에 계산 — 계산식은 기존 대시보드 박스와 동일하고,
-// 화면 배치만 대시보드 쪽에서 나눠서 보여준다. 외상 정산 이력은 대시보드가 한 번 받아온 것을
-// 그대로 넘겨받아 같은 데이터를 두 번 조회하지 않는다.
-export async function loadProfitOutlook(year: number, creditPaymentsPromise: Promise<CreditPayment[]>) {
+// 화면 배치만 대시보드 쪽에서 나눠서 보여준다. 선택 연도의 거래·프로젝트·외상 정산 이력은
+// 대시보드가 이미 받아온 것을 그대로 넘겨받아 같은 데이터를 다시 조회하지 않는다.
+export async function loadProfitOutlook(
+  year: number,
+  {
+    payments,
+    yearProjects,
+    yearTx,
+  }: { payments: CreditPayment[]; yearProjects: YearProjectRow[]; yearTx: YearTxRow[] }
+) {
   const supabase = await createClient();
 
-  type NullProjectTxRow = {
-    id: string;
-    type: string;
-    payment_type: string;
-    sales_amount: number;
-    sales_vat: number;
-    purchase_amount: number;
-    purchase_vat: number;
-    trans_date: string;
-    expense_categories: { name: string } | { name: string }[] | null;
-  };
-  type H2TxRow = {
-    id: string;
-    type: string;
-    payment_type: string;
-    sales_amount: number;
-    sales_vat: number;
-    purchase_amount: number;
-    purchase_vat: number;
-    project_id: string | null;
-    expense_categories: { name: string } | { name: string }[] | null;
-  };
-
-  const [
-    { data: unbilledProjects },
-    { data: yearProjects },
-    nullProjectTxRaw,
-    { data: halfYearRow },
-    h2TxRaw,
-    payments,
-  ] = await Promise.all([
-    // 세금계산서 미발행 예상 이익금 대상: 완료 수금대기 + 공사 완료(둘 다 매출/세금계산서가
-    // 아직 없는 경우가 많음 — 프로젝트 페이지의 hasIncompleteProjects 판단과 동일한 범위),
-    // 마찬가지로 필터 연도로 한정.
-    supabase
-      .from("projects")
-      .select("id, name, quote_amount")
-      .in("status", [PROJECT_STATUS_AWAITING_PAYMENT, "done"])
-      .eq("year", year),
-    supabase.from("projects").select("id, name, quote_amount, status").eq("year", year),
-    // 프로젝트에 귀속되지 않은(project_id가 없는) 매입 거래 전체(연간) — 카테고리별로
-    // "일반경비"(직원급여 제외)와 "직원급여/상여/4대보험"(payroll 관리 화면이 아니라
-    // 매입매출장의 이 카테고리 기준으로 집계, employees/payroll 입력 누락과 무관하게 실측)로 나눠 씀.
-    fetchAllRows<NullProjectTxRow>((from, to) =>
-      supabase
-        .from("transactions")
-        .select("id, type, payment_type, sales_amount, sales_vat, purchase_amount, purchase_vat, trans_date, expense_categories(*)")
-        .eq("type", "매입")
-        .is("project_id", null)
-        .gte("trans_date", `${year}-01-01`)
-        .lte("trans_date", `${year}-12-31`)
-        .order("id", { ascending: true })
-        .range(from, to)
-    ),
-    supabase.from("half_year_settlements").select("profit_amount").eq("year", year).eq("half", 1).maybeSingle(),
-    // 하반기 집계 이익금: 대시보드 "장부 기준 세금"과 같은 부가세 제외 매출-매입(원장 기준)으로 계산
-    fetchAllRows<H2TxRow>((from, to) =>
-      supabase
-        .from("transactions")
-        .select("id, type, payment_type, sales_amount, sales_vat, purchase_amount, purchase_vat, project_id, expense_categories(*)")
-        .gte("trans_date", `${year}-07-01`)
-        .lte("trans_date", `${year}-12-31`)
-        .order("id", { ascending: true })
-        .range(from, to)
-    ),
-    creditPaymentsPromise,
-  ]);
+  // 프로젝트에 귀속되지 않은(project_id가 없는) 매입 거래 전체(연간) — 카테고리별로
+  // "일반경비"(직원급여 제외)와 "직원급여/상여/4대보험"(payroll 관리 화면이 아니라
+  // 매입매출장의 이 카테고리 기준으로 집계, employees/payroll 입력 누락과 무관하게 실측)로 나눠 씀.
+  const nullProjectTxRaw = yearTx.filter((t) => t.type === "매입" && !t.project_id);
+  // 하반기 집계 이익금: 대시보드 "장부 기준 세금"과 같은 부가세 제외 매출-매입(원장 기준)으로 계산
+  const h2TxRaw = yearTx.filter((t) => t.trans_date >= `${year}-07-01`);
 
   // 외상(미완납)은 대시보드의 다른 항목들과 동일하게 완납 전까지 장부에서 제외한다.
   const nullProjectTx = nullProjectTxRaw.filter((t) => isLedgerVisible(t, payments));
@@ -90,8 +50,11 @@ export async function loadProfitOutlook(year: number, creditPaymentsPromise: Pro
   const payrollTx = nullProjectTx.filter((t) => one(t.expense_categories)?.name === PAYROLL_CATEGORY_NAME);
   const generalTx = nullProjectTx.filter((t) => one(t.expense_categories)?.name !== PAYROLL_CATEGORY_NAME);
 
-  const unbilledRows = unbilledProjects ?? [];
-  const yearRows = yearProjects ?? [];
+  // 세금계산서 미발행 예상 이익금 대상: 완료 수금대기 + 공사 완료(둘 다 매출/세금계산서가
+  // 아직 없는 경우가 많음 — 프로젝트 페이지의 hasIncompleteProjects 판단과 동일한 범위),
+  // 마찬가지로 필터 연도로 한정.
+  const unbilledRows = yearProjects.filter((p) => p.status === PROJECT_STATUS_AWAITING_PAYMENT || p.status === "done");
+  const yearRows = yearProjects;
 
   // 완료 수금대기/공사 완료 프로젝트는 매입(원가)은 이미 원장에 찍혔지만 매출/세금계산서가
   // 아직 없는 경우가 많음 — 이 프로젝트들의 예상 이익도 같은 매입/대행구매 조회에 포함해서 구함.
@@ -110,6 +73,14 @@ export async function loadProfitOutlook(year: number, creditPaymentsPromise: Pro
     trans_date: string;
     expense_categories: { name: string } | { name: string }[] | null;
   };
+  // 아래 프로젝트 매입 조회와 동시에 보내려고 먼저 시작(.then으로 바로 요청이 나가게).
+  const halfYearPromise = supabase
+    .from("half_year_settlements")
+    .select("profit_amount")
+    .eq("year", year)
+    .eq("half", 1)
+    .maybeSingle()
+    .then((r) => r);
   const [purchaseTxRaw, { data: agencyTx }] = allProjectIds.length
     ? await Promise.all([
         fetchAllRows<ProjectPurchaseTxRow>((from, to) =>
@@ -131,6 +102,7 @@ export async function loadProfitOutlook(year: number, creditPaymentsPromise: Pro
         ).then((data) => ({ data })),
       ])
     : [[] as ProjectPurchaseTxRow[], { data: [] as { project_id: string; amount: number }[] }];
+  const { data: halfYearRow } = await halfYearPromise;
   // 외상(미완납)은 완납 전까지 장부에서 제외 — 다른 대시보드 항목들과 동일한 기준.
   const purchaseTx = purchaseTxRaw.filter((t) => isLedgerVisible(t, payments));
 
