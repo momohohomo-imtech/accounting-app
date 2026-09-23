@@ -25,6 +25,32 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  /* 한글을 글자 단위가 아니라 띄어쓰기 단위로 줄바꿈("일용/직 근/로자"처럼 끊기지 않게).
+     띄어쓰기 없는 긴 문자열만 어쩔 수 없을 때 끊는다. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* 가로로 넓은 표에서 옆으로 넘겨도 "어느 행인지" 보이게 이름 칸을 왼쪽에 고정.
+   고정 칸은 행 배경색을 그대로 물려받아야 하므로, 색이 없는 행은 흰색을 기본으로 둔다
+   (base 레이어라 행에 붙은 bg-* 유틸리티가 항상 우선). */
+@layer base {
+  .sticky-col-table tr {
+    background-color: #fff;
+  }
+}
+.sticky-col-table .sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background-color: inherit;
+  box-shadow: inset -1px 0 0 var(--color-slate-200);
+}
+@media print {
+  .sticky-col-table .sticky-col {
+    position: static;
+    box-shadow: none;
+  }
 }
 
 input,

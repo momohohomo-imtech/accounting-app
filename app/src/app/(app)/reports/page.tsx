@@ -913,24 +913,24 @@ export default async function ReportsPage({
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 xl:grid-cols-4">
             <div>
               <p className="text-sm text-slate-500">{selectedYear}년 총 매출액</p>
-              <p className="mt-2 tabular-nums text-2xl font-bold text-slate-900">{formatWon(yearTotal.sales)}</p>
+              <p className="mt-2 whitespace-nowrap tabular-nums text-xl font-bold sm:text-2xl text-slate-900">{formatWon(yearTotal.sales)}</p>
             </div>
             <div>
               <p className="text-sm text-slate-500">{selectedYear}년 총 매입액</p>
-              <p className="mt-2 tabular-nums text-2xl font-bold text-slate-900">{formatWon(yearTotal.purchase)}</p>
+              <p className="mt-2 whitespace-nowrap tabular-nums text-xl font-bold sm:text-2xl text-slate-900">{formatWon(yearTotal.purchase)}</p>
             </div>
             <div>
               <p className="text-sm text-slate-500">{selectedYear}년 순손익</p>
-              <p className="mt-2 tabular-nums text-2xl font-bold text-slate-900">
+              <p className="mt-2 whitespace-nowrap tabular-nums text-xl font-bold sm:text-2xl text-slate-900">
                 {formatWon(yearTotal.sales - yearTotal.purchase)}
               </p>
             </div>
             <div>
               <p className="text-sm text-slate-500">예상 순이익율</p>
-              <p className="mt-2 tabular-nums text-2xl font-bold text-red-600">
+              <p className="mt-2 whitespace-nowrap tabular-nums text-xl font-bold sm:text-2xl text-red-600">
                 {yearProfitEstimateRate === null ? "-" : `${yearProfitEstimateRate.toFixed(2)}%`}
               </p>
               <p className="mt-1 text-[11px] leading-tight text-slate-400">
@@ -976,20 +976,20 @@ export default async function ReportsPage({
               rows: [[bankTotalBalance, outstandingCreditPurchaseTotal, currentFunds]],
             })}
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div>
               <p className="text-sm text-slate-500">은행 총 잔액</p>
-              <p className={`mt-1 tabular-nums text-2xl font-bold ${bankTotalBalance < 0 ? "text-red-600" : "text-slate-900"}`}>
+              <p className={`mt-1 whitespace-nowrap tabular-nums text-xl font-bold sm:text-2xl ${bankTotalBalance < 0 ? "text-red-600" : "text-slate-900"}`}>
                 {formatWon(bankTotalBalance)}
               </p>
             </div>
             <div>
               <p className="text-sm text-slate-500">외상 매입 총액 (VAT 포함, 미정산분)</p>
-              <p className="mt-1 tabular-nums text-2xl font-bold text-slate-500">-{formatWon(outstandingCreditPurchaseTotal)}</p>
+              <p className="mt-1 whitespace-nowrap tabular-nums text-xl font-bold sm:text-2xl text-slate-500">-{formatWon(outstandingCreditPurchaseTotal)}</p>
             </div>
             <div>
               <p className="text-sm text-slate-500">실질 자금</p>
-              <p className={`mt-1 tabular-nums text-2xl font-bold ${currentFunds < 0 ? "text-red-600" : "text-slate-900"}`}>
+              <p className={`mt-1 whitespace-nowrap tabular-nums text-xl font-bold sm:text-2xl ${currentFunds < 0 ? "text-red-600" : "text-slate-900"}`}>
                 {formatWon(currentFunds)}
               </p>
             </div>
@@ -1090,16 +1090,16 @@ export default async function ReportsPage({
             {projectSummary.profitRate === null ? "-" : `${projectSummary.profitRate.toFixed(2)}%`}
           </p>
 
-          <div className="mb-4 grid grid-cols-2 gap-4 print:mb-2 print:gap-2 print:break-inside-avoid">
+          <div className="mb-4 grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 print:mb-2 print:grid-cols-2 print:gap-2 print:break-inside-avoid">
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:border-0 print:p-0 print:shadow-none">
               <p className="text-sm text-slate-500 print:text-xs">총 발주액</p>
-              <p className="mt-1 tabular-nums text-2xl font-bold text-slate-900 print:text-lg">
+              <p className="mt-1 whitespace-nowrap tabular-nums text-xl font-bold sm:text-2xl text-slate-900 print:text-lg">
                 {formatWon(projectSummary.quoteAmount)}
               </p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:border-0 print:p-0 print:shadow-none">
               <p className="text-sm text-slate-500 print:text-xs">총 이익금</p>
-              <p className="mt-1 tabular-nums text-2xl font-bold text-slate-900 print:text-lg">
+              <p className="mt-1 whitespace-nowrap tabular-nums text-xl font-bold sm:text-2xl text-slate-900 print:text-lg">
                 {formatWon(projectSummary.profit)}
               </p>
             </div>

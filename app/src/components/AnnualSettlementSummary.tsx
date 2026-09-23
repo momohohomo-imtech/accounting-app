@@ -35,7 +35,7 @@ export function AnnualSettlementSummary({
 
   return (
     <div className="space-y-4 print:break-inside-avoid">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 print:grid-cols-4 print:gap-2">
+      <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 xl:grid-cols-4 print:grid-cols-4 print:gap-2">
         <Stat label={`${year}년 총 매출`} value={formatWon(totalSales)} />
         <Stat label={`${year}년 총 매입`} value={formatWon(totalPurchase)} />
         <Stat label="순손익" value={formatWon(netProfit)} negative={netProfit < 0} />
@@ -69,7 +69,7 @@ function Stat({ label, value, negative }: { label: string; value: string; negati
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-3 print:rounded-none print:border-slate-300 print:p-2">
       <p className="text-xs text-slate-500 print:text-[9px]">{label}</p>
-      <p className={`mt-1 tabular-nums text-xl font-bold print:text-sm ${negative ? "text-red-600" : "text-slate-900"}`}>
+      <p className={`mt-1 whitespace-nowrap tabular-nums text-xl font-bold print:text-sm ${negative ? "text-red-600" : "text-slate-900"}`}>
         {value}
       </p>
     </div>
@@ -88,13 +88,14 @@ function MiniTable({
   colored?: (string | undefined)[];
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3 print:rounded-none print:border-slate-300 print:p-2">
+    <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-3 print:rounded-none print:border-slate-300 print:p-2">
       <h3 className="mb-1.5 text-xs font-semibold text-slate-700 print:text-[10px]">{title}</h3>
-      <table className="w-full text-xs print:text-[9px]">
+      <div className="overflow-x-auto print:overflow-visible">
+      <table className="sticky-col-table w-full text-xs print:text-[9px]">
         <thead>
           <tr className="border-b border-slate-200 text-left text-slate-500">
             {headers.map((h, i) => (
-              <th key={h} className={`pb-1 pr-2 print:pb-0.5 ${i > 0 ? "text-right" : ""}`}>
+              <th key={h} className={`whitespace-nowrap pb-1 pr-2 print:pb-0.5 ${i > 0 ? "text-right" : "sticky-col"}`}>
                 {h}
               </th>
             ))}
@@ -106,7 +107,7 @@ function MiniTable({
               {r.map((cell, j) => (
                 <td
                   key={j}
-                  className={`truncate py-1 pr-2 print:py-0.5 ${j > 0 ? "text-right tabular-nums text-slate-900" : "text-slate-700"}`}
+                  className={`truncate py-1 pr-2 print:py-0.5 ${j > 0 ? "text-right tabular-nums text-slate-900" : "sticky-col max-w-[40vw] text-slate-700 print:max-w-none"}`}
                   style={j === 0 && colored?.[i] ? { color: colored[i] } : undefined}
                 >
                   {cell}
@@ -123,6 +124,7 @@ function MiniTable({
           )}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

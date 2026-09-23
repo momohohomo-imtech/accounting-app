@@ -3,7 +3,7 @@ import type { ComponentProps } from "react";
 import { cx } from "@/lib/cx";
 
 const base =
-  "inline-flex items-center justify-center gap-1.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50";
 
 const variantClass = {
   primary: "bg-brand font-semibold text-white hover:bg-brand-dark",
