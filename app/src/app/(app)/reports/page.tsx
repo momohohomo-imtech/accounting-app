@@ -8,6 +8,7 @@ import { YearFilter } from "@/components/YearFilter";
 import { ReportProjectSiteFilter } from "@/components/ReportProjectSiteFilter";
 import { ReportProjectPicker } from "@/components/ReportProjectPicker";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
+import { AnnualSettlementSummary } from "@/components/AnnualSettlementSummary";
 import { ProjectSummaryReport, type ProjectSummaryRow } from "@/components/ProjectSummaryReport";
 import { projectStatusLabel } from "@/lib/projectStatus";
 import { AutoPrint } from "@/components/AutoPrint";
@@ -841,6 +842,23 @@ export default async function ReportsPage({
           </div>
         </div>
       </div>
+
+      <CollapsibleSection
+        title="연간 결산 요약 — 전체 프로젝트 한눈에 보기 (A4 한 장)"
+        className={hiddenClass("annualSummary")}
+        defaultOpen={true}
+        headerExtra={printLink("annualSummary")}
+      >
+        <AnnualSettlementSummary
+          year={selectedYear}
+          totalSales={yearTotal.sales}
+          totalPurchase={yearTotal.purchase}
+          projectCount={byProject.length}
+          bySite={bySite}
+          byVendor={byVendorPurchaseOnly}
+          byCategory={byCategory}
+        />
+      </CollapsibleSection>
 
       <CollapsibleSection
         title={groupTitle("재무 개요")}
