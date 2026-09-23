@@ -132,7 +132,7 @@ export default async function ReportsPage({
       supabase
         .from("projects")
         .select(
-          "id, project_code, name, status, progress_pct, site_id, parent_project_id, quote_amount, contract_amount, settlement_finalized, start_date, end_date, order_date, sites(name)"
+          "id, project_code, name, status, progress_pct, site_id, parent_project_id, quote_amount, contract_amount, settlement_finalized, start_date, end_date, order_date, memo, sites(name)"
         )
         .eq("year", selectedYear),
       supabase.from("transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
@@ -312,6 +312,7 @@ export default async function ReportsPage({
         startDate: p.start_date ?? null,
         endDate: p.end_date ?? null,
         orderDate: p.order_date ?? null,
+        memo: p.memo ?? null,
         workDayCount,
         childNames: group.length > 1 ? group.slice(1).map((g) => g.name) : [],
         quoteAmount,
@@ -341,6 +342,7 @@ export default async function ReportsPage({
     p.contractAmountExpected,
     p.profit,
     p.margin === null ? 0 : Math.round(p.margin * 100) / 100,
+    p.memo ?? "",
   ]);
 
   // 매출 검증: 수주액(실수령액으로 입력해둔 금액)과 실제 매출 원장(세금계산서 기준) 합계를
@@ -1043,6 +1045,7 @@ export default async function ReportsPage({
               "수주예상액",
               "이익금",
               "이익율(%)",
+              "메모",
             ],
             rows: projectSummaryExportRows,
           })}

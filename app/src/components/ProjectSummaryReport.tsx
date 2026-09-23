@@ -16,6 +16,7 @@ export type ProjectSummaryRow = {
   startDate: string | null;
   endDate: string | null;
   orderDate: string | null;
+  memo: string | null;
   /** 작업일지 기준 실제 작업한 날짜 수(귀속 하위 프로젝트 포함, 중복 날짜는 한 번만). */
   workDayCount: number;
   /** 이 프로젝트에 귀속(합산)된 하위 프로젝트 이름들 — 있으면 재무제표에 이미 합산돼 있음을 표시. */
@@ -230,6 +231,13 @@ export function ProjectSummaryReport({ rows }: { rows: ProjectSummaryRow[] }) {
                   </table>
                 </div>
               </div>
+
+              {p.memo && (
+                <div className="mt-4 rounded-xl border border-slate-200 px-4 py-3 print:mt-3 print:rounded-none print:border print:border-slate-400 print:break-inside-avoid">
+                  <p className="mb-1 text-xs font-medium text-slate-500 print:text-[9px]">메모</p>
+                  <p className="whitespace-pre-wrap text-sm text-slate-700 print:text-[10px]">{p.memo}</p>
+                </div>
+              )}
             </div>
           );
         })}
