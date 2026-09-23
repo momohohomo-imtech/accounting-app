@@ -152,13 +152,13 @@ export function BankTransactionTable({
   return (
     <>
     {actionError && <p className="mb-2 text-sm text-red-600">{actionError}</p>}
-    <table className="w-full min-w-[700px] text-sm">
+    <table className="sticky-col-table w-full min-w-[700px] text-sm">
       <thead>
-        <tr className="border-b border-slate-200 text-left text-slate-500">
+        <tr className="whitespace-nowrap border-b border-slate-200 text-left text-slate-500">
           <th className="pb-2 pr-4">{headerButton("trans_date", "날짜")}</th>
           <th className="pb-2 pr-4">{headerButton("account", "계좌")}</th>
           <th className="pb-2 pr-4">{headerButton("direction", "구분")}</th>
-          <th className="pb-2 pr-4">{headerButton("description", "내용")}</th>
+          <th className="sticky-col pb-2 pr-4">{headerButton("description", "내용")}</th>
           <th className="pb-2 pr-4">{headerButton("client", "매칭 거래처")}</th>
           <th className="pb-2 pr-4 text-right">{headerButton("amount", "금액")}</th>
           <th className="pb-2 pr-4 text-center">매입/매출장</th>
@@ -241,9 +241,13 @@ export function BankTransactionTable({
             </tr>
           ) : (
             <tr key={t.id} className="border-b border-slate-100 last:border-0">
-              <td className="py-2 pr-4 text-slate-600">{formatDate(t.trans_date)}</td>
-              <td className="py-2 pr-4 text-slate-700">{t.bank_accounts?.nickname ?? t.bank_accounts?.bank_name}</td>
-              <td className="py-2 pr-4">
+              <td className="whitespace-nowrap py-2 pr-4 text-slate-600" title={formatDate(t.trans_date)}>
+                {/* 화면은 연도 필터로 이미 한 해만 보이므로 월-일만, 인쇄는 전체 날짜 */}
+                <span className="print:hidden">{formatDate(t.trans_date).slice(5)}</span>
+                <span className="hidden print:inline">{formatDate(t.trans_date)}</span>
+              </td>
+              <td className="whitespace-nowrap py-2 pr-4 text-slate-700">{t.bank_accounts?.nickname ?? t.bank_accounts?.bank_name}</td>
+              <td className="whitespace-nowrap py-2 pr-4">
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                     t.direction === "입금" ? "bg-blue-50 text-blue-700" : "bg-orange-50 text-orange-700"
@@ -255,10 +259,17 @@ export function BankTransactionTable({
                   <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">이체</span>
                 )}
               </td>
-              <td className="py-2 pr-4 text-slate-700">{t.description ?? "-"}</td>
-              <td className="py-2 pr-4 text-slate-700">{t.clients?.name ?? t.matched_client_name_raw ?? "-"}</td>
-              <td className="py-2 pr-4 text-right font-medium text-slate-900">{formatWon(t.amount)}</td>
-              <td className="py-2 pr-4 text-center">
+              <td className="sticky-col py-2 pr-4 text-slate-700 max-md:max-w-[9rem] max-md:truncate print:max-w-none print:overflow-visible print:whitespace-normal" title={t.description ?? undefined}>
+                {t.description ?? "-"}
+              </td>
+              <td
+                className="py-2 pr-4 text-slate-700 max-md:max-w-[8rem] max-md:truncate print:max-w-none print:overflow-visible print:whitespace-normal"
+                title={t.clients?.name ?? t.matched_client_name_raw ?? undefined}
+              >
+                {t.clients?.name ?? t.matched_client_name_raw ?? "-"}
+              </td>
+              <td className="whitespace-nowrap py-2 pr-4 text-right font-medium text-slate-900">{formatWon(t.amount)}</td>
+              <td className="whitespace-nowrap py-2 pr-4 text-center">
                 {t.transfer_group_id ? (
                   <span className="text-xs text-slate-300" title="계좌 간 이체 내역은 올릴 수 없습니다">
                     -
@@ -283,7 +294,7 @@ export function BankTransactionTable({
                   </button>
                 )}
               </td>
-              <td className="py-2 text-right">
+              <td className="whitespace-nowrap py-2 text-right">
                 <div className="flex justify-end gap-1">
                   <button
                     type="button"
