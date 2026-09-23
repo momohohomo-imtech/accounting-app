@@ -125,10 +125,19 @@ export default async function DashboardPage({
     supabase.from("expense_categories").select("*"),
     supabase
       .from("projects")
-      .select("status, contract_amount, quote_amount")
+      .select("id, status, quote_amount")
       .eq("year", selectedYear)
       .in("status", EXPECTED_RECEIVABLE_STATUSES.map((s) => s.value)),
   ]);
+
+  const receivableProjectIds = (receivableProjects ?? []).map((p) => p.id);
+  const { data: receivableAgencyRows } = receivableProjectIds.length
+    ? await supabase.from("project_agency_purchases").select("project_id, amount").in("project_id", receivableProjectIds)
+    : { data: [] as { project_id: string; amount: number }[] };
+  const agencyByReceivableProject = new Map<string, number>();
+  for (const a of receivableAgencyRows ?? []) {
+    agencyByReceivableProject.set(a.project_id, (agencyByReceivableProject.get(a.project_id) ?? 0) + Number(a.amount));
+  }
 
   const payments = creditPayments;
   const monthTx = (monthTxRaw ?? []).filter((t) => isLedgerVisible(t as Transaction, payments));
@@ -149,12 +158,18 @@ export default async function DashboardPage({
   const yearProfit = yearSales - yearPurchase;
 
   // 예상 미수액 — 아직 돈을 다 받지 않은 프로젝트(진행중·공사 완료·완료 수금대기)의 받을 금액.
-  // 금액 기준은 "공사 완료 · 수금 대기" 칸과 같음(수주액, 없으면 발주액).
+  // 프로젝트 목록의 "수주예상액"과 같은 기준: 발주액 − 대행구매액.
   const expectedReceivableByStatus = EXPECTED_RECEIVABLE_STATUSES.map(({ value, label }) => {
     const rows = (receivableProjects ?? []).filter((p) => p.status === value);
-    return { label, count: rows.length, amount: rows.reduce((s, p) => s + (p.contract_amount ?? p.quote_amount ?? 0), 0) };
+    return {
+      label,
+      count: rows.length,
+      amount: rows.reduce((s, p) => s + (p.quote_amount ?? 0) - (agencyByReceivableProject.get(p.id) ?? 0), 0),
+    };
   });
   const expectedReceivable = expectedReceivableByStatus.reduce((s, r) => s + r.amount, 0);
+  // "공사 완료 · 수금 대기" 칸도 같은 수주예상액 기준 — 두 칸의 수금 대기 금액이 항상 같게.
+  const awaitingPayment = expectedReceivableByStatus[EXPECTED_RECEIVABLE_STATUSES.findIndex((st) => st.value === PROJECT_STATUS_AWAITING_PAYMENT)];
 
   // 선택 연도 전체 프로젝트 수주액 합계 — 프로젝트 페이지 하단 "수주액" 합계와 같은 값.
   const totalExpectedRevenue = (yearProjects ?? []).reduce((s, p) => s + (p.contract_amount ?? 0), 0);
@@ -257,7 +272,7 @@ export default async function DashboardPage({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Link href="/projects" className="rounded-xl transition hover:ring-2 hover:ring-slate-200">
             <Stat
-              label="예상 미수액 (진행중·공사 완료·수금 대기)"
+              label="예상 미수액 (수주예상액 기준 · 진행중·공사 완료·수금 대기)"
               emphasis
               sub={
                 <ul className="space-y-0.5">
@@ -276,8 +291,8 @@ export default async function DashboardPage({
             </Stat>
           </Link>
           <Link href="/projects" className="rounded-xl transition hover:ring-2 hover:ring-slate-200">
-            <Stat label="공사 완료 · 수금 대기" sub={`${selectedYear}년 프로젝트 ${o.pendingCount}건 수주액 합계`}>
-              <Money value={o.pendingReceivable} />
+            <Stat label="공사 완료 · 수금 대기" sub={`${selectedYear}년 프로젝트 ${awaitingPayment.count}건 · 수주예상액 기준`}>
+              <Money value={awaitingPayment.amount} />
             </Stat>
           </Link>
           <Link href="/transactions?tab=credit" className="rounded-xl transition hover:ring-2 hover:ring-slate-200">

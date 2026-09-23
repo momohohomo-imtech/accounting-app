@@ -53,7 +53,6 @@ export async function loadProfitOutlook(year: number) {
   };
 
   const [
-    { data: pendingProjects },
     { data: unbilledProjects },
     { data: yearProjects },
     nullProjectTxRaw,
@@ -61,12 +60,6 @@ export async function loadProfitOutlook(year: number) {
     h2TxRaw,
     creditPayments,
   ] = await Promise.all([
-    // 대시보드 필터 연도의 완료 수금대기 프로젝트만 (모든 항목을 필터 연도 기준으로 통일).
-    supabase
-      .from("projects")
-      .select("id, contract_amount, quote_amount")
-      .eq("status", PROJECT_STATUS_AWAITING_PAYMENT)
-      .eq("year", year),
     // 세금계산서 미발행 예상 이익금 대상: 완료 수금대기 + 공사 완료(둘 다 매출/세금계산서가
     // 아직 없는 경우가 많음 — 프로젝트 페이지의 hasIncompleteProjects 판단과 동일한 범위),
     // 마찬가지로 필터 연도로 한정.
@@ -114,7 +107,6 @@ export async function loadProfitOutlook(year: number) {
   const payrollTx = nullProjectTx.filter((t) => one(t.expense_categories)?.name === PAYROLL_CATEGORY_NAME);
   const generalTx = nullProjectTx.filter((t) => one(t.expense_categories)?.name !== PAYROLL_CATEGORY_NAME);
 
-  const pendingRows = pendingProjects ?? [];
   const unbilledRows = unbilledProjects ?? [];
   const yearRows = yearProjects ?? [];
 
@@ -152,8 +144,6 @@ export async function loadProfitOutlook(year: number) {
   // 외상(미완납)은 완납 전까지 장부에서 제외 — 다른 대시보드 항목들과 동일한 기준.
   const purchaseTx = purchaseTxRaw.filter((t) => isLedgerVisible(t, payments));
 
-  // --- {year}년 공사 완료 수금 대기: 필터 연도의 프로젝트 상태가 "완료 수금대기"인 건들의 수주액 합계 ---
-  const pendingReceivable = pendingRows.reduce((s, p) => s + (p.contract_amount ?? p.quote_amount ?? 0), 0);
 
   // --- {year}년 이익 예상: 프로젝트 총이익금 - 카테고리 일반경비 - 직원급여/상여/4대보험 ---
   const purchaseByProject = new Map<string, number>();
@@ -218,8 +208,6 @@ export async function loadProfitOutlook(year: number) {
   const combinedTax = combinedProfit != null ? taxEstimate(combinedProfit) : null;
 
   return {
-    pendingCount: pendingRows.length,
-    pendingReceivable,
     hasProjectsWithProfit: yearProjectsWithProfit.length > 0,
     profitEstimate,
     profitTax,
