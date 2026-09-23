@@ -159,7 +159,7 @@ export function QuotePrintView({
       <div className="hidden rounded-2xl border border-slate-200 bg-white p-6 print:flex print:min-h-[277mm] print:flex-col print:rounded-none print:border-0 print:p-0">
         <div className="flex items-center gap-2.5">
           <Image src="/logo-lockup.png" alt="" width={30} height={24} className="h-6 w-auto" />
-          <span className="ml-auto font-mono text-[11px] tracking-widest text-slate-400">QUOTATION</span>
+          <span className="ml-auto tabular-nums text-[11px] tracking-widest text-slate-400">QUOTATION</span>
         </div>
         <div className="mt-3 flex flex-col">
           <div className="h-[3px] bg-brand" />
@@ -171,7 +171,7 @@ export function QuotePrintView({
         <div className="mt-6 grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
           <p>
             <span className="text-slate-500">견적번호: </span>
-            <span className="font-mono font-medium text-slate-900">{quote.quote_number ?? "-"}</span>
+            <span className="tabular-nums font-medium text-slate-900">{quote.quote_number ?? "-"}</span>
           </p>
           <p>
             <span className="text-slate-500">견적일자: </span>
@@ -234,7 +234,7 @@ export function QuotePrintView({
         <div className="mt-5 flex items-center justify-between rounded-lg border-2 border-brand bg-brand-soft px-4 py-3">
           <span className="text-sm font-semibold text-slate-700">합계금액 (VAT 별도)</span>
           <span className="text-sm font-bold text-slate-900">
-            {numberToKoreanAmount(total)} (<span className="font-mono">{formatWon(total)}</span>)
+            {numberToKoreanAmount(total)} (<span className="tabular-nums">{formatWon(total)}</span>)
           </span>
         </div>
 
@@ -260,11 +260,11 @@ export function QuotePrintView({
                 <td className="py-2 pr-2">{it.item_name ?? "-"}</td>
                 <td className="py-2 pr-2 text-slate-500">{it.spec ?? "-"}</td>
                 <td className="py-2 pr-2 text-slate-500">{it.unit ?? "-"}</td>
-                <td className="py-2 pr-2 text-right font-mono">{it.quantity ?? "-"}</td>
-                <td className="py-2 pr-2 text-right font-mono">
+                <td className="py-2 pr-2 text-right tabular-nums">{it.quantity ?? "-"}</td>
+                <td className="py-2 pr-2 text-right tabular-nums">
                   {it.adjustedUnitPrice != null ? formatWon(it.adjustedUnitPrice) : "-"}
                 </td>
-                <td className="py-2 pr-2 text-right font-mono">{it.confirmed === 0 ? "-" : formatWon(it.confirmed)}</td>
+                <td className="py-2 pr-2 text-right tabular-nums">{it.confirmed === 0 ? "-" : formatWon(it.confirmed)}</td>
                 <td className="py-2 text-slate-500">{it.note ?? "-"}</td>
               </tr>
             ))}
@@ -287,7 +287,7 @@ export function QuotePrintView({
               <td colSpan={6} className="py-2 text-right font-semibold text-slate-900">
                 합계
               </td>
-              <td className="py-2 text-right font-mono font-bold text-slate-900">{formatWon(total)}</td>
+              <td className="py-2 text-right tabular-nums font-bold text-slate-900">{formatWon(total)}</td>
               <td />
             </tr>
           </tfoot>

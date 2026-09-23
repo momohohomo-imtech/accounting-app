@@ -103,7 +103,7 @@ export function ToolChecklistHistoryTable({ rows }: { rows: HistoryRow[] }) {
               </td>
               <td className="py-2 pr-4 text-slate-600">{r.project_name ?? "-"}</td>
               <td className="py-2 pr-4 text-slate-600">{r.trip_date ? formatDate(r.trip_date) : "-"}</td>
-              <td className="py-2 pr-4 text-right font-mono text-slate-700">{r.item_count}개</td>
+              <td className="py-2 pr-4 text-right tabular-nums text-slate-700">{r.item_count}개</td>
               <td className="py-2 pr-4 text-slate-500">{formatDate(r.created_at)}</td>
               <td className="py-2 text-right print:hidden">
                 <div className="flex justify-end gap-2">

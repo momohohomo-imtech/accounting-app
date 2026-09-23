@@ -97,10 +97,10 @@ export function CategoryAggregateTable({
                   {c.name}
                 </Link>
               </td>
-              <td className="py-2 pr-4 text-right font-mono text-slate-700">{c.count}건</td>
-              <td className="py-2 pr-4 text-right font-mono text-slate-700">{formatWon(c.amount)}</td>
-              <td className="py-2 pr-4 text-right font-mono text-slate-500">{c.agencyCount}건</td>
-              <td className="py-2 text-right font-mono text-slate-500">
+              <td className="py-2 pr-4 text-right tabular-nums text-slate-700">{c.count}건</td>
+              <td className="py-2 pr-4 text-right tabular-nums text-slate-700">{formatWon(c.amount)}</td>
+              <td className="py-2 pr-4 text-right tabular-nums text-slate-500">{c.agencyCount}건</td>
+              <td className="py-2 text-right tabular-nums text-slate-500">
                 {c.agencyAmount > 0 ? formatWon(c.agencyAmount) : "-"}
               </td>
             </tr>

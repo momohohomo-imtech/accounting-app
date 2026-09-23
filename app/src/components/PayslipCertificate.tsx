@@ -42,7 +42,7 @@ export function PayslipCertificate({ data, closeHref }: { data: PayslipData; clo
       <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
         <h2 className="text-lg font-semibold text-slate-900">
           {data.employeeName} 급여명세서{" "}
-          <span className="font-mono text-sm font-normal text-slate-400">{payMonthLabel}</span>
+          <span className="tabular-nums text-sm font-normal text-slate-400">{payMonthLabel}</span>
         </h2>
         <div className="flex items-center gap-2">
           <PrintButton />
@@ -71,7 +71,7 @@ export function PayslipCertificate({ data, closeHref }: { data: PayslipData; clo
       <div className="mx-auto flex min-h-[700px] max-w-xl flex-col py-4 print:min-h-[250mm]">
         <div className="flex items-center gap-2.5">
           <Image src="/logo-lockup.png" alt="" width={30} height={24} className="h-6 w-auto" />
-          <span className="ml-auto font-mono text-[11px] tracking-widest text-slate-400">PAYSLIP</span>
+          <span className="ml-auto tabular-nums text-[11px] tracking-widest text-slate-400">PAYSLIP</span>
         </div>
         <div className="mt-3 flex flex-col">
           <div className="h-[3px] bg-brand" />
@@ -79,7 +79,7 @@ export function PayslipCertificate({ data, closeHref }: { data: PayslipData; clo
         </div>
 
         <h1 className="mt-6 text-center text-3xl font-bold tracking-[0.5em] text-brand">급여명세서</h1>
-        <p className="mt-1 text-center font-mono text-sm text-slate-500">{payMonthLabel} 귀속</p>
+        <p className="mt-1 text-center tabular-nums text-sm text-slate-500">{payMonthLabel} 귀속</p>
 
         <table className="mt-8 w-full border-t-2 border-slate-900 text-sm">
           <tbody>
@@ -111,15 +111,15 @@ export function PayslipCertificate({ data, closeHref }: { data: PayslipData; clo
               <tbody>
                 <tr className="border-b border-slate-300">
                   <td className="bg-brand-soft py-2 pl-3 text-slate-600">기본급</td>
-                  <td className="py-2 pr-3 text-right font-mono text-slate-900">{formatWon(data.amount)}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums text-slate-900">{formatWon(data.amount)}</td>
                 </tr>
                 <tr className="border-b border-slate-300">
                   <td className="bg-brand-soft py-2 pl-3 text-slate-600">상여</td>
-                  <td className="py-2 pr-3 text-right font-mono text-slate-900">{formatWon(data.bonus)}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums text-slate-900">{formatWon(data.bonus)}</td>
                 </tr>
                 <tr className="border-b-2 border-slate-900">
                   <td className="bg-brand-soft py-2 pl-3 font-semibold text-slate-900">지급합계</td>
-                  <td className="py-2 pr-3 text-right font-mono font-semibold text-slate-900">
+                  <td className="py-2 pr-3 text-right tabular-nums font-semibold text-slate-900">
                     {formatWon(data.total)}
                   </td>
                 </tr>
@@ -133,12 +133,12 @@ export function PayslipCertificate({ data, closeHref }: { data: PayslipData; clo
                 {data.deductionRows.map(([label, value]) => (
                   <tr key={label} className="border-b border-slate-300">
                     <td className="bg-brand-soft py-2 pl-3 text-slate-600">{label}</td>
-                    <td className="py-2 pr-3 text-right font-mono text-slate-900">{formatWon(value)}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums text-slate-900">{formatWon(value)}</td>
                   </tr>
                 ))}
                 <tr className="border-b-2 border-slate-900">
                   <td className="bg-brand-soft py-2 pl-3 font-semibold text-slate-900">공제합계</td>
-                  <td className="py-2 pr-3 text-right font-mono font-semibold text-slate-900">
+                  <td className="py-2 pr-3 text-right tabular-nums font-semibold text-slate-900">
                     {formatWon(data.deductionTotal)}
                   </td>
                 </tr>
@@ -149,11 +149,11 @@ export function PayslipCertificate({ data, closeHref }: { data: PayslipData; clo
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-brand-soft px-4 py-3 print:rounded-none print:border-2 print:border-slate-900">
           <span className="text-sm text-slate-600">
-            미제출비과세 <span className="font-mono font-medium text-slate-700">{formatWon(data.nonTaxableUnreported)}</span>
+            미제출비과세 <span className="tabular-nums font-medium text-slate-700">{formatWon(data.nonTaxableUnreported)}</span>
           </span>
           <span className="text-sm font-semibold text-slate-900">
             차인지급액(실지급액)
-            <span className="ml-2 font-mono text-xl font-bold text-slate-900">{formatWon(data.net)}</span>
+            <span className="ml-2 tabular-nums text-xl font-bold text-slate-900">{formatWon(data.net)}</span>
           </span>
         </div>
 

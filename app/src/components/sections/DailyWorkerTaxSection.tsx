@@ -96,7 +96,7 @@ export async function DailyWorkerTaxSection({ year, month }: { year?: string; mo
             일용직 사용내역서 — {selectedYear}년 {selectedMonth}월
           </h2>
           <p className="text-sm font-semibold text-slate-900">
-            {selectedMonth}월 지급액 <span className="ml-1 font-mono">{formatWon(totalPaid)}</span>
+            {selectedMonth}월 지급액 <span className="ml-1 tabular-nums">{formatWon(totalPaid)}</span>
           </p>
         </div>
         <DailyWorkerUsageStatementTable

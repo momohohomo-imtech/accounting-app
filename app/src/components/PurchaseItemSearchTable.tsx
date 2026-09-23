@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatWon, formatDate } from "@/lib/format";
+import { stickyHeadWrapClass } from "@/components/ui/Table";
 
 export type PurchaseItemRow = {
   id: string;
@@ -97,7 +98,7 @@ export function PurchaseItemSearchTable({ rows }: { rows: PurchaseItemRow[] }) {
           8월&quot;) 그 달에 산 해당 품목만 찾습니다.
         </p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className={stickyHeadWrapClass}>
           <table className="w-full min-w-[700px] text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-slate-500">
@@ -118,7 +119,7 @@ export function PurchaseItemSearchTable({ rows }: { rows: PurchaseItemRow[] }) {
                   <td className="py-2 pr-4 text-slate-700">{r.projectName}</td>
                   <td className="py-2 pr-4 text-slate-700">{r.categoryName}</td>
                   <td className="py-2 pr-4 text-slate-700">{r.itemName}</td>
-                  <td className="py-2 pr-4 text-right font-mono text-slate-900">{formatWon(r.amount)}</td>
+                  <td className="py-2 pr-4 text-right tabular-nums text-slate-900">{formatWon(r.amount)}</td>
                   <td className="py-2 text-right print:hidden">
                     <Link
                       href={r.editHref}
@@ -143,7 +144,7 @@ export function PurchaseItemSearchTable({ rows }: { rows: PurchaseItemRow[] }) {
                   <td colSpan={5} className="py-2 text-right font-semibold text-slate-900">
                     {sorted.length}건 합계
                   </td>
-                  <td className="py-2 text-right font-mono font-bold text-slate-900">{formatWon(total)}</td>
+                  <td className="py-2 text-right tabular-nums font-bold text-slate-900">{formatWon(total)}</td>
                   <td className="print:hidden" />
                 </tr>
               </tfoot>

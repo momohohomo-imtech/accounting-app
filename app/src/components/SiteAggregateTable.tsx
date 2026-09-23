@@ -83,8 +83,8 @@ export function SiteAggregateTable({
                   {r.siteName}
                 </button>
               </td>
-              <td className="py-2 pr-4 text-right font-mono text-slate-900">{r.jobTypeCount}개</td>
-              <td className="py-2 text-right font-mono text-slate-900">{r.dayCount}일</td>
+              <td className="py-2 pr-4 text-right tabular-nums text-slate-900">{r.jobTypeCount}개</td>
+              <td className="py-2 text-right tabular-nums text-slate-900">{r.dayCount}일</td>
             </tr>
           ))}
           {rows.length === 0 && (

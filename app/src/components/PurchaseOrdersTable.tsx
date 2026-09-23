@@ -92,7 +92,7 @@ export function PurchaseOrdersTable({ rows }: { rows: PurchaseOrderRow[] }) {
         <tbody>
           {sorted.map((po) => (
             <tr key={po.id} className="border-b border-slate-100 last:border-0">
-              <td className="py-2 pr-4 font-mono text-slate-500">
+              <td className="py-2 pr-4 tabular-nums text-slate-500">
                 <Link
                   href={`/purchase-orders/${po.id}/edit`}
                   className="underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
@@ -104,7 +104,7 @@ export function PurchaseOrdersTable({ rows }: { rows: PurchaseOrderRow[] }) {
               <td className="py-2 pr-4 text-slate-700">{po.clientName ?? "-"}</td>
               <td className="py-2 pr-4 text-slate-500">{po.projectLabel ?? "-"}</td>
               <td className="py-2 pr-4 text-slate-700">{purchaseOrderStatusLabel(po.status)}</td>
-              <td className="py-2 pr-4 text-right font-mono text-slate-900">{formatWon(po.total)}</td>
+              <td className="py-2 pr-4 text-right tabular-nums text-slate-900">{formatWon(po.total)}</td>
               <td className="py-2 pr-4 text-slate-500">{formatDate(po.created_at)}</td>
               <td className="py-2 text-right">
                 <div className="flex justify-end gap-1.5">

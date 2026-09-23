@@ -261,13 +261,13 @@ export function PayrollForm({
 
       <div className="flex flex-wrap gap-4 rounded-lg bg-slate-50 px-4 py-2.5 text-sm text-slate-600">
         <span>
-          지급합계 <b className="font-mono text-slate-900">{formatWon(total)}</b>
+          지급합계 <b className="tabular-nums text-slate-900">{formatWon(total)}</b>
         </span>
         <span>
-          공제합계 <b className="font-mono text-slate-900">{formatWon(deductionTotal)}</b>
+          공제합계 <b className="tabular-nums text-slate-900">{formatWon(deductionTotal)}</b>
         </span>
         <span>
-          차인지급액 <b className="font-mono text-slate-900">{formatWon(net)}</b>
+          차인지급액 <b className="tabular-nums text-slate-900">{formatWon(net)}</b>
         </span>
       </div>
 

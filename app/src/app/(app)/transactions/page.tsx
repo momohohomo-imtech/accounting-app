@@ -77,11 +77,11 @@ export default async function TransactionsPage({
             <div className="flex flex-wrap items-baseline gap-x-3 text-sm text-slate-500">
               <span>
                 총 매입액{" "}
-                <span className="font-mono font-semibold text-slate-900">{formatWon(totals.purchase)}</span>
+                <span className="tabular-nums font-semibold text-slate-900">{formatWon(totals.purchase)}</span>
               </span>
               <span>
                 총 매출액{" "}
-                <span className="font-mono font-semibold text-slate-900">{formatWon(totals.sales)}</span>
+                <span className="tabular-nums font-semibold text-slate-900">{formatWon(totals.sales)}</span>
               </span>
             </div>
           )}
@@ -314,7 +314,7 @@ async function TransactionListSection({
 
       <p className="text-sm text-slate-600">
         필터된 전체 금액{" "}
-        <span className={`font-mono font-semibold ${filteredNetTotal >= 0 ? "text-blue-700" : "text-red-600"}`}>
+        <span className={`tabular-nums font-semibold ${filteredNetTotal >= 0 ? "text-blue-700" : "text-red-600"}`}>
           {filteredNetTotal >= 0 ? "+" : "-"}
           {formatWon(Math.abs(filteredNetTotal))}
         </span>

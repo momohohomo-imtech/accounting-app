@@ -53,7 +53,7 @@ export function RestoreBackupButton({ fileName }: { fileName: string }) {
               <div className="space-y-3">
                 <h3 className="font-semibold text-red-600">이 백업으로 복구하시겠습니까?</h3>
                 <p className="text-sm text-slate-600">
-                  <span className="font-mono text-xs">{fileName}</span> 시점으로 되돌리면, 지금 있는 모든 데이터가
+                  <span className="tabular-nums text-xs">{fileName}</span> 시점으로 되돌리면, 지금 있는 모든 데이터가
                   이 백업의 데이터로 <b>완전히 대체</b>됩니다. 이후에 입력된 내용은 전부 사라지며 되돌릴 수 없습니다.
                 </p>
                 <p className="text-xs text-slate-500">

@@ -25,7 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="flex items-center gap-2.5 border-b border-slate-800 px-5 py-5">
           <Image src="/logo-icon.png" alt="" width={30} height={30} className="rounded-md" />
           <div>
-            <p className="font-mono text-[11px] tracking-widest text-slate-500">FIELD OPS · v0.1</p>
+            <p className="tabular-nums text-[11px] tracking-widest text-slate-500">FIELD OPS · v0.1</p>
             <p className="mt-0.5 text-base font-bold text-white">IM테크 회계 관리</p>
           </div>
         </div>

@@ -250,7 +250,7 @@ export function ToolChecklistDetailReport({
                       >
                         <span className="truncate print:text-slate-900">☐ {it.tool_name}</span>
                         <span
-                          className={`shrink-0 font-mono font-semibold print:text-slate-900 ${filled ? "text-slate-900" : "text-slate-400"}`}
+                          className={`shrink-0 tabular-nums font-semibold print:text-slate-900 ${filled ? "text-slate-900" : "text-slate-400"}`}
                         >
                           {filled ? it.quantity : "-"}
                         </span>

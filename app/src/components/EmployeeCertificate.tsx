@@ -74,7 +74,7 @@ export function EmployeeCertificate({ employee, closeHref }: { employee: Employe
       <div className="mx-auto flex min-h-[700px] max-w-xl flex-col py-4 print:min-h-[250mm]">
         <div className="flex items-center gap-2.5">
           <Image src="/logo-lockup.png" alt="" width={30} height={24} className="h-6 w-auto" />
-          <span className="ml-auto font-mono text-[11px] tracking-widest text-slate-400">
+          <span className="ml-auto tabular-nums text-[11px] tracking-widest text-slate-400">
             EMPLOYMENT CERTIFICATE
           </span>
         </div>

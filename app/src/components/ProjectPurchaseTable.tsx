@@ -98,7 +98,7 @@ export function ProjectPurchaseTable({ rows }: { rows: PurchaseRow[] }) {
               >
                 {r.category}
               </td>
-              <td className="py-2 text-right font-mono text-slate-900 print:py-0.5">{formatWon(r.amount)}</td>
+              <td className="py-2 text-right tabular-nums text-slate-900 print:py-0.5">{formatWon(r.amount)}</td>
             </tr>
           ))}
           {sorted.length === 0 && (

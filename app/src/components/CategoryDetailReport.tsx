@@ -161,7 +161,7 @@ function AgencyDetailRow({ row, categories, clientNames }: { row: DetailRow; cat
         {row.project_name ?? <span className="font-medium text-red-600">일반경비</span>}
       </td>
       <td className="py-2 pr-4 text-slate-700">{row.item_name ?? "-"}</td>
-      <td className="py-2 pr-4 text-right font-mono text-slate-900">{formatWon(row.amount)}</td>
+      <td className="py-2 pr-4 text-right tabular-nums text-slate-900">{formatWon(row.amount)}</td>
       <td className="py-2 text-right print:hidden">
         <button
           type="button"
@@ -266,7 +266,7 @@ export function CategoryDetailReport({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-slate-900">
-          {categoryName} 총 매입내역 <span className="font-mono text-sm font-normal text-slate-400">{year}년</span>
+          {categoryName} 총 매입내역 <span className="tabular-nums text-sm font-normal text-slate-400">{year}년</span>
         </h2>
         <div className="flex items-center gap-3 print:hidden">
           {statusOptions.length > 0 && (
@@ -324,7 +324,7 @@ export function CategoryDetailReport({
                     {r.project_name ?? <span className="font-medium text-red-600">일반경비</span>}
                   </td>
                   <td className="py-2 pr-4 text-slate-700">{r.item_name ?? "-"}</td>
-                  <td className="py-2 pr-4 text-right font-mono text-slate-900">{formatWon(r.amount)}</td>
+                  <td className="py-2 pr-4 text-right tabular-nums text-slate-900">{formatWon(r.amount)}</td>
                   <td className="py-2 text-right print:hidden">
                     <Link
                       href={editHrefFor(r.id)}
@@ -349,10 +349,10 @@ export function CategoryDetailReport({
 
       <div className="flex flex-wrap items-center justify-end gap-6 border-t border-slate-100 pt-4">
         <span className="text-sm text-slate-600">
-          매입 합계 <span className="ml-2 font-mono text-lg font-bold text-slate-900">{formatWon(purchaseTotal)}</span>
+          매입 합계 <span className="ml-2 tabular-nums text-lg font-bold text-slate-900">{formatWon(purchaseTotal)}</span>
         </span>
         <span className="text-sm text-slate-600">
-          대행구매액 합계 <span className="ml-2 font-mono text-lg font-bold text-slate-900">{formatWon(agencyTotal)}</span>
+          대행구매액 합계 <span className="ml-2 tabular-nums text-lg font-bold text-slate-900">{formatWon(agencyTotal)}</span>
         </span>
       </div>
     </div>

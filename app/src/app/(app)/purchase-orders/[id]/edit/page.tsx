@@ -32,7 +32,7 @@ export default async function EditPurchaseOrderPage({ params }: { params: Promis
     <div className="space-y-6">
       <div className="flex items-center justify-between print:hidden">
         <h1 className="text-2xl font-bold text-slate-900">
-          발주서 수정 <span className="font-mono text-base font-normal text-slate-400">{purchaseOrder.po_number}</span>
+          발주서 수정 <span className="tabular-nums text-base font-normal text-slate-400">{purchaseOrder.po_number}</span>
         </h1>
         <LinkButton href="/projects?tab=purchase_orders" variant="secondary" size="sm">
           ← 프로젝트·현장 발주서로

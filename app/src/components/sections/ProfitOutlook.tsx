@@ -223,17 +223,17 @@ export function ProfitCalculationDetail({ year, o }: { year: number; o: ProfitOu
       <p>
         <span className="font-semibold">{year}년 하반기 매출-매입</span>
         {" — 매출 "}
-        <span className="font-mono font-semibold">{formatWon(o.h2Sales)}</span>
+        <span className="tabular-nums font-semibold">{formatWon(o.h2Sales)}</span>
         {" − 매입 "}
-        <span className="font-mono font-semibold">{formatWon(o.h2Purchase)}</span>
+        <span className="tabular-nums font-semibold">{formatWon(o.h2Purchase)}</span>
         {" = "}
-        <span className={`font-mono font-semibold ${moneyClass(o.h2Profit)}`}>{formatWon(o.h2Profit)}</span>
+        <span className={`tabular-nums font-semibold ${moneyClass(o.h2Profit)}`}>{formatWon(o.h2Profit)}</span>
         {" (7~12월 원장 기준, 부가세 제외, 일반경비 포함)"}
       </p>
       <p>
         <span className="font-semibold">{year}년 세금계산서 미발행 예상 이익금</span>
         {" — "}
-        <span className={`font-mono font-semibold ${moneyClass(o.unbilledPendingProfit)}`}>
+        <span className={`tabular-nums font-semibold ${moneyClass(o.unbilledPendingProfit)}`}>
           {formatWon(o.unbilledPendingProfit)}
         </span>
         {` (완료 수금대기·공사 완료·진행중 ${o.unbilledProjectNames.length}건)`}
@@ -244,7 +244,7 @@ export function ProfitCalculationDetail({ year, o }: { year: number; o: ProfitOu
       <p>
         <span className="font-semibold">{year}년 하반기 직원급여/상여/4대보험</span>
         {" — "}
-        <span className="font-mono font-semibold">{formatWon(o.h2PayrollCost)}</span>
+        <span className="tabular-nums font-semibold">{formatWon(o.h2PayrollCost)}</span>
       </p>
       <p className="text-slate-500">
         하반기 예상 이익금 = 하반기 매출-매입 + 세금계산서 미발행 예상 이익금 − 하반기 인건비

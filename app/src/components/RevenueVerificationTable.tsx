@@ -101,10 +101,10 @@ export function RevenueVerificationTable({ rows }: { rows: RevenueVerificationRo
                   <td className={cx("py-2 pr-4", mismatch ? "font-medium text-red-700" : "text-slate-700")}>{r.name}</td>
                   <td className="py-2 pr-4 text-slate-600">{r.siteName ?? "-"}</td>
                   <td className="py-2 pr-4 text-slate-600">{projectStatusLabel(r.status)}</td>
-                  <td className="py-2 pr-4 text-right font-mono text-slate-700">{formatWon(r.quoteAmount)}</td>
-                  <td className="py-2 pr-4 text-right font-mono text-slate-700">{formatWon(r.contractAmount)}</td>
-                  <td className="py-2 pr-4 text-right font-mono text-slate-700">{formatWon(r.ledgerSales)}</td>
-                  <td className={cx("py-2 text-right font-mono font-semibold", mismatch ? "text-red-600" : "text-slate-400")}>
+                  <td className="py-2 pr-4 text-right tabular-nums text-slate-700">{formatWon(r.quoteAmount)}</td>
+                  <td className="py-2 pr-4 text-right tabular-nums text-slate-700">{formatWon(r.contractAmount)}</td>
+                  <td className="py-2 pr-4 text-right tabular-nums text-slate-700">{formatWon(r.ledgerSales)}</td>
+                  <td className={cx("py-2 text-right tabular-nums font-semibold", mismatch ? "text-red-600" : "text-slate-400")}>
                     {formatWon(diff)}
                   </td>
                 </tr>

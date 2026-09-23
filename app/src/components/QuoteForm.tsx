@@ -330,16 +330,16 @@ export function QuoteForm({
               className={`${inputClass} w-40`}
             />
             {targetAmountNum !== null && (
-              <span className="font-mono text-xs text-slate-500">{formatWon(targetAmountNum)}</span>
+              <span className="tabular-nums text-xs text-slate-500">{formatWon(targetAmountNum)}</span>
             )}
           </div>
           <p className="text-sm text-slate-600">
-            현재 견적액 <span className="font-mono font-semibold text-slate-900">{formatWon(total)}</span>
+            현재 견적액 <span className="tabular-nums font-semibold text-slate-900">{formatWon(total)}</span>
           </p>
           {diff !== null && (
             <p className="text-sm text-slate-600">
               차액{" "}
-              <span className={`font-mono font-semibold ${diff >= 0 ? "text-blue-600" : "text-red-600"}`}>
+              <span className={`tabular-nums font-semibold ${diff >= 0 ? "text-blue-600" : "text-red-600"}`}>
                 {diff >= 0 ? "+" : ""}
                 {formatWon(diff)}
               </span>
@@ -408,7 +408,7 @@ export function QuoteForm({
             </div>
             <p className="text-xs text-slate-500">
               확정금액 미리보기{" "}
-              <span className="font-mono font-semibold text-slate-900">
+              <span className="tabular-nums font-semibold text-slate-900">
                 {formatWon(computeConfirmedAmount((Number(groupUnitPrice) || 0) * (Number(groupQuantity) || 1), Number(groupFeePct) || 0))}
               </span>
             </p>
@@ -501,7 +501,7 @@ export function QuoteForm({
                   placeholder="금액"
                   className={`${compactInputClass} w-[20ch]`}
                 />
-                <span className="w-[9ch] shrink-0 text-right font-mono text-xs text-slate-600">{formatWon(confirmed)}</span>
+                <span className="w-[9ch] shrink-0 text-right tabular-nums text-xs text-slate-600">{formatWon(confirmed)}</span>
                 <input
                   value={it.note}
                   onChange={(e) => updateItem(i, { note: e.target.value })}
@@ -534,7 +534,7 @@ export function QuoteForm({
         </p>
 
         <p className="mt-3 text-right text-sm font-semibold text-slate-900">
-          합계(확정금액) <span className="ml-1 font-mono text-base">{formatWon(total)}</span>
+          합계(확정금액) <span className="ml-1 tabular-nums text-base">{formatWon(total)}</span>
         </p>
       </div>
 

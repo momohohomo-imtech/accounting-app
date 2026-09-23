@@ -114,7 +114,7 @@ export function ProjectSummaryReport({ rows }: { rows: ProjectSummaryRow[] }) {
             >
               <div className="mb-3 border-b border-slate-100 pb-3 print:pb-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-mono text-xs text-slate-400 print:text-[10px]">{p.projectCode ?? "-"}</p>
+                  <p className="tabular-nums text-xs text-slate-400 print:text-[10px]">{p.projectCode ?? "-"}</p>
                   {p.status === PROJECT_STATUS_AWAITING_PAYMENT && (
                     <Badge variant="red" className="print:border print:border-red-600 print:bg-white">
                       미수금 {formatWon(p.contractAmountExpected)}
@@ -143,44 +143,44 @@ export function ProjectSummaryReport({ rows }: { rows: ProjectSummaryRow[] }) {
               <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4 print:mb-3 print:grid-cols-4 print:gap-2 print:break-inside-avoid">
                 <div>
                   <p className="text-xs text-slate-500 print:text-[9px]">발주액</p>
-                  <p className="font-mono text-sm font-bold whitespace-nowrap text-slate-900 print:text-xs">
+                  <p className="tabular-nums text-sm font-bold whitespace-nowrap text-slate-900 print:text-xs">
                     {formatWon(p.quoteAmount)}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 print:text-[9px]">대행구매액</p>
-                  <p className="font-mono text-sm font-bold whitespace-nowrap text-slate-500 print:text-xs">
+                  <p className="tabular-nums text-sm font-bold whitespace-nowrap text-slate-500 print:text-xs">
                     -{formatWon(p.agencyAmount)}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 print:text-[9px]">매입 공급가액</p>
-                  <p className="font-mono text-sm font-bold whitespace-nowrap text-slate-500 print:text-xs">
+                  <p className="tabular-nums text-sm font-bold whitespace-nowrap text-slate-500 print:text-xs">
                     -{formatWon(p.purchaseSupply)}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 print:text-[9px]">매입 부가세</p>
-                  <p className="font-mono text-sm font-bold whitespace-nowrap text-slate-500 print:text-xs">
+                  <p className="tabular-nums text-sm font-bold whitespace-nowrap text-slate-500 print:text-xs">
                     -{formatWon(p.purchaseVat)}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 print:text-[9px]">매입 합계</p>
-                  <p className="font-mono text-sm font-bold whitespace-nowrap text-slate-500 print:text-xs">
+                  <p className="tabular-nums text-sm font-bold whitespace-nowrap text-slate-500 print:text-xs">
                     -{formatWon(p.purchaseTotal)}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 print:text-[9px]">수주예상액</p>
-                  <p className="font-mono text-sm font-bold whitespace-nowrap text-slate-900 print:text-xs">
+                  <p className="tabular-nums text-sm font-bold whitespace-nowrap text-slate-900 print:text-xs">
                     {formatWon(p.contractAmountExpected)}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 print:text-[9px]">이익금</p>
                   <p
-                    className={`font-mono text-sm font-bold whitespace-nowrap print:text-xs ${p.profit >= 0 ? "text-slate-900" : "text-red-600"}`}
+                    className={`tabular-nums text-sm font-bold whitespace-nowrap print:text-xs ${p.profit >= 0 ? "text-slate-900" : "text-red-600"}`}
                   >
                     {formatWon(p.profit)}
                   </p>
@@ -188,7 +188,7 @@ export function ProjectSummaryReport({ rows }: { rows: ProjectSummaryRow[] }) {
                 <div>
                   <p className="text-xs text-slate-500 print:text-[9px]">이익율</p>
                   <p
-                    className={`font-mono text-sm font-bold whitespace-nowrap print:text-xs ${p.margin === null || p.margin >= 0 ? "text-slate-900" : "text-red-600"}`}
+                    className={`tabular-nums text-sm font-bold whitespace-nowrap print:text-xs ${p.margin === null || p.margin >= 0 ? "text-slate-900" : "text-red-600"}`}
                   >
                     {p.margin === null ? "-" : `${p.margin.toFixed(2)}%`}
                   </p>
@@ -218,7 +218,7 @@ export function ProjectSummaryReport({ rows }: { rows: ProjectSummaryRow[] }) {
                           >
                             {c.name}
                           </td>
-                          <td className="py-1 text-right font-mono text-slate-900 print:py-0.5">{formatWon(c.amount)}</td>
+                          <td className="py-1 text-right tabular-nums text-slate-900 print:py-0.5">{formatWon(c.amount)}</td>
                         </tr>
                       ))}
                       {p.categoryBreakdown.length === 0 && (
