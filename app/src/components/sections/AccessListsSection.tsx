@@ -7,6 +7,7 @@ import { AccessListWorkerPicker } from "@/components/AccessListWorkerPicker";
 import { AccessListSubmitButton } from "@/components/AccessListSubmitButton";
 import { AccessListCard } from "@/components/AccessListCard";
 import { YearMonthFilter } from "@/components/YearMonthFilter";
+import { nowKst } from "@/lib/kstDate";
 
 const FLOOR_YEAR = 2026;
 
@@ -21,9 +22,7 @@ async function createAccessList(formData: FormData) {
 
 export async function AccessListsSection({ year, month }: { year?: string; month?: string }) {
   const supabase = await createClient();
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+  const { year: currentYear, month: currentMonth } = nowKst();
   const selectedYear = year ? Number(year) : currentYear;
   const selectedMonth = month ?? "current";
   const { start, end } = monthRange(selectedYear, selectedMonth, currentMonth);
@@ -34,12 +33,13 @@ export async function AccessListsSection({ year, month }: { year?: string; month
       supabase.from("daily_worker_offices").select("id, name").order("name"),
       supabase.from("daily_workers").select("id, name, office_id, status, grade").eq("status", "active").order("name"),
       supabase.from("employees").select("id, name, employee_no"),
-      supabase.from("access_lists").select("id, created_at").order("created_at", { ascending: false }),
+      supabase.from("access_lists").select("id, created_at").order("created_at", { ascending: false }).limit(1),
       supabase
         .from("access_lists")
         .select("*, sites(name)")
-        .gte("created_at", `${start}T00:00:00`)
-        .lte("created_at", `${end}T23:59:59`)
+        // created_at은 시각(timestamptz)이라 한국 시간 기준 하루 경계로 잘라야 "이번 달"(nowKst)과 맞음.
+        .gte("created_at", `${start}T00:00:00+09:00`)
+        .lte("created_at", `${end}T23:59:59.999+09:00`)
         .order("created_at", { ascending: false }),
     ]);
 

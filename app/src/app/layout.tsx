@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "현장관리 시스템",
+  title: "IM테크 회계 관리 시스템",
   description: "현장/거래/작업일지/인력 통합 관리",
 };
 

@@ -10,7 +10,7 @@ export async function sendEmail({ to, subject, html }: { to: string; subject: st
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: process.env.BACKUP_EMAIL_FROM ?? "현장관리 시스템 <onboarding@resend.dev>",
+      from: process.env.BACKUP_EMAIL_FROM ?? "IM테크 회계 관리 시스템 <onboarding@resend.dev>",
       to,
       subject,
       html,

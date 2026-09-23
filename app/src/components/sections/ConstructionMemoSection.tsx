@@ -8,6 +8,8 @@ import {
   updateConstructionMemo,
   deleteConstructionMemo,
 } from "@/lib/actions/constructionMemos";
+import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { nowKst } from "@/lib/kstDate";
 
 type MemoRow = {
   id: string;
@@ -30,15 +32,30 @@ export async function ConstructionMemoSection({
   month?: string;
 }) {
   const supabase = await createClient();
-  const [{ data: projectsRaw }, { data: sitesRaw }, { data: memosRaw }] = await Promise.all([
+  type MemoRawRow = {
+    id: string;
+    content: string;
+    created_at: string;
+    updated_at: string;
+    project_id: string;
+    projects:
+      | { name: string; site_id: string; sites: { name: string } | { name: string }[] | null }
+      | { name: string; site_id: string; sites: { name: string } | { name: string }[] | null }[]
+      | null;
+  };
+  const [{ data: projectsRaw }, { data: sitesRaw }, memosRaw] = await Promise.all([
     // status/year/project_code는 ProjectPicker가 "완료 프로젝트 보기" 토글에 씀 —
     // 메모 추가 팝업에서 완료 프로젝트도 고를 수 있어야 해서 필요함.
     supabase.from("projects").select("id, name, site_id, status, year, project_code").order("name"),
     supabase.from("sites").select("id, name, clients(name)").order("name"),
-    supabase
-      .from("construction_memos")
-      .select("id, content, created_at, updated_at, project_id, projects(name, site_id, sites(name))")
-      .order("created_at", { ascending: false }),
+    fetchAllRows<MemoRawRow>((from, to) =>
+      supabase
+        .from("construction_memos")
+        .select("id, content, created_at, updated_at, project_id, projects(name, site_id, sites(name))")
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
   ]);
 
   const siteOptions: SiteOption[] = (sitesRaw ?? []).map((s) => ({
@@ -47,7 +64,7 @@ export async function ConstructionMemoSection({
     client_name: (one(s.clients) as { name: string } | undefined)?.name ?? null,
   }));
 
-  const allMemos: MemoRow[] = (memosRaw ?? []).map((m) => {
+  const allMemos: MemoRow[] = memosRaw.map((m) => {
     const project = one(m.projects) as { name: string; site_id: string; sites?: unknown } | undefined;
     const site = one(project?.sites) as { name: string } | undefined;
     return {
@@ -64,19 +81,21 @@ export async function ConstructionMemoSection({
 
   // 파라미터가 아예 없으면(처음 진입) 올해를 기본으로 보여주고, "전체"는
   // 사용자가 명시적으로 골랐을 때만(URL에 year=all로 남음) 전체 연도를 보여줌.
-  const currentYear = new Date().getFullYear();
+  const currentYear = nowKst().year;
   const selectedYear = year ?? String(currentYear);
   const selectedSiteId = siteId ?? "all";
   const selectedMonth = month ?? "all";
 
-  const years = Array.from(new Set(allMemos.map((m) => new Date(m.created_at).getFullYear())));
+  // 작성 시각을 서버 시간대가 아니라 한국 시간(UTC+9) 기준 연/월로 — 월초 새벽에 쓴 메모가 전달로 분류되지 않게.
+  const kst = (iso: string) => new Date(new Date(iso).getTime() + 9 * 3600_000);
+  const years = Array.from(new Set(allMemos.map((m) => kst(m.created_at).getUTCFullYear())));
   if (!years.includes(currentYear)) years.push(currentYear);
   years.sort((a, b) => b - a);
 
   let memos = allMemos;
-  if (selectedYear !== "all") memos = memos.filter((m) => new Date(m.created_at).getFullYear() === Number(selectedYear));
+  if (selectedYear !== "all") memos = memos.filter((m) => kst(m.created_at).getUTCFullYear() === Number(selectedYear));
   if (selectedSiteId !== "all") memos = memos.filter((m) => m.site_id === selectedSiteId);
-  if (selectedMonth !== "all") memos = memos.filter((m) => new Date(m.created_at).getMonth() + 1 === Number(selectedMonth));
+  if (selectedMonth !== "all") memos = memos.filter((m) => kst(m.created_at).getUTCMonth() + 1 === Number(selectedMonth));
 
   return (
     <div className="space-y-6">

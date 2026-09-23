@@ -122,17 +122,11 @@ export function BankTransactionTable({
 
   async function handleTogglePromote(id: string, checked: boolean) {
     if (!checked) {
-      // 체크 해제 = 매입/매출장에 자동 등록됐던 내용이 통째로 삭제됨 — 되돌릴 수 없어서 3단계로 확인받는다.
+      // 체크 해제 = 매입/매출장에 자동 등록됐던 내용이 삭제됨(아직 손대지 않은 경우만 — 이미
+      // 분류/수정한 건은 서버가 거부하고 안내). 되돌릴 수 없어서 두 번 확인받는다.
       if (
         !(await confirm(
-          "이 체크를 해제하면 매입/매출장에 자동으로 올라갔던 내역이 삭제됩니다. 계속할까요?",
-          { danger: true, confirmLabel: "계속" }
-        ))
-      )
-        return;
-      if (
-        !(await confirm(
-          "그 사이 매입/매출장에서 카테고리를 지정했거나 내용을 수정했더라도 전부 함께 삭제됩니다. 계속할까요?",
+          "이 체크를 해제하면 매입/매출장에 자동으로 올라갔던 내역이 삭제됩니다. (매입/매출장에서 이미 분류하거나 수정한 내역이면 삭제되지 않고 안내가 표시됩니다.) 계속할까요?",
           { danger: true, confirmLabel: "계속" }
         ))
       )
@@ -185,12 +179,32 @@ export function BankTransactionTable({
                       </option>
                     ))}
                   </select>
-                  <input type="date" name="trans_date" required defaultValue={t.trans_date} className={inputClass} />
-                  <select name="direction" defaultValue={t.direction} className={inputClass}>
-                    <option value="입금">입금</option>
-                    <option value="출금">출금</option>
-                  </select>
-                  <input type="number" name="amount" required defaultValue={t.amount} className={inputClass} />
+                  {t.promoted_transaction_id ? (
+                    <>
+                      <input type="hidden" name="trans_date" value={t.trans_date} />
+                      <input type="hidden" name="direction" value={t.direction} />
+                      <input type="hidden" name="amount" value={t.amount} />
+                      <input type="date" value={t.trans_date} disabled className={`${inputClass} bg-slate-100`} />
+                      <input value={t.direction} disabled className={`${inputClass} bg-slate-100`} />
+                      <input value={formatWon(t.amount)} disabled className={`${inputClass} bg-slate-100`} />
+                    </>
+                  ) : (
+                    <>
+                      <input type="date" name="trans_date" required defaultValue={t.trans_date} className={inputClass} />
+                      {t.transfer_group_id ? (
+                        <>
+                          <input type="hidden" name="direction" value={t.direction} />
+                          <input value={t.direction} disabled className={`${inputClass} bg-slate-100`} />
+                        </>
+                      ) : (
+                        <select name="direction" defaultValue={t.direction} className={inputClass}>
+                          <option value="입금">입금</option>
+                          <option value="출금">출금</option>
+                        </select>
+                      )}
+                      <input type="number" name="amount" required defaultValue={t.amount} className={inputClass} />
+                    </>
+                  )}
                   <input name="description" defaultValue={t.description ?? ""} placeholder="내용" className={inputClass} />
                   <MatchedClientField
                     clients={clients}
@@ -200,6 +214,13 @@ export function BankTransactionTable({
                     selectClassName={inputClass}
                     inputClassName={inputClass}
                   />
+                  {(t.promoted_transaction_id || t.transfer_group_id) && (
+                    <p className="text-xs text-slate-500 lg:col-span-7">
+                      {t.promoted_transaction_id
+                        ? "매입/매출장에 등록된 거래라 날짜·입출금·금액은 바꿀 수 없습니다. 매입/매출장에서 수정하거나 등록을 취소한 뒤 수정해주세요."
+                        : "계좌 간 이체 — 날짜·금액·내용을 바꾸면 반대쪽 계좌의 짝에도 똑같이 반영됩니다."}
+                    </p>
+                  )}
                   <div className="flex gap-2 lg:col-span-7">
                     <button
                       type="submit"

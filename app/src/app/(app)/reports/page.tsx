@@ -16,7 +16,7 @@ import { ReportAIInsights } from "@/components/ReportAIInsights";
 import { saveReportAiInsight, deleteReportAiInsight } from "@/lib/actions/reportAiInsights";
 import { isLedgerVisible, remainingBalance } from "@/lib/credit";
 import { resolveCategoryColor } from "@/lib/categoryColor";
-import type { ReportAiInsight, CreditPayment } from "@/lib/types";
+import type { ReportAiInsight } from "@/lib/types";
 import { VendorAggregateTable } from "@/components/VendorAggregateTable";
 import { PurchaseItemSearchTable } from "@/components/PurchaseItemSearchTable";
 import { VendorAgencyToggle } from "@/components/VendorAgencyToggle";
@@ -36,7 +36,11 @@ import { UnassignedWorkLogMonthFilter } from "@/components/UnassignedWorkLogMont
 import { buildWorkLogSummary } from "@/lib/workLogSummary";
 import { parseMonthRange } from "@/lib/monthRange";
 import { ReportExcelButton } from "@/components/ReportExcelButton";
+import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
+import { purchaseCostOf, salesSupplyOf, supplyOf, vatOf } from "@/lib/vatBasis";
+import { PAYROLL_CATEGORY_NAME } from "@/lib/vatExempt";
 import type { WorkLog } from "@/lib/types";
+import { nowKst } from "@/lib/kstDate";
 
 const MONTH_LABELS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
 
@@ -68,6 +72,24 @@ type Row = {
     | { name: string; text_color: string | null; background_color: string | null }[]
     | null;
 };
+
+type AgencyPurchaseRow = {
+  id: string;
+  project_id: string;
+  item_name: string | null;
+  amount: number;
+  client_name: string | null;
+  memo: string | null;
+  category_id: string | null;
+  expense_categories:
+    | { name: string; project_only: boolean; color: string | null }
+    | { name: string; project_only: boolean; color: string | null }[]
+    | null;
+  projects: { year: number; name: string; status: string | null } | { year: number; name: string; status: string | null }[] | null;
+};
+
+const TX_SELECT =
+  "*, clients(name), projects(name, status, sites(name)), expense_categories(*), payment_methods(name, text_color, background_color)";
 
 function one<T>(v: T | T[] | null): T | null {
   return Array.isArray(v) ? v[0] ?? null : v;
@@ -107,31 +129,33 @@ export default async function ReportsPage({
     printSection,
   } = await searchParams;
   const includeVendorAgency = vendorAgency === "1";
-  const currentYear = new Date().getFullYear();
+  const currentYear = nowKst().year;
   const selectedYear = year ? Number(year) : currentYear;
 
   const supabase = await createClient();
   const [
-    { data: rawTx },
+    rawTx,
     { data: projects },
     { data: firstTx },
     { data: savedInsights },
-    { data: creditPayments },
+    creditPayments,
     { data: agencyPurchases },
     { data: expenseCategories },
     { data: clientRows },
-    { data: projectWorkLogRows },
     { data: bankAccounts },
-    { data: bankTxAll },
-    { data: creditPurchaseTxAll },
+    bankTxAll,
+    creditPurchaseTxAll,
   ] = await Promise.all([
-      supabase
-        .from("transactions")
-        .select(
-          "*, clients(name), projects(name, status, sites(name)), expense_categories(name, project_only, color), payment_methods(name, text_color, background_color)"
-        )
-        .gte("trans_date", `${selectedYear}-01-01`)
-        .lte("trans_date", `${selectedYear}-12-31`),
+      fetchAllRows<Row>((from, to) =>
+        supabase
+          .from("transactions")
+          .select(TX_SELECT)
+          .gte("trans_date", `${selectedYear}-01-01`)
+          .lte("trans_date", `${selectedYear}-12-31`)
+          .order("trans_date", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to)
+      ),
       supabase
         .from("projects")
         .select(
@@ -144,50 +168,88 @@ export default async function ReportsPage({
         .select("*")
         .eq("year", selectedYear)
         .order("created_at", { ascending: false }),
-      supabase.from("credit_payments").select("*"),
-      supabase
-        .from("project_agency_purchases")
-        .select(
-          "id, project_id, item_name, amount, client_name, memo, category_id, expense_categories(name, project_only, color), projects!inner(year, name, status)"
-        )
-        .eq("projects.year", selectedYear),
+      fetchAllCreditPayments(supabase),
+      fetchAllRows<AgencyPurchaseRow>((from, to) =>
+        supabase
+          .from("project_agency_purchases")
+          .select(
+            "id, project_id, item_name, amount, client_name, memo, category_id, expense_categories(name, project_only, color), projects!inner(year, name, status)"
+          )
+          .eq("projects.year", selectedYear)
+          .order("id", { ascending: true })
+          .range(from, to)
+      ).then((data) => ({ data })),
       supabase.from("expense_categories").select("id, name, project_only, color").order("sort_order"),
       supabase.from("clients").select("name").order("name"),
-      // 프로젝트 요약(재무제표)의 작업일수용 — 연도 범위 안, 프로젝트가 지정된 작업일지만.
-      supabase
-        .from("work_logs")
-        .select("log_date, project_id")
-        .not("project_id", "is", null)
-        .gte("log_date", `${selectedYear}-01-01`)
-        .lte("log_date", `${selectedYear}-12-31`),
       // 현재 자금 내역용 — 선택 연도와 무관하게 항상 "현재 시점" 기준이라 연도 필터를 안 건다.
       supabase.from("bank_accounts").select("id, opening_balance"),
-      supabase.from("bank_transactions").select("bank_account_id, direction, amount"),
-      supabase
-        .from("transactions")
-        .select("id, type, sales_amount, sales_vat, purchase_amount, purchase_vat")
-        .eq("type", "매입")
-        .eq("payment_type", "credit"),
+      fetchAllRows<{ bank_account_id: string; direction: string; amount: number }>((from, to) =>
+        supabase
+          .from("bank_transactions")
+          .select("bank_account_id, direction, amount")
+          .order("id", { ascending: true })
+          .range(from, to)
+      ),
+      fetchAllRows<{
+        id: string;
+        type: string;
+        sales_amount: number;
+        sales_vat: number;
+        purchase_amount: number;
+        purchase_vat: number;
+      }>((from, to) =>
+        supabase
+          .from("transactions")
+          .select("id, type, sales_amount, sales_vat, purchase_amount, purchase_vat")
+          .eq("type", "매입")
+          .eq("payment_type", "credit")
+          .order("id", { ascending: true })
+          .range(from, to)
+      ),
     ]);
 
   const clientNames = (clientRows ?? []).map((c) => c.name);
 
-  const transactions = ((rawTx ?? []) as unknown as Row[]).filter((t) =>
-    isLedgerVisible(t, (creditPayments ?? []) as CreditPayment[])
-  );
+  const transactions = rawTx.filter((t) => isLedgerVisible(t, creditPayments));
+
+  // 프로젝트 손익은 거래일 연도와 무관하게 그 프로젝트에 붙은 거래 전부로 계산 — 연도를 넘겨
+  // 들어온 매입/매출(예: 작년 프로젝트의 올해 1월 매입)이 어느 해 보고서에서도 빠지지 않게.
+  // 프로젝트 목록·손익 팝업·대시보드 이익 예상과 같은 기준. 작업일수도 같은 이유로 기간 제한 없음.
+  const projectIdList = (projects ?? []).map((p) => p.id);
+  const [projectTxRaw, projectWorkLogRows] = projectIdList.length
+    ? await Promise.all([
+        fetchAllRows<Row>((from, to) =>
+          supabase
+            .from("transactions")
+            .select(TX_SELECT)
+            .in("project_id", projectIdList)
+            .order("id", { ascending: true })
+            .range(from, to)
+        ),
+        fetchAllRows<{ log_date: string; project_id: string | null }>((from, to) =>
+          supabase
+            .from("work_logs")
+            .select("log_date, project_id")
+            .in("project_id", projectIdList)
+            .order("id", { ascending: true })
+            .range(from, to)
+        ),
+      ])
+    : [[] as Row[], [] as { log_date: string; project_id: string | null }[]];
+  const projectTx = projectTxRaw.filter((t) => isLedgerVisible(t, creditPayments));
 
   // 현재 자금 내역 — 선택 연도와 무관한 "현재" 스냅샷. 은행 총 잔액(마이너스 통장 있으면
   // 음수 가능)에서 아직 안 갚은 외상 매입 총액(VAT 포함, 완납 전까지 남은 잔액만)을 뺀
   // 실질 자금. 외상 매출(우리가 받을 돈)은 지출이 아니라서 안 뺀다.
   const bankBalanceByAccount = new Map<string, number>();
   for (const a of bankAccounts ?? []) bankBalanceByAccount.set(a.id, a.opening_balance ?? 0);
-  for (const t of bankTxAll ?? []) {
+  for (const t of bankTxAll) {
     const delta = t.direction === "입금" ? t.amount : -t.amount;
     bankBalanceByAccount.set(t.bank_account_id, (bankBalanceByAccount.get(t.bank_account_id) ?? 0) + delta);
   }
   const bankTotalBalance = Array.from(bankBalanceByAccount.values()).reduce((s, v) => s + v, 0);
-  const outstandingCreditPurchaseTotal = (creditPurchaseTxAll ?? []).reduce(
-    (s, t) => s + remainingBalance(t, (creditPayments ?? []) as CreditPayment[]),
+  const outstandingCreditPurchaseTotal = creditPurchaseTxAll.reduce(
+    (s, t) => s + remainingBalance(t, creditPayments),
     0
   );
   const currentFunds = bankTotalBalance - outstandingCreditPurchaseTotal;
@@ -201,7 +263,8 @@ export default async function ReportsPage({
   years.sort((a, b) => b - a);
 
   const monthly = MONTH_LABELS.map((label, i) => {
-    const rows = transactions.filter((t) => new Date(t.trans_date).getMonth() === i);
+    // 날짜 문자열에서 월을 직접 읽음 — new Date()로 바꾸면 서버 시간대에 따라 월초 거래가 전달로 넘어갈 수 있음.
+    const rows = transactions.filter((t) => Number(t.trans_date.slice(5, 7)) === i + 1);
     const sales = rows.reduce((s, t) => s + t.sales_amount + t.sales_vat, 0);
     const purchase = rows.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
     return { label, sales, purchase, profit: sales - purchase };
@@ -228,12 +291,11 @@ export default async function ReportsPage({
   }
 
   const byProjectAll = (projects ?? []).map((p) => {
-    const rows = transactions.filter((t) => t.project_id === p.id);
-    // 손익 계산 시 매출은 부가세를 뺀 금액을 사용 (VAT는 실제 이익이 아닌 세무서 납부분).
-    // 매출 총액(부가세 포함분)을 1.1로 나눠서 부가세만큼만 정확히 제외한다.
-    const salesGross = rows.reduce((s, t) => s + t.sales_amount + t.sales_vat, 0);
-    const sales = Math.round(salesGross / 1.1);
-    const purchase = rows.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
+    const rows = projectTx.filter((t) => t.project_id === p.id);
+    // 손익은 부가세 제외 기준 — 발주액·대행구매액이 부가세 제외라 매출·매입도 공급가로 맞춘다
+    // (총액을 부가세 포함으로 보고 ÷1.1, 인건비 등 비과세 카테고리는 총액 그대로 — lib/vatBasis.ts).
+    const sales = rows.reduce((s, t) => s + salesSupplyOf(t), 0);
+    const purchase = rows.reduce((s, t) => s + purchaseCostOf(t), 0);
     const quoteAmount = p.quote_amount ?? 0;
     const agencyAmount = agencyByProject.get(p.id) ?? 0;
     // 프로젝트 손익보고서 팝업과 동일한 방식(발주액-매입-대행구매액)으로 통일.
@@ -279,16 +341,21 @@ export default async function ReportsPage({
       const groupIds = new Set(group.map((g) => g.id));
 
       const catMap = new Map<string, { name: string; amount: number; color?: string }>();
+      let purchaseCost = 0;
       let purchaseSupply = 0;
       let purchaseVat = 0;
-      for (const t of transactions.filter((t) => t.project_id && groupIds.has(t.project_id) && t.type === "매입")) {
+      for (const t of projectTx.filter((t) => t.project_id && groupIds.has(t.project_id) && t.type === "매입")) {
         const cat = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
         const name = cat?.name ?? "미분류";
         const entry = catMap.get(name) ?? { name, amount: 0, color: cat ? resolveCategoryColor(cat) : undefined };
-        entry.amount += t.purchase_amount + t.purchase_vat;
+        // 카테고리 내역·이익은 발주액과 같은 부가세 제외(돌려받는 부가세만 뺀) 기준(매입세액 불공제 카테고리는
+        // 매입 총액 전부가 비용). 공급가액·부가세 표시는 항상 실제 공급가/세액 분리(supplyOf/vatOf) — 불공제라도
+        // 세금계산서상 부가세는 실재하므로 전액을 공급가액으로 잘못 표시하지 않는다.
+        entry.amount += purchaseCostOf(t);
         catMap.set(name, entry);
-        purchaseSupply += t.purchase_amount;
-        purchaseVat += t.purchase_vat;
+        purchaseCost += purchaseCostOf(t);
+        purchaseSupply += supplyOf(t);
+        purchaseVat += vatOf(t);
       }
       let agencyAmount = 0;
       for (const a of (agencyPurchases ?? []).filter((a) => groupIds.has(a.project_id))) {
@@ -301,10 +368,10 @@ export default async function ReportsPage({
       }
       const quoteAmount = group.reduce((s, g) => s + g.quoteAmount, 0);
       const purchaseTotal = purchaseSupply + purchaseVat;
-      const profit = quoteAmount - purchaseTotal - agencyAmount;
+      const profit = quoteAmount - purchaseCost - agencyAmount;
       const margin = quoteAmount > 0 ? (profit / quoteAmount) * 100 : null;
       const workDayCount = new Set(
-        (projectWorkLogRows ?? []).filter((r) => r.project_id && groupIds.has(r.project_id)).map((r) => r.log_date)
+        projectWorkLogRows.filter((r) => r.project_id && groupIds.has(r.project_id)).map((r) => r.log_date)
       ).size;
       return {
         id: p.id,
@@ -375,18 +442,17 @@ export default async function ReportsPage({
   };
 
   // 상단 박스의 "예상 순이익율" — 대시보드의 "총 예상 매출"/"이익 예상"과 동일한 기준(연도
-  // 전체, site 필터와 무관)으로 계산. PendingPaymentProfitSection.tsx의 이익 예상 계산과
+  // 전체, site 필터와 무관)으로 계산. 대시보드 이익 예상(components/sections/ProfitOutlook.tsx)과
   // 같은 방식(발주액 기준 프로젝트 손익 − 프로젝트 미배정 일반경비 − 직원급여/상여/4대보험)을 그대로 따름.
-  const PAYROLL_CATEGORY_NAME = "직원급여/상여/4대보험"; // PendingPaymentProfitSection.tsx와 동일한 이름 유지 필요
   const totalExpectedRevenue = byProjectAll.reduce((s, p) => s + (p.contract_amount ?? 0), 0);
   const yearProfitSum = byProjectAll.filter((p) => p.quote_amount != null).reduce((s, p) => s + p.profit, 0);
   const nullProjectPurchaseTx = transactions.filter((t) => !t.project_id && t.type === "매입");
   const generalExpense = nullProjectPurchaseTx
     .filter((t) => one(t.expense_categories)?.name !== PAYROLL_CATEGORY_NAME)
-    .reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
+    .reduce((s, t) => s + purchaseCostOf(t), 0);
   const payrollCost = nullProjectPurchaseTx
     .filter((t) => one(t.expense_categories)?.name === PAYROLL_CATEGORY_NAME)
-    .reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
+    .reduce((s, t) => s + purchaseCostOf(t), 0);
   const yearProfitEstimate = yearProfitSum - generalExpense - payrollCost;
   const yearProfitEstimateRate = totalExpectedRevenue > 0 ? (yearProfitEstimate / totalExpectedRevenue) * 100 : null;
 
@@ -542,28 +608,40 @@ export default async function ReportsPage({
     ? `${selectedYear}-${pad(unassignedMonthNum)}-${pad(uEndDay)}`
     : `${selectedYear}-12-31`;
 
-  const [{ data: wlRows }, { data: wlSites }, { data: unassignedLogRows }, { data: wlChecks }] = await Promise.all([
-    supabase.from("work_logs").select("*").gte("log_date", wlStart).lte("log_date", wlEnd),
+  const [wlRows, { data: wlSites }, unassignedLogRows, { data: wlChecks }] = await Promise.all([
+    fetchAllRows<WorkLog>((from, to) =>
+      supabase
+        .from("work_logs")
+        .select("*")
+        .gte("log_date", wlStart)
+        .lte("log_date", wlEnd)
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
     supabase.from("sites").select("id, name, color"),
-    supabase
-      .from("work_logs")
-      .select("id, log_date, site_id, title")
-      .not("site_id", "is", null)
-      .is("project_id", null)
-      .gte("log_date", uStart)
-      .lte("log_date", uEnd)
-      .order("log_date", { ascending: true }),
+    fetchAllRows<{ id: string; log_date: string; site_id: string | null; title: string | null }>((from, to) =>
+      supabase
+        .from("work_logs")
+        .select("id, log_date, site_id, title")
+        .not("site_id", "is", null)
+        .is("project_id", null)
+        .gte("log_date", uStart)
+        .lte("log_date", uEnd)
+        .order("log_date", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
     supabase.from("work_log_summary_checks").select("group_key").eq("year", selectedYear),
   ]);
 
-  const wlRowsFiltered = wlSite ? (wlRows ?? []).filter((r) => r.site_id === wlSite) : wlRows ?? [];
-  const workLogSummaryRaw = buildWorkLogSummary(wlRowsFiltered as WorkLog[], wlSites ?? []);
+  const wlRowsFiltered = wlSite ? wlRows.filter((r) => r.site_id === wlSite) : wlRows;
+  const workLogSummaryRaw = buildWorkLogSummary(wlRowsFiltered, wlSites ?? []);
   // 특정 현장으로 좁혀보면 현장에 안 묶이는 휴무/사내/기타 특수 항목은 그 현장 이야기가 아니라서 뺌.
   const workLogSummary = wlSite ? workLogSummaryRaw.filter((r) => !r.isSpecial) : workLogSummaryRaw;
   const workLogTotalDays = new Set(wlRowsFiltered.map((r) => r.log_date)).size;
 
   const siteNameById = new Map((wlSites ?? []).map((s) => [s.id, s.name]));
-  const unassignedRows = (unassignedLogRows ?? []).map((r) => ({
+  const unassignedRows = unassignedLogRows.map((r) => ({
     id: r.id,
     date: r.log_date,
     siteName: siteNameById.get(r.site_id ?? "") ?? "-",
@@ -979,12 +1057,12 @@ export default async function ReportsPage({
             "projects",
             {
               filename: `프로젝트별_손익_${selectedYear}.xlsx`,
-              headers: ["프로젝트", "진행률", "발주액", "매출", "매입", "이익금", "이익율"],
+              headers: ["프로젝트", "진행률", "발주액", "매출(VAT제외)", "매입(VAT제외)", "이익금", "이익율"],
               rows: projectExportRows,
             },
             <>
               <span className="text-xs text-slate-500">
-                {selectedYear}년 총 {projectSummary.count}건 · 매출 {formatWon(projectSummary.sales)} · 매입{" "}
+                {selectedYear}년 총 {projectSummary.count}건 · 매출(VAT제외) {formatWon(projectSummary.sales)} · 매입(VAT제외){" "}
                 {formatWon(projectSummary.purchase)} · 이익금 {formatWon(projectSummary.profit)} · 이익율{" "}
                 {projectSummary.profitRate === null ? "-" : `${projectSummary.profitRate.toFixed(2)}%`}
               </span>
@@ -1007,7 +1085,7 @@ export default async function ReportsPage({
           )}
         >
           <p className="mb-3 hidden text-xs text-slate-500 print:block">
-            {selectedYear}년 총 {projectSummary.count}건 · 매출 {formatWon(projectSummary.sales)} · 매입{" "}
+            {selectedYear}년 총 {projectSummary.count}건 · 매출(VAT제외) {formatWon(projectSummary.sales)} · 매입(VAT제외){" "}
             {formatWon(projectSummary.purchase)} · 이익금 {formatWon(projectSummary.profit)} · 이익율{" "}
             {projectSummary.profitRate === null ? "-" : `${projectSummary.profitRate.toFixed(2)}%`}
           </p>

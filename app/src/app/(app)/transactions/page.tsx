@@ -20,6 +20,8 @@ import { formatWon } from "@/lib/format";
 import { monthRange } from "@/lib/dateRange";
 import { isLedgerVisible } from "@/lib/credit";
 import type { CreditPayment, Transaction } from "@/lib/types";
+import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { nowKst } from "@/lib/kstDate";
 
 const TABS = [
   { key: "list", label: "매입매출" },
@@ -125,29 +127,44 @@ async function fetchTransactionTotals({
   payment_method_id?: string;
 }) {
   const supabase = await createClient();
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+  const { year: currentYear, month: currentMonth } = nowKst();
   const selectedYear = year ? Number(year) : currentYear;
   const selectedMonth = month ?? "current";
   const { start, end } = monthRange(selectedYear, selectedMonth, currentMonth);
 
-  let query = supabase
-    .from("transactions")
-    .select("id, type, payment_type, purchase_amount, purchase_vat, sales_amount, sales_vat")
-    .gte("trans_date", start)
-    .lte("trans_date", end);
-  if (type) query = query.eq("type", type);
-  if (project_id) query = query.eq("project_id", project_id);
-  if (payment_method_id) query = query.eq("payment_method_id", payment_method_id);
-
-  const { data } = await query;
-  const rows = data ?? [];
+  const rows = await fetchAllRows<{
+    id: string;
+    type: string;
+    payment_type: string;
+    purchase_amount: number;
+    purchase_vat: number;
+    sales_amount: number;
+    sales_vat: number;
+  }>((from, to) => {
+    let q = supabase
+      .from("transactions")
+      .select("id, type, payment_type, purchase_amount, purchase_vat, sales_amount, sales_vat")
+      .gte("trans_date", start)
+      .lte("trans_date", end)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (type) q = q.eq("type", type);
+    if (project_id) q = q.eq("project_id", project_id);
+    if (payment_method_id) q = q.eq("payment_method_id", payment_method_id);
+    return q;
+  });
   const creditIds = rows.filter((t) => t.payment_type === "credit").map((t) => t.id);
-  const { data: payments } = creditIds.length
-    ? await supabase.from("credit_payments").select("*").in("transaction_id", creditIds)
-    : { data: [] as CreditPayment[] };
-  const visible = rows.filter((t) => isLedgerVisible(t, (payments ?? []) as CreditPayment[]));
+  const payments = creditIds.length
+    ? await fetchAllRows<CreditPayment>((from, to) =>
+        supabase
+          .from("credit_payments")
+          .select("*")
+          .in("transaction_id", creditIds)
+          .order("id", { ascending: true })
+          .range(from, to)
+      )
+    : [];
+  const visible = rows.filter((t) => isLedgerVisible(t, payments));
 
   return {
     purchase: visible.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0),
@@ -180,27 +197,14 @@ async function TransactionListSection({
     showItem: showItem !== "0",
   };
   const supabase = await createClient();
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+  const { year: currentYear, month: currentMonth } = nowKst();
   const selectedYear = year ? Number(year) : currentYear;
   const selectedMonth = month ?? "current";
 
   const { start, end } = monthRange(selectedYear, selectedMonth, currentMonth);
 
-  let query = supabase
-    .from("transactions")
-    .select("*, clients(name), projects(name), payment_methods(*), expense_categories(*)")
-    .gte("trans_date", start)
-    .lte("trans_date", end)
-    .order("trans_date", { ascending: false });
-
-  if (type) query = query.eq("type", type);
-  if (project_id) query = query.eq("project_id", project_id);
-  if (payment_method_id) query = query.eq("payment_method_id", payment_method_id);
-
   const [
-    { data: rawTransactions },
+    rawTransactions,
     { data: projectTree },
     { data: latestTx },
     { data: importClients },
@@ -208,7 +212,20 @@ async function TransactionListSection({
     { data: importPaymentMethods },
     { data: importExpenseCategories },
   ] = await Promise.all([
-    query,
+    fetchAllRows<Transaction>((from, to) => {
+      let q = supabase
+        .from("transactions")
+        .select("*, clients(name), projects(name), payment_methods(*), expense_categories(*)")
+        .gte("trans_date", start)
+        .lte("trans_date", end)
+        .order("trans_date", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (type) q = q.eq("type", type);
+      if (project_id) q = q.eq("project_id", project_id);
+      if (payment_method_id) q = q.eq("payment_method_id", payment_method_id);
+      return q;
+    }),
     supabase.from("projects").select("id, name, year, site_id, sites(name, clients(name))").order("name"),
     supabase.from("transactions").select("trans_date").order("trans_date", { ascending: false }).limit(1),
     supabase.from("clients").select("id, name").order("name"),
@@ -217,13 +234,18 @@ async function TransactionListSection({
     supabase.from("expense_categories").select("id, name").order("sort_order"),
   ]);
 
-  const creditIds = (rawTransactions ?? []).filter((t) => t.payment_type === "credit").map((t) => t.id);
-  const { data: relevantPayments } = creditIds.length
-    ? await supabase.from("credit_payments").select("*").in("transaction_id", creditIds)
-    : { data: [] as CreditPayment[] };
-  const transactions = (rawTransactions ?? []).filter((t) =>
-    isLedgerVisible(t, (relevantPayments ?? []) as CreditPayment[])
-  );
+  const creditIds = rawTransactions.filter((t) => t.payment_type === "credit").map((t) => t.id);
+  const relevantPayments = creditIds.length
+    ? await fetchAllRows<CreditPayment>((from, to) =>
+        supabase
+          .from("credit_payments")
+          .select("*")
+          .in("transaction_id", creditIds)
+          .order("id", { ascending: true })
+          .range(from, to)
+      )
+    : [];
+  const transactions = rawTransactions.filter((t) => isLedgerVisible(t, relevantPayments));
 
   const filteredNetTotal = transactions.reduce(
     (s, t) => s + (t.type === "매출" ? t.sales_amount + t.sales_vat : -(t.purchase_amount + t.purchase_vat)),

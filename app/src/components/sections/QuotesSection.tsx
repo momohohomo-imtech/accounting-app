@@ -3,24 +3,53 @@ import { one } from "@/lib/relations";
 import { computeConfirmedAmount, isVisibleQuoteItem } from "@/lib/quoteCalc";
 import { QuotesTable } from "@/components/QuotesTable";
 import { LinkButton } from "@/components/ui/Button";
+import { fetchAllRows } from "@/lib/supabaseFetchAll";
 
 export async function QuotesSection() {
   const supabase = await createClient();
-  const [{ data: quotes }, { data: items }] = await Promise.all([
-    supabase
-      .from("quotes")
-      .select("id, quote_number, title, status, created_at, client_id, client_name_raw, clients(name), projects(name, project_code)")
-      .order("created_at", { ascending: false }),
-    supabase.from("quote_items").select("quote_id, amount, handling_fee_pct, group_label, is_group_summary"),
+  type QuoteRow = {
+    id: string;
+    quote_number: string;
+    title: string;
+    status: string;
+    created_at: string;
+    client_id: string | null;
+    client_name_raw: string | null;
+    clients: { name: string } | { name: string }[] | null;
+    projects: { name: string; project_code: string | null } | { name: string; project_code: string | null }[] | null;
+  };
+  type QuoteItemRow = {
+    quote_id: string;
+    amount: number;
+    handling_fee_pct: number | null;
+    group_label: string | null;
+    is_group_summary: boolean;
+  };
+  const [quotes, items] = await Promise.all([
+    fetchAllRows<QuoteRow>((from, to) =>
+      supabase
+        .from("quotes")
+        .select("id, quote_number, title, status, created_at, client_id, client_name_raw, clients(name), projects(name, project_code)")
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
+    fetchAllRows<QuoteItemRow>((from, to) =>
+      supabase
+        .from("quote_items")
+        .select("quote_id, amount, handling_fee_pct, group_label, is_group_summary")
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
   ]);
 
   const totalByQuote = new Map<string, number>();
-  for (const it of (items ?? []).filter(isVisibleQuoteItem)) {
+  for (const it of items.filter(isVisibleQuoteItem)) {
     const confirmed = computeConfirmedAmount(it.amount, it.handling_fee_pct ?? 0);
     totalByQuote.set(it.quote_id, (totalByQuote.get(it.quote_id) ?? 0) + confirmed);
   }
 
-  const rows = (quotes ?? []).map((q) => {
+  const rows = quotes.map((q) => {
     const client = one(q.clients) as { name: string } | null;
     const project = one(q.projects) as { name: string; project_code: string | null } | null;
     return {

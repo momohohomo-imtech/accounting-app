@@ -13,6 +13,7 @@ import { AccessListsSection } from "@/components/sections/AccessListsSection";
 import { DailyWorkerUsageSection } from "@/components/sections/DailyWorkerUsageSection";
 import { DailyWorkerTaxSection } from "@/components/sections/DailyWorkerTaxSection";
 import { Pill } from "@/components/ui/Pill";
+import { fetchAllRows } from "@/lib/supabaseFetchAll";
 
 const TABS = [
   { key: "list", label: "일용직 근로자" },
@@ -54,15 +55,19 @@ export default async function DailyWorkersPage({
 
 async function WorkerListSection({ officeId }: { officeId?: string }) {
   const supabase = await createClient();
-  const [{ data: offices }, { data: workers }] = await Promise.all([
+  const [{ data: offices }, workers] = await Promise.all([
     supabase.from("daily_worker_offices").select("id, name").order("name"),
-    supabase
-      .from("daily_workers")
-      .select("*, daily_worker_offices(name)")
-      .order("registered_at", { ascending: false }),
+    fetchAllRows<Record<string, unknown> & { id: string; office_id: string | null }>((from, to) =>
+      supabase
+        .from("daily_workers")
+        .select("*, daily_worker_offices(name)")
+        .order("registered_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
   ]);
 
-  const filteredWorkers = officeId ? (workers ?? []).filter((w) => w.office_id === officeId) : workers ?? [];
+  const filteredWorkers = officeId ? workers.filter((w) => w.office_id === officeId) : workers;
 
   const fields: FieldConfig[] = [
     {

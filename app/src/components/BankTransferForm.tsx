@@ -4,13 +4,14 @@ import { useState, type FormEvent } from "react";
 import { createBankTransferRecord } from "@/lib/actions/bank";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { todayString } from "@/lib/format";
 
 const inputClass = "rounded-lg border border-slate-300 px-3 py-2 text-sm";
 
 export function BankTransferForm({ accounts }: { accounts: { id: string; name: string }[] }) {
   const confirm = useConfirm();
   const pending = useGlobalPending();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayString();
   const [fromId, setFromId] = useState(accounts[0]?.id ?? "");
   const [toId, setToId] = useState(accounts[1]?.id ?? accounts[0]?.id ?? "");
   const [transDate, setTransDate] = useState(today);

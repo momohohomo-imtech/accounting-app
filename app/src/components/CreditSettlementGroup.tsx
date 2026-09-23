@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { settleCreditTransactions, deleteTransactionRecord } from "@/lib/actions/transactions";
-import { formatWon, formatDate } from "@/lib/format";
+import { todayString, formatWon, formatDate } from "@/lib/format";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button, LinkButton } from "@/components/ui/Button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { paymentMethodColorStyle } from "@/lib/paymentMethodColors";
+import { supplyOf } from "@/lib/vatBasis";
 import type { PaymentMethod, Transaction } from "@/lib/types";
 
 export type OutstandingItem = { tx: Transaction; remaining: number };
@@ -25,6 +26,22 @@ export function CreditSettlementGroup({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [settleError, setSettleError] = useState<string | null>(null);
+
+  async function handleSettle(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    setSettleError(null);
+    const result = await pending.run(() => settleCreditTransactions(fd));
+    if (result?.error) {
+      setSettleError(result.error);
+      // settled: 정산(credit_payments) 자체는 끝났고 결제수단·메모 기록만 일부 실패한 경우 —
+      // 선택을 비우지 않으면 다음 제출 때 이미 정산된 거래id가 다시 섞여 들어간다.
+      if (result.settled) setSelected(new Set());
+      return;
+    }
+    setSelected(new Set());
+  }
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -36,10 +53,7 @@ export function CreditSettlementGroup({
   }
 
   const groupTotal = items.reduce((s, i) => s + i.remaining, 0);
-  const groupVatExcludedTotal = items.reduce(
-    (s, i) => s + (i.tx.type === "매출" ? i.tx.sales_amount : i.tx.purchase_amount),
-    0
-  );
+  const groupVatExcludedTotal = items.reduce((s, i) => s + supplyOf(i.tx), 0);
   const selectedTotal = items.filter((i) => selected.has(i.tx.id)).reduce((s, i) => s + i.remaining, 0);
 
   return (
@@ -74,7 +88,7 @@ export function CreditSettlementGroup({
             </span>
             <span className="flex-1 truncate text-slate-700">{tx.item_name ?? "-"}</span>
             <span className="shrink-0 text-blue-600">
-              {formatWon(tx.type === "매출" ? tx.sales_amount : tx.purchase_amount)}
+              {formatWon(supplyOf(tx))}
             </span>
             <span className="shrink-0 font-medium text-slate-900">{formatWon(remaining)}</span>
             <LinkButton href={`/transactions?tab=credit&editTx=${tx.id}`} variant="secondary" size="xs">
@@ -124,10 +138,7 @@ export function CreditSettlementGroup({
       </ul>
 
       {selected.size > 0 && (
-        <form
-          action={settleCreditTransactions}
-          className="mt-4 flex flex-wrap items-end gap-2 border-t border-slate-100 pt-4"
-        >
+        <form onSubmit={handleSettle} className="mt-4 flex flex-wrap items-end gap-2 border-t border-slate-100 pt-4">
           {Array.from(selected).map((id) => (
             <input key={id} type="hidden" name="transaction_ids" value={id} />
           ))}
@@ -138,7 +149,7 @@ export function CreditSettlementGroup({
               type="date"
               name="paid_date"
               required
-              defaultValue={new Date().toISOString().slice(0, 10)}
+              defaultValue={todayString()}
               className={fieldClass}
             />
           </div>
@@ -157,6 +168,7 @@ export function CreditSettlementGroup({
           </Button>
         </form>
       )}
+      {settleError && <p className="mt-2 text-sm text-red-600">{settleError}</p>}
     </Card>
   );
 }

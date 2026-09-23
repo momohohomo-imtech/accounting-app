@@ -6,7 +6,7 @@ import type { ExpenseCategory, PaymentMethod, Transaction } from "@/lib/types";
 import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components/ProjectPicker";
 import { bulkImportTransactions, type BulkTransactionInput } from "@/lib/actions/transactions";
 import { formatWon, todayString } from "@/lib/format";
-import { VAT_EXEMPT_CATEGORIES } from "@/lib/vatExempt";
+import { isVatExemptCategory } from "@/lib/vatBasis";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import { paymentMethodColorStyle } from "@/lib/paymentMethodColors";
 import { useEscapeKey } from "@/lib/useEscapeKey";
@@ -105,8 +105,7 @@ export function TransactionForm({
   const [projectPopupIndex, setProjectPopupIndex] = useState<number | null>(null);
   useEscapeKey(projectPopupIndex !== null, () => setProjectPopupIndex(null));
   const inputClass = "rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none";
-  const selectedCategoryName = expenseCategories.find((c) => c.id === values.category_id)?.name;
-  const vatExempt = selectedCategoryName ? VAT_EXEMPT_CATEGORIES.includes(selectedCategoryName) : false;
+  const vatExempt = isVatExemptCategory(expenseCategories.find((c) => c.id === values.category_id));
   const vatAppliesNow = !vatExempt && values.vat_included;
   // 실제 저장 시 각 줄마다 VAT를 반올림해서 더하는 computeAmounts와 동일한 방식으로 미리보기 합계를 계산.
   const grandTotal = lineItems.reduce((s, li) => {
@@ -120,8 +119,7 @@ export function TransactionForm({
   }
 
   function handleCategorySelect(categoryId: string) {
-    const name = expenseCategories.find((c) => c.id === categoryId)?.name;
-    const exempt = name ? VAT_EXEMPT_CATEGORIES.includes(name) : false;
+    const exempt = isVatExemptCategory(expenseCategories.find((c) => c.id === categoryId));
     setValues((prev) => ({
       ...prev,
       category_id: categoryId,
@@ -220,7 +218,7 @@ export function TransactionForm({
       });
       const ex = valid[0];
       const matchedCategory = expenseCategories.find((c) => c.name === ex.category);
-      const ocrExempt = matchedCategory ? VAT_EXEMPT_CATEGORIES.includes(matchedCategory.name) : false;
+      const ocrExempt = isVatExemptCategory(matchedCategory);
       setValues((prev) => ({
         ...prev,
         trans_date: (ex.trans_date as string) ?? prev.trans_date,
@@ -290,7 +288,7 @@ export function TransactionForm({
       const matchedPaymentMethod = first.payment_method_name
         ? paymentMethods.find((pm) => pm.name === first.payment_method_name)
         : undefined;
-      const catExempt = matchedCategory ? VAT_EXEMPT_CATEGORIES.includes(matchedCategory.name) : false;
+      const catExempt = isVatExemptCategory(matchedCategory);
       setValues((prev) => ({
         ...prev,
         trans_date: first.trans_date ?? prev.trans_date,

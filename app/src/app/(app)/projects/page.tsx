@@ -18,6 +18,9 @@ import { formatWon } from "@/lib/format";
 import { ProjectListExportButtons } from "@/components/ProjectListExportButtons";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { ProjectsPageMemo } from "@/components/ProjectsPageMemo";
+import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
+import { purchaseCostOf } from "@/lib/vatBasis";
+import { nowKst } from "@/lib/kstDate";
 
 const TABS = [
   { key: "list", label: "프로젝트" },
@@ -98,7 +101,7 @@ async function ProjectListSection({
   report?: string;
 }) {
   const supabase = await createClient();
-  const currentYear = new Date().getFullYear();
+  const currentYear = nowKst().year;
   const selectedYear = year ? Number(year) : currentYear;
   // 상태 필터는 체크박스로 여러 개를 동시에 고를 수 있어서 콤마로 구분된 값으로 옴.
   const statusList = status ? status.split(",").filter(Boolean) : [];
@@ -134,40 +137,48 @@ async function ProjectListSection({
   }));
 
   const projectIds = (projects ?? []).map((p) => p.id);
-  const [{ data: purchaseRowsRaw }, { data: agencyRows }, { data: creditPayments }] = projectIds.length
+  type ProjectPurchaseRow = {
+    id: string;
+    type: string;
+    payment_type: string;
+    sales_amount: number;
+    sales_vat: number;
+    project_id: string | null;
+    purchase_amount: number;
+    purchase_vat: number;
+    expense_categories: { name: string } | { name: string }[] | null;
+  };
+  const [purchaseRowsRaw, { data: agencyRows }, creditPayments] = projectIds.length
     ? await Promise.all([
-        supabase
-          .from("transactions")
-          .select("id, type, payment_type, sales_amount, sales_vat, project_id, purchase_amount, purchase_vat")
-          .eq("type", "매입")
-          .in("project_id", projectIds),
-        supabase.from("project_agency_purchases").select("project_id, amount").in("project_id", projectIds),
-        supabase.from("credit_payments").select("*"),
+        fetchAllRows<ProjectPurchaseRow>((from, to) =>
+          supabase
+            .from("transactions")
+            .select("id, type, payment_type, sales_amount, sales_vat, project_id, purchase_amount, purchase_vat, expense_categories(*)")
+            .eq("type", "매입")
+            .in("project_id", projectIds)
+            .order("id", { ascending: true })
+            .range(from, to)
+        ),
+        fetchAllRows<{ project_id: string; amount: number }>((from, to) =>
+          supabase
+            .from("project_agency_purchases")
+            .select("project_id, amount")
+            .in("project_id", projectIds)
+            .order("id", { ascending: true })
+            .range(from, to)
+        ).then((data) => ({ data })),
+        fetchAllCreditPayments(supabase),
       ])
-    : [
-        {
-          data: [] as {
-            id: string;
-            type: string;
-            payment_type: string;
-            sales_amount: number;
-            sales_vat: number;
-            project_id: string | null;
-            purchase_amount: number;
-            purchase_vat: number;
-          }[],
-        },
-        { data: [] as { project_id: string; amount: number }[] },
-        { data: [] as CreditPayment[] },
-      ];
+    : [[] as ProjectPurchaseRow[], { data: [] as { project_id: string; amount: number }[] }, [] as CreditPayment[]];
 
   // 외상(미완납)은 완납 전까지 장부에서 제외 — 대시보드·보고서와 동일한 기준.
-  const purchaseRows = (purchaseRowsRaw ?? []).filter((t) => isLedgerVisible(t, (creditPayments ?? []) as CreditPayment[]));
+  const purchaseRows = purchaseRowsRaw.filter((t) => isLedgerVisible(t, creditPayments));
 
+  // 발주액·대행구매액이 부가세 제외라 매입도 공급가(부가세 제외)로 맞춰 이익을 계산.
   const purchaseByProject = new Map<string, number>();
   for (const t of purchaseRows) {
     if (!t.project_id) continue;
-    purchaseByProject.set(t.project_id, (purchaseByProject.get(t.project_id) ?? 0) + t.purchase_amount + t.purchase_vat);
+    purchaseByProject.set(t.project_id, (purchaseByProject.get(t.project_id) ?? 0) + purchaseCostOf(t));
   }
 
   const agencyByProject = new Map<string, number>();
@@ -291,8 +302,8 @@ async function ProjectListSection({
     },
     {
       name: "totalPurchase",
-      label: "총 매입 (매입+구매대행)",
-      tableLabel: "총 매입",
+      label: "총 매입 (매입 공급가+구매대행, 부가세 제외)",
+      tableLabel: "총 매입(VAT제외)",
       readOnly: true,
       format: "currency",
       width: "8%",

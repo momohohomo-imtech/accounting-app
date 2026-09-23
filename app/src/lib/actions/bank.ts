@@ -135,6 +135,44 @@ export async function createBankTransferRecord(formData: FormData) {
   revalidatePath("/bank");
 }
 
+type BankTxForLedger = {
+  trans_date: string;
+  direction: string;
+  amount: number;
+  description: string | null;
+  matched_client_id: string | null;
+  matched_client_name_raw: string | null;
+  bank_accounts?: { nickname: string | null; bank_name: string } | null;
+  clients?: { name: string } | null;
+};
+
+const BANK_TX_FOR_LEDGER_SELECT = "*, bank_accounts(nickname, bank_name), clients(name)";
+
+// 은행 거래 한 건을 매입/매출장에 "분류 대기 중"으로 올릴 때 넣는 값 — 등록할 때와, 나중에
+// "등록 당시 그대로인지" 비교할 때 둘 다 이 함수 하나로 만들어서 기준이 어긋나지 않게 한다.
+function ledgerRowFromBank(bankTx: BankTxForLedger) {
+  const isPurchase = bankTx.direction === "출금";
+  const accountName = bankTx.bank_accounts?.nickname ?? bankTx.bank_accounts?.bank_name ?? "";
+  // 매칭 거래처 이름을 품목으로 — 매칭 거래처가 없으면 내용(적요)으로 대신한다.
+  const matchedClientName = bankTx.clients?.name ?? bankTx.matched_client_name_raw ?? null;
+  return {
+    trans_date: bankTx.trans_date,
+    type: isPurchase ? "매입" : "매출",
+    client_id: bankTx.matched_client_id,
+    client_name_raw: bankTx.matched_client_name_raw,
+    item_name: matchedClientName ?? bankTx.description,
+    purchase_amount: isPurchase ? bankTx.amount : 0,
+    purchase_vat: 0,
+    sales_amount: isPurchase ? 0 : bankTx.amount,
+    sales_vat: 0,
+    payment_type: "immediate",
+    vat_included: false,
+    tax_invoice_issued: false,
+    needs_classification: true,
+    note1: `[은행] ${accountName}${bankTx.description ? ` · ${bankTx.description}` : ""}`,
+  };
+}
+
 // 은행 거래내역 체크박스 ON — 매입/매출장(transactions)에 "분류 대기 중" 상태로 자동 등록.
 // 출금이면 매입, 입금이면 매출로 넣는다. 계좌 간 이체 건은 실제 매입/매출이 아니라 올릴 수 없음.
 export async function promoteBankTransactionToLedger(formData: FormData) {
@@ -143,36 +181,16 @@ export async function promoteBankTransactionToLedger(formData: FormData) {
 
   const { data: bankTx } = await supabase
     .from("bank_transactions")
-    .select("*, bank_accounts(nickname, bank_name), clients(name)")
+    .select(BANK_TX_FOR_LEDGER_SELECT)
     .eq("id", id)
     .maybeSingle();
   if (!bankTx) return { error: "거래내역을 찾을 수 없습니다." };
   if (bankTx.promoted_transaction_id) return {};
   if (bankTx.transfer_group_id) return { error: "계좌 간 이체 내역은 매입/매출장으로 올릴 수 없습니다." };
 
-  const isPurchase = bankTx.direction === "출금";
-  const accountName = bankTx.bank_accounts?.nickname ?? bankTx.bank_accounts?.bank_name ?? "";
-  // 매칭 거래처 이름을 품목으로 — 매칭 거래처가 없으면 내용(적요)으로 대신한다.
-  const matchedClientName = bankTx.clients?.name ?? bankTx.matched_client_name_raw ?? null;
-
   const { data: inserted, error } = await supabase
     .from("transactions")
-    .insert({
-      trans_date: bankTx.trans_date,
-      type: isPurchase ? "매입" : "매출",
-      client_id: bankTx.matched_client_id,
-      client_name_raw: bankTx.matched_client_name_raw,
-      item_name: matchedClientName ?? bankTx.description,
-      purchase_amount: isPurchase ? bankTx.amount : 0,
-      purchase_vat: 0,
-      sales_amount: isPurchase ? 0 : bankTx.amount,
-      sales_vat: 0,
-      payment_type: "immediate",
-      vat_included: false,
-      tax_invoice_issued: false,
-      needs_classification: true,
-      note1: `[은행] ${accountName}${bankTx.description ? ` · ${bankTx.description}` : ""}`,
-    })
+    .insert(ledgerRowFromBank(bankTx))
     .select("id")
     .single();
   if (error || !inserted) return { error: error?.message ?? "매입/매출장 등록에 실패했습니다." };
@@ -182,17 +200,47 @@ export async function promoteBankTransactionToLedger(formData: FormData) {
   revalidatePath("/transactions");
 }
 
-// 체크 해제 — 자동으로 만들어졌던 매입/매출장 내역을 같이 지운다.
+// 비교 기준은 은행 거래의 현재 값이라, 등록 뒤 은행 쪽 내용·거래처·계좌 별칭만 바꿔도 "다르다"로
+// 나온다 — 어느 쪽이 바뀐 건지 구분할 수 없으니 지우지 않고, 두 경우를 다 안내한다.
+const CLASSIFIED_LEDGER_ERROR =
+  "매입/매출장 내역이 등록 당시와 달라져서 안전을 위해 지우지 않았습니다. 장부에서 분류·수정했거나, 등록 후 은행 쪽 내용·거래처·계좌 별칭을 바꾼 경우입니다. 매입/매출장에서 해당 내역을 직접 삭제한 뒤 다시 시도해주세요.";
+
+// 자동 등록된 장부 내역이 등록 당시 그대로인지 — 등록 때 넣은 값(ledgerRowFromBank)과 모든 칸이
+// 같고, 등록 때 비워둔 칸(프로젝트·카테고리·결제수단·메모2·수량·단가)도 여전히 비어 있을 때만
+// true. 하나라도 다르면 누군가 장부에서 손댄 것이라 은행 쪽 취소/삭제와 함께 지우지 않는다.
+// 조회 자체가 실패하면 판단할 수 없으니 지우지 않는 쪽(false)으로.
+async function isLedgerUntouched(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  ledgerId: string,
+  bankTx: BankTxForLedger
+) {
+  const { data: ledger, error } = await supabase.from("transactions").select("*").eq("id", ledgerId).maybeSingle();
+  if (error) return false;
+  if (!ledger) return true;
+  const expected = ledgerRowFromBank(bankTx);
+  const sameValue = (a: unknown, b: unknown) =>
+    typeof b === "number" ? Number(a) === b : (a ?? null) === (b ?? null);
+  const unchanged = (Object.keys(expected) as (keyof typeof expected)[]).every((k) => sameValue(ledger[k], expected[k]));
+  const stillEmpty = ["project_id", "category_id", "payment_method_id", "note2", "quantity", "unit_price"].every(
+    (k) => ledger[k] === null || ledger[k] === undefined
+  );
+  return unchanged && stillEmpty;
+}
+
+// 체크 해제 — 자동으로 만들어졌던 매입/매출장 내역을 같이 지운다(아직 손대지 않은 경우만).
 export async function unpromoteBankTransactionFromLedger(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
 
   const { data: bankTx } = await supabase
     .from("bank_transactions")
-    .select("promoted_transaction_id")
+    .select(BANK_TX_FOR_LEDGER_SELECT)
     .eq("id", id)
     .maybeSingle();
   if (bankTx?.promoted_transaction_id) {
+    if (!(await isLedgerUntouched(supabase, bankTx.promoted_transaction_id, bankTx))) {
+      return { error: CLASSIFIED_LEDGER_ERROR };
+    }
     const del = await supabase.from("transactions").delete().eq("id", bankTx.promoted_transaction_id);
     if (del.error) return { error: del.error.message };
     const upd = await supabase.from("bank_transactions").update({ promoted_transaction_id: null }).eq("id", id);
@@ -205,7 +253,58 @@ export async function unpromoteBankTransactionFromLedger(formData: FormData) {
 export async function updateBankTransactionRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  const { error } = await supabase.from("bank_transactions").update(parseTransaction(formData)).eq("id", id);
+  const patch = parseTransaction(formData);
+
+  const { data: existing } = await supabase
+    .from("bank_transactions")
+    .select("bank_account_id, trans_date, direction, amount, transfer_group_id, promoted_transaction_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (!existing) return { error: "거래내역을 찾을 수 없습니다." };
+
+  // 매입/매출장에 올라간 건은 금액·날짜·입출금을 바꾸면 장부와 어긋나므로 막는다.
+  if (
+    existing.promoted_transaction_id &&
+    (patch.amount !== Number(existing.amount) ||
+      patch.trans_date !== existing.trans_date ||
+      patch.direction !== existing.direction)
+  ) {
+    return {
+      error:
+        "매입/매출장에 등록된 거래는 금액·날짜·입출금을 바꿀 수 없습니다. 매입/매출장에서 수정하거나, 등록을 취소한 뒤 수정해주세요.",
+    };
+  }
+
+  if (existing.transfer_group_id) {
+    // 이체는 입출금 방향을 바꿀 수 없고, 날짜·금액·내용은 짝에도 똑같이 반영해서 잔액이 어긋나지 않게 한다.
+    const { data: pair } = await supabase
+      .from("bank_transactions")
+      .select("id, bank_account_id")
+      .eq("transfer_group_id", existing.transfer_group_id)
+      .neq("id", id)
+      .maybeSingle();
+    if (pair && pair.bank_account_id === patch.bank_account_id) {
+      return { error: "이체의 보내는 계좌와 받는 계좌가 같아질 수 없습니다." };
+    }
+    if (!patch.amount || patch.amount <= 0) return { error: "금액을 입력해주세요." };
+
+    const { error } = await supabase
+      .from("bank_transactions")
+      .update({ ...patch, direction: existing.direction })
+      .eq("id", id);
+    if (error) return { error: error.message };
+    if (pair) {
+      const { error: pairError } = await supabase
+        .from("bank_transactions")
+        .update({ trans_date: patch.trans_date, amount: patch.amount, description: patch.description })
+        .eq("id", pair.id);
+      if (pairError) return { error: `이체 짝 반영 실패: ${pairError.message}` };
+    }
+    revalidatePath("/bank");
+    return;
+  }
+
+  const { error } = await supabase.from("bank_transactions").update(patch).eq("id", id);
   if (error) return { error: error.message };
   revalidatePath("/bank");
 }
@@ -216,11 +315,14 @@ export async function deleteBankTransactionRecord(formData: FormData) {
 
   const { data: row } = await supabase
     .from("bank_transactions")
-    .select("transfer_group_id, promoted_transaction_id")
+    .select(BANK_TX_FOR_LEDGER_SELECT)
     .eq("id", id)
     .maybeSingle();
   if (row?.promoted_transaction_id) {
-    // 매입/매출장으로 올라가 있던 자동 등록 내역도 같이 지운다.
+    // 매입/매출장으로 올라가 있던 자동 등록 내역도 같이 지운다 — 장부에서 이미 손댄 건 보호.
+    if (!(await isLedgerUntouched(supabase, row.promoted_transaction_id, row))) {
+      return { error: CLASSIFIED_LEDGER_ERROR };
+    }
     const { error } = await supabase.from("transactions").delete().eq("id", row.promoted_transaction_id);
     if (error) return { error: error.message };
   }

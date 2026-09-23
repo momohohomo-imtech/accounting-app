@@ -3,6 +3,11 @@ export function formatWon(amount: number | null | undefined) {
   return new Intl.NumberFormat("ko-KR").format(amount) + "원";
 }
 
+// 마이너스 금액을 빨간색으로 — 대시보드·부가세 표·이익 계산 상세 등 금액 표시 여러 곳에서 공용.
+export function moneyClass(amount: number) {
+  return amount < 0 ? "text-red-600" : "";
+}
+
 export function formatNumber(amount: number | string | null | undefined) {
   if (amount === null || amount === undefined || amount === "") return "-";
   return new Intl.NumberFormat("ko-KR").format(Number(amount));

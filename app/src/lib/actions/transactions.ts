@@ -5,6 +5,14 @@ import { createClient } from "@/lib/supabase/server";
 import { remainingBalance } from "@/lib/credit";
 import type { CreditPayment, Transaction } from "@/lib/types";
 
+// 거래가 바뀌면 금액이 보이는 모든 화면을 새로 그리게 한다.
+function revalidateLedgerPages() {
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  revalidatePath("/projects");
+}
+
 // addVat 체크 시에만 입력 금액의 10%를 얹어서 합계에 더함. 체크 안 하면(기본값) 입력한 금액이
 // 곧 최종 합계이고 부가세는 0 — "얼마인지 모르니 자동으로 계산해준다"는 동작은 없음, 항상 사용자가
 // 명시적으로 체크해야만 10%가 붙음.
@@ -56,10 +64,7 @@ export async function createTransactionRecord(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/transactions");
-  revalidatePath("/dashboard");
-  revalidatePath("/reports");
-  revalidatePath("/projects");
+  revalidateLedgerPages();
 }
 
 export async function updateTransactionRecord(formData: FormData) {
@@ -96,10 +101,7 @@ export async function updateTransactionRecord(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/transactions");
-  revalidatePath("/dashboard");
-  revalidatePath("/reports");
-  revalidatePath("/projects");
+  revalidateLedgerPages();
 }
 
 export type BulkTransactionInput = {
@@ -155,83 +157,71 @@ export async function bulkImportTransactions(rows: BulkTransactionInput[]) {
   const { error } = await supabase.from("transactions").insert(inserts);
   if (error) return { error: error.message };
 
-  revalidatePath("/transactions");
-  revalidatePath("/dashboard");
-  revalidatePath("/reports");
-  revalidatePath("/projects");
+  revalidateLedgerPages();
 }
 
 export async function bulkUpdateProjectId(formData: FormData) {
   const supabase = await createClient();
   const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
   const projectId = String(formData.get("project_id") ?? "") || null;
-  if (ids.length === 0) return;
+  if (ids.length === 0) return { error: "선택된 거래가 없습니다." };
 
   const { error } = await supabase
     .from("transactions")
     .update({ project_id: projectId, needs_classification: false })
     .in("id", ids);
-  if (error) console.error("bulkUpdateProjectId failed:", error.message);
-
-  revalidatePath("/transactions");
-  revalidatePath("/dashboard");
-  revalidatePath("/reports");
-  revalidatePath("/projects");
+  if (error) return { error: error.message };
+  revalidateLedgerPages();
 }
 
+// 거래처는 등록된 거래처(client_id)로 고르거나, 목록에 없으면 이름을 직접 적을 수 있다
+// (client_name_raw) — 둘 중 하나만 채우고 나머지는 비운다.
 export async function bulkUpdateClientId(formData: FormData) {
   const supabase = await createClient();
   const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
   const clientId = String(formData.get("client_id") ?? "") || null;
-  if (ids.length === 0) return;
+  const clientNameRaw = clientId ? null : String(formData.get("client_name_raw") ?? "").trim() || null;
+  if (ids.length === 0) return { error: "선택된 거래가 없습니다." };
 
   const { error } = await supabase
     .from("transactions")
-    .update({ client_id: clientId, client_name_raw: null })
+    .update({ client_id: clientId, client_name_raw: clientNameRaw })
     .in("id", ids);
-  if (error) console.error("bulkUpdateClientId failed:", error.message);
-
-  revalidatePath("/transactions");
-  revalidatePath("/reports");
+  if (error) return { error: error.message };
+  revalidateLedgerPages();
 }
 
 export async function bulkUpdateCategoryId(formData: FormData) {
   const supabase = await createClient();
   const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
   const categoryId = String(formData.get("category_id") ?? "") || null;
-  if (ids.length === 0) return;
+  if (ids.length === 0) return { error: "선택된 거래가 없습니다." };
 
   const { error } = await supabase.from("transactions").update({ category_id: categoryId }).in("id", ids);
-  if (error) console.error("bulkUpdateCategoryId failed:", error.message);
-
-  revalidatePath("/transactions");
-  revalidatePath("/reports");
+  if (error) return { error: error.message };
+  revalidateLedgerPages();
 }
 
 export async function bulkUpdatePaymentMethodId(formData: FormData) {
   const supabase = await createClient();
   const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
   const paymentMethodId = String(formData.get("payment_method_id") ?? "") || null;
-  if (ids.length === 0) return;
+  if (ids.length === 0) return { error: "선택된 거래가 없습니다." };
 
   const { error } = await supabase.from("transactions").update({ payment_method_id: paymentMethodId }).in("id", ids);
-  if (error) console.error("bulkUpdatePaymentMethodId failed:", error.message);
-
-  revalidatePath("/transactions");
-  revalidatePath("/reports");
+  if (error) return { error: error.message };
+  revalidateLedgerPages();
 }
 
 export async function bulkUpdateItemName(formData: FormData) {
   const supabase = await createClient();
   const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
   const itemName = String(formData.get("item_name") ?? "").trim() || null;
-  if (ids.length === 0) return;
+  if (ids.length === 0) return { error: "선택된 거래가 없습니다." };
 
   const { error } = await supabase.from("transactions").update({ item_name: itemName }).in("id", ids);
-  if (error) console.error("bulkUpdateItemName failed:", error.message);
-
-  revalidatePath("/transactions");
-  revalidatePath("/reports");
+  if (error) return { error: error.message };
+  revalidateLedgerPages();
 }
 
 export async function deleteTransactionRecord(formData: FormData) {
@@ -239,10 +229,7 @@ export async function deleteTransactionRecord(formData: FormData) {
   const id = String(formData.get("id"));
   const { error } = await supabase.from("transactions").delete().eq("id", id);
   if (error) return { error: error.message };
-  revalidatePath("/transactions");
-  revalidatePath("/dashboard");
-  revalidatePath("/reports");
-  revalidatePath("/projects");
+  revalidateLedgerPages();
 }
 
 export async function updateTransactionNote(formData: FormData) {
@@ -264,26 +251,39 @@ export async function settleCreditTransactions(formData: FormData) {
   const paidDate = String(formData.get("paid_date") ?? "");
   const paymentMethodId = String(formData.get("payment_method_id") ?? "") || null;
 
-  if (ids.length === 0 || !paidDate) {
-    revalidatePath("/transactions");
-    return;
-  }
+  if (ids.length === 0) return { error: "정산할 거래를 선택해주세요." };
+  if (!paidDate) return { error: "정산일을 입력해주세요." };
 
-  const [{ data: txs }, { data: payments }, { data: paymentMethod }] = await Promise.all([
-    supabase.from("transactions").select("*").in("id", ids),
-    supabase.from("credit_payments").select("*").in("transaction_id", ids),
-    paymentMethodId
-      ? supabase.from("payment_methods").select("name").eq("id", paymentMethodId).single()
-      : Promise.resolve({ data: null }),
-  ]);
+  const [{ data: txs, error: txError }, { data: payments, error: payError }, { data: paymentMethod }] =
+    await Promise.all([
+      supabase.from("transactions").select("*").in("id", ids),
+      supabase.from("credit_payments").select("*").in("transaction_id", ids),
+      paymentMethodId
+        ? supabase.from("payment_methods").select("name").eq("id", paymentMethodId).single()
+        : Promise.resolve({ data: null }),
+    ]);
+  if (txError || payError) return { error: (txError ?? payError)!.message };
 
-  const targetTxs = (txs ?? []) as Transaction[];
   const existingPayments = (payments ?? []) as CreditPayment[];
-  if (targetTxs.length === 0) return;
+  // 이미 완납된 건(중복 제출 등)은 다시 정산하지 않는다 — 메모에 정산일이 두 번 붙는 것 방지.
+  const targetTxs = ((txs ?? []) as Transaction[]).filter(
+    (tx) => !(existingPayments.some((p) => p.transaction_id === tx.id) && remainingBalance(tx, existingPayments) === 0)
+  );
+  if (targetTxs.length === 0) return { error: "선택한 거래는 이미 정산됐습니다." };
+
+  // 정산 여부를 결정하는 이력을 먼저 저장 — 이게 실패하면 거래 쪽은 아무것도 안 바뀐 상태로 끝난다.
+  const { error: insertError } = await supabase.from("credit_payments").insert(
+    targetTxs.map((tx) => ({
+      transaction_id: tx.id,
+      paid_date: paidDate,
+      paid_amount: remainingBalance(tx, existingPayments),
+      remaining_amount: 0,
+    }))
+  );
+  if (insertError) return { error: insertError.message };
 
   const settleNote = `정산일: ${paidDate}${paymentMethod?.name ? ` · ${paymentMethod.name}` : ""}`;
-
-  await Promise.all(
+  const updateResults = await Promise.all(
     targetTxs.map((tx) =>
       supabase
         .from("transactions")
@@ -295,17 +295,16 @@ export async function settleCreditTransactions(formData: FormData) {
     )
   );
 
-  const creditPaymentRows = targetTxs.map((tx) => ({
-    transaction_id: tx.id,
-    paid_date: paidDate,
-    paid_amount: remainingBalance(tx, existingPayments),
-    remaining_amount: 0,
-  }));
+  revalidateLedgerPages();
 
-  await supabase.from("credit_payments").insert(creditPaymentRows);
-
-  revalidatePath("/transactions");
-  revalidatePath("/dashboard");
-  revalidatePath("/reports");
-  revalidatePath("/projects");
+  const failed = updateResults.filter((r) => r.error);
+  if (failed.length > 0) {
+    // credit_payments는 이미 전부 등록돼 정산 자체는 끝난 상태(결제수단·메모만 일부 실패) —
+    // settled: true로 호출 쪽에 알려서 선택 목록을 비우게 한다(안 비우면 다음 제출 때 이미
+    // 정산된 거래id가 다시 섞여 들어간다).
+    return {
+      error: `정산은 완료됐지만 ${failed.length}건은 결제수단·메모 기록에 실패했습니다: ${failed[0].error!.message}`,
+      settled: true,
+    };
+  }
 }

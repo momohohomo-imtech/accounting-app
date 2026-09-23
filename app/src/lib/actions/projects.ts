@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { nowKst } from "@/lib/kstDate";
 
 function parse(formData: FormData) {
   const estimated = formData.get("contract_amount_estimated") === "on";
@@ -14,7 +15,7 @@ function parse(formData: FormData) {
     start_date: String(formData.get("start_date") ?? "") || null,
     end_date: String(formData.get("end_date") ?? "") || null,
     progress_pct: formData.get("progress_pct") ? Number(formData.get("progress_pct")) : 0,
-    year: Number(formData.get("year") ?? new Date().getFullYear()),
+    year: Number(formData.get("year") ?? nowKst().year),
     quote_amount: formData.get("quote_amount") ? Number(formData.get("quote_amount")) : null,
     contract_amount: formData.get("contract_amount") ? Number(formData.get("contract_amount")) : null,
     contract_amount_estimated: estimated,

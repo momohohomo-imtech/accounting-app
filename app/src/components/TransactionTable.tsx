@@ -23,6 +23,8 @@ import type { Transaction } from "@/lib/types";
 import type { ProjectTreeNode } from "@/components/ProjectTreeFilter";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
+const CLIENT_NAMES_DATALIST_ID = "bulk-client-names";
+
 type SortKey =
   | "trans_date"
   | "type"
@@ -123,8 +125,23 @@ export function TransactionTable({
   const [bulkCategoryId, setBulkCategoryId] = useState("");
   const [bulkPaymentMethodId, setBulkPaymentMethodId] = useState("");
   const [bulkItemName, setBulkItemName] = useState("");
+  const [bulkClientText, setBulkClientText] = useState("");
+  const [bulkError, setBulkError] = useState<string | null>(null);
+
+  // 거래처 자동완성 — 등록된 거래처 + 지금 목록에 있는 수기 입력 거래처 이름.
+  const clientNameOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...clients.map((c) => c.name),
+          ...transactions.map((t) => t.client_name_raw).filter((n): n is string => Boolean(n)),
+        ])
+      ).sort((a, b) => a.localeCompare(b, "ko")),
+    [clients, transactions]
+  );
 
   function resetBulkFields() {
+    setBulkError(null);
     setBulkField("project");
     setBulkYear("");
     setBulkSiteId("");
@@ -133,9 +150,11 @@ export function TransactionTable({
     setBulkCategoryId("");
     setBulkPaymentMethodId("");
     setBulkItemName("");
+    setBulkClientText("");
   }
 
-  const bulkAction =
+  type BulkResult = { error?: string } | undefined;
+  const bulkAction: (fd: FormData) => Promise<BulkResult> =
     bulkField === "project"
       ? bulkUpdateProjectId
       : bulkField === "client"
@@ -145,6 +164,30 @@ export function TransactionTable({
           : bulkField === "payment_method"
             ? bulkUpdatePaymentMethodId
             : bulkUpdateItemName;
+
+  async function handleBulkSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    setBulkError(null);
+
+    if (bulkField === "client") {
+      const text = bulkClientText.trim();
+      // 드롭다운에서 고른 거래처가 있으면 그 id를 그대로 씀 — 같은 이름의 거래처가 여럿이어도
+      // 고른 쪽으로 저장되게. 직접 입력한 이름만 있을 때만 이름으로 찾는다.
+      const picked = clients.find((c) => c.id === bulkClientId);
+      const matched = picked && picked.name === text ? picked : clients.find((c) => c.name === text);
+      fd.set("client_id", matched?.id ?? "");
+      fd.set("client_name_raw", matched ? "" : text);
+    }
+
+    const result = await pending.run(() => bulkAction(fd));
+    if (result?.error) {
+      setBulkError(result.error);
+      return;
+    }
+    setSelected(new Set());
+    resetBulkFields();
+  }
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -204,14 +247,7 @@ export function TransactionTable({
     <div className="space-y-3">
       {selected.size > 0 && (
         <Card padding="none" className="flex flex-wrap items-center gap-2 border-slate-300 bg-slate-50 p-3 print:hidden">
-          <form
-            action={bulkAction}
-            onSubmit={() => {
-              setSelected(new Set());
-              resetBulkFields();
-            }}
-            className="flex flex-wrap items-center gap-2"
-          >
+          <form onSubmit={handleBulkSubmit} className="flex flex-wrap items-center gap-2">
             {Array.from(selected).map((id) => (
               <input key={id} type="hidden" name="transaction_ids" value={id} />
             ))}
@@ -227,6 +263,7 @@ export function TransactionTable({
                 setBulkCategoryId("");
                 setBulkPaymentMethodId("");
                 setBulkItemName("");
+                setBulkClientText("");
               }}
               className={fieldClass}
             >
@@ -284,19 +321,38 @@ export function TransactionTable({
             )}
 
             {bulkField === "client" && (
-              <select
-                name="client_id"
-                value={bulkClientId}
-                onChange={(e) => setBulkClientId(e.target.value)}
-                className={fieldClass}
-              >
-                <option value="">선택 안함</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              <>
+                <select
+                  value={bulkClientId}
+                  onChange={(e) => {
+                    setBulkClientId(e.target.value);
+                    setBulkClientText(clients.find((c) => c.id === e.target.value)?.name ?? "");
+                  }}
+                  className={fieldClass}
+                >
+                  <option value="">등록 거래처 선택</option>
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  value={bulkClientText}
+                  onChange={(e) => {
+                    setBulkClientText(e.target.value);
+                    setBulkClientId(clients.find((c) => c.name === e.target.value.trim())?.id ?? "");
+                  }}
+                  list={CLIENT_NAMES_DATALIST_ID}
+                  placeholder="또는 거래처 이름 직접 입력"
+                  className={fieldClass}
+                />
+                <datalist id={CLIENT_NAMES_DATALIST_ID}>
+                  {clientNameOptions.map((n) => (
+                    <option key={n} value={n} />
+                  ))}
+                </datalist>
+              </>
             )}
 
             {bulkField === "category" && (
@@ -358,6 +414,7 @@ export function TransactionTable({
           </form>
         </Card>
       )}
+      {bulkError && <p className="text-sm text-red-600 print:hidden">{bulkError}</p>}
 
       <Table className="min-w-[1020px]">
         <THead>

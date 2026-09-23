@@ -10,6 +10,7 @@ import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { groupToolsBySortOrder, toolGroupLabel } from "@/lib/tools";
 import { cx } from "@/lib/cx";
 import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components/ProjectPicker";
+import { todayString } from "@/lib/format";
 
 type Tool = {
   id: string;
@@ -24,7 +25,7 @@ type Tool = {
 type AdhocItem = { key: string; name: string; quantity: string; forAccessPass: boolean };
 
 function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+  return todayString();
 }
 
 export function ToolChecklistCreateForm({

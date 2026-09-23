@@ -14,7 +14,7 @@ export default async function LoginPage({
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <Card className="w-full max-w-sm" padding="lg">
-        <h1 className="text-xl font-bold text-slate-900">현장관리 시스템</h1>
+        <h1 className="text-xl font-bold text-slate-900">IM테크 회계 관리 시스템</h1>
         <p className="mt-1 text-sm text-slate-500">로그인</p>
 
         {params.reason === "idle" && (
