@@ -155,7 +155,7 @@ export function TransactionBulkImport({
       {rows && rows.length > 0 && (
         <div className="space-y-3">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1300px] text-xs">
+            <table className="sticky-col-table w-full min-w-[1300px] text-xs">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-slate-500">
                   <th className="pb-2 pr-2">날짜</th>

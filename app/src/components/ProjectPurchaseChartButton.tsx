@@ -257,7 +257,7 @@ export function ProjectPurchaseChartButton({
                 {bottomStats.map(([label, value]) => (
                   <div key={label}>
                     <p className="text-xs text-slate-500">{label}</p>
-                    <p className="tabular-nums text-base font-bold text-slate-900">{value}</p>
+                    <p className="whitespace-nowrap tabular-nums text-sm font-bold text-slate-900 sm:text-base">{value}</p>
                   </div>
                 ))}
               </div>

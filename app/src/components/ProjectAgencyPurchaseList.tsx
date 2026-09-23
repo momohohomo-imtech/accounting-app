@@ -173,7 +173,7 @@ function AgencyRow({
   return (
     <tr className="border-b border-slate-100 last:border-0">
       <td className="py-2 pr-4 text-slate-600 print:py-0.5"></td>
-      <td className="truncate py-2 pr-4 text-slate-700 print:py-0.5">{item.client_name ?? "-"}</td>
+      <td className="sticky-col truncate py-2 pr-4 text-slate-700 print:py-0.5" title={item.client_name ?? undefined}>{item.client_name ?? "-"}</td>
       <td className="py-2 pr-4 text-slate-700 print:py-0.5">
         <div className="truncate">{item.item_name ?? "-"}</div>
         {item.memo && <div className="truncate text-xs text-slate-500 print:text-[9px]">{item.memo}</div>}
@@ -284,11 +284,11 @@ export function ProjectAgencyPurchaseList({
 
       {items.length > 0 ? (
         <div className="mb-2 overflow-x-auto">
-          <table className="w-full min-w-[600px] table-fixed text-sm print:text-[10px]">
+          <table className="sticky-col-table w-full min-w-[600px] table-fixed text-sm print:text-[10px]">
             <thead>
               <tr className="border-b border-slate-200 text-left text-slate-500">
                 <th className="w-[88px] pb-2 pr-4 print:pb-1">날짜</th>
-                <th className="w-[100px] pb-2 pr-4 print:pb-1">{headerButton("client", "거래처")}</th>
+                <th className="sticky-col w-[100px] pb-2 pr-4 print:pb-1">{headerButton("client", "거래처")}</th>
                 <th className="pb-2 pr-4 print:pb-1">{headerButton("item", "품목")}</th>
                 <th className="w-[90px] pb-2 pr-4 print:pb-1">{headerButton("category", "카테고리")}</th>
                 <th className="w-[110px] pb-2 pr-4 text-right print:pb-1">{headerButton("amount", "금액")}</th>
