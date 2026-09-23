@@ -16,6 +16,13 @@ import { Table, THead, Th, Tr, Td, EmptyRow } from "@/components/ui/Table";
 import { cx } from "@/lib/cx";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import { nowKst } from "@/lib/kstDate";
+import { PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
+
+const EXPECTED_RECEIVABLE_STATUSES = [
+  { value: "ongoing", label: "진행중" },
+  { value: "done", label: "공사 완료" },
+  { value: PROJECT_STATUS_AWAITING_PAYMENT, label: "수금 대기" },
+];
 
 function Money({ value, className }: { value: number; className?: string }) {
   return <span className={cx("font-mono", value < 0 && "text-red-600", className)}>{formatWon(value)}</span>;
@@ -76,6 +83,7 @@ export default async function DashboardPage({
     outlook,
     ledgerTax,
     { data: categoryRows },
+    { data: receivableProjects },
   ] = await Promise.all([
     supabase.from("transactions").select("*").gte("trans_date", monthStart).lte("trans_date", monthEnd),
     fetchAllRows<Transaction>((from, to) =>
@@ -115,6 +123,11 @@ export default async function DashboardPage({
     loadLedgerTaxEstimate(selectedYear),
     // select("*") — 불공제 칸(082 마이그레이션) 실행 전에도 조회가 깨지지 않게.
     supabase.from("expense_categories").select("*"),
+    supabase
+      .from("projects")
+      .select("status, contract_amount, quote_amount")
+      .eq("year", selectedYear)
+      .in("status", EXPECTED_RECEIVABLE_STATUSES.map((s) => s.value)),
   ]);
 
   const payments = creditPayments;
@@ -134,6 +147,14 @@ export default async function DashboardPage({
   const yearSales = yearTx.reduce((s, t) => s + t.sales_amount + t.sales_vat, 0);
   const yearPurchase = yearTx.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
   const yearProfit = yearSales - yearPurchase;
+
+  // 예상 미수액 — 아직 돈을 다 받지 않은 프로젝트(진행중·공사 완료·완료 수금대기)의 받을 금액.
+  // 금액 기준은 "공사 완료 · 수금 대기" 칸과 같음(수주액, 없으면 발주액).
+  const expectedReceivableByStatus = EXPECTED_RECEIVABLE_STATUSES.map(({ value, label }) => {
+    const rows = (receivableProjects ?? []).filter((p) => p.status === value);
+    return { label, count: rows.length, amount: rows.reduce((s, p) => s + (p.contract_amount ?? p.quote_amount ?? 0), 0) };
+  });
+  const expectedReceivable = expectedReceivableByStatus.reduce((s, r) => s + r.amount, 0);
 
   // 선택 연도 전체 프로젝트 수주액 합계 — 프로젝트 페이지 하단 "수주액" 합계와 같은 값.
   const totalExpectedRevenue = (yearProjects ?? []).reduce((s, p) => s + (p.contract_amount ?? 0), 0);
@@ -233,7 +254,27 @@ export default async function DashboardPage({
       {/* ② 받을 돈 · 줄 돈 */}
       <Card>
         <SectionTitle note="외상은 정산 등록 전까지 매입매출장 합계에서 빠져 있음">② 받을 돈 · 줄 돈</SectionTitle>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Link href="/projects" className="rounded-xl transition hover:ring-2 hover:ring-slate-200">
+            <Stat
+              label="예상 미수액 (진행중·공사 완료·수금 대기)"
+              emphasis
+              sub={
+                <ul className="space-y-0.5">
+                  {expectedReceivableByStatus.map((r) => (
+                    <li key={r.label} className="flex justify-between gap-2">
+                      <span>
+                        {r.label} {r.count}건
+                      </span>
+                      <span className="font-mono">{formatWon(r.amount)}</span>
+                    </li>
+                  ))}
+                </ul>
+              }
+            >
+              <Money value={expectedReceivable} className="text-white" />
+            </Stat>
+          </Link>
           <Link href="/projects" className="rounded-xl transition hover:ring-2 hover:ring-slate-200">
             <Stat label="공사 완료 · 수금 대기" sub={`${selectedYear}년 프로젝트 ${o.pendingCount}건 수주액 합계`}>
               <Money value={o.pendingReceivable} />
