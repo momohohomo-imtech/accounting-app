@@ -36,6 +36,7 @@ import { UnassignedWorkLogMonthFilter } from "@/components/UnassignedWorkLogMont
 import { buildWorkLogSummary } from "@/lib/workLogSummary";
 import { parseMonthRange } from "@/lib/monthRange";
 import { ReportExcelButton } from "@/components/ReportExcelButton";
+import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import type { WorkLog } from "@/lib/types";
 
 const MONTH_LABELS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
@@ -112,26 +113,31 @@ export default async function ReportsPage({
 
   const supabase = await createClient();
   const [
-    { data: rawTx },
+    rawTx,
     { data: projects },
     { data: firstTx },
     { data: savedInsights },
-    { data: creditPayments },
+    creditPayments,
     { data: agencyPurchases },
     { data: expenseCategories },
     { data: clientRows },
     { data: projectWorkLogRows },
     { data: bankAccounts },
-    { data: bankTxAll },
-    { data: creditPurchaseTxAll },
+    bankTxAll,
+    creditPurchaseTxAll,
   ] = await Promise.all([
-      supabase
-        .from("transactions")
-        .select(
-          "*, clients(name), projects(name, status, sites(name)), expense_categories(name, project_only, color), payment_methods(name, text_color, background_color)"
-        )
-        .gte("trans_date", `${selectedYear}-01-01`)
-        .lte("trans_date", `${selectedYear}-12-31`),
+      fetchAllRows<Row>((from, to) =>
+        supabase
+          .from("transactions")
+          .select(
+            "*, clients(name), projects(name, status, sites(name)), expense_categories(name, project_only, color), payment_methods(name, text_color, background_color)"
+          )
+          .gte("trans_date", `${selectedYear}-01-01`)
+          .lte("trans_date", `${selectedYear}-12-31`)
+          .order("trans_date", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to)
+      ),
       supabase
         .from("projects")
         .select(
@@ -144,7 +150,9 @@ export default async function ReportsPage({
         .select("*")
         .eq("year", selectedYear)
         .order("created_at", { ascending: false }),
-      supabase.from("credit_payments").select("*"),
+      fetchAllRows<CreditPayment>((from, to) =>
+        supabase.from("credit_payments").select("*").order("id", { ascending: true }).range(from, to)
+      ),
       supabase
         .from("project_agency_purchases")
         .select(
@@ -162,32 +170,47 @@ export default async function ReportsPage({
         .lte("log_date", `${selectedYear}-12-31`),
       // 현재 자금 내역용 — 선택 연도와 무관하게 항상 "현재 시점" 기준이라 연도 필터를 안 건다.
       supabase.from("bank_accounts").select("id, opening_balance"),
-      supabase.from("bank_transactions").select("bank_account_id, direction, amount"),
-      supabase
-        .from("transactions")
-        .select("id, type, sales_amount, sales_vat, purchase_amount, purchase_vat")
-        .eq("type", "매입")
-        .eq("payment_type", "credit"),
+      fetchAllRows<{ bank_account_id: string; direction: string; amount: number }>((from, to) =>
+        supabase
+          .from("bank_transactions")
+          .select("bank_account_id, direction, amount")
+          .order("id", { ascending: true })
+          .range(from, to)
+      ),
+      fetchAllRows<{
+        id: string;
+        type: string;
+        sales_amount: number;
+        sales_vat: number;
+        purchase_amount: number;
+        purchase_vat: number;
+      }>((from, to) =>
+        supabase
+          .from("transactions")
+          .select("id, type, sales_amount, sales_vat, purchase_amount, purchase_vat")
+          .eq("type", "매입")
+          .eq("payment_type", "credit")
+          .order("id", { ascending: true })
+          .range(from, to)
+      ),
     ]);
 
   const clientNames = (clientRows ?? []).map((c) => c.name);
 
-  const transactions = ((rawTx ?? []) as unknown as Row[]).filter((t) =>
-    isLedgerVisible(t, (creditPayments ?? []) as CreditPayment[])
-  );
+  const transactions = rawTx.filter((t) => isLedgerVisible(t, creditPayments));
 
   // 현재 자금 내역 — 선택 연도와 무관한 "현재" 스냅샷. 은행 총 잔액(마이너스 통장 있으면
   // 음수 가능)에서 아직 안 갚은 외상 매입 총액(VAT 포함, 완납 전까지 남은 잔액만)을 뺀
   // 실질 자금. 외상 매출(우리가 받을 돈)은 지출이 아니라서 안 뺀다.
   const bankBalanceByAccount = new Map<string, number>();
   for (const a of bankAccounts ?? []) bankBalanceByAccount.set(a.id, a.opening_balance ?? 0);
-  for (const t of bankTxAll ?? []) {
+  for (const t of bankTxAll) {
     const delta = t.direction === "입금" ? t.amount : -t.amount;
     bankBalanceByAccount.set(t.bank_account_id, (bankBalanceByAccount.get(t.bank_account_id) ?? 0) + delta);
   }
   const bankTotalBalance = Array.from(bankBalanceByAccount.values()).reduce((s, v) => s + v, 0);
-  const outstandingCreditPurchaseTotal = (creditPurchaseTxAll ?? []).reduce(
-    (s, t) => s + remainingBalance(t, (creditPayments ?? []) as CreditPayment[]),
+  const outstandingCreditPurchaseTotal = creditPurchaseTxAll.reduce(
+    (s, t) => s + remainingBalance(t, creditPayments),
     0
   );
   const currentFunds = bankTotalBalance - outstandingCreditPurchaseTotal;
