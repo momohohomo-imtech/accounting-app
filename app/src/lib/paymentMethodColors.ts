@@ -5,5 +5,5 @@ export const PAYMENT_METHOD_COLORS = [
   { label: "파랑", hex: "#0ea5e9" },
   { label: "초록", hex: "#22c55e" },
   { label: "주황", hex: "#f59e0b" },
-  { label: "보라", hex: "#a855f7" },
+  { label: "백색", hex: "#ffffff" },
 ] as const;
