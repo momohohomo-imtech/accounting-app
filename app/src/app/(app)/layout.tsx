@@ -21,20 +21,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <GlobalPendingProvider>
     <div className="flex min-h-screen bg-slate-50">
       <IdleLogout />
-      <aside className="hidden w-60 shrink-0 bg-slate-900 md:flex md:flex-col">
-        <div className="flex items-center gap-2.5 border-b border-slate-800 px-5 py-5">
-          <Image src="/logo-icon.png" alt="" width={30} height={30} className="rounded-md" />
-          <div>
-            <p className="tabular-nums text-[11px] tracking-widest text-slate-500">FIELD OPS · v0.1</p>
-            <p className="mt-0.5 text-base font-bold text-white">IM테크 회계 관리</p>
+      <aside className="hidden w-60 shrink-0 bg-slate-900 md:sticky md:top-0 md:flex md:h-screen md:flex-col print:hidden">
+        <div className="flex items-center gap-3 px-6 pb-2 pt-7">
+          <Image src="/logo-icon.png" alt="" width={28} height={28} className="rounded-md" />
+          <div className="leading-tight">
+            <p className="text-[15px] font-semibold tracking-tight text-white">IM테크</p>
+            <p className="mt-0.5 text-xs text-slate-500">회계 관리 시스템</p>
           </div>
         </div>
         <SidebarNav role={role} />
-        <form action={signOut} className="border-t border-slate-800 p-3">
-          <p className="truncate px-3 pb-2 text-xs text-slate-500">{user?.email}</p>
-          <button className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-400 transition-colors hover:bg-slate-800 hover:text-white">
-            로그아웃
-          </button>
+        <form action={signOut} className="border-t border-white/[0.06] px-6 py-4">
+          <p className="truncate text-xs text-slate-500">{user?.email}</p>
+          <button className="mt-1 text-xs text-slate-400 transition-colors hover:text-white">로그아웃</button>
         </form>
       </aside>
 
@@ -50,8 +48,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </button>
           </form>
         </header>
+        {/* pb-24: 휴대폰 하단 탭에 내용이 가리지 않게. 인쇄 폭(A4 ≈ 718px)도 md 미만이라 인쇄 땐 원래 여백으로. */}
+        <main className="flex-1 p-4 pb-24 md:p-8 print:pb-4">{children}</main>
         <MobileNav role={role} />
-        <main className="flex-1 p-4 md:p-8">{children}</main>
       </div>
     </div>
     </GlobalPendingProvider>
