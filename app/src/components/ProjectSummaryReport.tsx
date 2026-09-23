@@ -16,6 +16,8 @@ export type ProjectSummaryRow = {
   startDate: string | null;
   endDate: string | null;
   orderDate: string | null;
+  /** 작업일지 기준 실제 작업한 날짜 수(귀속 하위 프로젝트 포함, 중복 날짜는 한 번만). */
+  workDayCount: number;
   /** 이 프로젝트에 귀속(합산)된 하위 프로젝트 이름들 — 있으면 재무제표에 이미 합산돼 있음을 표시. */
   childNames: string[];
   quoteAmount: number;
@@ -132,6 +134,7 @@ export function ProjectSummaryReport({ rows }: { rows: ProjectSummaryRow[] }) {
                     기간: {formatDate(p.startDate)} ~ {formatDate(p.endDate)}
                   </span>
                   <span>발주서일자: {formatDate(p.orderDate)}</span>
+                  <span>작업일수: {p.workDayCount}일</span>
                 </div>
               </div>
 

@@ -116,6 +116,7 @@ export default async function ReportsPage({
     { data: agencyPurchases },
     { data: expenseCategories },
     { data: clientRows },
+    { data: projectWorkLogRows },
   ] = await Promise.all([
       supabase
         .from("transactions")
@@ -145,6 +146,13 @@ export default async function ReportsPage({
         .eq("projects.year", selectedYear),
       supabase.from("expense_categories").select("id, name, project_only, color").order("sort_order"),
       supabase.from("clients").select("name").order("name"),
+      // 프로젝트 요약(재무제표)의 작업일수용 — 연도 범위 안, 프로젝트가 지정된 작업일지만.
+      supabase
+        .from("work_logs")
+        .select("log_date, project_id")
+        .not("project_id", "is", null)
+        .gte("log_date", `${selectedYear}-01-01`)
+        .lte("log_date", `${selectedYear}-12-31`),
     ]);
 
   const clientNames = (clientRows ?? []).map((c) => c.name);
@@ -264,6 +272,9 @@ export default async function ReportsPage({
       const purchaseTotal = purchaseSupply + purchaseVat;
       const profit = quoteAmount - purchaseTotal - agencyAmount;
       const margin = quoteAmount > 0 ? (profit / quoteAmount) * 100 : null;
+      const workDayCount = new Set(
+        (projectWorkLogRows ?? []).filter((r) => r.project_id && groupIds.has(r.project_id)).map((r) => r.log_date)
+      ).size;
       return {
         id: p.id,
         projectCode: p.project_code ?? null,
@@ -273,6 +284,7 @@ export default async function ReportsPage({
         startDate: p.start_date ?? null,
         endDate: p.end_date ?? null,
         orderDate: p.order_date ?? null,
+        workDayCount,
         childNames: group.length > 1 ? group.slice(1).map((g) => g.name) : [],
         quoteAmount,
         agencyAmount,
@@ -292,6 +304,7 @@ export default async function ReportsPage({
     p.name,
     p.siteName ?? "-",
     projectStatusLabel(p.status),
+    p.workDayCount,
     p.quoteAmount,
     p.agencyAmount,
     p.purchaseSupply,
@@ -944,6 +957,7 @@ export default async function ReportsPage({
               "프로젝트명",
               "현장",
               "상태",
+              "작업일수",
               "발주액",
               "대행구매액",
               "매입 공급가액",
