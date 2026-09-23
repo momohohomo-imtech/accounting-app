@@ -10,6 +10,7 @@ import { useEscapeKey } from "@/lib/useEscapeKey";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { TOOL_COLORS } from "@/lib/toolColors";
+import { ColorSwatchPicker } from "@/components/ColorSwatchPicker";
 
 type Tool = {
   id: string;
@@ -23,43 +24,6 @@ type Tool = {
   for_access_pass: boolean;
 };
 type ToolOption = { id: string; name: string };
-
-function ColorSwatchPicker({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string | null;
-  onChange: (hex: string | null) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label className={labelClass}>{label}</label>
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onChange(null)}
-          className={`rounded-full border px-2.5 py-1 text-xs ${
-            value === null ? "border-slate-900 font-semibold text-slate-900" : "border-slate-300 text-slate-500"
-          }`}
-        >
-          없음
-        </button>
-        {TOOL_COLORS.map((c) => (
-          <button
-            key={c.hex}
-            type="button"
-            onClick={() => onChange(c.hex)}
-            className={`h-6 w-6 rounded-full border ${value === c.hex ? "border-2 border-slate-900" : "border-slate-300"}`}
-            style={{ backgroundColor: c.hex }}
-            title={c.label}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export function ToolEditPopup({
   tool,
@@ -182,8 +146,8 @@ export function ToolEditPopup({
               반입반출증용 (반입반출증 인쇄 시 이 공구만 포함)
             </label>
 
-            <ColorSwatchPicker label="글씨색" value={textColor} onChange={setTextColor} />
-            <ColorSwatchPicker label="배경색" value={backgroundColor} onChange={setBackgroundColor} />
+            <ColorSwatchPicker label="글씨색" value={textColor} onChange={setTextColor} colors={TOOL_COLORS} />
+            <ColorSwatchPicker label="배경색" value={backgroundColor} onChange={setBackgroundColor} colors={TOOL_COLORS} />
 
             <div className="flex flex-col gap-1">
               <label className={labelClass}>연결 공구 (이 공구를 고르면 같이 자동 선택됨)</label>

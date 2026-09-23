@@ -1265,3 +1265,23 @@ admin/staff/tax_agent 전체 계정을 관리하는 `AccountPanel`/`lib/actions/
 - 빌드/린트 통과. 미검증(로그인 세션 없음) — 다음 세션에서 계정 추가/수정/
   삭제/비밀번호 변경/세무사 정지 전부 실제로 확인할 것 — 특히 계정 삭제는
   되돌릴 수 없으니 테스트 계정으로 먼저 확인 권장.
+
+### 결제수단 — 이름 글씨색·배경색 지정 기능 추가
+공구(tools)에 이미 있던 "글씨색/배경색 5~6색 중 택1" 스와치 선택 UI를
+결제수단에도 적용. 공용화하면서 `ToolEditPopup.tsx` 안에 있던
+`ColorSwatchPicker`를 `components/ColorSwatchPicker.tsx`로 분리(팔레트를
+`colors` prop으로 받게 바꿈 — 공구는 기존 6색(`toolColors.ts`) 그대로,
+결제수단은 사용자 요청대로 5색(`paymentMethodColors.ts`) 신규).
+- `077_payment_method_colors.sql`(신규, **실행 필요**) —
+  `payment_methods`에 `text_color`/`background_color` 추가.
+- `PaymentMethodColorLegend.tsx`(신규) — 매입매출 페이지의 결제수단 섹션
+  (`PaymentMethodsSection.tsx`) 하단에 목록 형태로 추가, 각 행에서 "색
+  지정" 눌러 스와치로 글씨색/배경색 선택 → 저장하면 바로 그 색으로 뱃지
+  미리보기가 바뀜.
+- 범위를 결제수단 관리 화면(선택 UI + 그 자리에서의 미리보기)으로만
+  한정함 — 카테고리 색상처럼 매입매출 목록/보고서 등 다른 화면까지
+  전파하는 건 이번엔 안 함(필요하면 다음에 요청받아 확장).
+- 빌드/린트 통과. 미검증(SQL 미실행 + 로그인 세션 없음) — **마이그레이션
+  실행 전까지는 "색 지정"으로 저장할 때만 에러 남**(text_color/
+  background_color 컬럼이 아직 없어서), 목록 조회 자체는 문제없음. 다음
+  세션에서 SQL 실행 여부 확인 후 색 선택 UI 실제로 확인할 것.

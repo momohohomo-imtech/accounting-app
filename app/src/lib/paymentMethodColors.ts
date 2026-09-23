@@ -1,0 +1,9 @@
+// 결제수단 이름에 지정하는 글씨색·배경색 — 고정 5색 중 택1, 두 선택이 같은
+// 팔레트를 공유함(공구 색상 팔레트 toolColors.ts와 같은 5색).
+export const PAYMENT_METHOD_COLORS = [
+  { label: "빨강", hex: "#ef4444" },
+  { label: "파랑", hex: "#0ea5e9" },
+  { label: "초록", hex: "#22c55e" },
+  { label: "주황", hex: "#f59e0b" },
+  { label: "보라", hex: "#a855f7" },
+] as const;

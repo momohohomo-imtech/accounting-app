@@ -29,3 +29,12 @@ export async function deletePaymentMethodRecord(formData: FormData) {
   await supabase.from("payment_methods").delete().eq("id", id);
   revalidatePath("/transactions");
 }
+
+export async function updatePaymentMethodColor(formData: FormData) {
+  const supabase = await createClient();
+  const id = String(formData.get("id"));
+  const textColor = String(formData.get("text_color") ?? "") || null;
+  const backgroundColor = String(formData.get("background_color") ?? "") || null;
+  await supabase.from("payment_methods").update({ text_color: textColor, background_color: backgroundColor }).eq("id", id);
+  revalidatePath("/transactions");
+}

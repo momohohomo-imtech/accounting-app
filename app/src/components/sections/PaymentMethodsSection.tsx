@@ -7,6 +7,7 @@ import {
   deletePaymentMethodRecord,
 } from "@/lib/actions/payment-methods";
 import type { FieldConfig } from "@/components/crud/types";
+import { PaymentMethodColorLegend } from "@/components/PaymentMethodColorLegend";
 
 const fields: FieldConfig[] = [
   { name: "name", label: "이름", required: true, placeholder: "예: 신한카드, 현금, 송금" },
@@ -29,6 +30,7 @@ export async function PaymentMethodsSection() {
           deleteAction={deletePaymentMethodRecord}
         />
       </div>
+      <PaymentMethodColorLegend methods={paymentMethods ?? []} />
     </div>
   );
 }
