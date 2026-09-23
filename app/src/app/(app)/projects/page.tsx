@@ -18,7 +18,6 @@ import { formatWon } from "@/lib/format";
 import { ProjectListExportButtons } from "@/components/ProjectListExportButtons";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { ProjectsPageMemo } from "@/components/ProjectsPageMemo";
-import { TotalPurchaseSummary } from "@/components/TotalPurchaseSummary";
 
 const TABS = [
   { key: "list", label: "프로젝트" },
@@ -291,6 +290,16 @@ async function ProjectListSection({
       defaultVisible: false,
     },
     {
+      name: "totalPurchase",
+      label: "총 매입 (매입+구매대행)",
+      tableLabel: "총 매입",
+      readOnly: true,
+      format: "currency",
+      width: "8%",
+      toggleable: true,
+      defaultVisible: false,
+    },
+    {
       name: "profitRate",
       label: "이익율",
       readOnly: true,
@@ -322,11 +331,14 @@ async function ProjectListSection({
     const contractMismatch =
       !p.settlement_finalized &&
       (p.contract_amount ?? 0) > 0 && (p.quote_amount ?? 0) - (p.contract_amount ?? 0) - agencyAmount !== 0;
-    const profit = p.quote_amount ? p.quote_amount - (purchaseByProject.get(p.id) ?? 0) - agencyAmount : null;
+    const purchaseAmount = purchaseByProject.get(p.id) ?? 0;
+    const profit = p.quote_amount ? p.quote_amount - purchaseAmount - agencyAmount : null;
     // 이익율은 발주액 대비 비율 — 손익보고서 팝업/보고서 페이지와 동일한 계산 기준.
     const profitRate = p.quote_amount && profit !== null ? `${((profit / p.quote_amount) * 100).toFixed(1)}%` : "-";
     // 수주예상액 = 발주액 - 구매 대행비.
     const contractAmountExpected = (p.quote_amount ?? 0) - agencyAmount;
+    // 총 매입 = 매입 합계 + 구매대행 합계.
+    const totalPurchase = purchaseAmount + agencyAmount;
     return {
       ...p,
       site_name: (one(p.sites) as { name: string } | undefined)?.name,
@@ -334,6 +346,7 @@ async function ProjectListSection({
       profitRate,
       contractMismatch,
       contractAmountExpected,
+      totalPurchase,
     };
   });
 
@@ -364,11 +377,7 @@ async function ProjectListSection({
   const filteredQuoteSum = tableRows.reduce((sum, p) => sum + (p.quote_amount ?? 0), 0);
   const filteredContractSum = tableRows.reduce((sum, p) => sum + p.contractAmountExpected, 0);
   const filteredProfitSum = tableRows.reduce((sum, p) => sum + (p.profit ?? 0), 0);
-  // 총 매입 = 매입 합계 + 구매대행 합계 (필터된 프로젝트 기준).
-  const filteredPurchaseSum = tableRows.reduce(
-    (sum, p) => sum + (purchaseByProject.get(p.id) ?? 0) + (agencyByProject.get(p.id) ?? 0),
-    0
-  );
+  const filteredPurchaseSum = tableRows.reduce((sum, p) => sum + p.totalPurchase, 0);
 
   return (
     <div className="space-y-6">
@@ -443,7 +452,9 @@ async function ProjectListSection({
             <span>
               이익금 <span className="font-mono font-semibold text-slate-900">{formatWon(filteredProfitSum)}</span>
             </span>
-            <TotalPurchaseSummary amount={filteredPurchaseSum} />
+            <span>
+              총 매입 <span className="font-mono font-semibold text-slate-900">{formatWon(filteredPurchaseSum)}</span>
+            </span>
           </div>
         </div>
       </div>
