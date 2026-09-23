@@ -8,6 +8,8 @@ import { YearFilter } from "@/components/YearFilter";
 import { ReportProjectSiteFilter } from "@/components/ReportProjectSiteFilter";
 import { ReportProjectPicker } from "@/components/ReportProjectPicker";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
+import { ProjectSummaryReport, type ProjectSummaryRow } from "@/components/ProjectSummaryReport";
+import { projectStatusLabel } from "@/lib/projectStatus";
 import { AutoPrint } from "@/components/AutoPrint";
 import { ReportAIInsights } from "@/components/ReportAIInsights";
 import { saveReportAiInsight, deleteReportAiInsight } from "@/lib/actions/reportAiInsights";
@@ -124,7 +126,9 @@ export default async function ReportsPage({
         .lte("trans_date", `${selectedYear}-12-31`),
       supabase
         .from("projects")
-        .select("id, name, status, progress_pct, site_id, quote_amount, contract_amount, settlement_finalized, sites(name)")
+        .select(
+          "id, project_code, name, status, progress_pct, site_id, parent_project_id, quote_amount, contract_amount, settlement_finalized, start_date, end_date, order_date, sites(name)"
+        )
         .eq("year", selectedYear),
       supabase.from("transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
       supabase
@@ -213,6 +217,90 @@ export default async function ReportsPage({
     .sort((a, b) => a.label.localeCompare(b.label));
 
   const byProject = site ? byProjectAll.filter((p) => p.site_id === site) : byProjectAll;
+
+  // 프로젝트 요약(A4 재무제표) 대상 — 공사완료·완료 수금대기·수금완료 3개 상태만.
+  // 귀속(parent_project_id가 있는) 프로젝트는 절대 단독으로 카드를 만들지 않고 항상
+  // 어미(상위) 프로젝트 쪽에 발주액·매입·대행구매·카테고리 내역을 합산해서 보여준다
+  // (같은 해에 등록된 귀속 프로젝트만 대상 — 연도가 다르면 못 합침, 기존 한계와 동일).
+  // 매입내역 전체가 아니라 카테고리별 합산 금액만 쓰므로 프로젝트별로 매입/대행구매를
+  // 카테고리 단위로 다시 묶는다(전체 집계용 byCategory/agencyByCategory와 같은 방식,
+  // 프로젝트(+귀속 하위) 그룹 단위로만 좁힌 버전).
+  const PROJECT_SUMMARY_STATUSES = ["done", "done_awaiting_payment", "collected"];
+  const childrenByParentId = new Map<string, typeof byProjectAll>();
+  for (const p of byProjectAll) {
+    if (!p.parent_project_id) continue;
+    const arr = childrenByParentId.get(p.parent_project_id) ?? [];
+    arr.push(p);
+    childrenByParentId.set(p.parent_project_id, arr);
+  }
+  const projectSummaryRows: ProjectSummaryRow[] = byProject
+    .filter((p) => !p.parent_project_id && PROJECT_SUMMARY_STATUSES.includes(p.status ?? ""))
+    .map((p) => {
+      const group = [p, ...(childrenByParentId.get(p.id) ?? [])];
+      const groupIds = new Set(group.map((g) => g.id));
+
+      const catMap = new Map<string, { name: string; amount: number; color?: string }>();
+      let purchaseSupply = 0;
+      let purchaseVat = 0;
+      for (const t of transactions.filter((t) => t.project_id && groupIds.has(t.project_id) && t.type === "매입")) {
+        const cat = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
+        const name = cat?.name ?? "미분류";
+        const entry = catMap.get(name) ?? { name, amount: 0, color: cat ? resolveCategoryColor(cat) : undefined };
+        entry.amount += t.purchase_amount + t.purchase_vat;
+        catMap.set(name, entry);
+        purchaseSupply += t.purchase_amount;
+        purchaseVat += t.purchase_vat;
+      }
+      let agencyAmount = 0;
+      for (const a of (agencyPurchases ?? []).filter((a) => groupIds.has(a.project_id))) {
+        const cat = one(a.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
+        const name = cat?.name ?? "미분류";
+        const entry = catMap.get(name) ?? { name, amount: 0, color: cat ? resolveCategoryColor(cat) : undefined };
+        entry.amount += a.amount;
+        catMap.set(name, entry);
+        agencyAmount += a.amount;
+      }
+      const quoteAmount = group.reduce((s, g) => s + g.quoteAmount, 0);
+      const purchaseTotal = purchaseSupply + purchaseVat;
+      const profit = quoteAmount - purchaseTotal - agencyAmount;
+      const margin = quoteAmount > 0 ? (profit / quoteAmount) * 100 : null;
+      return {
+        id: p.id,
+        projectCode: p.project_code ?? null,
+        name: p.name,
+        siteName: (one(p.sites) as { name: string } | null)?.name ?? null,
+        status: p.status,
+        startDate: p.start_date ?? null,
+        endDate: p.end_date ?? null,
+        orderDate: p.order_date ?? null,
+        childNames: group.length > 1 ? group.slice(1).map((g) => g.name) : [],
+        quoteAmount,
+        agencyAmount,
+        purchaseTotal,
+        purchaseSupply,
+        purchaseVat,
+        contractAmountExpected: quoteAmount - agencyAmount,
+        profit,
+        margin,
+        categoryBreakdown: Array.from(catMap.values()).sort((a, b) => b.amount - a.amount),
+      };
+    })
+    .sort((a, b) => (a.projectCode ?? "").localeCompare(b.projectCode ?? "") || a.name.localeCompare(b.name, "ko"));
+
+  const projectSummaryExportRows = projectSummaryRows.map((p) => [
+    p.projectCode ?? "-",
+    p.name,
+    p.siteName ?? "-",
+    projectStatusLabel(p.status),
+    p.quoteAmount,
+    p.agencyAmount,
+    p.purchaseSupply,
+    p.purchaseVat,
+    p.purchaseTotal,
+    p.contractAmountExpected,
+    p.profit,
+    p.margin === null ? 0 : Math.round(p.margin * 100) / 100,
+  ]);
 
   // 매출 검증: 수주액(실수령액으로 입력해둔 금액)과 실제 매출 원장(세금계산서 기준) 합계를
   // 대조 — 수주액 필드만 입력되고 원장에 매출이 안 찍혔거나, 반대로 원장엔 매출이 있는데
@@ -769,7 +857,7 @@ export default async function ReportsPage({
       <CollapsibleSection
         title={groupTitle("프로젝트")}
         bare
-        defaultOpen={groupDefaultOpen(["projects", "revenue"])}
+        defaultOpen={groupDefaultOpen(["projects", "revenue", "projectSummary"])}
       >
        <div className="space-y-6 mt-3">
 
@@ -797,7 +885,12 @@ export default async function ReportsPage({
                 <ReportProjectPicker
                   year={selectedYear}
                   site={site}
-                  projects={[...byProject].sort((a, b) => a.name.localeCompare(b.name, "ko"))}
+                  // 귀속(parent_project_id가 있는) 프로젝트는 목록에서 빼고 항상 어미 프로젝트만
+                  // 고를 수 있게 함 — 어미 프로젝트를 고르면 ProjectProfitReport가 귀속 하위까지
+                  // 알아서 합쳐서 보여줌(하위 프로젝트를 단독으로 열면 그 하위 몫만 나와 불완전함).
+                  projects={[...byProject]
+                    .filter((p) => !p.parent_project_id)
+                    .sort((a, b) => a.name.localeCompare(b.name, "ko"))}
                 />
               )}
             </>
@@ -838,6 +931,32 @@ export default async function ReportsPage({
         })}
       >
         <RevenueVerificationTable rows={revenueVerificationRows} />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title="프로젝트 요약 — 공사완료 · 완료 수금대기 · 수금완료 (A4 인쇄용 재무제표)"
+          className={hiddenClass("projectSummary")}
+          defaultOpen={printSection === "projectSummary"}
+          headerExtra={sectionControls("projectSummary", {
+            filename: `프로젝트_요약_${selectedYear}.xlsx`,
+            headers: [
+              "프로젝트번호",
+              "프로젝트명",
+              "현장",
+              "상태",
+              "발주액",
+              "대행구매액",
+              "매입 공급가액",
+              "매입 부가세",
+              "매입합계",
+              "수주예상액",
+              "이익금",
+              "이익율(%)",
+            ],
+            rows: projectSummaryExportRows,
+          })}
+        >
+          <ProjectSummaryReport rows={projectSummaryRows} />
         </CollapsibleSection>
        </div>
       </CollapsibleSection>

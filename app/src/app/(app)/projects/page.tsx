@@ -407,17 +407,23 @@ async function ProjectListSection({
             deleteAction={deleteProjectRecord}
             editPopup
             extraActions={Object.fromEntries(
-              (projects ?? []).map((p) => [
-                p.id,
-                <LinkButton
-                  key={p.id}
-                  href={`/projects?tab=list&year=${selectedYear}${siteId ? `&site_id=${siteId}` : ""}${status ? `&status=${encodeURIComponent(status)}` : ""}&report=${p.id}`}
-                  variant="secondary"
-                  size="xs"
-                >
-                  보고서
-                </LinkButton>,
-              ])
+              (projects ?? []).map((p) => {
+                // 귀속(parent_project_id가 있는) 프로젝트는 보고서를 열어도 항상 어미
+                // 프로젝트 보고서로 이동 — 하위 프로젝트만 단독으로 열면 귀속 합산 전
+                // 불완전한 수치가 보임(ProjectProfitReport는 어미 id로 열어야 하위까지 합침).
+                const reportId = p.parent_project_id ?? p.id;
+                return [
+                  p.id,
+                  <LinkButton
+                    key={p.id}
+                    href={`/projects?tab=list&year=${selectedYear}${siteId ? `&site_id=${siteId}` : ""}${status ? `&status=${encodeURIComponent(status)}` : ""}&report=${reportId}`}
+                    variant="secondary"
+                    size="xs"
+                  >
+                    보고서
+                  </LinkButton>,
+                ];
+              })
             )}
           />
           <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-slate-100 pt-3 text-sm text-slate-600">
