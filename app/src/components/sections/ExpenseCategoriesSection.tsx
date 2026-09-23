@@ -17,6 +17,11 @@ const fields: FieldConfig[] = [
     label: "프로젝트 전용 (체크 시 빨간색으로 표시 — 항상 특정 프로젝트에 귀속되는 지출)",
     type: "checkbox",
   },
+  {
+    name: "vat_non_deductible",
+    label: "매입세액 불공제 (체크 시 대시보드 부가세 집계에서 공제 대상에서 빼고 따로 표시 — 예: 승용차 렌트·유류비)",
+    type: "checkbox",
+  },
 ];
 
 export async function ExpenseCategoriesSection() {

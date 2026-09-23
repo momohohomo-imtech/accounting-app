@@ -8,6 +8,7 @@ import { Button, LinkButton } from "@/components/ui/Button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { paymentMethodColorStyle } from "@/lib/paymentMethodColors";
+import { supplyOf } from "@/lib/vatBasis";
 import type { PaymentMethod, Transaction } from "@/lib/types";
 
 export type OutstandingItem = { tx: Transaction; remaining: number };
@@ -49,10 +50,7 @@ export function CreditSettlementGroup({
   }
 
   const groupTotal = items.reduce((s, i) => s + i.remaining, 0);
-  const groupVatExcludedTotal = items.reduce(
-    (s, i) => s + (i.tx.type === "매출" ? i.tx.sales_amount : i.tx.purchase_amount),
-    0
-  );
+  const groupVatExcludedTotal = items.reduce((s, i) => s + supplyOf(i.tx), 0);
   const selectedTotal = items.filter((i) => selected.has(i.tx.id)).reduce((s, i) => s + i.remaining, 0);
 
   return (
@@ -87,7 +85,7 @@ export function CreditSettlementGroup({
             </span>
             <span className="flex-1 truncate text-slate-700">{tx.item_name ?? "-"}</span>
             <span className="shrink-0 text-blue-600">
-              {formatWon(tx.type === "매출" ? tx.sales_amount : tx.purchase_amount)}
+              {formatWon(supplyOf(tx))}
             </span>
             <span className="shrink-0 font-medium text-slate-900">{formatWon(remaining)}</span>
             <LinkButton href={`/transactions?tab=credit&editTx=${tx.id}`} variant="secondary" size="xs">

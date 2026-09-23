@@ -37,6 +37,7 @@ import { buildWorkLogSummary } from "@/lib/workLogSummary";
 import { parseMonthRange } from "@/lib/monthRange";
 import { ReportExcelButton } from "@/components/ReportExcelButton";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { grossOf, purchaseCostOf, salesSupplyOf } from "@/lib/vatBasis";
 import type { WorkLog } from "@/lib/types";
 import { nowKst } from "@/lib/kstDate";
 
@@ -72,7 +73,7 @@ type Row = {
 };
 
 const TX_SELECT =
-  "*, clients(name), projects(name, status, sites(name)), expense_categories(name, project_only, color), payment_methods(name, text_color, background_color)";
+  "*, clients(name), projects(name, status, sites(name)), expense_categories(*), payment_methods(name, text_color, background_color)";
 
 function one<T>(v: T | T[] | null): T | null {
   return Array.isArray(v) ? v[0] ?? null : v;
@@ -273,11 +274,10 @@ export default async function ReportsPage({
 
   const byProjectAll = (projects ?? []).map((p) => {
     const rows = projectTx.filter((t) => t.project_id === p.id);
-    // 손익 계산 시 매출은 부가세를 뺀 금액을 사용 (VAT는 실제 이익이 아닌 세무서 납부분).
-    // 매출 총액(부가세 포함분)을 1.1로 나눠서 부가세만큼만 정확히 제외한다.
-    const salesGross = rows.reduce((s, t) => s + t.sales_amount + t.sales_vat, 0);
-    const sales = Math.round(salesGross / 1.1);
-    const purchase = rows.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
+    // 손익은 부가세 제외 기준 — 발주액·대행구매액이 부가세 제외라 매출·매입도 공급가로 맞춘다
+    // (총액을 부가세 포함으로 보고 ÷1.1, 인건비 등 비과세 카테고리는 총액 그대로 — lib/vatBasis.ts).
+    const sales = rows.reduce((s, t) => s + salesSupplyOf(t), 0);
+    const purchase = rows.reduce((s, t) => s + purchaseCostOf(t), 0);
     const quoteAmount = p.quote_amount ?? 0;
     const agencyAmount = agencyByProject.get(p.id) ?? 0;
     // 프로젝트 손익보고서 팝업과 동일한 방식(발주액-매입-대행구매액)으로 통일.
@@ -329,10 +329,11 @@ export default async function ReportsPage({
         const cat = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
         const name = cat?.name ?? "미분류";
         const entry = catMap.get(name) ?? { name, amount: 0, color: cat ? resolveCategoryColor(cat) : undefined };
-        entry.amount += t.purchase_amount + t.purchase_vat;
+        // 카테고리 내역·이익은 발주액과 같은 부가세 제외(돌려받는 부가세만 뺀) 기준, 매입 총액은 그대로.
+        entry.amount += purchaseCostOf(t);
         catMap.set(name, entry);
-        purchaseSupply += t.purchase_amount;
-        purchaseVat += t.purchase_vat;
+        purchaseSupply += purchaseCostOf(t);
+        purchaseVat += grossOf(t) - purchaseCostOf(t);
       }
       let agencyAmount = 0;
       for (const a of (agencyPurchases ?? []).filter((a) => groupIds.has(a.project_id))) {
@@ -345,7 +346,7 @@ export default async function ReportsPage({
       }
       const quoteAmount = group.reduce((s, g) => s + g.quoteAmount, 0);
       const purchaseTotal = purchaseSupply + purchaseVat;
-      const profit = quoteAmount - purchaseTotal - agencyAmount;
+      const profit = quoteAmount - purchaseSupply - agencyAmount;
       const margin = quoteAmount > 0 ? (profit / quoteAmount) * 100 : null;
       const workDayCount = new Set(
         projectWorkLogRows.filter((r) => r.project_id && groupIds.has(r.project_id)).map((r) => r.log_date)
@@ -427,10 +428,10 @@ export default async function ReportsPage({
   const nullProjectPurchaseTx = transactions.filter((t) => !t.project_id && t.type === "매입");
   const generalExpense = nullProjectPurchaseTx
     .filter((t) => one(t.expense_categories)?.name !== PAYROLL_CATEGORY_NAME)
-    .reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
+    .reduce((s, t) => s + purchaseCostOf(t), 0);
   const payrollCost = nullProjectPurchaseTx
     .filter((t) => one(t.expense_categories)?.name === PAYROLL_CATEGORY_NAME)
-    .reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
+    .reduce((s, t) => s + purchaseCostOf(t), 0);
   const yearProfitEstimate = yearProfitSum - generalExpense - payrollCost;
   const yearProfitEstimateRate = totalExpectedRevenue > 0 ? (yearProfitEstimate / totalExpectedRevenue) * 100 : null;
 
@@ -1035,12 +1036,12 @@ export default async function ReportsPage({
             "projects",
             {
               filename: `프로젝트별_손익_${selectedYear}.xlsx`,
-              headers: ["프로젝트", "진행률", "발주액", "매출", "매입", "이익금", "이익율"],
+              headers: ["프로젝트", "진행률", "발주액", "매출(VAT제외)", "매입(VAT제외)", "이익금", "이익율"],
               rows: projectExportRows,
             },
             <>
               <span className="text-xs text-slate-500">
-                {selectedYear}년 총 {projectSummary.count}건 · 매출 {formatWon(projectSummary.sales)} · 매입{" "}
+                {selectedYear}년 총 {projectSummary.count}건 · 매출(VAT제외) {formatWon(projectSummary.sales)} · 매입(VAT제외){" "}
                 {formatWon(projectSummary.purchase)} · 이익금 {formatWon(projectSummary.profit)} · 이익율{" "}
                 {projectSummary.profitRate === null ? "-" : `${projectSummary.profitRate.toFixed(2)}%`}
               </span>
@@ -1063,7 +1064,7 @@ export default async function ReportsPage({
           )}
         >
           <p className="mb-3 hidden text-xs text-slate-500 print:block">
-            {selectedYear}년 총 {projectSummary.count}건 · 매출 {formatWon(projectSummary.sales)} · 매입{" "}
+            {selectedYear}년 총 {projectSummary.count}건 · 매출(VAT제외) {formatWon(projectSummary.sales)} · 매입(VAT제외){" "}
             {formatWon(projectSummary.purchase)} · 이익금 {formatWon(projectSummary.profit)} · 이익율{" "}
             {projectSummary.profitRate === null ? "-" : `${projectSummary.profitRate.toFixed(2)}%`}
           </p>

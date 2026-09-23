@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { formatWon, formatDate } from "@/lib/format";
 import { remainingBalance, isLedgerVisible } from "@/lib/credit";
-import type { CreditPayment, Transaction } from "@/lib/types";
+import type { CreditPayment, ExpenseCategory, Transaction } from "@/lib/types";
+import { vatOf } from "@/lib/vatBasis";
 import { loadLedgerTaxEstimate } from "@/lib/ledgerTaxEstimate";
 import { loadProfitOutlook, ProfitCalculationDetail } from "@/components/sections/ProfitOutlook";
 import { HalfYearSettlementInput } from "@/components/sections/HalfYearSettlementInput";
@@ -74,6 +75,7 @@ export default async function DashboardPage({
     { data: yearProjects },
     outlook,
     ledgerTax,
+    { data: categoryRows },
   ] = await Promise.all([
     supabase.from("transactions").select("*").gte("trans_date", monthStart).lte("trans_date", monthEnd),
     fetchAllRows<Transaction>((from, to) =>
@@ -93,6 +95,7 @@ export default async function DashboardPage({
       type: string;
       payment_type: string;
       trans_date: string;
+      category_id: string | null;
       sales_amount: number;
       sales_vat: number;
       purchase_amount: number;
@@ -100,7 +103,7 @@ export default async function DashboardPage({
     }>((from, to) =>
       supabase
         .from("transactions")
-        .select("id, type, payment_type, trans_date, sales_amount, sales_vat, purchase_amount, purchase_vat")
+        .select("id, type, payment_type, trans_date, category_id, sales_amount, sales_vat, purchase_amount, purchase_vat")
         .gte("trans_date", `${selectedYear}-01-01`)
         .lte("trans_date", `${selectedYear}-12-31`)
         .order("id", { ascending: true })
@@ -110,6 +113,8 @@ export default async function DashboardPage({
     supabase.from("projects").select("contract_amount").eq("year", selectedYear),
     loadProfitOutlook(selectedYear),
     loadLedgerTaxEstimate(selectedYear),
+    // select("*") — 불공제 칸(082 마이그레이션) 실행 전에도 조회가 깨지지 않게.
+    supabase.from("expense_categories").select("*"),
   ]);
 
   const payments = creditPayments;
@@ -133,17 +138,33 @@ export default async function DashboardPage({
   // 선택 연도 전체 프로젝트 수주액 합계 — 프로젝트 페이지 하단 "수주액" 합계와 같은 값.
   const totalExpectedRevenue = (yearProjects ?? []).reduce((s, p) => s + (p.contract_amount ?? 0), 0);
 
-  // 부가세는 세금계산서(거래일) 기준이라 외상 미정산 건도 포함한다. 장부에 부가세가 따로
-  // 기록된 금액(sales_vat/purchase_vat)만 합산.
+  // 부가세는 세금계산서(거래일) 기준이라 외상 미정산 건도 포함한다. 금액은 총액(부가세 포함)에서
+  // 계산(lib/vatBasis.ts)하고, 매입세액 불공제 카테고리(승용차 등)는 공제 대상에서 빼서 따로 표시.
+  const categoryById = new Map(
+    ((categoryRows ?? []) as ExpenseCategory[]).map((c) => [c.id, { name: c.name, nonDeductible: Boolean(c.vat_non_deductible) }])
+  );
   const vatQuarters = [1, 2, 3, 4].map((q) => {
-    const rows = yearTxRaw.filter((t) => Math.ceil(Number(t.trans_date.slice(5, 7)) / 3) === q);
-    const salesVat = rows.reduce((s, t) => s + t.sales_vat, 0);
-    const purchaseVat = rows.reduce((s, t) => s + t.purchase_vat, 0);
-    return { q, salesVat, purchaseVat, net: salesVat - purchaseVat };
+    let salesVat = 0;
+    let purchaseVat = 0;
+    let nonDeductibleVat = 0;
+    for (const t of yearTxRaw) {
+      if (Math.ceil(Number(t.trans_date.slice(5, 7)) / 3) !== q) continue;
+      const cat = t.category_id ? categoryById.get(t.category_id) : undefined;
+      const vat = vatOf({ ...t, expense_categories: cat ? { name: cat.name } : null });
+      if (t.type === "매출") salesVat += vat;
+      else if (cat?.nonDeductible) nonDeductibleVat += vat;
+      else purchaseVat += vat;
+    }
+    return { q, salesVat, purchaseVat, nonDeductibleVat, net: salesVat - purchaseVat };
   });
   const vatTotal = vatQuarters.reduce(
-    (acc, v) => ({ salesVat: acc.salesVat + v.salesVat, purchaseVat: acc.purchaseVat + v.purchaseVat, net: acc.net + v.net }),
-    { salesVat: 0, purchaseVat: 0, net: 0 }
+    (acc, v) => ({
+      salesVat: acc.salesVat + v.salesVat,
+      purchaseVat: acc.purchaseVat + v.purchaseVat,
+      nonDeductibleVat: acc.nonDeductibleVat + v.nonDeductibleVat,
+      net: acc.net + v.net,
+    }),
+    { salesVat: 0, purchaseVat: 0, nonDeductibleVat: 0, net: 0 }
   );
 
   const firstYear = Math.min(
@@ -253,14 +274,15 @@ export default async function DashboardPage({
 
       {/* ④ 부가세 */}
       <Card>
-        <SectionTitle note="장부에 부가세가 따로 기록된 금액만 합산 · 외상 미정산 건 포함(세금계산서 기준)">
+        <SectionTitle note="총액(부가세 포함)에서 계산 · 인건비 등 비과세 제외 · 외상 미정산 건 포함(세금계산서 기준)">
           ④ {selectedYear}년 부가세 (분기별)
         </SectionTitle>
-        <Table className="min-w-[480px]">
+        <Table className="min-w-[620px]">
           <THead>
             <Th className="pr-4">분기</Th>
             <Th className="pr-4 text-right">매출세액</Th>
-            <Th className="pr-4 text-right">매입세액</Th>
+            <Th className="pr-4 text-right">공제 매입세액</Th>
+            <Th className="pr-4 text-right">불공제 매입세액</Th>
             <Th className="text-right">납부(−환급) 예상</Th>
           </THead>
           <tbody>
@@ -275,6 +297,9 @@ export default async function DashboardPage({
                 <Td className="pr-4 text-right">
                   <Money value={v.purchaseVat} />
                 </Td>
+                <Td className="pr-4 text-right text-slate-400">
+                  <Money value={v.nonDeductibleVat} />
+                </Td>
                 <Td className="text-right font-semibold">
                   <Money value={v.net} />
                 </Td>
@@ -288,6 +313,9 @@ export default async function DashboardPage({
               <td className="py-2 pr-4 text-right">
                 <Money value={vatTotal.purchaseVat} />
               </td>
+              <td className="py-2 pr-4 text-right text-slate-400">
+                <Money value={vatTotal.nonDeductibleVat} />
+              </td>
               <td className="py-2 text-right">
                 <Money value={vatTotal.net} />
               </td>
@@ -295,7 +323,8 @@ export default async function DashboardPage({
           </tbody>
         </Table>
         <p className="mt-2 text-xs text-slate-400">
-          부가세 신고는 반기(1~6월, 7~12월) 기준이며, 실제 신고 금액은 세무사 확인 후 확정됩니다.
+          불공제 매입세액은 지출카테고리에서 &quot;매입세액 불공제&quot;로 체크한 카테고리(승용차 렌트·유류비 등) 몫으로, 납부
+          예상에서 빼주지 않습니다. 부가세 신고는 반기(1~6월, 7~12월) 기준이며, 실제 신고 금액은 세무사 확인 후 확정됩니다.
         </p>
       </Card>
 

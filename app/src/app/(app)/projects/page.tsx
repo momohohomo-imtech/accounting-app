@@ -19,6 +19,7 @@ import { ProjectListExportButtons } from "@/components/ProjectListExportButtons"
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { ProjectsPageMemo } from "@/components/ProjectsPageMemo";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { purchaseCostOf } from "@/lib/vatBasis";
 import { nowKst } from "@/lib/kstDate";
 
 const TABS = [
@@ -145,13 +146,14 @@ async function ProjectListSection({
     project_id: string | null;
     purchase_amount: number;
     purchase_vat: number;
+    expense_categories: { name: string } | { name: string }[] | null;
   };
   const [purchaseRowsRaw, { data: agencyRows }, creditPayments] = projectIds.length
     ? await Promise.all([
         fetchAllRows<ProjectPurchaseRow>((from, to) =>
           supabase
             .from("transactions")
-            .select("id, type, payment_type, sales_amount, sales_vat, project_id, purchase_amount, purchase_vat")
+            .select("id, type, payment_type, sales_amount, sales_vat, project_id, purchase_amount, purchase_vat, expense_categories(*)")
             .eq("type", "매입")
             .in("project_id", projectIds)
             .order("id", { ascending: true })
@@ -167,10 +169,11 @@ async function ProjectListSection({
   // 외상(미완납)은 완납 전까지 장부에서 제외 — 대시보드·보고서와 동일한 기준.
   const purchaseRows = purchaseRowsRaw.filter((t) => isLedgerVisible(t, creditPayments));
 
+  // 발주액·대행구매액이 부가세 제외라 매입도 공급가(부가세 제외)로 맞춰 이익을 계산.
   const purchaseByProject = new Map<string, number>();
   for (const t of purchaseRows) {
     if (!t.project_id) continue;
-    purchaseByProject.set(t.project_id, (purchaseByProject.get(t.project_id) ?? 0) + t.purchase_amount + t.purchase_vat);
+    purchaseByProject.set(t.project_id, (purchaseByProject.get(t.project_id) ?? 0) + purchaseCostOf(t));
   }
 
   const agencyByProject = new Map<string, number>();
@@ -294,8 +297,8 @@ async function ProjectListSection({
     },
     {
       name: "totalPurchase",
-      label: "총 매입 (매입+구매대행)",
-      tableLabel: "총 매입",
+      label: "총 매입 (매입 공급가+구매대행, 부가세 제외)",
+      tableLabel: "총 매입(VAT제외)",
       readOnly: true,
       format: "currency",
       width: "8%",

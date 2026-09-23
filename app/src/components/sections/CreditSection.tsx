@@ -7,6 +7,7 @@ import { CreditHistoryToggle, type VendorHistoryGroup, type VendorHistoryItem } 
 import { PrintButton } from "@/components/PrintButton";
 import { Card } from "@/components/ui/Card";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { supplyOf } from "@/lib/vatBasis";
 
 export async function CreditSection() {
   const supabase = await createClient();
@@ -14,7 +15,7 @@ export async function CreditSection() {
     fetchAllRows<Transaction>((from, to) =>
       supabase
         .from("transactions")
-        .select("*, clients(name), projects(name)")
+        .select("*, clients(name), projects(name), expense_categories(name)")
         .eq("payment_type", "credit")
         .order("trans_date", { ascending: false })
         .order("id", { ascending: true })
@@ -77,7 +78,7 @@ export async function CreditSection() {
       ? fetchAllRows<Transaction>((from, to) =>
           supabase
             .from("transactions")
-            .select("*, clients(name), projects(name), payment_methods(name)")
+            .select("*, clients(name), projects(name), payment_methods(name), expense_categories(name)")
             .in("client_id", vendorClientIds)
             .order("trans_date", { ascending: false })
             .order("id", { ascending: true })
@@ -88,7 +89,7 @@ export async function CreditSection() {
       ? fetchAllRows<Transaction>((from, to) =>
           supabase
             .from("transactions")
-            .select("*, clients(name), projects(name), payment_methods(name)")
+            .select("*, clients(name), projects(name), payment_methods(name), expense_categories(name)")
             .is("client_id", null)
             .in("client_name_raw", vendorRawNames)
             .order("trans_date", { ascending: false })
@@ -120,7 +121,7 @@ export async function CreditSection() {
       project_name: tx.projects?.name ?? null,
       needs_classification: tx.needs_classification,
       amount: transactionTotal(tx),
-      vatExcludedAmount: tx.type === "매출" ? tx.sales_amount : tx.purchase_amount,
+      vatExcludedAmount: supplyOf(tx),
       status,
       methodName: tx.payment_methods?.name ?? null,
     });

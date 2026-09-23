@@ -92,8 +92,8 @@ export function ProjectProfitTable({
             <th className="pb-2 pr-4 text-right">{headerButton("progress_pct", "진행률")}</th>
             <th className="pb-2 pr-4 text-right">{headerButton("quoteAmount", "발주액")}</th>
             <th className="pb-2 pr-4 text-right">{headerButton("profitRate", "이익율")}</th>
-            <th className="pb-2 pr-4 text-right">{headerButton("sales", "매출")}</th>
-            <th className="pb-2 pr-4 text-right">{headerButton("purchase", "매입")}</th>
+            <th className="pb-2 pr-4 text-right">{headerButton("sales", "매출(VAT제외)")}</th>
+            <th className="pb-2 pr-4 text-right">{headerButton("purchase", "매입(VAT제외)")}</th>
             <th className="pb-2 text-right">{headerButton("profit", "손익")}</th>
           </tr>
         </thead>

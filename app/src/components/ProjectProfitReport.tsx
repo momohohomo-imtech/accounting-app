@@ -20,6 +20,7 @@ import { ReportChartProvider } from "@/components/ReportChartProvider";
 import { ReportChartToggle } from "@/components/ReportChartToggle";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { purchaseCostOf } from "@/lib/vatBasis";
 
 export async function ProjectProfitReport({ projectId, closeHref }: { projectId: string; closeHref: string }) {
   const supabase = await createClient();
@@ -43,7 +44,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
 
   const { data: purchaseRowsRaw } = await supabase
     .from("transactions")
-    .select("*, clients(name), expense_categories(name, project_only, color)")
+    .select("*, clients(name), expense_categories(*)")
     .in("project_id", groupIds)
     .eq("type", "매입")
     .order("trans_date", { ascending: true });
@@ -86,14 +87,16 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
   );
 
   const rows = purchaseRows;
-  const purchaseTotal = rows.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
+  // 발주액·대행구매액이 부가세 제외라, 이익 계산용 매입도 공급가(부가세 제외) 합계로 맞춘다.
+  // 개별 매입 행(아래 표)은 실제 지출한 부가세 포함 금액 그대로 보여줌.
+  const purchaseTotal = rows.reduce((s, t) => s + purchaseCostOf(t), 0);
   const agencyTotal = (agencyRows ?? []).reduce((s, a) => s + a.amount, 0);
 
   const categoryBreakdown = (() => {
     const map = new Map<string, number>();
     for (const t of rows) {
       const name = (one(t.expense_categories) as { name: string } | null)?.name ?? "미분류";
-      map.set(name, (map.get(name) ?? 0) + t.purchase_amount + t.purchase_vat);
+      map.set(name, (map.get(name) ?? 0) + purchaseCostOf(t));
     }
     for (const a of agencyRows ?? []) {
       const name = (one(a.expense_categories) as { name: string } | null)?.name ?? "미분류";
@@ -139,7 +142,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
       `수주액 (실수령액)${project.contract_amount_estimated ? " - 예상금액" : project.contract_amount_minimum ? " - 최소금액 산정액" : ""}`,
       formatWon(contractTotal),
     ],
-    ["매입 합계", `-${formatWon(purchaseTotal)}`],
+    ["매입 합계 (부가세 제외)", `-${formatWon(purchaseTotal)}`],
     ["이익금", profit === null ? "발주액 미입력" : formatWon(profit)],
     ["이익율", margin === null ? "-" : `${margin.toFixed(2)}%`],
   ];
@@ -267,7 +270,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
           )}
         </div>
         <div>
-          <p className="text-xs text-slate-500 print:text-[9px]">매입 합계</p>
+          <p className="text-xs text-slate-500 print:text-[9px]">매입 합계 (부가세 제외)</p>
           <p className="font-mono text-sm font-bold whitespace-nowrap text-slate-500 print:text-xs">-{formatWon(purchaseTotal)}</p>
         </div>
         <div>

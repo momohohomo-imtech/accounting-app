@@ -6,6 +6,7 @@ import { isLedgerVisible } from "@/lib/credit";
 import type { CreditPayment } from "@/lib/types";
 import { one } from "@/lib/relations";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { purchaseCostOf, salesSupplyOf } from "@/lib/vatBasis";
 
 // 직원 급여/상여/4대보험 지출은 employees/payroll 관리 화면이 아니라 매입매출장에
 // 이 카테고리로 찍힌 매입 기준으로 집계한다 (payroll 테이블은 입력이 다 안 돼 있어 누락됨).
@@ -81,7 +82,7 @@ export async function loadProfitOutlook(year: number) {
     fetchAllRows<NullProjectTxRow>((from, to) =>
       supabase
         .from("transactions")
-        .select("id, type, payment_type, sales_amount, sales_vat, purchase_amount, purchase_vat, trans_date, expense_categories(name)")
+        .select("id, type, payment_type, sales_amount, sales_vat, purchase_amount, purchase_vat, trans_date, expense_categories(*)")
         .eq("type", "매입")
         .is("project_id", null)
         .gte("trans_date", `${year}-01-01`)
@@ -94,7 +95,7 @@ export async function loadProfitOutlook(year: number) {
     fetchAllRows<H2TxRow>((from, to) =>
       supabase
         .from("transactions")
-        .select("id, type, payment_type, sales_amount, sales_vat, purchase_amount, purchase_vat, project_id, expense_categories(name)")
+        .select("id, type, payment_type, sales_amount, sales_vat, purchase_amount, purchase_vat, project_id, expense_categories(*)")
         .gte("trans_date", `${year}-07-01`)
         .lte("trans_date", `${year}-12-31`)
         .order("id", { ascending: true })
@@ -132,13 +133,14 @@ export async function loadProfitOutlook(year: number) {
     purchase_amount: number;
     purchase_vat: number;
     trans_date: string;
+    expense_categories: { name: string } | { name: string }[] | null;
   };
   const [purchaseTxRaw, { data: agencyTx }] = allProjectIds.length
     ? await Promise.all([
         fetchAllRows<ProjectPurchaseTxRow>((from, to) =>
           supabase
             .from("transactions")
-            .select("id, type, payment_type, sales_amount, sales_vat, project_id, purchase_amount, purchase_vat, trans_date")
+            .select("id, type, payment_type, sales_amount, sales_vat, project_id, purchase_amount, purchase_vat, trans_date, expense_categories(*)")
             .eq("type", "매입")
             .in("project_id", allProjectIds)
             .order("id", { ascending: true })
@@ -157,7 +159,7 @@ export async function loadProfitOutlook(year: number) {
   const purchaseByProject = new Map<string, number>();
   for (const t of purchaseTx) {
     if (!t.project_id) continue;
-    purchaseByProject.set(t.project_id, (purchaseByProject.get(t.project_id) ?? 0) + t.purchase_amount + t.purchase_vat);
+    purchaseByProject.set(t.project_id, (purchaseByProject.get(t.project_id) ?? 0) + purchaseCostOf(t));
   }
   const agencyByProject = new Map<string, number>();
   for (const a of agencyTx ?? []) {
@@ -172,8 +174,9 @@ export async function loadProfitOutlook(year: number) {
     (p) => p.status !== "done" && p.status !== PROJECT_STATUS_AWAITING_PAYMENT
   );
 
-  const generalExpense = generalTx.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
-  const payrollCost = payrollTx.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
+  // 발주액·대행구매액이 부가세 제외라 매입·경비도 공급가(부가세 제외) 기준 — lib/vatBasis.ts.
+  const generalExpense = generalTx.reduce((s, t) => s + purchaseCostOf(t), 0);
+  const payrollCost = payrollTx.reduce((s, t) => s + purchaseCostOf(t), 0);
   const profitEstimate = yearProfitSum - generalExpense - payrollCost;
   const profitTax = taxEstimate(profitEstimate);
 
@@ -186,7 +189,7 @@ export async function loadProfitOutlook(year: number) {
   const purchaseByProjectH2 = new Map<string, number>();
   for (const t of purchaseTx) {
     if (!t.project_id || t.trans_date < `${year}-07-01`) continue;
-    purchaseByProjectH2.set(t.project_id, (purchaseByProjectH2.get(t.project_id) ?? 0) + t.purchase_amount + t.purchase_vat);
+    purchaseByProjectH2.set(t.project_id, (purchaseByProjectH2.get(t.project_id) ?? 0) + purchaseCostOf(t));
   }
   const ongoingYearProjectsWithProfit = yearRows.filter((p) => p.status === "ongoing" && p.quote_amount != null);
   const unbilledProjectsWithProfit = [
@@ -203,12 +206,12 @@ export async function loadProfitOutlook(year: number) {
   const h2LedgerTx = h2Tx
     .filter((t) => !t.project_id || !unbilledProjectIdSet.has(t.project_id))
     .filter((t) => one(t.expense_categories)?.name !== PAYROLL_CATEGORY_NAME);
-  const h2Sales = h2LedgerTx.reduce((s, t) => s + t.sales_amount, 0);
-  const h2Purchase = h2LedgerTx.reduce((s, t) => s + t.purchase_amount, 0);
+  const h2Sales = h2LedgerTx.reduce((s, t) => s + salesSupplyOf(t), 0);
+  const h2Purchase = h2LedgerTx.reduce((s, t) => s + purchaseCostOf(t), 0);
   const h2Profit = h2Sales - h2Purchase;
   const h2PayrollCost = payrollTx
     .filter((t) => t.trans_date >= `${year}-07-01`)
-    .reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
+    .reduce((s, t) => s + purchaseCostOf(t), 0);
   const half1Profit = halfYearRow?.profit_amount ?? null;
   const combinedProfit =
     half1Profit != null ? half1Profit + h2Profit + unbilledPendingProfit - h2PayrollCost : null;
