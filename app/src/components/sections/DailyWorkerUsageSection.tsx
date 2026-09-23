@@ -1,12 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { isLedgerVisible } from "@/lib/credit";
-import type { CreditPayment } from "@/lib/types";
 import { parseMonthRange } from "@/lib/monthRange";
 import { DailyWorkerUsageFilter } from "@/components/DailyWorkerUsageFilter";
 import { DailyWorkerUsageExportButtons } from "@/components/DailyWorkerUsageExportButtons";
 import { DailyWorkerUsageTable } from "@/components/DailyWorkerUsageTable";
-import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
 import { nowKst } from "@/lib/kstDate";
 
 export async function DailyWorkerUsageSection({
@@ -61,9 +60,7 @@ export async function DailyWorkerUsageSection({
         .range(from, to)
     ),
     supabase.from("transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
-    fetchAllRows<CreditPayment>((from, to) =>
-      supabase.from("credit_payments").select("*").order("id", { ascending: true }).range(from, to)
-    ),
+    fetchAllCreditPayments(supabase),
   ]);
 
   const officeNames = new Set((offices ?? []).map((o) => o.name));

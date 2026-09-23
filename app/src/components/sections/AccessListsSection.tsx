@@ -37,8 +37,9 @@ export async function AccessListsSection({ year, month }: { year?: string; month
       supabase
         .from("access_lists")
         .select("*, sites(name)")
-        .gte("created_at", `${start}T00:00:00`)
-        .lte("created_at", `${end}T23:59:59`)
+        // created_at은 시각(timestamptz)이라 한국 시간 기준 하루 경계로 잘라야 "이번 달"(nowKst)과 맞음.
+        .gte("created_at", `${start}T00:00:00+09:00`)
+        .lte("created_at", `${end}T23:59:59.999+09:00`)
         .order("created_at", { ascending: false }),
     ]);
 

@@ -18,3 +18,12 @@ export function estimateIncomeTax(taxBase: number) {
 export function currentBracketIndex(taxBase: number) {
   return INCOME_TAX_BRACKETS.findIndex((b) => taxBase <= b.upTo);
 }
+
+// 개인사업자 종합소득세 추정 — 이익이 0 이하면 0, 지방소득세(소득세의 10%) 포함.
+export function taxEstimate(profit: number) {
+  const taxBase = Math.max(profit, 0);
+  const incomeTax = estimateIncomeTax(taxBase);
+  const localTax = Math.round(incomeTax * 0.1);
+  const bracket = INCOME_TAX_BRACKETS[currentBracketIndex(taxBase)];
+  return { taxBase, totalTax: incomeTax + localTax, ratePct: Math.round(bracket.rate * 100) };
+}

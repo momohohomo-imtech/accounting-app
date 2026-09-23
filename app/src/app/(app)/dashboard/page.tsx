@@ -3,18 +3,19 @@ import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { formatWon, formatDate } from "@/lib/format";
 import { remainingBalance, isLedgerVisible } from "@/lib/credit";
-import type { CreditPayment, ExpenseCategory, Transaction } from "@/lib/types";
-import { vatOf } from "@/lib/vatBasis";
-import { loadLedgerTaxEstimate } from "@/lib/ledgerTaxEstimate";
+import type { ExpenseCategory, Transaction } from "@/lib/types";
+import { vatOf, salesSupplyOf, purchaseCostOf } from "@/lib/vatBasis";
+import { taxEstimate } from "@/lib/tax";
 import { loadProfitOutlook, ProfitCalculationDetail } from "@/components/sections/ProfitOutlook";
 import { HalfYearSettlementInput } from "@/components/sections/HalfYearSettlementInput";
 import { DetailToggle } from "@/components/DetailToggle";
+import { VatQuarterTable } from "@/components/VatQuarterTable";
 import { YearFilter } from "@/components/YearFilter";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Table, THead, Th, Tr, Td, EmptyRow } from "@/components/ui/Table";
 import { cx } from "@/lib/cx";
-import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
 import { nowKst } from "@/lib/kstDate";
 import { PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
 
@@ -71,17 +72,19 @@ export default async function DashboardPage({
   const monthStart = `${currentYear}-${mm}-01`;
   const monthEnd = `${currentYear}-${mm}-${String(new Date(currentYear, today.month, 0).getDate()).padStart(2, "0")}`;
 
+  // 외상 정산 이력은 한 번만 받아서 이 페이지와 이익 예상 계산(loadProfitOutlook)이 같이 쓴다.
+  const creditPaymentsPromise = fetchAllCreditPayments(supabase);
+
   const [
     { data: monthTxRaw },
     creditTx,
-    creditPayments,
+    payments,
     { data: ongoingProjects },
     { data: recentTxRaw },
     yearTxRaw,
     { data: firstTx },
     { data: yearProjects },
-    outlook,
-    ledgerTax,
+    o,
     { data: categoryRows },
     { data: receivableProjects },
   ] = await Promise.all([
@@ -89,9 +92,7 @@ export default async function DashboardPage({
     fetchAllRows<Transaction>((from, to) =>
       supabase.from("transactions").select("*").eq("payment_type", "credit").order("id", { ascending: true }).range(from, to)
     ),
-    fetchAllRows<CreditPayment>((from, to) =>
-      supabase.from("credit_payments").select("*").order("id", { ascending: true }).range(from, to)
-    ),
+    creditPaymentsPromise,
     supabase.from("projects").select("id, status").eq("status", "ongoing"),
     supabase
       .from("transactions")
@@ -119,8 +120,7 @@ export default async function DashboardPage({
     ),
     supabase.from("transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
     supabase.from("projects").select("contract_amount").eq("year", selectedYear),
-    loadProfitOutlook(selectedYear),
-    loadLedgerTaxEstimate(selectedYear),
+    loadProfitOutlook(selectedYear, creditPaymentsPromise),
     // select("*") — 불공제 칸(082 마이그레이션) 실행 전에도 조회가 깨지지 않게.
     supabase.from("expense_categories").select("*"),
     supabase
@@ -131,15 +131,21 @@ export default async function DashboardPage({
   ]);
 
   const receivableProjectIds = (receivableProjects ?? []).map((p) => p.id);
-  const { data: receivableAgencyRows } = receivableProjectIds.length
-    ? await supabase.from("project_agency_purchases").select("project_id, amount").in("project_id", receivableProjectIds)
-    : { data: [] as { project_id: string; amount: number }[] };
+  const receivableAgencyRows = receivableProjectIds.length
+    ? await fetchAllRows<{ project_id: string; amount: number }>((from, to) =>
+        supabase
+          .from("project_agency_purchases")
+          .select("project_id, amount")
+          .in("project_id", receivableProjectIds)
+          .order("id", { ascending: true })
+          .range(from, to)
+      )
+    : [];
   const agencyByReceivableProject = new Map<string, number>();
-  for (const a of receivableAgencyRows ?? []) {
+  for (const a of receivableAgencyRows) {
     agencyByReceivableProject.set(a.project_id, (agencyByReceivableProject.get(a.project_id) ?? 0) + Number(a.amount));
   }
 
-  const payments = creditPayments;
   const monthTx = (monthTxRaw ?? []).filter((t) => isLedgerVisible(t as Transaction, payments));
   const recentTx = (recentTxRaw ?? []).filter((t) => isLedgerVisible(t as Transaction, payments)).slice(0, 8);
   const yearTx = yearTxRaw.filter((t) => isLedgerVisible(t, payments));
@@ -179,6 +185,20 @@ export default async function DashboardPage({
   const categoryById = new Map(
     ((categoryRows ?? []) as ExpenseCategory[]).map((c) => [c.id, { name: c.name, nonDeductible: Boolean(c.vat_non_deductible) }])
   );
+  const categoryRel = (categoryId: string | null) => {
+    const cat = categoryId ? categoryById.get(categoryId) : undefined;
+    return cat ? { name: cat.name, vat_non_deductible: cat.nonDeductible } : null;
+  };
+
+  // 참고: 장부 매출−매입(부가세 제외, 불공제 부가세는 비용) 기준 연간 예상 세금 — 위에서 받은
+  // 연간 거래(외상 미정산 제외)로 바로 계산해서 같은 거래를 다시 조회하지 않는다.
+  const ledgerTax = taxEstimate(
+    yearTx.reduce((s, t) => {
+      const row = { ...t, expense_categories: categoryRel(t.category_id) };
+      return s + salesSupplyOf(row) - purchaseCostOf(row);
+    }, 0)
+  );
+
   const vatQuarters = [1, 2, 3, 4].map((q) => {
     let salesVat = 0;
     let purchaseVat = 0;
@@ -186,7 +206,7 @@ export default async function DashboardPage({
     for (const t of yearTxRaw) {
       if (Math.ceil(Number(t.trans_date.slice(5, 7)) / 3) !== q) continue;
       const cat = t.category_id ? categoryById.get(t.category_id) : undefined;
-      const vat = vatOf({ ...t, expense_categories: cat ? { name: cat.name } : null });
+      const vat = vatOf({ ...t, expense_categories: categoryRel(t.category_id) });
       if (t.type === "매출") salesVat += vat;
       else if (cat?.nonDeductible) nonDeductibleVat += vat;
       else purchaseVat += vat;
@@ -211,7 +231,6 @@ export default async function DashboardPage({
   if (!years.includes(selectedYear)) years.unshift(selectedYear);
   years.sort((a, b) => b - a);
 
-  const o = outlook;
 
   return (
     <div className="space-y-6">
@@ -333,51 +352,7 @@ export default async function DashboardPage({
         <SectionTitle note="총액(부가세 포함)에서 계산 · 인건비 등 비과세 제외 · 외상 미정산 건 포함(세금계산서 기준)">
           ④ {selectedYear}년 부가세 (분기별)
         </SectionTitle>
-        <Table className="min-w-[620px]">
-          <THead>
-            <Th className="pr-4">분기</Th>
-            <Th className="pr-4 text-right">매출세액</Th>
-            <Th className="pr-4 text-right">공제 매입세액</Th>
-            <Th className="pr-4 text-right">불공제 매입세액</Th>
-            <Th className="text-right">납부(−환급) 예상</Th>
-          </THead>
-          <tbody>
-            {vatQuarters.map((v) => (
-              <Tr key={v.q}>
-                <Td className="pr-4">
-                  {v.q}분기 <span className="text-xs text-slate-400">({(v.q - 1) * 3 + 1}~{v.q * 3}월)</span>
-                </Td>
-                <Td className="pr-4 text-right">
-                  <Money value={v.salesVat} />
-                </Td>
-                <Td className="pr-4 text-right">
-                  <Money value={v.purchaseVat} />
-                </Td>
-                <Td className="pr-4 text-right text-slate-400">
-                  <Money value={v.nonDeductibleVat} />
-                </Td>
-                <Td className="text-right font-semibold">
-                  <Money value={v.net} />
-                </Td>
-              </Tr>
-            ))}
-            <tr className="border-t-2 border-slate-300 font-semibold">
-              <td className="py-2 pr-4">합계</td>
-              <td className="py-2 pr-4 text-right">
-                <Money value={vatTotal.salesVat} />
-              </td>
-              <td className="py-2 pr-4 text-right">
-                <Money value={vatTotal.purchaseVat} />
-              </td>
-              <td className="py-2 pr-4 text-right text-slate-400">
-                <Money value={vatTotal.nonDeductibleVat} />
-              </td>
-              <td className="py-2 text-right">
-                <Money value={vatTotal.net} />
-              </td>
-            </tr>
-          </tbody>
-        </Table>
+        <VatQuarterTable rows={vatQuarters} total={vatTotal} />
         <p className="mt-2 text-xs text-slate-400">
           불공제 매입세액은 지출카테고리에서 &quot;매입세액 불공제&quot;로 체크한 카테고리(승용차 렌트·유류비 등) 몫으로, 납부
           예상에서 빼주지 않습니다. 부가세 신고는 반기(1~6월, 7~12월) 기준이며, 실제 신고 금액은 세무사 확인 후 확정됩니다.

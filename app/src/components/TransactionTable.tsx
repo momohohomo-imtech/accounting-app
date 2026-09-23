@@ -171,7 +171,10 @@ export function TransactionTable({
 
     if (bulkField === "client") {
       const text = bulkClientText.trim();
-      const matched = clients.find((c) => c.name === text);
+      // 드롭다운에서 고른 거래처가 있으면 그 id를 그대로 씀 — 같은 이름의 거래처가 여럿이어도
+      // 고른 쪽으로 저장되게. 직접 입력한 이름만 있을 때만 이름으로 찾는다.
+      const picked = clients.find((c) => c.id === bulkClientId);
+      const matched = picked && picked.name === text ? picked : clients.find((c) => c.name === text);
       fd.set("client_id", matched?.id ?? "");
       fd.set("client_name_raw", matched ? "" : text);
     }

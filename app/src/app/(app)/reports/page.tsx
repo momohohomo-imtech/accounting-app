@@ -14,9 +14,9 @@ import { projectStatusLabel } from "@/lib/projectStatus";
 import { AutoPrint } from "@/components/AutoPrint";
 import { ReportAIInsights } from "@/components/ReportAIInsights";
 import { saveReportAiInsight, deleteReportAiInsight } from "@/lib/actions/reportAiInsights";
-import { isLedgerVisible, remainingBalance } from "@/lib/credit";
+import { isLedgerVisible, remainingBalance, transactionTotal } from "@/lib/credit";
 import { resolveCategoryColor } from "@/lib/categoryColor";
-import type { ReportAiInsight, CreditPayment } from "@/lib/types";
+import type { ReportAiInsight } from "@/lib/types";
 import { VendorAggregateTable } from "@/components/VendorAggregateTable";
 import { PurchaseItemSearchTable } from "@/components/PurchaseItemSearchTable";
 import { VendorAgencyToggle } from "@/components/VendorAgencyToggle";
@@ -36,8 +36,9 @@ import { UnassignedWorkLogMonthFilter } from "@/components/UnassignedWorkLogMont
 import { buildWorkLogSummary } from "@/lib/workLogSummary";
 import { parseMonthRange } from "@/lib/monthRange";
 import { ReportExcelButton } from "@/components/ReportExcelButton";
-import { fetchAllRows } from "@/lib/supabaseFetchAll";
-import { grossOf, purchaseCostOf, salesSupplyOf } from "@/lib/vatBasis";
+import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
+import { purchaseCostOf, salesSupplyOf } from "@/lib/vatBasis";
+import { PAYROLL_CATEGORY_NAME } from "@/lib/vatExempt";
 import type { WorkLog } from "@/lib/types";
 import { nowKst } from "@/lib/kstDate";
 
@@ -70,6 +71,21 @@ type Row = {
     | { name: string; text_color: string | null; background_color: string | null }
     | { name: string; text_color: string | null; background_color: string | null }[]
     | null;
+};
+
+type AgencyPurchaseRow = {
+  id: string;
+  project_id: string;
+  item_name: string | null;
+  amount: number;
+  client_name: string | null;
+  memo: string | null;
+  category_id: string | null;
+  expense_categories:
+    | { name: string; project_only: boolean; color: string | null }
+    | { name: string; project_only: boolean; color: string | null }[]
+    | null;
+  projects: { year: number; name: string; status: string | null } | { year: number; name: string; status: string | null }[] | null;
 };
 
 const TX_SELECT =
@@ -152,15 +168,17 @@ export default async function ReportsPage({
         .select("*")
         .eq("year", selectedYear)
         .order("created_at", { ascending: false }),
-      fetchAllRows<CreditPayment>((from, to) =>
-        supabase.from("credit_payments").select("*").order("id", { ascending: true }).range(from, to)
-      ),
-      supabase
-        .from("project_agency_purchases")
-        .select(
-          "id, project_id, item_name, amount, client_name, memo, category_id, expense_categories(name, project_only, color), projects!inner(year, name, status)"
-        )
-        .eq("projects.year", selectedYear),
+      fetchAllCreditPayments(supabase),
+      fetchAllRows<AgencyPurchaseRow>((from, to) =>
+        supabase
+          .from("project_agency_purchases")
+          .select(
+            "id, project_id, item_name, amount, client_name, memo, category_id, expense_categories(name, project_only, color), projects!inner(year, name, status)"
+          )
+          .eq("projects.year", selectedYear)
+          .order("id", { ascending: true })
+          .range(from, to)
+      ).then((data) => ({ data })),
       supabase.from("expense_categories").select("id, name, project_only, color").order("sort_order"),
       supabase.from("clients").select("name").order("name"),
       // 현재 자금 내역용 — 선택 연도와 무관하게 항상 "현재 시점" 기준이라 연도 필터를 안 건다.
@@ -333,7 +351,7 @@ export default async function ReportsPage({
         entry.amount += purchaseCostOf(t);
         catMap.set(name, entry);
         purchaseSupply += purchaseCostOf(t);
-        purchaseVat += grossOf(t) - purchaseCostOf(t);
+        purchaseVat += transactionTotal(t) - purchaseCostOf(t);
       }
       let agencyAmount = 0;
       for (const a of (agencyPurchases ?? []).filter((a) => groupIds.has(a.project_id))) {
@@ -420,9 +438,8 @@ export default async function ReportsPage({
   };
 
   // 상단 박스의 "예상 순이익율" — 대시보드의 "총 예상 매출"/"이익 예상"과 동일한 기준(연도
-  // 전체, site 필터와 무관)으로 계산. PendingPaymentProfitSection.tsx의 이익 예상 계산과
+  // 전체, site 필터와 무관)으로 계산. 대시보드 이익 예상(components/sections/ProfitOutlook.tsx)과
   // 같은 방식(발주액 기준 프로젝트 손익 − 프로젝트 미배정 일반경비 − 직원급여/상여/4대보험)을 그대로 따름.
-  const PAYROLL_CATEGORY_NAME = "직원급여/상여/4대보험"; // PendingPaymentProfitSection.tsx와 동일한 이름 유지 필요
   const totalExpectedRevenue = byProjectAll.reduce((s, p) => s + (p.contract_amount ?? 0), 0);
   const yearProfitSum = byProjectAll.filter((p) => p.quote_amount != null).reduce((s, p) => s + p.profit, 0);
   const nullProjectPurchaseTx = transactions.filter((t) => !t.project_id && t.type === "매입");

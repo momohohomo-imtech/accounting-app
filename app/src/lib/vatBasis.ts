@@ -1,4 +1,6 @@
 import { VAT_EXEMPT_CATEGORIES } from "@/lib/vatExempt";
+import { one } from "@/lib/relations";
+import { transactionTotal } from "@/lib/credit";
 
 // 부가세 계산 기준(앱 전체 공통): 거래에 저장된 공급가 칸 + 부가세 칸을 합친 "총액"은 항상
 // 부가세 포함 금액으로 본다 — 등록 화면의 VAT 체크는 여러 품목에 10%를 한 번에 붙이는 입력
@@ -19,27 +21,17 @@ export type VatBasisRow = {
   expense_categories?: CategoryRel;
 };
 
-function categoryOf(rel: CategoryRel): CategoryInfo | null {
-  return (Array.isArray(rel) ? rel[0] : rel) ?? null;
-}
-
 export function isVatExemptCategory(name: string | null | undefined) {
   return name ? VAT_EXEMPT_CATEGORIES.includes(name) : false;
 }
 
-export function grossOf(row: VatBasisRow) {
-  return row.type === "매출"
-    ? Number(row.sales_amount) + Number(row.sales_vat)
-    : Number(row.purchase_amount) + Number(row.purchase_vat);
-}
-
 export function supplyOf(row: VatBasisRow) {
-  const gross = grossOf(row);
-  return isVatExemptCategory(categoryOf(row.expense_categories)?.name) ? gross : Math.round(gross / 1.1);
+  const gross = transactionTotal(row);
+  return isVatExemptCategory(one(row.expense_categories)?.name) ? gross : Math.round(gross / 1.1);
 }
 
 export function vatOf(row: VatBasisRow) {
-  return grossOf(row) - supplyOf(row);
+  return transactionTotal(row) - supplyOf(row);
 }
 
 export function salesSupplyOf(row: VatBasisRow) {
@@ -50,5 +42,5 @@ export function salesSupplyOf(row: VatBasisRow) {
 // 유류비 등, 지출카테고리에서 체크)는 부가세를 못 돌려받으니 총액 전체가 비용.
 export function purchaseCostOf(row: VatBasisRow) {
   if (row.type !== "매입") return 0;
-  return categoryOf(row.expense_categories)?.vat_non_deductible ? grossOf(row) : supplyOf(row);
+  return one(row.expense_categories)?.vat_non_deductible ? transactionTotal(row) : supplyOf(row);
 }

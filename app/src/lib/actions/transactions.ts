@@ -5,6 +5,14 @@ import { createClient } from "@/lib/supabase/server";
 import { remainingBalance } from "@/lib/credit";
 import type { CreditPayment, Transaction } from "@/lib/types";
 
+// 거래가 바뀌면 금액이 보이는 모든 화면을 새로 그리게 한다.
+function revalidateLedgerPages() {
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  revalidatePath("/projects");
+}
+
 // addVat 체크 시에만 입력 금액의 10%를 얹어서 합계에 더함. 체크 안 하면(기본값) 입력한 금액이
 // 곧 최종 합계이고 부가세는 0 — "얼마인지 모르니 자동으로 계산해준다"는 동작은 없음, 항상 사용자가
 // 명시적으로 체크해야만 10%가 붙음.
@@ -56,10 +64,7 @@ export async function createTransactionRecord(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/transactions");
-  revalidatePath("/dashboard");
-  revalidatePath("/reports");
-  revalidatePath("/projects");
+  revalidateLedgerPages();
 }
 
 export async function updateTransactionRecord(formData: FormData) {
@@ -96,10 +101,7 @@ export async function updateTransactionRecord(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/transactions");
-  revalidatePath("/dashboard");
-  revalidatePath("/reports");
-  revalidatePath("/projects");
+  revalidateLedgerPages();
 }
 
 export type BulkTransactionInput = {
@@ -155,17 +157,7 @@ export async function bulkImportTransactions(rows: BulkTransactionInput[]) {
   const { error } = await supabase.from("transactions").insert(inserts);
   if (error) return { error: error.message };
 
-  revalidatePath("/transactions");
-  revalidatePath("/dashboard");
-  revalidatePath("/reports");
-  revalidatePath("/projects");
-}
-
-function revalidateLedgerPages() {
-  revalidatePath("/transactions");
-  revalidatePath("/dashboard");
-  revalidatePath("/reports");
-  revalidatePath("/projects");
+  revalidateLedgerPages();
 }
 
 export async function bulkUpdateProjectId(formData: FormData) {
@@ -237,10 +229,7 @@ export async function deleteTransactionRecord(formData: FormData) {
   const id = String(formData.get("id"));
   const { error } = await supabase.from("transactions").delete().eq("id", id);
   if (error) return { error: error.message };
-  revalidatePath("/transactions");
-  revalidatePath("/dashboard");
-  revalidatePath("/reports");
-  revalidatePath("/projects");
+  revalidateLedgerPages();
 }
 
 export async function updateTransactionNote(formData: FormData) {
@@ -306,10 +295,7 @@ export async function settleCreditTransactions(formData: FormData) {
     )
   );
 
-  revalidatePath("/transactions");
-  revalidatePath("/dashboard");
-  revalidatePath("/reports");
-  revalidatePath("/projects");
+  revalidateLedgerPages();
 
   const failed = updateResults.filter((r) => r.error);
   if (failed.length > 0) {

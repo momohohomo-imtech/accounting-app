@@ -19,7 +19,7 @@ import { ReportPrintChart } from "@/components/ReportPrintChart";
 import { ReportChartProvider } from "@/components/ReportChartProvider";
 import { ReportChartToggle } from "@/components/ReportChartToggle";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
-import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
 import { purchaseCostOf } from "@/lib/vatBasis";
 
 export async function ProjectProfitReport({ projectId, closeHref }: { projectId: string; closeHref: string }) {
@@ -49,9 +49,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
     .eq("type", "매입")
     .order("trans_date", { ascending: true });
 
-  const creditPayments = await fetchAllRows<CreditPayment>((from, to) =>
-    supabase.from("credit_payments").select("*").order("id", { ascending: true }).range(from, to)
-  );
+  const creditPayments = await fetchAllCreditPayments(supabase);
   // 외상(미완납)은 완납 전까지 장부에서 제외 — 대시보드·보고서와 동일한 기준.
   const purchaseRows = (purchaseRowsRaw ?? []).filter((t) => isLedgerVisible(t, creditPayments));
 

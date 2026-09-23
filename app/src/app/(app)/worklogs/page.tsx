@@ -74,7 +74,7 @@ async function BusinessTripSection({
   const selectedMonth = month ?? "all";
   const { start, end } = monthRange(selectedYear, selectedMonth, currentMonth);
 
-  const [logs, allLogs] = await Promise.all([
+  const [typedLogs, allTyped] = await Promise.all([
     fetchAllRows<BusinessTripLog>((from, to) =>
       supabase
         .from("business_trip_logs")
@@ -95,14 +95,12 @@ async function BusinessTripSection({
     ),
   ]);
 
-  const typedLogs = logs;
   const filteredLogs = typedLogs.filter((log) => {
     if (site && log.site_name !== site) return false;
     if (project && !log.projects.some((p) => p.project_name === project)) return false;
     return true;
   });
 
-  const allTyped = allLogs;
   const firstYear = Math.min(
     ...allTyped.map((l) => Number(l.work_date.slice(0, 4))).filter((y) => !Number.isNaN(y)),
     TRIP_FLOOR_YEAR
@@ -168,6 +166,7 @@ async function WorkLogCalendarSection({
         .lte("log_date", monthEnd)
         .order("log_date", { ascending: true })
         .order("sort_order", { ascending: true })
+        .order("id", { ascending: true })
         .range(from, to)
     ),
     fetchAllRows<{ log_date: string }>((from, to) =>

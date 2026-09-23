@@ -109,7 +109,14 @@ export default async function BankPage({
         .range(from, to)
     ),
     supabase.from("bank_transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
-    supabase.from("bank_transactions").select("matched_client_name_raw").not("matched_client_name_raw", "is", null),
+    fetchAllRows<{ matched_client_name_raw: string | null }>((from, to) =>
+      supabase
+        .from("bank_transactions")
+        .select("matched_client_name_raw")
+        .not("matched_client_name_raw", "is", null)
+        .order("id", { ascending: true })
+        .range(from, to)
+    ).then((data) => ({ data })),
   ]);
 
   // 자동완성 목록 = 등록된 거래처 이름 + 예전에 수기로 직접 입력했던 이름들(등록 안 된 것 포함).

@@ -18,7 +18,7 @@ import { formatWon } from "@/lib/format";
 import { ProjectListExportButtons } from "@/components/ProjectListExportButtons";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { ProjectsPageMemo } from "@/components/ProjectsPageMemo";
-import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
 import { purchaseCostOf } from "@/lib/vatBasis";
 import { nowKst } from "@/lib/kstDate";
 
@@ -159,10 +159,15 @@ async function ProjectListSection({
             .order("id", { ascending: true })
             .range(from, to)
         ),
-        supabase.from("project_agency_purchases").select("project_id, amount").in("project_id", projectIds),
-        fetchAllRows<CreditPayment>((from, to) =>
-          supabase.from("credit_payments").select("*").order("id", { ascending: true }).range(from, to)
-        ),
+        fetchAllRows<{ project_id: string; amount: number }>((from, to) =>
+          supabase
+            .from("project_agency_purchases")
+            .select("project_id, amount")
+            .in("project_id", projectIds)
+            .order("id", { ascending: true })
+            .range(from, to)
+        ).then((data) => ({ data })),
+        fetchAllCreditPayments(supabase),
       ])
     : [[] as ProjectPurchaseRow[], { data: [] as { project_id: string; amount: number }[] }, [] as CreditPayment[]];
 

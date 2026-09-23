@@ -1,17 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatWon } from "@/lib/format";
 import { remainingBalance, transactionTotal } from "@/lib/credit";
-import type { CreditPayment, PaymentMethod, Transaction } from "@/lib/types";
+import type { PaymentMethod, Transaction } from "@/lib/types";
 import { CreditSettlementGroup } from "@/components/CreditSettlementGroup";
 import { CreditHistoryToggle, type VendorHistoryGroup, type VendorHistoryItem } from "@/components/CreditHistoryToggle";
 import { PrintButton } from "@/components/PrintButton";
 import { Card } from "@/components/ui/Card";
-import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
 import { supplyOf } from "@/lib/vatBasis";
 
 export async function CreditSection() {
   const supabase = await createClient();
-  const [creditTx, payments, { data: paymentMethods }] = await Promise.all([
+  const [txs, pays, { data: paymentMethods }] = await Promise.all([
     fetchAllRows<Transaction>((from, to) =>
       supabase
         .from("transactions")
@@ -21,14 +21,10 @@ export async function CreditSection() {
         .order("id", { ascending: true })
         .range(from, to)
     ),
-    fetchAllRows<CreditPayment>((from, to) =>
-      supabase.from("credit_payments").select("*").order("id", { ascending: true }).range(from, to)
-    ),
+    fetchAllCreditPayments(supabase),
     supabase.from("payment_methods").select("*").order("sort_order"),
   ]);
 
-  const txs = creditTx;
-  const pays = payments;
   const methods = (paymentMethods ?? []) as PaymentMethod[];
 
   // remaining > 0이면 당연히 미정산. remaining이 0이어도 정산 이력이 아예 없으면
