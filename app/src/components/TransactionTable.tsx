@@ -416,7 +416,7 @@ export function TransactionTable({
       )}
       {bulkError && <p className="text-sm text-red-600 print:hidden">{bulkError}</p>}
 
-      <Table stickyHeader className="min-w-[1020px]">
+      <Table stickyHeader className="sticky-col-table min-w-[1020px]">
         <THead>
           <th className="w-8 pb-2 pr-2">
             <input
@@ -427,7 +427,14 @@ export function TransactionTable({
             />
           </th>
           {COLUMNS.map((c) => (
-            <th key={c.key} className={cx("whitespace-nowrap pb-2 pr-4 font-medium", c.key === "amount" && "text-right")}>
+            <th
+              key={c.key}
+              className={cx(
+                "whitespace-nowrap pb-2 pr-4 font-medium",
+                c.key === "amount" && "text-right",
+                c.key === "client" && "sticky-col"
+              )}
+            >
               <button
                 type="button"
                 onClick={() => handleSort(c.key)}
@@ -444,7 +451,7 @@ export function TransactionTable({
           {sorted.map((t) => (
             <Tr
               key={t.id}
-              className={selected.has(t.id) ? "bg-blue-50/60" : undefined}
+              className={selected.has(t.id) ? "bg-blue-50" : undefined}
             >
               <Td className="pr-2">
                 <input
@@ -454,13 +461,22 @@ export function TransactionTable({
                   className="h-4 w-4 accent-slate-900"
                 />
               </Td>
-              <Td className="pr-4">{formatDate(t.trans_date)}</Td>
-              <Td className="pr-4">
+              <Td className="whitespace-nowrap pr-4" title={formatDate(t.trans_date)}>
+                {/* 화면은 연도 필터로 이미 한 해만 보이므로 월-일만, 인쇄는 전체 날짜 */}
+                <span className="print:hidden">{formatDate(t.trans_date).slice(5)}</span>
+                <span className="hidden print:inline">{formatDate(t.trans_date)}</span>
+              </Td>
+              <Td className="whitespace-nowrap pr-4">
                 <Badge variant={t.type === "매출" ? "blue" : "orange"}>{t.type}</Badge>
               </Td>
-              <Td className="pr-4">{t.clients?.name ?? t.client_name_raw ?? "-"}</Td>
+              <Td
+                className="sticky-col pr-4 max-md:max-w-[8.5rem] max-md:truncate print:max-w-none print:overflow-visible print:whitespace-normal"
+                title={t.clients?.name ?? t.client_name_raw ?? undefined}
+              >
+                {t.clients?.name ?? t.client_name_raw ?? "-"}
+              </Td>
               {showProject && (
-                <Td className="pr-4">
+                <Td className="pr-4 max-md:max-w-[10rem] max-md:truncate print:max-w-none print:overflow-visible print:whitespace-normal" title={t.projects?.name ?? undefined}>
                   {t.needs_classification ? (
                     <Badge variant="green">분류 대기 중</Badge>
                   ) : (
@@ -469,7 +485,7 @@ export function TransactionTable({
                 </Td>
               )}
               {showCategory && (
-                <Td className="pr-4">
+                <Td className="whitespace-nowrap pr-4">
                   <span
                     className={t.expense_categories?.project_only ? "font-medium" : undefined}
                     style={{ color: resolveCategoryColor(t.expense_categories) }}
@@ -478,8 +494,12 @@ export function TransactionTable({
                   </span>
                 </Td>
               )}
-              {showItem && <Td className="pr-4">{t.item_name ?? "-"}</Td>}
-              <Td className="pr-4">
+              {showItem && (
+                <Td className="pr-4 max-md:max-w-[10rem] max-md:truncate print:max-w-none print:overflow-visible print:whitespace-normal" title={t.item_name ?? undefined}>
+                  {t.item_name ?? "-"}
+                </Td>
+              )}
+              <Td className="whitespace-nowrap pr-4">
                 {t.payment_methods ? (
                   <span
                     className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
@@ -491,10 +511,10 @@ export function TransactionTable({
                   "-"
                 )}
               </Td>
-              <Td className="pr-4">
+              <Td className="whitespace-nowrap pr-4">
                 {t.tax_invoice_issued ? <Badge variant="emerald">발행</Badge> : <span className="text-slate-300">-</span>}
               </Td>
-              <Td className="pr-4 text-right font-medium text-slate-900">{formatWon(transactionTotal(t))}</Td>
+              <Td className="whitespace-nowrap pr-4 text-right font-medium text-slate-900">{formatWon(transactionTotal(t))}</Td>
               <Td className="text-right">
                 <div className="flex justify-end gap-2">
                   <LinkButton href={editHrefFor(t.id)} variant="secondary" size="xs">
