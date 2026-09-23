@@ -13,6 +13,7 @@ import { KnowHowSection } from "@/components/KnowHowSection";
 import { createKnowHowNote, updateKnowHowNote, deleteKnowHowNote } from "@/lib/actions/knowHow";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { groupToolsBySortOrder, toolGroupLabel } from "@/lib/tools";
+import { fetchAllRows } from "@/lib/supabaseFetchAll";
 
 const toolFields: FieldConfig[] = [
   { name: "name", label: "공구명", required: true },
@@ -65,13 +66,31 @@ export async function ToolListSection({
   historySite?: string;
 }) {
   const supabase = await createClient();
-  const [{ data: tools }, { data: sites }, { data: projects }, { data: checklists }, { data: items }, { data: knowHowNotes }] =
+  const [{ data: tools }, { data: sites }, { data: projects }, checklists, items, { data: knowHowNotes }] =
     await Promise.all([
       supabase.from("tools").select("*").order("sort_order").order("position").order("name"),
       supabase.from("sites").select("id, name, clients(name)").order("name"),
       supabase.from("projects").select("id, name, site_id, status, year, project_code").order("name"),
-      supabase.from("tool_checklists").select("*, projects(name, site_id)").order("created_at", { ascending: false }),
-      supabase.from("tool_checklist_items").select("*"),
+      fetchAllRows<{
+        id: string;
+        title: string;
+        project_id: string | null;
+        trip_date: string | null;
+        helper_count: number | null;
+        memo: string | null;
+        created_at: string;
+        projects: { name: string; site_id: string | null } | { name: string; site_id: string | null }[] | null;
+      }>((from, to) =>
+        supabase
+          .from("tool_checklists")
+          .select("*, projects(name, site_id)")
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: true })
+          .range(from, to)
+      ),
+      fetchAllRows<ChecklistItemRow>((from, to) =>
+        supabase.from("tool_checklist_items").select("*").order("id", { ascending: true }).range(from, to)
+      ),
       supabase.from("know_how_notes").select("*").eq("category", "tools").order("created_at", { ascending: false }),
     ]);
 
@@ -88,13 +107,13 @@ export async function ToolListSection({
   }
 
   const itemsByChecklist = new Map<string, ChecklistItemRow[]>();
-  for (const it of (items ?? []) as ChecklistItemRow[]) {
+  for (const it of items) {
     const list = itemsByChecklist.get(it.checklist_id) ?? [];
     list.push(it);
     itemsByChecklist.set(it.checklist_id, list);
   }
 
-  const historyRows = (checklists ?? []).map((c) => {
+  const historyRows = checklists.map((c) => {
     const project = one(c.projects) as { name: string; site_id: string | null } | null;
     return {
       id: c.id as string,

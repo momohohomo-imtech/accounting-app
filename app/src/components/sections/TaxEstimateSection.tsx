@@ -3,23 +3,28 @@ import { formatWon } from "@/lib/format";
 import { estimateIncomeTax, currentBracketIndex, INCOME_TAX_BRACKETS } from "@/lib/tax";
 import { isLedgerVisible } from "@/lib/credit";
 import type { CreditPayment, Transaction } from "@/lib/types";
+import { fetchAllRows } from "@/lib/supabaseFetchAll";
 
 export async function TaxEstimateSection({ year }: { year: number }) {
   const supabase = await createClient();
 
-  const [{ data: transactions }, { data: creditPayments }] = await Promise.all([
-    supabase
-      .from("transactions")
-      .select("*")
-      .gte("trans_date", `${year}-01-01`)
-      .lte("trans_date", `${year}-12-31`),
-    supabase.from("credit_payments").select("*"),
+  const [transactions, creditPayments] = await Promise.all([
+    fetchAllRows<Transaction>((from, to) =>
+      supabase
+        .from("transactions")
+        .select("*")
+        .gte("trans_date", `${year}-01-01`)
+        .lte("trans_date", `${year}-12-31`)
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
+    fetchAllRows<CreditPayment>((from, to) =>
+      supabase.from("credit_payments").select("*").order("id", { ascending: true }).range(from, to)
+    ),
   ]);
 
   // 외상(미완납)은 다른 대시보드 항목과 동일하게 완납 전까지 장부에서 제외한다.
-  const rows = ((transactions ?? []) as Transaction[]).filter((t) =>
-    isLedgerVisible(t, (creditPayments ?? []) as CreditPayment[])
-  );
+  const rows = transactions.filter((t) => isLedgerVisible(t, creditPayments));
   const profitYTD = rows.reduce((s, t) => s + t.sales_amount - t.purchase_amount, 0);
   const taxBase = Math.max(profitYTD, 0);
   const incomeTax = estimateIncomeTax(taxBase);

@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Table, THead, Th, Tr, Td, EmptyRow } from "@/components/ui/Table";
 import { cx } from "@/lib/cx";
+import { fetchAllRows } from "@/lib/supabaseFetchAll";
 
 export default async function DashboardPage({
   searchParams,
@@ -27,33 +28,49 @@ export default async function DashboardPage({
 
   const [
     { data: monthTxRaw },
-    { data: creditTx },
-    { data: creditPayments },
+    creditTx,
+    creditPayments,
     { data: sites },
     { data: recentTxRaw },
-    { data: yearTxRaw },
+    yearTxRaw,
     { data: firstTx },
     { data: yearProjects },
   ] = await Promise.all([
     supabase.from("transactions").select("*").gte("trans_date", monthStart).lte("trans_date", monthEnd),
-    supabase.from("transactions").select("*").eq("payment_type", "credit"),
-    supabase.from("credit_payments").select("*"),
+    fetchAllRows<Transaction>((from, to) =>
+      supabase.from("transactions").select("*").eq("payment_type", "credit").order("id", { ascending: true }).range(from, to)
+    ),
+    fetchAllRows<CreditPayment>((from, to) =>
+      supabase.from("credit_payments").select("*").order("id", { ascending: true }).range(from, to)
+    ),
     supabase.from("projects").select("id, status").eq("status", "ongoing"),
     supabase
       .from("transactions")
       .select("*, clients(name), projects(name)")
       .order("trans_date", { ascending: false })
       .limit(20),
-    supabase
-      .from("transactions")
-      .select("id, type, payment_type, sales_amount, sales_vat, purchase_amount, purchase_vat")
-      .gte("trans_date", `${selectedYear}-01-01`)
-      .lte("trans_date", `${selectedYear}-12-31`),
+    fetchAllRows<{
+      id: string;
+      type: string;
+      payment_type: string;
+      sales_amount: number;
+      sales_vat: number;
+      purchase_amount: number;
+      purchase_vat: number;
+    }>((from, to) =>
+      supabase
+        .from("transactions")
+        .select("id, type, payment_type, sales_amount, sales_vat, purchase_amount, purchase_vat")
+        .gte("trans_date", `${selectedYear}-01-01`)
+        .lte("trans_date", `${selectedYear}-12-31`)
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
     supabase.from("transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
     supabase.from("projects").select("contract_amount").eq("year", selectedYear),
   ]);
 
-  const payments = (creditPayments ?? []) as CreditPayment[];
+  const payments = creditPayments;
   const monthTx = (monthTxRaw ?? []).filter((t) => isLedgerVisible(t as Transaction, payments));
   const recentTx = (recentTxRaw ?? []).filter((t) => isLedgerVisible(t as Transaction, payments)).slice(0, 8);
   const yearTx = (yearTxRaw ?? []).filter((t) => isLedgerVisible(t, payments));

@@ -8,6 +8,7 @@ import {
   updateConstructionMemo,
   deleteConstructionMemo,
 } from "@/lib/actions/constructionMemos";
+import { fetchAllRows } from "@/lib/supabaseFetchAll";
 
 type MemoRow = {
   id: string;
@@ -30,15 +31,30 @@ export async function ConstructionMemoSection({
   month?: string;
 }) {
   const supabase = await createClient();
-  const [{ data: projectsRaw }, { data: sitesRaw }, { data: memosRaw }] = await Promise.all([
+  type MemoRawRow = {
+    id: string;
+    content: string;
+    created_at: string;
+    updated_at: string;
+    project_id: string;
+    projects:
+      | { name: string; site_id: string; sites: { name: string } | { name: string }[] | null }
+      | { name: string; site_id: string; sites: { name: string } | { name: string }[] | null }[]
+      | null;
+  };
+  const [{ data: projectsRaw }, { data: sitesRaw }, memosRaw] = await Promise.all([
     // status/year/project_code는 ProjectPicker가 "완료 프로젝트 보기" 토글에 씀 —
     // 메모 추가 팝업에서 완료 프로젝트도 고를 수 있어야 해서 필요함.
     supabase.from("projects").select("id, name, site_id, status, year, project_code").order("name"),
     supabase.from("sites").select("id, name, clients(name)").order("name"),
-    supabase
-      .from("construction_memos")
-      .select("id, content, created_at, updated_at, project_id, projects(name, site_id, sites(name))")
-      .order("created_at", { ascending: false }),
+    fetchAllRows<MemoRawRow>((from, to) =>
+      supabase
+        .from("construction_memos")
+        .select("id, content, created_at, updated_at, project_id, projects(name, site_id, sites(name))")
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
   ]);
 
   const siteOptions: SiteOption[] = (sitesRaw ?? []).map((s) => ({
@@ -47,7 +63,7 @@ export async function ConstructionMemoSection({
     client_name: (one(s.clients) as { name: string } | undefined)?.name ?? null,
   }));
 
-  const allMemos: MemoRow[] = (memosRaw ?? []).map((m) => {
+  const allMemos: MemoRow[] = memosRaw.map((m) => {
     const project = one(m.projects) as { name: string; site_id: string; sites?: unknown } | undefined;
     const site = one(project?.sites) as { name: string } | undefined;
     return {

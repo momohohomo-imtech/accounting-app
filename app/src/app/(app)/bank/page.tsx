@@ -11,6 +11,7 @@ import { BankTransactionFilter } from "@/components/BankTransactionFilter";
 import { BankAccountsPopup } from "@/components/BankAccountsPopup";
 import { BankAccountMemo } from "@/components/BankAccountMemo";
 import { BankEntryPopup } from "@/components/BankEntryPopup";
+import { fetchAllRows } from "@/lib/supabaseFetchAll";
 
 const accountFields: FieldConfig[] = [
   { name: "bank_name", label: "은행명", required: true },
@@ -69,24 +70,47 @@ export default async function BankPage({
   const excludedSet = new Set(excludedAccountIds);
   const includedAccountIds = (accounts ?? []).filter((a) => !excludedSet.has(a.id)).map((a) => a.id);
 
-  let transactionsQuery = supabase
-    .from("bank_transactions")
-    .select("*, bank_accounts(nickname, bank_name), clients(name)")
-    .gte("trans_date", rangeStart)
-    .lte("trans_date", rangeEnd)
-    .order("trans_date", { ascending: false });
-  // 둘 다 체크(전체) 또는 둘 다 해제(빈 결과 방지)면 필터 안 걸고, 하나만 체크됐을 때만 그 방향으로 좁힌다.
-  if (showDeposit !== showWithdrawal) transactionsQuery = transactionsQuery.eq("direction", showDeposit ? "입금" : "출금");
-  if (excludedSet.size > 0) transactionsQuery = transactionsQuery.in("bank_account_id", includedAccountIds);
+  type BankTxRow = {
+    id: string;
+    bank_account_id: string;
+    trans_date: string;
+    direction: string;
+    description: string | null;
+    amount: number;
+    matched_client_id: string | null;
+    matched_client_name_raw: string | null;
+    transfer_group_id: string | null;
+    promoted_transaction_id: string | null;
+    bank_accounts?: { nickname: string | null; bank_name: string } | null;
+    clients?: { name: string } | null;
+  };
 
-  const [{ data: clients }, { data: transactions }, { data: allTx }, { data: firstTx }, { data: rawNames }] =
-    await Promise.all([
-      supabase.from("clients").select("id, name").order("name"),
-      transactionsQuery,
-      supabase.from("bank_transactions").select("bank_account_id, direction, amount"),
-      supabase.from("bank_transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
-      supabase.from("bank_transactions").select("matched_client_name_raw").not("matched_client_name_raw", "is", null),
-    ]);
+  const [{ data: clients }, transactions, allTx, { data: firstTx }, { data: rawNames }] = await Promise.all([
+    supabase.from("clients").select("id, name").order("name"),
+    fetchAllRows<BankTxRow>((from, to) => {
+      let q = supabase
+        .from("bank_transactions")
+        .select("*, bank_accounts(nickname, bank_name), clients(name)")
+        .gte("trans_date", rangeStart)
+        .lte("trans_date", rangeEnd)
+        .order("trans_date", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to);
+      // 둘 다 체크(전체) 또는 둘 다 해제(빈 결과 방지)면 필터 안 걸고, 하나만 체크됐을 때만 그 방향으로 좁힌다.
+      if (showDeposit !== showWithdrawal) q = q.eq("direction", showDeposit ? "입금" : "출금");
+      if (excludedSet.size > 0) q = q.in("bank_account_id", includedAccountIds);
+      return q;
+    }),
+    fetchAllRows<{ bank_account_id: string; direction: string; amount: number }>((from, to) =>
+      supabase
+        .from("bank_transactions")
+        .select("bank_account_id, direction, amount")
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
+    supabase.from("bank_transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
+    supabase.from("bank_transactions").select("matched_client_name_raw").not("matched_client_name_raw", "is", null),
+  ]);
 
   // 자동완성 목록 = 등록된 거래처 이름 + 예전에 수기로 직접 입력했던 이름들(등록 안 된 것 포함).
   const nameSuggestions = Array.from(
@@ -106,7 +130,7 @@ export default async function BankPage({
 
   const balanceByAccount = new Map<string, number>();
   for (const a of accounts ?? []) balanceByAccount.set(a.id, a.opening_balance ?? 0);
-  for (const t of allTx ?? []) {
+  for (const t of allTx) {
     const delta = t.direction === "입금" ? t.amount : -t.amount;
     balanceByAccount.set(t.bank_account_id, (balanceByAccount.get(t.bank_account_id) ?? 0) + delta);
   }
@@ -173,7 +197,7 @@ export default async function BankPage({
 
         <div className="mt-3 overflow-x-auto">
           <BankTransactionTable
-            transactions={transactions ?? []}
+            transactions={transactions}
             accounts={(accounts ?? []).map((a) => ({ id: a.id, name: a.nickname ?? a.bank_name }))}
             clients={clients ?? []}
             nameSuggestions={nameSuggestions}

@@ -34,7 +34,7 @@ export async function AccessListsSection({ year, month }: { year?: string; month
       supabase.from("daily_worker_offices").select("id, name").order("name"),
       supabase.from("daily_workers").select("id, name, office_id, status, grade").eq("status", "active").order("name"),
       supabase.from("employees").select("id, name, employee_no"),
-      supabase.from("access_lists").select("id, created_at").order("created_at", { ascending: false }),
+      supabase.from("access_lists").select("id, created_at").order("created_at", { ascending: false }).limit(1),
       supabase
         .from("access_lists")
         .select("*, sites(name)")

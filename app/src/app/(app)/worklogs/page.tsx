@@ -17,6 +17,7 @@ import { BusinessTripFilter } from "@/components/BusinessTripFilter";
 import { monthRange } from "@/lib/dateRange";
 import { cx } from "@/lib/cx";
 import type { BusinessTripLog, WorkLog } from "@/lib/types";
+import { fetchAllRows } from "@/lib/supabaseFetchAll";
 
 const HOLIDAY_TITLE = "휴무";
 const TABS = [
@@ -74,24 +75,35 @@ async function BusinessTripSection({
   const selectedMonth = month ?? "all";
   const { start, end } = monthRange(selectedYear, selectedMonth, currentMonth);
 
-  const [{ data: logs }, { data: allLogs }] = await Promise.all([
-    supabase
-      .from("business_trip_logs")
-      .select("*")
-      .gte("work_date", start)
-      .lte("work_date", end)
-      .order("work_date", { ascending: false }),
-    supabase.from("business_trip_logs").select("work_date, site_name, projects"),
+  const [logs, allLogs] = await Promise.all([
+    fetchAllRows<BusinessTripLog>((from, to) =>
+      supabase
+        .from("business_trip_logs")
+        .select("*")
+        .gte("work_date", start)
+        .lte("work_date", end)
+        .order("work_date", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
+    fetchAllRows<Pick<BusinessTripLog, "work_date" | "site_name" | "projects">>((from, to) =>
+      supabase
+        .from("business_trip_logs")
+        .select("work_date, site_name, projects")
+        .order("work_date", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
   ]);
 
-  const typedLogs = (logs ?? []) as BusinessTripLog[];
+  const typedLogs = logs;
   const filteredLogs = typedLogs.filter((log) => {
     if (site && log.site_name !== site) return false;
     if (project && !log.projects.some((p) => p.project_name === project)) return false;
     return true;
   });
 
-  const allTyped = (allLogs ?? []) as Pick<BusinessTripLog, "work_date" | "site_name" | "projects">[];
+  const allTyped = allLogs;
   const firstYear = Math.min(
     ...allTyped.map((l) => Number(l.work_date.slice(0, 4))).filter((y) => !Number.isNaN(y)),
     TRIP_FLOOR_YEAR
@@ -148,20 +160,27 @@ async function WorkLogCalendarSection({
   const lastDay = new Date(selectedYear, selectedMonth, 0).getDate();
   const monthEnd = `${selectedYear}-${pad(selectedMonth)}-${pad(lastDay)}`;
 
-  const [{ data: logs }, { data: allDates }, { data: sites }, { data: tripLogs }] = await Promise.all([
-    supabase
-      .from("work_logs")
-      .select("*")
-      .gte("log_date", monthStart)
-      .lte("log_date", monthEnd)
-      .order("log_date", { ascending: true })
-      .order("sort_order", { ascending: true }),
-    supabase.from("work_logs").select("log_date"),
+  const [logs, allDates, { data: sites }, tripLogs] = await Promise.all([
+    fetchAllRows<WorkLog>((from, to) =>
+      supabase
+        .from("work_logs")
+        .select("*")
+        .gte("log_date", monthStart)
+        .lte("log_date", monthEnd)
+        .order("log_date", { ascending: true })
+        .order("sort_order", { ascending: true })
+        .range(from, to)
+    ),
+    fetchAllRows<{ log_date: string }>((from, to) =>
+      supabase.from("work_logs").select("log_date").order("log_date", { ascending: true }).range(from, to)
+    ),
     supabase.from("sites").select("id, name, color").order("name"),
-    supabase.from("business_trip_logs").select("projects"),
+    fetchAllRows<{ projects: unknown }>((from, to) =>
+      supabase.from("business_trip_logs").select("projects").order("id", { ascending: true }).range(from, to)
+    ),
   ]);
 
-  const rows = (logs ?? []) as WorkLog[];
+  const rows = logs;
   const logsByDate = new Map<string, WorkLog[]>();
   const holidayDates = new Set<string>();
   const unassignedDates = new Set<string>();
@@ -174,7 +193,7 @@ async function WorkLogCalendarSection({
   }
 
   const tripDates = new Set(
-    (tripLogs ?? []).flatMap((t) => (t.projects as { work_date?: string }[] | null ?? []).map((p) => p.work_date))
+    tripLogs.flatMap((t) => (t.projects as { work_date?: string }[] | null ?? []).map((p) => p.work_date))
   );
 
   const siteNameById = new Map((sites ?? []).map((s) => [s.id, s.name]));
@@ -183,7 +202,7 @@ async function WorkLogCalendarSection({
   const siteAggregate = buildSiteAggregate(rows, sites ?? []);
 
   const monthsByYear = new Map<number, Set<number>>();
-  for (const { log_date } of allDates ?? []) {
+  for (const { log_date } of allDates) {
     const y = Number(log_date.slice(0, 4));
     const m = Number(log_date.slice(5, 7));
     const set = monthsByYear.get(y) ?? new Set<number>();

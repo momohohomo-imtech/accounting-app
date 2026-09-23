@@ -7,6 +7,7 @@ import type { CreditPayment } from "@/lib/types";
 import { HalfYearSettlementInput } from "@/components/sections/HalfYearSettlementInput";
 import { DetailToggle } from "@/components/DetailToggle";
 import { one } from "@/lib/relations";
+import { fetchAllRows } from "@/lib/supabaseFetchAll";
 
 // 직원 급여/상여/4대보험 지출은 employees/payroll 관리 화면이 아니라 매입매출장에
 // 이 카테고리로 찍힌 매입 기준으로 집계한다 (payroll 테이블은 입력이 다 안 돼 있어 누락됨).
@@ -27,14 +28,37 @@ function taxEstimate(profit: number) {
 export async function PendingPaymentProfitSection({ year }: { year: number }) {
   const supabase = await createClient();
 
+  type NullProjectTxRow = {
+    id: string;
+    type: string;
+    payment_type: string;
+    sales_amount: number;
+    sales_vat: number;
+    purchase_amount: number;
+    purchase_vat: number;
+    trans_date: string;
+    expense_categories: { name: string } | { name: string }[] | null;
+  };
+  type H2TxRow = {
+    id: string;
+    type: string;
+    payment_type: string;
+    sales_amount: number;
+    sales_vat: number;
+    purchase_amount: number;
+    purchase_vat: number;
+    project_id: string | null;
+    expense_categories: { name: string } | { name: string }[] | null;
+  };
+
   const [
     { data: pendingProjects },
     { data: unbilledProjects },
     { data: yearProjects },
-    { data: nullProjectTxRaw },
+    nullProjectTxRaw,
     { data: halfYearRow },
-    { data: h2TxRaw },
-    { data: creditPayments },
+    h2TxRaw,
+    creditPayments,
   ] = await Promise.all([
     // 대시보드 필터 연도의 완료 수금대기 프로젝트만 (모든 항목을 필터 연도 기준으로 통일).
     supabase
@@ -54,27 +78,37 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
     // 프로젝트에 귀속되지 않은(project_id가 없는) 매입 거래 전체(연간) — 카테고리별로
     // "일반경비"(직원급여 제외)와 "직원급여/상여/4대보험"(payroll 관리 화면이 아니라
     // 매입매출장의 이 카테고리 기준으로 집계, employees/payroll 입력 누락과 무관하게 실측)로 나눠 씀.
-    supabase
-      .from("transactions")
-      .select("id, type, payment_type, sales_amount, sales_vat, purchase_amount, purchase_vat, trans_date, expense_categories(name)")
-      .eq("type", "매입")
-      .is("project_id", null)
-      .gte("trans_date", `${year}-01-01`)
-      .lte("trans_date", `${year}-12-31`),
+    fetchAllRows<NullProjectTxRow>((from, to) =>
+      supabase
+        .from("transactions")
+        .select("id, type, payment_type, sales_amount, sales_vat, purchase_amount, purchase_vat, trans_date, expense_categories(name)")
+        .eq("type", "매입")
+        .is("project_id", null)
+        .gte("trans_date", `${year}-01-01`)
+        .lte("trans_date", `${year}-12-31`)
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
     supabase.from("half_year_settlements").select("profit_amount").eq("year", year).eq("half", 1).maybeSingle(),
     // 하반기 집계 이익금: TaxEstimateSection과 동일하게 부가세 제외한 매출-매입(원장 기준)으로 계산
-    supabase
-      .from("transactions")
-      .select("id, type, payment_type, sales_amount, sales_vat, purchase_amount, purchase_vat, project_id, expense_categories(name)")
-      .gte("trans_date", `${year}-07-01`)
-      .lte("trans_date", `${year}-12-31`),
-    supabase.from("credit_payments").select("*"),
+    fetchAllRows<H2TxRow>((from, to) =>
+      supabase
+        .from("transactions")
+        .select("id, type, payment_type, sales_amount, sales_vat, purchase_amount, purchase_vat, project_id, expense_categories(name)")
+        .gte("trans_date", `${year}-07-01`)
+        .lte("trans_date", `${year}-12-31`)
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
+    fetchAllRows<CreditPayment>((from, to) =>
+      supabase.from("credit_payments").select("*").order("id", { ascending: true }).range(from, to)
+    ),
   ]);
 
   // 외상(미완납)은 대시보드의 다른 항목들과 동일하게 완납 전까지 장부에서 제외한다.
-  const payments = (creditPayments ?? []) as CreditPayment[];
-  const nullProjectTx = (nullProjectTxRaw ?? []).filter((t) => isLedgerVisible(t, payments));
-  const h2Tx = (h2TxRaw ?? []).filter((t) => isLedgerVisible(t, payments));
+  const payments = creditPayments;
+  const nullProjectTx = nullProjectTxRaw.filter((t) => isLedgerVisible(t, payments));
+  const h2Tx = h2TxRaw.filter((t) => isLedgerVisible(t, payments));
 
   const payrollTx = nullProjectTx.filter((t) => one(t.expense_categories)?.name === PAYROLL_CATEGORY_NAME);
   const generalTx = nullProjectTx.filter((t) => one(t.expense_categories)?.name !== PAYROLL_CATEGORY_NAME);
@@ -89,33 +123,33 @@ export async function PendingPaymentProfitSection({ year }: { year: number }) {
   const yearProjectIds = yearRows.map((p) => p.id);
   const unbilledProjectIds = unbilledRows.map((p) => p.id);
   const allProjectIds = Array.from(new Set([...yearProjectIds, ...unbilledProjectIds]));
-  const [{ data: purchaseTxRaw }, { data: agencyTx }] = allProjectIds.length
+  type ProjectPurchaseTxRow = {
+    id: string;
+    type: string;
+    payment_type: string;
+    sales_amount: number;
+    sales_vat: number;
+    project_id: string | null;
+    purchase_amount: number;
+    purchase_vat: number;
+    trans_date: string;
+  };
+  const [purchaseTxRaw, { data: agencyTx }] = allProjectIds.length
     ? await Promise.all([
-        supabase
-          .from("transactions")
-          .select("id, type, payment_type, sales_amount, sales_vat, project_id, purchase_amount, purchase_vat, trans_date")
-          .eq("type", "매입")
-          .in("project_id", allProjectIds),
+        fetchAllRows<ProjectPurchaseTxRow>((from, to) =>
+          supabase
+            .from("transactions")
+            .select("id, type, payment_type, sales_amount, sales_vat, project_id, purchase_amount, purchase_vat, trans_date")
+            .eq("type", "매입")
+            .in("project_id", allProjectIds)
+            .order("id", { ascending: true })
+            .range(from, to)
+        ),
         supabase.from("project_agency_purchases").select("project_id, amount").in("project_id", allProjectIds),
       ])
-    : [
-        {
-          data: [] as {
-            id: string;
-            type: string;
-            payment_type: string;
-            sales_amount: number;
-            sales_vat: number;
-            project_id: string | null;
-            purchase_amount: number;
-            purchase_vat: number;
-            trans_date: string;
-          }[],
-        },
-        { data: [] as { project_id: string; amount: number }[] },
-      ];
+    : [[] as ProjectPurchaseTxRow[], { data: [] as { project_id: string; amount: number }[] }];
   // 외상(미완납)은 완납 전까지 장부에서 제외 — 다른 대시보드 항목들과 동일한 기준.
-  const purchaseTx = (purchaseTxRaw ?? []).filter((t) => isLedgerVisible(t, payments));
+  const purchaseTx = purchaseTxRaw.filter((t) => isLedgerVisible(t, payments));
 
   // --- {year}년 공사 완료 수금 대기: 필터 연도의 프로젝트 상태가 "완료 수금대기"인 건들의 수주액 합계 ---
   const pendingReceivable = pendingRows.reduce((s, p) => s + (p.contract_amount ?? p.quote_amount ?? 0), 0);

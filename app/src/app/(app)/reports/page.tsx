@@ -121,7 +121,7 @@ export default async function ReportsPage({
     { data: agencyPurchases },
     { data: expenseCategories },
     { data: clientRows },
-    { data: projectWorkLogRows },
+    projectWorkLogRows,
     { data: bankAccounts },
     bankTxAll,
     creditPurchaseTxAll,
@@ -162,12 +162,16 @@ export default async function ReportsPage({
       supabase.from("expense_categories").select("id, name, project_only, color").order("sort_order"),
       supabase.from("clients").select("name").order("name"),
       // 프로젝트 요약(재무제표)의 작업일수용 — 연도 범위 안, 프로젝트가 지정된 작업일지만.
-      supabase
-        .from("work_logs")
-        .select("log_date, project_id")
-        .not("project_id", "is", null)
-        .gte("log_date", `${selectedYear}-01-01`)
-        .lte("log_date", `${selectedYear}-12-31`),
+      fetchAllRows<{ log_date: string; project_id: string | null }>((from, to) =>
+        supabase
+          .from("work_logs")
+          .select("log_date, project_id")
+          .not("project_id", "is", null)
+          .gte("log_date", `${selectedYear}-01-01`)
+          .lte("log_date", `${selectedYear}-12-31`)
+          .order("id", { ascending: true })
+          .range(from, to)
+      ),
       // 현재 자금 내역용 — 선택 연도와 무관하게 항상 "현재 시점" 기준이라 연도 필터를 안 건다.
       supabase.from("bank_accounts").select("id, opening_balance"),
       fetchAllRows<{ bank_account_id: string; direction: string; amount: number }>((from, to) =>
@@ -327,7 +331,7 @@ export default async function ReportsPage({
       const profit = quoteAmount - purchaseTotal - agencyAmount;
       const margin = quoteAmount > 0 ? (profit / quoteAmount) * 100 : null;
       const workDayCount = new Set(
-        (projectWorkLogRows ?? []).filter((r) => r.project_id && groupIds.has(r.project_id)).map((r) => r.log_date)
+        projectWorkLogRows.filter((r) => r.project_id && groupIds.has(r.project_id)).map((r) => r.log_date)
       ).size;
       return {
         id: p.id,
@@ -565,28 +569,40 @@ export default async function ReportsPage({
     ? `${selectedYear}-${pad(unassignedMonthNum)}-${pad(uEndDay)}`
     : `${selectedYear}-12-31`;
 
-  const [{ data: wlRows }, { data: wlSites }, { data: unassignedLogRows }, { data: wlChecks }] = await Promise.all([
-    supabase.from("work_logs").select("*").gte("log_date", wlStart).lte("log_date", wlEnd),
+  const [wlRows, { data: wlSites }, unassignedLogRows, { data: wlChecks }] = await Promise.all([
+    fetchAllRows<WorkLog>((from, to) =>
+      supabase
+        .from("work_logs")
+        .select("*")
+        .gte("log_date", wlStart)
+        .lte("log_date", wlEnd)
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
     supabase.from("sites").select("id, name, color"),
-    supabase
-      .from("work_logs")
-      .select("id, log_date, site_id, title")
-      .not("site_id", "is", null)
-      .is("project_id", null)
-      .gte("log_date", uStart)
-      .lte("log_date", uEnd)
-      .order("log_date", { ascending: true }),
+    fetchAllRows<{ id: string; log_date: string; site_id: string | null; title: string | null }>((from, to) =>
+      supabase
+        .from("work_logs")
+        .select("id, log_date, site_id, title")
+        .not("site_id", "is", null)
+        .is("project_id", null)
+        .gte("log_date", uStart)
+        .lte("log_date", uEnd)
+        .order("log_date", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
     supabase.from("work_log_summary_checks").select("group_key").eq("year", selectedYear),
   ]);
 
-  const wlRowsFiltered = wlSite ? (wlRows ?? []).filter((r) => r.site_id === wlSite) : wlRows ?? [];
-  const workLogSummaryRaw = buildWorkLogSummary(wlRowsFiltered as WorkLog[], wlSites ?? []);
+  const wlRowsFiltered = wlSite ? wlRows.filter((r) => r.site_id === wlSite) : wlRows;
+  const workLogSummaryRaw = buildWorkLogSummary(wlRowsFiltered, wlSites ?? []);
   // 특정 현장으로 좁혀보면 현장에 안 묶이는 휴무/사내/기타 특수 항목은 그 현장 이야기가 아니라서 뺌.
   const workLogSummary = wlSite ? workLogSummaryRaw.filter((r) => !r.isSpecial) : workLogSummaryRaw;
   const workLogTotalDays = new Set(wlRowsFiltered.map((r) => r.log_date)).size;
 
   const siteNameById = new Map((wlSites ?? []).map((s) => [s.id, s.name]));
-  const unassignedRows = (unassignedLogRows ?? []).map((r) => ({
+  const unassignedRows = unassignedLogRows.map((r) => ({
     id: r.id,
     date: r.log_date,
     siteName: siteNameById.get(r.site_id ?? "") ?? "-",

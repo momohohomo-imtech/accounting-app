@@ -2,25 +2,47 @@ import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { PurchaseOrdersTable } from "@/components/PurchaseOrdersTable";
 import { LinkButton } from "@/components/ui/Button";
+import { fetchAllRows } from "@/lib/supabaseFetchAll";
 
 export async function PurchaseOrdersSection() {
   const supabase = await createClient();
-  const [{ data: purchaseOrders }, { data: items }] = await Promise.all([
-    supabase
-      .from("purchase_orders")
-      .select(
-        "id, po_number, title, status, created_at, client_id, client_name_raw, clients(name), projects(name, project_code)"
-      )
-      .order("created_at", { ascending: false }),
-    supabase.from("purchase_order_items").select("purchase_order_id, amount"),
+  type PurchaseOrderRow = {
+    id: string;
+    po_number: string;
+    title: string;
+    status: string;
+    created_at: string;
+    client_id: string | null;
+    client_name_raw: string | null;
+    clients: { name: string } | { name: string }[] | null;
+    projects: { name: string; project_code: string | null } | { name: string; project_code: string | null }[] | null;
+  };
+  const [purchaseOrders, items] = await Promise.all([
+    fetchAllRows<PurchaseOrderRow>((from, to) =>
+      supabase
+        .from("purchase_orders")
+        .select(
+          "id, po_number, title, status, created_at, client_id, client_name_raw, clients(name), projects(name, project_code)"
+        )
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
+    fetchAllRows<{ purchase_order_id: string; amount: number }>((from, to) =>
+      supabase
+        .from("purchase_order_items")
+        .select("purchase_order_id, amount")
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
   ]);
 
   const totalByPo = new Map<string, number>();
-  for (const it of items ?? []) {
+  for (const it of items) {
     totalByPo.set(it.purchase_order_id, (totalByPo.get(it.purchase_order_id) ?? 0) + it.amount);
   }
 
-  const rows = (purchaseOrders ?? []).map((po) => {
+  const rows = purchaseOrders.map((po) => {
     const client = one(po.clients) as { name: string } | null;
     const project = one(po.projects) as { name: string; project_code: string | null } | null;
     return {

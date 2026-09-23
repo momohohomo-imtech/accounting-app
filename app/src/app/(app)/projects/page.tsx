@@ -18,6 +18,7 @@ import { formatWon } from "@/lib/format";
 import { ProjectListExportButtons } from "@/components/ProjectListExportButtons";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { ProjectsPageMemo } from "@/components/ProjectsPageMemo";
+import { fetchAllRows } from "@/lib/supabaseFetchAll";
 
 const TABS = [
   { key: "list", label: "프로젝트" },
@@ -134,35 +135,36 @@ async function ProjectListSection({
   }));
 
   const projectIds = (projects ?? []).map((p) => p.id);
-  const [{ data: purchaseRowsRaw }, { data: agencyRows }, { data: creditPayments }] = projectIds.length
+  type ProjectPurchaseRow = {
+    id: string;
+    type: string;
+    payment_type: string;
+    sales_amount: number;
+    sales_vat: number;
+    project_id: string | null;
+    purchase_amount: number;
+    purchase_vat: number;
+  };
+  const [purchaseRowsRaw, { data: agencyRows }, creditPayments] = projectIds.length
     ? await Promise.all([
-        supabase
-          .from("transactions")
-          .select("id, type, payment_type, sales_amount, sales_vat, project_id, purchase_amount, purchase_vat")
-          .eq("type", "매입")
-          .in("project_id", projectIds),
+        fetchAllRows<ProjectPurchaseRow>((from, to) =>
+          supabase
+            .from("transactions")
+            .select("id, type, payment_type, sales_amount, sales_vat, project_id, purchase_amount, purchase_vat")
+            .eq("type", "매입")
+            .in("project_id", projectIds)
+            .order("id", { ascending: true })
+            .range(from, to)
+        ),
         supabase.from("project_agency_purchases").select("project_id, amount").in("project_id", projectIds),
-        supabase.from("credit_payments").select("*"),
+        fetchAllRows<CreditPayment>((from, to) =>
+          supabase.from("credit_payments").select("*").order("id", { ascending: true }).range(from, to)
+        ),
       ])
-    : [
-        {
-          data: [] as {
-            id: string;
-            type: string;
-            payment_type: string;
-            sales_amount: number;
-            sales_vat: number;
-            project_id: string | null;
-            purchase_amount: number;
-            purchase_vat: number;
-          }[],
-        },
-        { data: [] as { project_id: string; amount: number }[] },
-        { data: [] as CreditPayment[] },
-      ];
+    : [[] as ProjectPurchaseRow[], { data: [] as { project_id: string; amount: number }[] }, [] as CreditPayment[]];
 
   // 외상(미완납)은 완납 전까지 장부에서 제외 — 대시보드·보고서와 동일한 기준.
-  const purchaseRows = (purchaseRowsRaw ?? []).filter((t) => isLedgerVisible(t, (creditPayments ?? []) as CreditPayment[]));
+  const purchaseRows = purchaseRowsRaw.filter((t) => isLedgerVisible(t, creditPayments));
 
   const purchaseByProject = new Map<string, number>();
   for (const t of purchaseRows) {

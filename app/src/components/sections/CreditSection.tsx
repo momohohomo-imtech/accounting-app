@@ -6,21 +6,28 @@ import { CreditSettlementGroup } from "@/components/CreditSettlementGroup";
 import { CreditHistoryToggle, type VendorHistoryGroup, type VendorHistoryItem } from "@/components/CreditHistoryToggle";
 import { PrintButton } from "@/components/PrintButton";
 import { Card } from "@/components/ui/Card";
+import { fetchAllRows } from "@/lib/supabaseFetchAll";
 
 export async function CreditSection() {
   const supabase = await createClient();
-  const [{ data: creditTx }, { data: payments }, { data: paymentMethods }] = await Promise.all([
-    supabase
-      .from("transactions")
-      .select("*, clients(name), projects(name)")
-      .eq("payment_type", "credit")
-      .order("trans_date", { ascending: false }),
-    supabase.from("credit_payments").select("*"),
+  const [creditTx, payments, { data: paymentMethods }] = await Promise.all([
+    fetchAllRows<Transaction>((from, to) =>
+      supabase
+        .from("transactions")
+        .select("*, clients(name), projects(name)")
+        .eq("payment_type", "credit")
+        .order("trans_date", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
+    fetchAllRows<CreditPayment>((from, to) =>
+      supabase.from("credit_payments").select("*").order("id", { ascending: true }).range(from, to)
+    ),
     supabase.from("payment_methods").select("*").order("sort_order"),
   ]);
 
-  const txs = (creditTx ?? []) as Transaction[];
-  const pays = (payments ?? []) as CreditPayment[];
+  const txs = creditTx;
+  const pays = payments;
   const methods = (paymentMethods ?? []) as PaymentMethod[];
 
   // remaining > 0이면 당연히 미정산. remaining이 0이어도 정산 이력이 아예 없으면
@@ -65,27 +72,35 @@ export async function CreditSection() {
     new Set(txs.filter((t) => !t.client_id).map((t) => t.client_name_raw).filter((n): n is string => Boolean(n)))
   );
 
-  const [{ data: vendorAllTxById }, { data: vendorAllTxByName }] = await Promise.all([
+  const [vendorAllTxById, vendorAllTxByName] = await Promise.all([
     vendorClientIds.length
-      ? supabase
-          .from("transactions")
-          .select("*, clients(name), projects(name), payment_methods(name)")
-          .in("client_id", vendorClientIds)
-          .order("trans_date", { ascending: false })
-      : Promise.resolve({ data: [] as Transaction[] }),
+      ? fetchAllRows<Transaction>((from, to) =>
+          supabase
+            .from("transactions")
+            .select("*, clients(name), projects(name), payment_methods(name)")
+            .in("client_id", vendorClientIds)
+            .order("trans_date", { ascending: false })
+            .order("id", { ascending: true })
+            .range(from, to)
+        )
+      : Promise.resolve([] as Transaction[]),
     vendorRawNames.length
-      ? supabase
-          .from("transactions")
-          .select("*, clients(name), projects(name), payment_methods(name)")
-          .is("client_id", null)
-          .in("client_name_raw", vendorRawNames)
-          .order("trans_date", { ascending: false })
-      : Promise.resolve({ data: [] as Transaction[] }),
+      ? fetchAllRows<Transaction>((from, to) =>
+          supabase
+            .from("transactions")
+            .select("*, clients(name), projects(name), payment_methods(name)")
+            .is("client_id", null)
+            .in("client_name_raw", vendorRawNames)
+            .order("trans_date", { ascending: false })
+            .order("id", { ascending: true })
+            .range(from, to)
+        )
+      : Promise.resolve([] as Transaction[]),
   ]);
-  const vendorAllTx = [...(vendorAllTxById ?? []), ...(vendorAllTxByName ?? [])];
+  const vendorAllTx = [...vendorAllTxById, ...vendorAllTxByName];
 
   const vendorGroupMap = new Map<string, VendorHistoryGroup>();
-  for (const tx of vendorAllTx as Transaction[]) {
+  for (const tx of vendorAllTx) {
     const key = tx.client_id ?? `raw:${tx.client_name_raw}`;
     if (!vendorGroupMap.has(key)) {
       vendorGroupMap.set(key, { key, label: tx.clients?.name ?? tx.client_name_raw ?? "거래처", items: [] });
