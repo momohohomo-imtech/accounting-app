@@ -6,6 +6,7 @@ import { projectStatusLabel, PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/proje
 import { BarChart, buildChartData, type CategoryAmount } from "@/components/ProjectPurchaseChartButton";
 import { Badge } from "@/components/ui/Badge";
 import { fieldClass } from "@/components/ui/field";
+import { ProjectSummaryMemoEditor } from "@/components/ProjectSummaryMemoEditor";
 
 export type ProjectSummaryRow = {
   id: string;
@@ -232,12 +233,7 @@ export function ProjectSummaryReport({ rows }: { rows: ProjectSummaryRow[] }) {
                 </div>
               </div>
 
-              {p.memo && (
-                <div className="mt-4 rounded-xl border border-slate-200 px-4 py-3 print:mt-3 print:rounded-none print:border print:border-slate-400 print:break-inside-avoid">
-                  <p className="mb-1 text-xs font-medium text-slate-500 print:text-[9px]">메모</p>
-                  <p className="whitespace-pre-wrap text-sm text-slate-700 print:text-[10px]">{p.memo}</p>
-                </div>
-              )}
+              <ProjectSummaryMemoEditor projectId={p.id} initialMemo={p.memo} />
             </div>
           );
         })}
