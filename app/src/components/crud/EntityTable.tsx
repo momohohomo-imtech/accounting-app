@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { cx } from "@/lib/cx";
 import type { FieldConfig, RowBgColor } from "./types";
 import { EntityForm } from "./EntityForm";
 import { Table, THead, Tr, Td } from "@/components/ui/Table";
@@ -193,6 +194,13 @@ export function EntityTable({
     [fields, colVisible]
   );
   const hasWidths = visibleFields.some((f) => f.width);
+  // 옆으로 넘겨도 어느 행인지 보이게 고정할 칸 — "name" 칸이 있으면 그것, 없으면 첫 칸.
+  const stickyFieldName = (visibleFields.find((f) => f.name === "name") ?? visibleFields[0])?.name;
+  const hasExtraActions = Boolean(extraActions && Object.keys(extraActions).length > 0);
+  // 관리 칸은 버튼이 한 줄에 들어가는 고정 폭(비율로 주면 휴대폰에서 버튼이 세로로 쌓임).
+  const actionsWidth = hasExtraActions ? 180 : 120;
+  // 휴대폰에서는 칸 수에 맞춰 표를 넓히고 가로로 넘김(700px에 다 우겨넣으면 칸마다 글자가 잘림).
+  const mobileMinWidth = visibleFields.length * 105 + actionsWidth;
   const sortField = fields.find((f) => f.name === sortKey);
 
   // 폭이 지정된(hasWidths) 표에 한해 헤더 오른쪽 끝을 드래그해서 열 너비를 직접
@@ -325,7 +333,13 @@ export function EntityTable({
         ))}
       </div>
     )}
-    <Table className={hasWidths ? "min-w-[700px] table-fixed" : "min-w-[700px]"}>
+    <Table
+      className={cx(
+        "sticky-col-table min-w-(--entity-min-w) md:min-w-[700px]",
+        hasWidths && "table-fixed"
+      )}
+      style={{ "--entity-min-w": `${mobileMinWidth}px` } as CSSProperties}
+    >
       <THead>
         {visibleFields.map((f) => (
           <th
@@ -334,7 +348,7 @@ export function EntityTable({
               thRefs.current[f.name] = el;
             }}
             style={colStyle(f)}
-            className="relative whitespace-nowrap pb-2 pr-4 font-medium"
+            className={cx("relative whitespace-nowrap pb-2 pr-4 font-medium", f.name === stickyFieldName && "sticky-col")}
           >
             <button
               type="button"
@@ -353,7 +367,7 @@ export function EntityTable({
             )}
           </th>
         ))}
-        <th className="pb-2 text-right font-medium print:hidden" style={hasWidths ? { width: "8%" } : undefined}>
+        <th className="whitespace-nowrap pb-2 text-right font-medium print:hidden" style={{ width: `${actionsWidth}px` }}>
           관리
         </th>
       </THead>
@@ -410,7 +424,10 @@ export function EntityTable({
                   key={f.name}
                   style={colStyle(f)}
                   title={f.display === "progress" ? undefined : displayValue(row, f)}
-                  className="max-w-[220px] truncate pr-4 print:whitespace-normal print:overflow-visible"
+                  className={cx(
+                    "max-w-[220px] truncate pr-4 print:whitespace-normal print:overflow-visible",
+                    f.name === stickyFieldName && "sticky-col"
+                  )}
                 >
                   {f.display === "progress" ? (
                     <ProgressCell value={Number(row[f.name]) || 0} />
@@ -430,7 +447,7 @@ export function EntityTable({
                   )}
                 </Td>
               ))}
-              <Td className="text-right print:hidden">
+              <Td className="whitespace-nowrap text-right print:hidden">
                 <div className="flex justify-end gap-2">
                   {extraActions?.[row.id]}
                   <Button variant="secondary" size="xs" onClick={() => setEditingId(row.id)}>
