@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { formatWon, formatDate } from "@/lib/format";
 import { projectStatusLabel, PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
 import { BarChart, buildChartData, type CategoryAmount } from "@/components/ProjectPurchaseChartButton";
 import { Badge } from "@/components/ui/Badge";
+import { fieldClass } from "@/components/ui/field";
 
 export type ProjectSummaryRow = {
   id: string;
@@ -31,10 +32,26 @@ export type ProjectSummaryRow = {
 // 공사완료·완료 수금대기·수금완료 프로젝트를 A4 한 장짜리 재무제표 형태로 나열 —
 // 매입 품목 전체 내역이 아니라 카테고리별 합산 금액만 보여주는 요약본. 귀속(하위)
 // 프로젝트는 이미 어미 프로젝트 카드에 합산돼 있으므로 여기 목록에는 따로 나오지
-// 않는다. 체크박스로 원하는 프로젝트만 골라서 화면·인쇄에 남길 수 있고, 인쇄 시엔
-// 선택된 항목끼리만 마지막 항목 제외 print:break-after-page로 페이지를 나눈다.
+// 않는다. "전체 → 현장 → 프로젝트" 순으로 좁혀가는 드롭다운 2개로 화면·인쇄에 남길
+// 범위를 고르고, 인쇄 시엔 해당 범위끼리만 마지막 항목 제외 print:break-after-page로
+// 페이지를 나눈다.
 export function ProjectSummaryReport({ rows }: { rows: ProjectSummaryRow[] }) {
-  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  const [selectedSite, setSelectedSite] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+
+  const siteOptions = useMemo(
+    () => Array.from(new Set(rows.map((p) => p.siteName).filter((s): s is string => Boolean(s)))).sort((a, b) => a.localeCompare(b, "ko")),
+    [rows]
+  );
+
+  const projectOptionsForSite = useMemo(
+    () =>
+      rows
+        .filter((p) => !selectedSite || p.siteName === selectedSite)
+        .map((p) => ({ id: p.id, label: p.projectCode ? `${p.projectCode} ${p.name}` : p.name }))
+        .sort((a, b) => a.label.localeCompare(b.label, "ko")),
+    [rows, selectedSite]
+  );
 
   if (rows.length === 0) {
     return (
@@ -44,49 +61,41 @@ export function ProjectSummaryReport({ rows }: { rows: ProjectSummaryRow[] }) {
     );
   }
 
-  const visibleRows = rows.filter((p) => !excluded.has(p.id));
-
-  function toggle(id: string) {
-    setExcluded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
+  const visibleRows = rows.filter(
+    (p) => (!selectedSite || p.siteName === selectedSite) && (!selectedProjectId || p.id === selectedProjectId)
+  );
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 print:hidden">
-        <span className="text-xs font-medium text-slate-500">인쇄에 포함할 프로젝트 선택 ({visibleRows.length}/{rows.length}건)</span>
-        <button
-          type="button"
-          onClick={() => setExcluded(new Set())}
-          className="text-xs text-blue-600 hover:underline"
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 print:hidden">
+        <span className="text-xs font-medium text-slate-500">범위 선택 ({visibleRows.length}/{rows.length}건)</span>
+        <select
+          value={selectedSite}
+          onChange={(e) => {
+            setSelectedSite(e.target.value);
+            setSelectedProjectId("");
+          }}
+          className={`${fieldClass} w-auto`}
         >
-          전체 선택
-        </button>
-        <button
-          type="button"
-          onClick={() => setExcluded(new Set(rows.map((p) => p.id)))}
-          className="text-xs text-blue-600 hover:underline"
-        >
-          전체 해제
-        </button>
-        <div className="flex flex-wrap gap-x-3 gap-y-1 basis-full">
-          {rows.map((p) => (
-            <label key={p.id} className="flex items-center gap-1.5 text-xs text-slate-700">
-              <input
-                type="checkbox"
-                checked={!excluded.has(p.id)}
-                onChange={() => toggle(p.id)}
-                className="h-3.5 w-3.5 rounded border-slate-300 accent-slate-900"
-              />
-              {p.projectCode ? `${p.projectCode} ` : ""}
-              {p.name}
-            </label>
+          <option value="">전체 현장</option>
+          {siteOptions.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
           ))}
-        </div>
+        </select>
+        <select
+          value={selectedProjectId}
+          onChange={(e) => setSelectedProjectId(e.target.value)}
+          className={`${fieldClass} w-auto`}
+        >
+          <option value="">전체 프로젝트</option>
+          {projectOptionsForSite.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="space-y-6 print:space-y-0">
