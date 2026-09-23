@@ -461,7 +461,11 @@ export function TransactionTable({
                   className="h-4 w-4 accent-slate-900"
                 />
               </Td>
-              <Td className="whitespace-nowrap pr-4">{formatDate(t.trans_date)}</Td>
+              <Td className="whitespace-nowrap pr-4" title={formatDate(t.trans_date)}>
+                {/* 화면은 연도 필터로 이미 한 해만 보이므로 월-일만, 인쇄는 전체 날짜 */}
+                <span className="print:hidden">{formatDate(t.trans_date).slice(5)}</span>
+                <span className="hidden print:inline">{formatDate(t.trans_date)}</span>
+              </Td>
               <Td className="whitespace-nowrap pr-4">
                 <Badge variant={t.type === "매출" ? "blue" : "orange"}>{t.type}</Badge>
               </Td>
