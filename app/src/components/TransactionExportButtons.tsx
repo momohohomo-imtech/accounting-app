@@ -2,7 +2,7 @@
 
 import { downloadXlsx } from "@/lib/xlsxExport";
 import { transactionTotal } from "@/lib/credit";
-import { formatDate } from "@/lib/format";
+import { todayString, formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { PrintButton } from "@/components/PrintButton";
 import type { Transaction } from "@/lib/types";
@@ -20,7 +20,7 @@ export function TransactionExportButtons({ transactions }: { transactions: Trans
       transactionTotal(t),
     ]);
     await downloadXlsx(
-      `매입매출_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      `매입매출_${todayString()}.xlsx`,
       ["날짜", "구분", "거래처", "프로젝트", "품목", "결제방식", "세금계산서", "금액"],
       rows,
       "매입매출"

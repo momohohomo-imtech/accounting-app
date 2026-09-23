@@ -7,6 +7,7 @@ import { AccessListWorkerPicker } from "@/components/AccessListWorkerPicker";
 import { AccessListSubmitButton } from "@/components/AccessListSubmitButton";
 import { AccessListCard } from "@/components/AccessListCard";
 import { YearMonthFilter } from "@/components/YearMonthFilter";
+import { nowKst } from "@/lib/kstDate";
 
 const FLOOR_YEAR = 2026;
 
@@ -21,9 +22,7 @@ async function createAccessList(formData: FormData) {
 
 export async function AccessListsSection({ year, month }: { year?: string; month?: string }) {
   const supabase = await createClient();
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+  const { year: currentYear, month: currentMonth } = nowKst();
   const selectedYear = year ? Number(year) : currentYear;
   const selectedMonth = month ?? "current";
   const { start, end } = monthRange(selectedYear, selectedMonth, currentMonth);

@@ -264,26 +264,39 @@ export async function settleCreditTransactions(formData: FormData) {
   const paidDate = String(formData.get("paid_date") ?? "");
   const paymentMethodId = String(formData.get("payment_method_id") ?? "") || null;
 
-  if (ids.length === 0 || !paidDate) {
-    revalidatePath("/transactions");
-    return;
-  }
+  if (ids.length === 0) return { error: "정산할 거래를 선택해주세요." };
+  if (!paidDate) return { error: "정산일을 입력해주세요." };
 
-  const [{ data: txs }, { data: payments }, { data: paymentMethod }] = await Promise.all([
-    supabase.from("transactions").select("*").in("id", ids),
-    supabase.from("credit_payments").select("*").in("transaction_id", ids),
-    paymentMethodId
-      ? supabase.from("payment_methods").select("name").eq("id", paymentMethodId).single()
-      : Promise.resolve({ data: null }),
-  ]);
+  const [{ data: txs, error: txError }, { data: payments, error: payError }, { data: paymentMethod }] =
+    await Promise.all([
+      supabase.from("transactions").select("*").in("id", ids),
+      supabase.from("credit_payments").select("*").in("transaction_id", ids),
+      paymentMethodId
+        ? supabase.from("payment_methods").select("name").eq("id", paymentMethodId).single()
+        : Promise.resolve({ data: null }),
+    ]);
+  if (txError || payError) return { error: (txError ?? payError)!.message };
 
-  const targetTxs = (txs ?? []) as Transaction[];
   const existingPayments = (payments ?? []) as CreditPayment[];
-  if (targetTxs.length === 0) return;
+  // 이미 완납된 건(중복 제출 등)은 다시 정산하지 않는다 — 메모에 정산일이 두 번 붙는 것 방지.
+  const targetTxs = ((txs ?? []) as Transaction[]).filter(
+    (tx) => !(existingPayments.some((p) => p.transaction_id === tx.id) && remainingBalance(tx, existingPayments) === 0)
+  );
+  if (targetTxs.length === 0) return { error: "선택한 거래는 이미 정산됐습니다." };
+
+  // 정산 여부를 결정하는 이력을 먼저 저장 — 이게 실패하면 거래 쪽은 아무것도 안 바뀐 상태로 끝난다.
+  const { error: insertError } = await supabase.from("credit_payments").insert(
+    targetTxs.map((tx) => ({
+      transaction_id: tx.id,
+      paid_date: paidDate,
+      paid_amount: remainingBalance(tx, existingPayments),
+      remaining_amount: 0,
+    }))
+  );
+  if (insertError) return { error: insertError.message };
 
   const settleNote = `정산일: ${paidDate}${paymentMethod?.name ? ` · ${paymentMethod.name}` : ""}`;
-
-  await Promise.all(
+  const updateResults = await Promise.all(
     targetTxs.map((tx) =>
       supabase
         .from("transactions")
@@ -295,17 +308,13 @@ export async function settleCreditTransactions(formData: FormData) {
     )
   );
 
-  const creditPaymentRows = targetTxs.map((tx) => ({
-    transaction_id: tx.id,
-    paid_date: paidDate,
-    paid_amount: remainingBalance(tx, existingPayments),
-    remaining_amount: 0,
-  }));
-
-  await supabase.from("credit_payments").insert(creditPaymentRows);
-
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
   revalidatePath("/reports");
   revalidatePath("/projects");
+
+  const failed = updateResults.filter((r) => r.error);
+  if (failed.length > 0) {
+    return { error: `정산은 완료됐지만 ${failed.length}건은 결제수단·메모 기록에 실패했습니다: ${failed[0].error!.message}` };
+  }
 }

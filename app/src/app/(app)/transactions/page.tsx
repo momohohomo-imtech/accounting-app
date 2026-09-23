@@ -21,6 +21,7 @@ import { monthRange } from "@/lib/dateRange";
 import { isLedgerVisible } from "@/lib/credit";
 import type { CreditPayment, Transaction } from "@/lib/types";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { nowKst } from "@/lib/kstDate";
 
 const TABS = [
   { key: "list", label: "매입매출" },
@@ -126,9 +127,7 @@ async function fetchTransactionTotals({
   payment_method_id?: string;
 }) {
   const supabase = await createClient();
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+  const { year: currentYear, month: currentMonth } = nowKst();
   const selectedYear = year ? Number(year) : currentYear;
   const selectedMonth = month ?? "current";
   const { start, end } = monthRange(selectedYear, selectedMonth, currentMonth);
@@ -198,9 +197,7 @@ async function TransactionListSection({
     showItem: showItem !== "0",
   };
   const supabase = await createClient();
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+  const { year: currentYear, month: currentMonth } = nowKst();
   const selectedYear = year ? Number(year) : currentYear;
   const selectedMonth = month ?? "current";
 

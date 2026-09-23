@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { nowKst } from "@/lib/kstDate";
 
 type ChatMessage = { role: "user" | "model"; text: string };
 
@@ -12,7 +13,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const summary = (body.summary ?? {}) as Record<string, unknown> & { year?: number };
   const messages = (body.messages ?? []) as ChatMessage[];
-  const year = summary.year ?? new Date().getFullYear();
+  const year = summary.year ?? nowKst().year;
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return NextResponse.json({ error: "질문이 없습니다." }, { status: 400 });

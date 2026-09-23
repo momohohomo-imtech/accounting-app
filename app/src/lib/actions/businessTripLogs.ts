@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { todayKstString } from "@/lib/kstDate";
 
 function parseJsonField(formData: FormData, key: string) {
   try {
@@ -16,7 +17,7 @@ function parse(formData: FormData) {
   const projects = parseJsonField(formData, "projects_json") as { work_date?: string }[];
   // 목록 정렬/기본 표시용 대표 날짜 — 프로젝트별 공사일 중 가장 이른 날짜.
   const dates = projects.map((p) => p.work_date).filter((d): d is string => Boolean(d)).sort();
-  const workDate = dates[0] ?? new Date().toISOString().slice(0, 10);
+  const workDate = dates[0] ?? todayKstString();
 
   const dayCountRaw = String(formData.get("day_count") ?? "").trim();
   const dayCount = dayCountRaw === "" ? null : Number(dayCountRaw);

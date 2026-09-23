@@ -7,6 +7,7 @@ import { DailyWorkerUsageFilter } from "@/components/DailyWorkerUsageFilter";
 import { DailyWorkerUsageExportButtons } from "@/components/DailyWorkerUsageExportButtons";
 import { DailyWorkerUsageTable } from "@/components/DailyWorkerUsageTable";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { nowKst } from "@/lib/kstDate";
 
 export async function DailyWorkerUsageSection({
   year,
@@ -18,7 +19,7 @@ export async function DailyWorkerUsageSection({
   client?: string;
 }) {
   const supabase = await createClient();
-  const currentYear = new Date().getFullYear();
+  const currentYear = nowKst().year;
   const selectedYear = year ? Number(year) : currentYear;
   const { start, end, label: monthLabel } = parseMonthRange(months);
 

@@ -38,6 +38,7 @@ import { parseMonthRange } from "@/lib/monthRange";
 import { ReportExcelButton } from "@/components/ReportExcelButton";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import type { WorkLog } from "@/lib/types";
+import { nowKst } from "@/lib/kstDate";
 
 const MONTH_LABELS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
 
@@ -69,6 +70,9 @@ type Row = {
     | { name: string; text_color: string | null; background_color: string | null }[]
     | null;
 };
+
+const TX_SELECT =
+  "*, clients(name), projects(name, status, sites(name)), expense_categories(name, project_only, color), payment_methods(name, text_color, background_color)";
 
 function one<T>(v: T | T[] | null): T | null {
   return Array.isArray(v) ? v[0] ?? null : v;
@@ -108,7 +112,7 @@ export default async function ReportsPage({
     printSection,
   } = await searchParams;
   const includeVendorAgency = vendorAgency === "1";
-  const currentYear = new Date().getFullYear();
+  const currentYear = nowKst().year;
   const selectedYear = year ? Number(year) : currentYear;
 
   const supabase = await createClient();
@@ -121,7 +125,6 @@ export default async function ReportsPage({
     { data: agencyPurchases },
     { data: expenseCategories },
     { data: clientRows },
-    projectWorkLogRows,
     { data: bankAccounts },
     bankTxAll,
     creditPurchaseTxAll,
@@ -129,9 +132,7 @@ export default async function ReportsPage({
       fetchAllRows<Row>((from, to) =>
         supabase
           .from("transactions")
-          .select(
-            "*, clients(name), projects(name, status, sites(name)), expense_categories(name, project_only, color), payment_methods(name, text_color, background_color)"
-          )
+          .select(TX_SELECT)
           .gte("trans_date", `${selectedYear}-01-01`)
           .lte("trans_date", `${selectedYear}-12-31`)
           .order("trans_date", { ascending: true })
@@ -161,17 +162,6 @@ export default async function ReportsPage({
         .eq("projects.year", selectedYear),
       supabase.from("expense_categories").select("id, name, project_only, color").order("sort_order"),
       supabase.from("clients").select("name").order("name"),
-      // 프로젝트 요약(재무제표)의 작업일수용 — 연도 범위 안, 프로젝트가 지정된 작업일지만.
-      fetchAllRows<{ log_date: string; project_id: string | null }>((from, to) =>
-        supabase
-          .from("work_logs")
-          .select("log_date, project_id")
-          .not("project_id", "is", null)
-          .gte("log_date", `${selectedYear}-01-01`)
-          .lte("log_date", `${selectedYear}-12-31`)
-          .order("id", { ascending: true })
-          .range(from, to)
-      ),
       // 현재 자금 내역용 — 선택 연도와 무관하게 항상 "현재 시점" 기준이라 연도 필터를 안 건다.
       supabase.from("bank_accounts").select("id, opening_balance"),
       fetchAllRows<{ bank_account_id: string; direction: string; amount: number }>((from, to) =>
@@ -203,6 +193,32 @@ export default async function ReportsPage({
 
   const transactions = rawTx.filter((t) => isLedgerVisible(t, creditPayments));
 
+  // 프로젝트 손익은 거래일 연도와 무관하게 그 프로젝트에 붙은 거래 전부로 계산 — 연도를 넘겨
+  // 들어온 매입/매출(예: 작년 프로젝트의 올해 1월 매입)이 어느 해 보고서에서도 빠지지 않게.
+  // 프로젝트 목록·손익 팝업·대시보드 이익 예상과 같은 기준. 작업일수도 같은 이유로 기간 제한 없음.
+  const projectIdList = (projects ?? []).map((p) => p.id);
+  const [projectTxRaw, projectWorkLogRows] = projectIdList.length
+    ? await Promise.all([
+        fetchAllRows<Row>((from, to) =>
+          supabase
+            .from("transactions")
+            .select(TX_SELECT)
+            .in("project_id", projectIdList)
+            .order("id", { ascending: true })
+            .range(from, to)
+        ),
+        fetchAllRows<{ log_date: string; project_id: string | null }>((from, to) =>
+          supabase
+            .from("work_logs")
+            .select("log_date, project_id")
+            .in("project_id", projectIdList)
+            .order("id", { ascending: true })
+            .range(from, to)
+        ),
+      ])
+    : [[] as Row[], [] as { log_date: string; project_id: string | null }[]];
+  const projectTx = projectTxRaw.filter((t) => isLedgerVisible(t, creditPayments));
+
   // 현재 자금 내역 — 선택 연도와 무관한 "현재" 스냅샷. 은행 총 잔액(마이너스 통장 있으면
   // 음수 가능)에서 아직 안 갚은 외상 매입 총액(VAT 포함, 완납 전까지 남은 잔액만)을 뺀
   // 실질 자금. 외상 매출(우리가 받을 돈)은 지출이 아니라서 안 뺀다.
@@ -228,7 +244,8 @@ export default async function ReportsPage({
   years.sort((a, b) => b - a);
 
   const monthly = MONTH_LABELS.map((label, i) => {
-    const rows = transactions.filter((t) => new Date(t.trans_date).getMonth() === i);
+    // 날짜 문자열에서 월을 직접 읽음 — new Date()로 바꾸면 서버 시간대에 따라 월초 거래가 전달로 넘어갈 수 있음.
+    const rows = transactions.filter((t) => Number(t.trans_date.slice(5, 7)) === i + 1);
     const sales = rows.reduce((s, t) => s + t.sales_amount + t.sales_vat, 0);
     const purchase = rows.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
     return { label, sales, purchase, profit: sales - purchase };
@@ -255,7 +272,7 @@ export default async function ReportsPage({
   }
 
   const byProjectAll = (projects ?? []).map((p) => {
-    const rows = transactions.filter((t) => t.project_id === p.id);
+    const rows = projectTx.filter((t) => t.project_id === p.id);
     // 손익 계산 시 매출은 부가세를 뺀 금액을 사용 (VAT는 실제 이익이 아닌 세무서 납부분).
     // 매출 총액(부가세 포함분)을 1.1로 나눠서 부가세만큼만 정확히 제외한다.
     const salesGross = rows.reduce((s, t) => s + t.sales_amount + t.sales_vat, 0);
@@ -308,7 +325,7 @@ export default async function ReportsPage({
       const catMap = new Map<string, { name: string; amount: number; color?: string }>();
       let purchaseSupply = 0;
       let purchaseVat = 0;
-      for (const t of transactions.filter((t) => t.project_id && groupIds.has(t.project_id) && t.type === "매입")) {
+      for (const t of projectTx.filter((t) => t.project_id && groupIds.has(t.project_id) && t.type === "매입")) {
         const cat = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
         const name = cat?.name ?? "미분류";
         const entry = catMap.get(name) ?? { name, amount: 0, color: cat ? resolveCategoryColor(cat) : undefined };

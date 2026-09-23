@@ -18,6 +18,7 @@ import { monthRange } from "@/lib/dateRange";
 import { cx } from "@/lib/cx";
 import type { BusinessTripLog, WorkLog } from "@/lib/types";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { nowKst } from "@/lib/kstDate";
 
 const HOLIDAY_TITLE = "휴무";
 const TABS = [
@@ -68,9 +69,7 @@ async function BusinessTripSection({
   project?: string;
 }) {
   const supabase = await createClient();
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+  const { year: currentYear, month: currentMonth } = nowKst();
   const selectedYear = year ? Number(year) : currentYear;
   const selectedMonth = month ?? "all";
   const { start, end } = monthRange(selectedYear, selectedMonth, currentMonth);
@@ -150,9 +149,9 @@ async function WorkLogCalendarSection({
   printSummary?: string;
 }) {
   const isolateSummary = printSummary === "1";
-  const now = new Date();
-  const selectedYear = year ? Number(year) : now.getFullYear();
-  const selectedMonth = month ? Number(month) : now.getMonth() + 1;
+  const now = nowKst();
+  const selectedYear = year ? Number(year) : now.year;
+  const selectedMonth = month ? Number(month) : now.month;
 
   const supabase = await createClient();
   const pad = (n: number) => String(n).padStart(2, "0");

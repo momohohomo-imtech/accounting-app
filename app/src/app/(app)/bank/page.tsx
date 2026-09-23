@@ -12,6 +12,7 @@ import { BankAccountsPopup } from "@/components/BankAccountsPopup";
 import { BankAccountMemo } from "@/components/BankAccountMemo";
 import { BankEntryPopup } from "@/components/BankEntryPopup";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { nowKst } from "@/lib/kstDate";
 
 const accountFields: FieldConfig[] = [
   { name: "bank_name", label: "은행명", required: true },
@@ -34,8 +35,7 @@ export default async function BankPage({
 }) {
   const { year, period, deposit, withdrawal, excludeAccounts } = await searchParams;
   const supabase = await createClient();
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth() + 1;
+  const { year: currentYear, month: currentMonth } = nowKst();
   const selectedYear = year ? Number(year) : currentYear;
   // period 파라미터가 아예 없으면(맨 처음 들어왔을 때) 이번 달을 기본값으로 —
   // "전체 기간"을 직접 고른 경우엔 "all"이 명시적으로 붙어있어서 이 기본값과 구분된다.

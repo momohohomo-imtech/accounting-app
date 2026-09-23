@@ -14,6 +14,7 @@ import { createKnowHowNote, updateKnowHowNote, deleteKnowHowNote } from "@/lib/a
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { groupToolsBySortOrder, toolGroupLabel } from "@/lib/tools";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { nowKst } from "@/lib/kstDate";
 
 const toolFields: FieldConfig[] = [
   { name: "name", label: "공구명", required: true },
@@ -130,9 +131,7 @@ export async function ToolListSection({
   // 보여주고, "전체"를 고르면 명시적으로 URL에 남겨서(연/월 다 포함) 파라미터가
   // 없는 최초 진입 상태와 구분되게 함(안 그러면 "전체"를 눌러도 다시 이번
   // 달로 되돌아가 버림).
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+  const { year: currentYear, month: currentMonth } = nowKst();
   const selectedHistoryYear = historyYear ?? String(currentYear);
   const selectedHistoryMonth = historyMonth ?? String(currentMonth);
   const selectedHistorySiteId = historySite ?? "all";

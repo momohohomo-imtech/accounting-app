@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { settleCreditTransactions, deleteTransactionRecord } from "@/lib/actions/transactions";
-import { formatWon, formatDate } from "@/lib/format";
+import { todayString, formatWon, formatDate } from "@/lib/format";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button, LinkButton } from "@/components/ui/Button";
 import { fieldClass, labelClass } from "@/components/ui/field";
@@ -25,6 +25,19 @@ export function CreditSettlementGroup({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [settleError, setSettleError] = useState<string | null>(null);
+
+  async function handleSettle(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    setSettleError(null);
+    const result = await pending.run(() => settleCreditTransactions(fd));
+    if (result?.error) {
+      setSettleError(result.error);
+      return;
+    }
+    setSelected(new Set());
+  }
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -124,10 +137,7 @@ export function CreditSettlementGroup({
       </ul>
 
       {selected.size > 0 && (
-        <form
-          action={settleCreditTransactions}
-          className="mt-4 flex flex-wrap items-end gap-2 border-t border-slate-100 pt-4"
-        >
+        <form onSubmit={handleSettle} className="mt-4 flex flex-wrap items-end gap-2 border-t border-slate-100 pt-4">
           {Array.from(selected).map((id) => (
             <input key={id} type="hidden" name="transaction_ids" value={id} />
           ))}
@@ -138,7 +148,7 @@ export function CreditSettlementGroup({
               type="date"
               name="paid_date"
               required
-              defaultValue={new Date().toISOString().slice(0, 10)}
+              defaultValue={todayString()}
               className={fieldClass}
             />
           </div>
@@ -157,6 +167,7 @@ export function CreditSettlementGroup({
           </Button>
         </form>
       )}
+      {settleError && <p className="mt-2 text-sm text-red-600">{settleError}</p>}
     </Card>
   );
 }

@@ -6,14 +6,13 @@ import { DailyWorkerTaxFilter } from "@/components/DailyWorkerTaxFilter";
 import { DailyWorkerUsageLogForm } from "@/components/DailyWorkerUsageLogForm";
 import { DailyWorkerUsageStatementTable } from "@/components/DailyWorkerUsageStatementTable";
 import { DailyWorkerUsageStatementExportButtons } from "@/components/DailyWorkerUsageStatementExportButtons";
+import { nowKst } from "@/lib/kstDate";
 
 const FLOOR_YEAR = 2026;
 
 export async function DailyWorkerTaxSection({ year, month }: { year?: string; month?: string }) {
   const supabase = await createClient();
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+  const { year: currentYear, month: currentMonth } = nowKst();
   const selectedYear = year ? Number(year) : currentYear;
   const selectedMonth = month ? Number(month) : currentMonth;
 

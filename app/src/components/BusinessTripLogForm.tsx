@@ -13,6 +13,7 @@ import { getWorkLogsForDate, type WorkLogDateEntry } from "@/lib/actions/worklog
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { Button } from "@/components/ui/Button";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { todayString } from "@/lib/format";
 
 function emptyWorker(workDate: string): BusinessTripWorker {
   return { work_date: workDate, name: "", overtime: false, note: "" };
@@ -345,7 +346,7 @@ export function BusinessTripLogForm({
 }) {
   const pending = useGlobalPending();
   const [error, setError] = useState<string | null>(null);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayString();
   const workDate = initial?.work_date ?? defaultWorkDate ?? today;
 
   const [clientName, setClientName] = useState(initial?.client_name ?? "");

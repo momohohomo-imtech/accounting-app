@@ -19,6 +19,7 @@ import { ProjectListExportButtons } from "@/components/ProjectListExportButtons"
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { ProjectsPageMemo } from "@/components/ProjectsPageMemo";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { nowKst } from "@/lib/kstDate";
 
 const TABS = [
   { key: "list", label: "프로젝트" },
@@ -99,7 +100,7 @@ async function ProjectListSection({
   report?: string;
 }) {
   const supabase = await createClient();
-  const currentYear = new Date().getFullYear();
+  const currentYear = nowKst().year;
   const selectedYear = year ? Number(year) : currentYear;
   // 상태 필터는 체크박스로 여러 개를 동시에 고를 수 있어서 콤마로 구분된 값으로 옴.
   const statusList = status ? status.split(",").filter(Boolean) : [];

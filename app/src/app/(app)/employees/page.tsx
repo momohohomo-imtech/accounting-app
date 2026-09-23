@@ -18,6 +18,7 @@ import { YearFilter } from "@/components/YearFilter";
 import { EmployeeCertificate } from "@/components/EmployeeCertificate";
 import { LinkButton } from "@/components/ui/Button";
 import { sortByEmployeeNo } from "@/lib/format";
+import { nowKst } from "@/lib/kstDate";
 
 const employeeFields: FieldConfig[] = [
   { name: "employee_no", label: "사원번호" },
@@ -53,7 +54,7 @@ export default async function EmployeesPage({
   searchParams: Promise<{ payslip?: string; year?: string; certificate?: string }>;
 }) {
   const { payslip, year, certificate } = await searchParams;
-  const currentYear = new Date().getFullYear();
+  const currentYear = nowKst().year;
   const selectedYear = year ? Number(year) : currentYear;
   const yearStart = `${selectedYear}-01-01`;
   const yearEnd = `${selectedYear}-12-31`;

@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { createBankTransactionsBulk } from "@/lib/actions/bank";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { todayString } from "@/lib/format";
 
 const inputClass = "shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-sm";
 const CLIENT_NAMES_DATALIST_ID = "bank-transaction-client-names";
@@ -39,7 +40,7 @@ export function BankTransactionForm({
 }) {
   const confirm = useConfirm();
   const pending = useGlobalPending();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayString();
   const [transDate, setTransDate] = useState(today);
   const [rows, setRows] = useState<Row[]>([emptyRow(accounts[0]?.id ?? "")]);
   const [error, setError] = useState<string | null>(null);
