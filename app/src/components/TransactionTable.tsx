@@ -141,6 +141,7 @@ export function TransactionTable({
   );
 
   function resetBulkFields() {
+    setBulkError(null);
     setBulkField("project");
     setBulkYear("");
     setBulkSiteId("");

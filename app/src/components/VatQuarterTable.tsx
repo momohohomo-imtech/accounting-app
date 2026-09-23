@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { formatWon } from "@/lib/format";
+import { formatWon, moneyClass } from "@/lib/format";
 import { cx } from "@/lib/cx";
 import { Table, THead, Th, Tr, Td } from "@/components/ui/Table";
 
@@ -24,7 +24,7 @@ const COLUMNS: { key: SortKey; label: string; className?: string }[] = [
 ];
 
 function Money({ value, className }: { value: number; className?: string }) {
-  return <span className={cx("font-mono", value < 0 && "text-red-600", className)}>{formatWon(value)}</span>;
+  return <span className={cx("font-mono", moneyClass(value), className)}>{formatWon(value)}</span>;
 }
 
 // 대시보드 분기별 부가세 표 — 합계 행은 정렬과 무관하게 항상 맨 아래.

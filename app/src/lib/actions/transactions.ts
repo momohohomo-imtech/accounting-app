@@ -299,6 +299,12 @@ export async function settleCreditTransactions(formData: FormData) {
 
   const failed = updateResults.filter((r) => r.error);
   if (failed.length > 0) {
-    return { error: `정산은 완료됐지만 ${failed.length}건은 결제수단·메모 기록에 실패했습니다: ${failed[0].error!.message}` };
+    // credit_payments는 이미 전부 등록돼 정산 자체는 끝난 상태(결제수단·메모만 일부 실패) —
+    // settled: true로 호출 쪽에 알려서 선택 목록을 비우게 한다(안 비우면 다음 제출 때 이미
+    // 정산된 거래id가 다시 섞여 들어간다).
+    return {
+      error: `정산은 완료됐지만 ${failed.length}건은 결제수단·메모 기록에 실패했습니다: ${failed[0].error!.message}`,
+      settled: true,
+    };
   }
 }

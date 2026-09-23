@@ -35,6 +35,9 @@ export function CreditSettlementGroup({
     const result = await pending.run(() => settleCreditTransactions(fd));
     if (result?.error) {
       setSettleError(result.error);
+      // settled: 정산(credit_payments) 자체는 끝났고 결제수단·메모 기록만 일부 실패한 경우 —
+      // 선택을 비우지 않으면 다음 제출 때 이미 정산된 거래id가 다시 섞여 들어간다.
+      if (result.settled) setSelected(new Set());
       return;
     }
     setSelected(new Set());

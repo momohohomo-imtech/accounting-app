@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { formatWon } from "@/lib/format";
+import { formatWon, moneyClass } from "@/lib/format";
 import { PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
 import { taxEstimate } from "@/lib/tax";
 import { isLedgerVisible } from "@/lib/credit";
@@ -8,10 +8,6 @@ import { one } from "@/lib/relations";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import { PAYROLL_CATEGORY_NAME } from "@/lib/vatExempt";
 import { purchaseCostOf, salesSupplyOf } from "@/lib/vatBasis";
-
-function moneyClass(amount: number) {
-  return amount < 0 ? "text-red-600" : "";
-}
 
 // 대시보드의 이익·세금 추정치를 한 번에 계산 — 계산식은 기존 대시보드 박스와 동일하고,
 // 화면 배치만 대시보드 쪽에서 나눠서 보여준다. 외상 정산 이력은 대시보드가 한 번 받아온 것을

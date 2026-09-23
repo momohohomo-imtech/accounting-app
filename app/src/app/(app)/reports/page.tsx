@@ -14,7 +14,7 @@ import { projectStatusLabel } from "@/lib/projectStatus";
 import { AutoPrint } from "@/components/AutoPrint";
 import { ReportAIInsights } from "@/components/ReportAIInsights";
 import { saveReportAiInsight, deleteReportAiInsight } from "@/lib/actions/reportAiInsights";
-import { isLedgerVisible, remainingBalance, transactionTotal } from "@/lib/credit";
+import { isLedgerVisible, remainingBalance } from "@/lib/credit";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import type { ReportAiInsight } from "@/lib/types";
 import { VendorAggregateTable } from "@/components/VendorAggregateTable";
@@ -37,7 +37,7 @@ import { buildWorkLogSummary } from "@/lib/workLogSummary";
 import { parseMonthRange } from "@/lib/monthRange";
 import { ReportExcelButton } from "@/components/ReportExcelButton";
 import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
-import { purchaseCostOf, salesSupplyOf } from "@/lib/vatBasis";
+import { purchaseCostOf, salesSupplyOf, supplyOf, vatOf } from "@/lib/vatBasis";
 import { PAYROLL_CATEGORY_NAME } from "@/lib/vatExempt";
 import type { WorkLog } from "@/lib/types";
 import { nowKst } from "@/lib/kstDate";
@@ -341,17 +341,21 @@ export default async function ReportsPage({
       const groupIds = new Set(group.map((g) => g.id));
 
       const catMap = new Map<string, { name: string; amount: number; color?: string }>();
+      let purchaseCost = 0;
       let purchaseSupply = 0;
       let purchaseVat = 0;
       for (const t of projectTx.filter((t) => t.project_id && groupIds.has(t.project_id) && t.type === "매입")) {
         const cat = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
         const name = cat?.name ?? "미분류";
         const entry = catMap.get(name) ?? { name, amount: 0, color: cat ? resolveCategoryColor(cat) : undefined };
-        // 카테고리 내역·이익은 발주액과 같은 부가세 제외(돌려받는 부가세만 뺀) 기준, 매입 총액은 그대로.
+        // 카테고리 내역·이익은 발주액과 같은 부가세 제외(돌려받는 부가세만 뺀) 기준(매입세액 불공제 카테고리는
+        // 매입 총액 전부가 비용). 공급가액·부가세 표시는 항상 실제 공급가/세액 분리(supplyOf/vatOf) — 불공제라도
+        // 세금계산서상 부가세는 실재하므로 전액을 공급가액으로 잘못 표시하지 않는다.
         entry.amount += purchaseCostOf(t);
         catMap.set(name, entry);
-        purchaseSupply += purchaseCostOf(t);
-        purchaseVat += transactionTotal(t) - purchaseCostOf(t);
+        purchaseCost += purchaseCostOf(t);
+        purchaseSupply += supplyOf(t);
+        purchaseVat += vatOf(t);
       }
       let agencyAmount = 0;
       for (const a of (agencyPurchases ?? []).filter((a) => groupIds.has(a.project_id))) {
@@ -364,7 +368,7 @@ export default async function ReportsPage({
       }
       const quoteAmount = group.reduce((s, g) => s + g.quoteAmount, 0);
       const purchaseTotal = purchaseSupply + purchaseVat;
-      const profit = quoteAmount - purchaseSupply - agencyAmount;
+      const profit = quoteAmount - purchaseCost - agencyAmount;
       const margin = quoteAmount > 0 ? (profit / quoteAmount) * 100 : null;
       const workDayCount = new Set(
         projectWorkLogRows.filter((r) => r.project_id && groupIds.has(r.project_id)).map((r) => r.log_date)

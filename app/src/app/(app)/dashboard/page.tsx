@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { formatWon, formatDate } from "@/lib/format";
+import { formatWon, formatDate, moneyClass } from "@/lib/format";
 import { remainingBalance, isLedgerVisible } from "@/lib/credit";
 import type { ExpenseCategory, Transaction } from "@/lib/types";
 import { vatOf, salesSupplyOf, purchaseCostOf } from "@/lib/vatBasis";
@@ -26,7 +26,7 @@ const EXPECTED_RECEIVABLE_STATUSES = [
 ];
 
 function Money({ value, className }: { value: number; className?: string }) {
-  return <span className={cx("font-mono", value < 0 && "text-red-600", className)}>{formatWon(value)}</span>;
+  return <span className={cx("font-mono", moneyClass(value), className)}>{formatWon(value)}</span>;
 }
 
 function SectionTitle({ children, note }: { children: ReactNode; note?: ReactNode }) {
@@ -252,7 +252,7 @@ export default async function DashboardPage({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Stat
             label="상반기 확정 이익금 (세무사 결산)"
-            sub={<HalfYearSettlementInput year={selectedYear} initialAmount={o.half1Profit} />}
+            sub={<HalfYearSettlementInput key={selectedYear} year={selectedYear} initialAmount={o.half1Profit} />}
           >
             {o.half1Profit != null ? <Money value={o.half1Profit} /> : <span className="text-base text-slate-400">미입력</span>}
           </Stat>
