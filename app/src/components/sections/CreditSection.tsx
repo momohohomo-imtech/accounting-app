@@ -15,7 +15,7 @@ export async function CreditSection() {
     fetchAllRows<Transaction>((from, to) =>
       supabase
         .from("transactions")
-        .select("*, clients(name), projects(name), expense_categories(name)")
+        .select("*, clients(name), projects(name), expense_categories(*)")
         .eq("payment_type", "credit")
         .order("trans_date", { ascending: false })
         .order("id", { ascending: true })
@@ -74,7 +74,7 @@ export async function CreditSection() {
       ? fetchAllRows<Transaction>((from, to) =>
           supabase
             .from("transactions")
-            .select("*, clients(name), projects(name), payment_methods(name), expense_categories(name)")
+            .select("*, clients(name), projects(name), payment_methods(name), expense_categories(*)")
             .in("client_id", vendorClientIds)
             .order("trans_date", { ascending: false })
             .order("id", { ascending: true })
@@ -85,7 +85,7 @@ export async function CreditSection() {
       ? fetchAllRows<Transaction>((from, to) =>
           supabase
             .from("transactions")
-            .select("*, clients(name), projects(name), payment_methods(name), expense_categories(name)")
+            .select("*, clients(name), projects(name), payment_methods(name), expense_categories(*)")
             .is("client_id", null)
             .in("client_name_raw", vendorRawNames)
             .order("trans_date", { ascending: false })

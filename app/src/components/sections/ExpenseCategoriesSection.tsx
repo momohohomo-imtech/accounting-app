@@ -22,6 +22,11 @@ const fields: FieldConfig[] = [
     label: "매입세액 불공제 (체크 시 대시보드 부가세 집계에서 공제 대상에서 빼고 따로 표시 — 예: 승용차 렌트·유류비)",
     type: "checkbox",
   },
+  {
+    name: "vat_exempt",
+    label: "비과세 (부가세가 없는 지출 — 예: 인건비, 직원급여/상여/4대보험, 면세. 총액 전체를 공급가로 보고, 거래 입력 시 VAT 체크를 막음)",
+    type: "checkbox",
+  },
 ];
 
 export async function ExpenseCategoriesSection() {

@@ -65,6 +65,8 @@ export type ExpenseCategory = {
   color: string | null;
   // 매입세액 불공제 카테고리(승용차 렌트·유류비 등) — 082 마이그레이션 전엔 값이 없을 수 있음.
   vat_non_deductible?: boolean;
+  // 비과세 카테고리(인건비 등) — 083 마이그레이션 전엔 값이 없을 수 있음.
+  vat_exempt?: boolean;
   created_at: string;
 };
 

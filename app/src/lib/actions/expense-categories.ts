@@ -9,6 +9,7 @@ function parse(formData: FormData) {
     sort_order: formData.get("sort_order") ? Number(formData.get("sort_order")) : 0,
     project_only: formData.get("project_only") === "on",
     vat_non_deductible: formData.get("vat_non_deductible") === "on",
+    vat_exempt: formData.get("vat_exempt") === "on",
   };
 }
 

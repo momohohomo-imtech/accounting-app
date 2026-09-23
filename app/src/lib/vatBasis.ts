@@ -9,7 +9,7 @@ import { transactionTotal } from "@/lib/credit";
 //  - 그 외: 공급가 = 총액 ÷ 1.1(반올림), 부가세 = 총액 − 공급가
 // 저장된 값은 절대 바꾸지 않고, 계산·표시할 때만 이 함수들로 나눈다.
 
-type CategoryInfo = { name: string; vat_non_deductible?: boolean | null };
+type CategoryInfo = { name: string; vat_exempt?: boolean | null; vat_non_deductible?: boolean | null };
 type CategoryRel = CategoryInfo | CategoryInfo[] | null | undefined;
 
 export type VatBasisRow = {
@@ -21,13 +21,16 @@ export type VatBasisRow = {
   expense_categories?: CategoryRel;
 };
 
-export function isVatExemptCategory(name: string | null | undefined) {
-  return name ? VAT_EXEMPT_CATEGORIES.includes(name) : false;
+// 지출카테고리의 "비과세" 체크로 판단. 083 SQL 실행 전이라 칸 자체가 없을 때만 예전처럼 이름으로.
+export function isVatExemptCategory(category: CategoryInfo | null | undefined) {
+  if (!category) return false;
+  if (category.vat_exempt === undefined) return VAT_EXEMPT_CATEGORIES.includes(category.name);
+  return Boolean(category.vat_exempt);
 }
 
 export function supplyOf(row: VatBasisRow) {
   const gross = transactionTotal(row);
-  return isVatExemptCategory(one(row.expense_categories)?.name) ? gross : Math.round(gross / 1.1);
+  return isVatExemptCategory(one(row.expense_categories)) ? gross : Math.round(gross / 1.1);
 }
 
 export function vatOf(row: VatBasisRow) {

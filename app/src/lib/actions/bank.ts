@@ -200,8 +200,10 @@ export async function promoteBankTransactionToLedger(formData: FormData) {
   revalidatePath("/transactions");
 }
 
+// 비교 기준은 은행 거래의 현재 값이라, 등록 뒤 은행 쪽 내용·거래처·계좌 별칭만 바꿔도 "다르다"로
+// 나온다 — 어느 쪽이 바뀐 건지 구분할 수 없으니 지우지 않고, 두 경우를 다 안내한다.
 const CLASSIFIED_LEDGER_ERROR =
-  "매입/매출장에서 이미 분류하거나 수정한 내역이라 여기서 지우지 않았습니다. 매입/매출장에서 직접 삭제한 뒤 다시 시도해주세요.";
+  "매입/매출장 내역이 등록 당시와 달라져서 안전을 위해 지우지 않았습니다. 장부에서 분류·수정했거나, 등록 후 은행 쪽 내용·거래처·계좌 별칭을 바꾼 경우입니다. 매입/매출장에서 해당 내역을 직접 삭제한 뒤 다시 시도해주세요.";
 
 // 자동 등록된 장부 내역이 등록 당시 그대로인지 — 등록 때 넣은 값(ledgerRowFromBank)과 모든 칸이
 // 같고, 등록 때 비워둔 칸(프로젝트·카테고리·결제수단·메모2·수량·단가)도 여전히 비어 있을 때만
@@ -255,7 +257,7 @@ export async function updateBankTransactionRecord(formData: FormData) {
 
   const { data: existing } = await supabase
     .from("bank_transactions")
-    .select(BANK_TX_FOR_LEDGER_SELECT)
+    .select("bank_account_id, trans_date, direction, amount, transfer_group_id, promoted_transaction_id")
     .eq("id", id)
     .maybeSingle();
   if (!existing) return { error: "거래내역을 찾을 수 없습니다." };
@@ -272,12 +274,6 @@ export async function updateBankTransactionRecord(formData: FormData) {
         "매입/매출장에 등록된 거래는 금액·날짜·입출금을 바꿀 수 없습니다. 매입/매출장에서 수정하거나, 등록을 취소한 뒤 수정해주세요.",
     };
   }
-
-  // 승인 후 아직 미분류(untouched)인 장부 내역은 은행 쪽 내용·거래처 수정에 맞춰 같이 갱신 —
-  // 안 그러면 이 수정 때문에 isLedgerUntouched의 "등록 당시 그대로인지" 비교 기준이 어긋나서
-  // 실제로는 손대지 않은 장부인데도 취소/삭제가 막히게 된다.
-  const shouldSyncLedger =
-    !!existing.promoted_transaction_id && (await isLedgerUntouched(supabase, existing.promoted_transaction_id, existing));
 
   if (existing.transfer_group_id) {
     // 이체는 입출금 방향을 바꿀 수 없고, 날짜·금액·내용은 짝에도 똑같이 반영해서 잔액이 어긋나지 않게 한다.
@@ -310,36 +306,7 @@ export async function updateBankTransactionRecord(formData: FormData) {
 
   const { error } = await supabase.from("bank_transactions").update(patch).eq("id", id);
   if (error) return { error: error.message };
-
-  if (shouldSyncLedger && existing.promoted_transaction_id) {
-    let clientName = existing.clients?.name ?? null;
-    if (patch.matched_client_id !== existing.matched_client_id) {
-      if (patch.matched_client_id) {
-        const { data: client } = await supabase
-          .from("clients")
-          .select("name")
-          .eq("id", patch.matched_client_id)
-          .maybeSingle();
-        clientName = client?.name ?? null;
-      } else {
-        clientName = null;
-      }
-    }
-    const synced = ledgerRowFromBank({ ...existing, ...patch, clients: clientName ? { name: clientName } : null });
-    const { error: syncError } = await supabase
-      .from("transactions")
-      .update({
-        item_name: synced.item_name,
-        client_id: synced.client_id,
-        client_name_raw: synced.client_name_raw,
-        note1: synced.note1,
-      })
-      .eq("id", existing.promoted_transaction_id);
-    if (syncError) return { error: `장부 반영 실패: ${syncError.message}` };
-  }
-
   revalidatePath("/bank");
-  revalidatePath("/transactions");
 }
 
 export async function deleteBankTransactionRecord(formData: FormData) {

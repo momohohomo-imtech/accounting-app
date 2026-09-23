@@ -182,13 +182,8 @@ export default async function DashboardPage({
 
   // 부가세는 세금계산서(거래일) 기준이라 외상 미정산 건도 포함한다. 금액은 총액(부가세 포함)에서
   // 계산(lib/vatBasis.ts)하고, 매입세액 불공제 카테고리(승용차 등)는 공제 대상에서 빼서 따로 표시.
-  const categoryById = new Map(
-    ((categoryRows ?? []) as ExpenseCategory[]).map((c) => [c.id, { name: c.name, nonDeductible: Boolean(c.vat_non_deductible) }])
-  );
-  const categoryRel = (categoryId: string | null) => {
-    const cat = categoryId ? categoryById.get(categoryId) : undefined;
-    return cat ? { name: cat.name, vat_non_deductible: cat.nonDeductible } : null;
-  };
+  const categoryById = new Map(((categoryRows ?? []) as ExpenseCategory[]).map((c) => [c.id, c]));
+  const categoryRel = (categoryId: string | null) => (categoryId ? categoryById.get(categoryId) ?? null : null);
 
   // 참고: 장부 매출−매입(부가세 제외, 불공제 부가세는 비용) 기준 연간 예상 세금 — 위에서 받은
   // 연간 거래(외상 미정산 제외)로 바로 계산해서 같은 거래를 다시 조회하지 않는다.
@@ -205,10 +200,10 @@ export default async function DashboardPage({
     let nonDeductibleVat = 0;
     for (const t of yearTxRaw) {
       if (Math.ceil(Number(t.trans_date.slice(5, 7)) / 3) !== q) continue;
-      const cat = t.category_id ? categoryById.get(t.category_id) : undefined;
-      const vat = vatOf({ ...t, expense_categories: categoryRel(t.category_id) });
+      const cat = categoryRel(t.category_id);
+      const vat = vatOf({ ...t, expense_categories: cat });
       if (t.type === "매출") salesVat += vat;
-      else if (cat?.nonDeductible) nonDeductibleVat += vat;
+      else if (cat?.vat_non_deductible) nonDeductibleVat += vat;
       else purchaseVat += vat;
     }
     return { q, salesVat, purchaseVat, nonDeductibleVat, net: salesVat - purchaseVat };
