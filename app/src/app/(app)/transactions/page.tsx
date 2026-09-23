@@ -213,7 +213,7 @@ async function TransactionListSection({
     supabase.from("transactions").select("trans_date").order("trans_date", { ascending: false }).limit(1),
     supabase.from("clients").select("id, name").order("name"),
     supabase.from("projects").select("id, name").order("name"),
-    supabase.from("payment_methods").select("id, name").order("sort_order"),
+    supabase.from("payment_methods").select("id, name, text_color, background_color").order("sort_order"),
     supabase.from("expense_categories").select("id, name").order("sort_order"),
   ]);
 

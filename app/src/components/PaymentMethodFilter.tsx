@@ -2,8 +2,13 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { fieldClass } from "@/components/ui/field";
+import { paymentMethodColorStyle } from "@/lib/paymentMethodColors";
 
-export function PaymentMethodFilter({ paymentMethods }: { paymentMethods: { id: string; name: string }[] }) {
+export function PaymentMethodFilter({
+  paymentMethods,
+}: {
+  paymentMethods: { id: string; name: string; text_color?: string | null; background_color?: string | null }[];
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selected = searchParams.get("payment_method_id") ?? "";
@@ -21,7 +26,7 @@ export function PaymentMethodFilter({ paymentMethods }: { paymentMethods: { id: 
     >
       <option value="">결제방식 전체</option>
       {paymentMethods.map((pm) => (
-        <option key={pm.id} value={pm.id}>
+        <option key={pm.id} value={pm.id} style={paymentMethodColorStyle(pm)}>
           {pm.name}
         </option>
       ))}

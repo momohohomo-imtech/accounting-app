@@ -1285,3 +1285,26 @@ admin/staff/tax_agent 전체 계정을 관리하는 `AccountPanel`/`lib/actions/
   실행 전까지는 "색 지정"으로 저장할 때만 에러 남**(text_color/
   background_color 컬럼이 아직 없어서), 목록 조회 자체는 문제없음. 다음
   세션에서 SQL 실행 여부 확인 후 색 선택 UI 실제로 확인할 것.
+
+### 결제수단 색상 — 등록 화면 뿐 아니라 실제 쓰이는 곳까지 전파
+바로 위에서 "결제수단 관리 화면에서만 선택+미리보기"로 범위를 한정했는데,
+사용자가 "내역서와 거래등록 드롭다운에는 적용이 안 되나요"라고 물어봐서
+아래처럼 확장함(공용 헬퍼 `paymentMethodColorStyle()`을
+`paymentMethodColors.ts`에 추가해서 재사용):
+- **거래등록 드롭다운**: `TransactionForm.tsx`(매입매출 등록/수정 폼)의
+  결제수단 select — 옵션 글씨색/배경색 적용. 같이 있는 `TransactionTable.tsx`
+  일괄수정 select, `CreditSettlementGroup.tsx`(외상 정산) select,
+  `PaymentMethodFilter.tsx`(목록 필터) select도 동일하게 적용(일관성).
+- **내역서**: `SiteProfitReport.tsx`(현장 내역서)에 원래 데이터는 있었는데
+  안 쓰이고 있던 `payment_method_name`을 살려서 결제방식 컬럼을 새로
+  추가(뱃지로 색 표시). `VendorDetailReport.tsx`(매입처별 집계 상세, 기존
+  "결제방식" 토글 컬럼)에도 같은 뱃지 스타일 적용.
+- **매입매출 목록**(`TransactionTable.tsx`)의 "결제방식" 컬럼도 뱃지로 변경.
+- 위 화면들이 색을 받으려면 각 조회 쿼리의 `payment_methods(...)` select에
+  `text_color, background_color`를 추가해야 해서 `reports/page.tsx`,
+  `transactions/page.tsx`의 관련 쿼리도 같이 수정함.
+- 외상관리 쪽 `CreditHistoryToggle.tsx`(거래처별 이력)는 이번엔 안 건드림
+  — 필요하면 다음에 요청받아 추가.
+- 빌드/린트 통과. 여전히 `077_payment_method_colors.sql` 마이그레이션
+  실행 전이면 이 화면들에서 색이 다 비어 보임(컬럼 자체가 없어서 null) —
+  SQL 실행 여부부터 다음 세션에서 확인할 것.

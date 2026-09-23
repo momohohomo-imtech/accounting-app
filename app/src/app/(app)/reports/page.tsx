@@ -63,7 +63,10 @@ type Row = {
     | { name: string; project_only: boolean; color: string | null }
     | { name: string; project_only: boolean; color: string | null }[]
     | null;
-  payment_methods: { name: string } | { name: string }[] | null;
+  payment_methods:
+    | { name: string; text_color: string | null; background_color: string | null }
+    | { name: string; text_color: string | null; background_color: string | null }[]
+    | null;
 };
 
 function one<T>(v: T | T[] | null): T | null {
@@ -125,7 +128,7 @@ export default async function ReportsPage({
       supabase
         .from("transactions")
         .select(
-          "*, clients(name), projects(name, status, sites(name)), expense_categories(name, project_only, color), payment_methods(name)"
+          "*, clients(name), projects(name, status, sites(name)), expense_categories(name, project_only, color), payment_methods(name, text_color, background_color)"
         )
         .gte("trans_date", `${selectedYear}-01-01`)
         .lte("trans_date", `${selectedYear}-12-31`),
@@ -414,7 +417,11 @@ export default async function ReportsPage({
         .map((t) => {
           const proj = one(t.projects) as { name: string; status: string | null } | null;
           const cat = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
-          const pm = one(t.payment_methods) as { name: string } | null;
+          const pm = one(t.payment_methods) as {
+            name: string;
+            text_color: string | null;
+            background_color: string | null;
+          } | null;
           return {
             id: t.id,
             kind: t.type as "매출" | "매입",
@@ -427,6 +434,8 @@ export default async function ReportsPage({
             category_project_only: cat?.project_only ?? false,
             category_color: cat?.color ?? null,
             payment_method_name: pm?.name ?? null,
+            payment_method_text_color: pm?.text_color ?? null,
+            payment_method_background_color: pm?.background_color ?? null,
           };
         })
     : [];
@@ -615,6 +624,11 @@ export default async function ReportsPage({
         .map((t) => {
           const category = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
           const proj = one(t.projects) as { name: string; status: string | null } | null;
+          const pm = one(t.payment_methods) as {
+            name: string;
+            text_color: string | null;
+            background_color: string | null;
+          } | null;
           return {
             id: t.id,
             kind: "매입" as const,
@@ -627,7 +641,9 @@ export default async function ReportsPage({
             category_name: category?.name ?? null,
             category_project_only: category?.project_only ?? false,
             category_color: category?.color ?? null,
-            payment_method_name: (one(t.payment_methods) as { name: string } | null)?.name ?? null,
+            payment_method_name: pm?.name ?? null,
+            payment_method_text_color: pm?.text_color ?? null,
+            payment_method_background_color: pm?.background_color ?? null,
           };
         })
     : [];
@@ -652,6 +668,8 @@ export default async function ReportsPage({
               category_project_only: category?.project_only ?? false,
               category_color: category?.color ?? null,
               payment_method_name: null,
+              payment_method_text_color: null,
+              payment_method_background_color: null,
             };
           })
       : [];

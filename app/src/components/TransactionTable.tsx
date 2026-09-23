@@ -12,6 +12,7 @@ import {
 import { formatWon, formatDate } from "@/lib/format";
 import { transactionTotal } from "@/lib/credit";
 import { resolveCategoryColor } from "@/lib/categoryColor";
+import { paymentMethodColorStyle } from "@/lib/paymentMethodColors";
 import { Badge } from "@/components/ui/Badge";
 import { LinkButton, Button } from "@/components/ui/Button";
 import { Table, THead, Tr, Td, EmptyRow } from "@/components/ui/Table";
@@ -85,7 +86,7 @@ export function TransactionTable({
   projectNodes: ProjectTreeNode[];
   clients: { id: string; name: string }[];
   categories: { id: string; name: string }[];
-  paymentMethods: { id: string; name: string }[];
+  paymentMethods: { id: string; name: string; text_color?: string | null; background_color?: string | null }[];
   listParams: { year: number; month: string; type: string; project_id: string };
   showProject?: boolean;
   showCategory?: boolean;
@@ -323,7 +324,7 @@ export function TransactionTable({
               >
                 <option value="">선택 안함</option>
                 {paymentMethods.map((pm) => (
-                  <option key={pm.id} value={pm.id}>
+                  <option key={pm.id} value={pm.id} style={paymentMethodColorStyle(pm)}>
                     {pm.name}
                   </option>
                 ))}
@@ -421,7 +422,18 @@ export function TransactionTable({
                 </Td>
               )}
               {showItem && <Td className="pr-4">{t.item_name ?? "-"}</Td>}
-              <Td className="pr-4">{t.payment_methods?.name ?? "-"}</Td>
+              <Td className="pr-4">
+                {t.payment_methods ? (
+                  <span
+                    className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+                    style={paymentMethodColorStyle(t.payment_methods)}
+                  >
+                    {t.payment_methods.name}
+                  </span>
+                ) : (
+                  "-"
+                )}
+              </Td>
               <Td className="pr-4">
                 {t.tax_invoice_issued ? <Badge variant="emerald">발행</Badge> : <span className="text-slate-300">-</span>}
               </Td>

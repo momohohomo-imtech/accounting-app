@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { formatWon, formatDate } from "@/lib/format";
 import { VendorReportActions } from "@/components/VendorReportActions";
 import { resolveCategoryColor } from "@/lib/categoryColor";
+import { paymentMethodColorStyle } from "@/lib/paymentMethodColors";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 import { projectStatusLabel } from "@/lib/projectStatus";
 
@@ -22,6 +23,8 @@ type VendorRow = {
   category_project_only: boolean;
   category_color: string | null;
   payment_method_name: string | null;
+  payment_method_text_color: string | null;
+  payment_method_background_color: string | null;
 };
 
 type SortKey = "trans_date" | "project_name" | "item_name" | "amount";
@@ -246,7 +249,23 @@ export function VendorDetailReport({
                     {r.category_name ?? "-"}
                   </td>
                 )}
-                {showPayment && <td className="py-2 pr-4 text-slate-700">{r.payment_method_name ?? "-"}</td>}
+                {showPayment && (
+                  <td className="py-2 pr-4 text-slate-700">
+                    {r.payment_method_name ? (
+                      <span
+                        className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+                        style={paymentMethodColorStyle({
+                          text_color: r.payment_method_text_color,
+                          background_color: r.payment_method_background_color,
+                        })}
+                      >
+                        {r.payment_method_name}
+                      </span>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
+                )}
                 {showItem && <td className="py-2 pr-4 text-slate-700">{r.item_name ?? "-"}</td>}
                 <td className="py-2 text-right font-mono text-slate-900">{formatWon(r.amount)}</td>
                 <td className="py-2 pl-4 text-right print:hidden">

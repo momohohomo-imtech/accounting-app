@@ -8,6 +8,7 @@ import { bulkImportTransactions, type BulkTransactionInput } from "@/lib/actions
 import { formatWon, todayString } from "@/lib/format";
 import { VAT_EXEMPT_CATEGORIES } from "@/lib/vatExempt";
 import { resolveCategoryColor } from "@/lib/categoryColor";
+import { paymentMethodColorStyle } from "@/lib/paymentMethodColors";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
@@ -534,7 +535,7 @@ export function TransactionForm({
           >
             <option value="">{values.payment_type === "credit" ? "정산 시 지정" : "선택 안함"}</option>
             {paymentMethods.map((pm) => (
-              <option key={pm.id} value={pm.id}>
+              <option key={pm.id} value={pm.id} style={paymentMethodColorStyle(pm)}>
                 {pm.name}
               </option>
             ))}

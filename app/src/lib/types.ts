@@ -51,6 +51,8 @@ export type PaymentMethod = {
   name: string;
   sort_order: number;
   created_at: string;
+  text_color?: string | null;
+  background_color?: string | null;
 };
 
 export type ExpenseCategory = {

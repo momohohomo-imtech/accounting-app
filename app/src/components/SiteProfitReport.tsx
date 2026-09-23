@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatWon, formatDate } from "@/lib/format";
 import { resolveCategoryColor } from "@/lib/categoryColor";
+import { paymentMethodColorStyle } from "@/lib/paymentMethodColors";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 import { projectStatusLabel } from "@/lib/projectStatus";
 
@@ -20,6 +21,8 @@ type SiteDetailRow = {
   category_project_only: boolean;
   category_color: string | null;
   payment_method_name: string | null;
+  payment_method_text_color: string | null;
+  payment_method_background_color: string | null;
 };
 
 type SortKey = "trans_date" | "project_name" | "item_name" | "amount";
@@ -151,6 +154,7 @@ export function SiteProfitReport({
               <th className="pb-2 pr-4">{headerButton("project_name", "프로젝트")}</th>
               <th className="pb-2 pr-4">카테고리</th>
               <th className="pb-2 pr-4">{headerButton("item_name", "품목")}</th>
+              <th className="pb-2 pr-4">결제방식</th>
               <th className="pb-2 pr-4 text-right">{headerButton("amount", "금액")}</th>
               <th className="pb-2 text-right print:hidden">관리</th>
             </tr>
@@ -172,6 +176,21 @@ export function SiteProfitReport({
                   {r.category_name ?? "-"}
                 </td>
                 <td className="py-2 pr-4 text-slate-700">{r.item_name ?? "-"}</td>
+                <td className="py-2 pr-4">
+                  {r.payment_method_name ? (
+                    <span
+                      className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+                      style={paymentMethodColorStyle({
+                        text_color: r.payment_method_text_color,
+                        background_color: r.payment_method_background_color,
+                      })}
+                    >
+                      {r.payment_method_name}
+                    </span>
+                  ) : (
+                    "-"
+                  )}
+                </td>
                 <td className="py-2 pr-4 text-right font-mono text-slate-900">{formatWon(r.amount)}</td>
                 <td className="py-2 text-right print:hidden">
                   <Link
@@ -185,7 +204,7 @@ export function SiteProfitReport({
             ))}
             {sortedRows.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-6 text-center text-slate-400">
+                <td colSpan={8} className="py-6 text-center text-slate-400">
                   내역이 없습니다.
                 </td>
               </tr>

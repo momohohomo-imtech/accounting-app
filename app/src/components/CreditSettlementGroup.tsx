@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button, LinkButton } from "@/components/ui/Button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { paymentMethodColorStyle } from "@/lib/paymentMethodColors";
 import type { PaymentMethod, Transaction } from "@/lib/types";
 
 export type OutstandingItem = { tx: Transaction; remaining: number };
@@ -145,7 +146,7 @@ export function CreditSettlementGroup({
             <label className={labelClass}>결제수단</label>
             <select name="payment_method_id" required className={fieldClass}>
               {paymentMethods.map((pm) => (
-                <option key={pm.id} value={pm.id}>
+                <option key={pm.id} value={pm.id} style={paymentMethodColorStyle(pm)}>
                   {pm.name}
                 </option>
               ))}
