@@ -161,77 +161,75 @@ export async function bulkImportTransactions(rows: BulkTransactionInput[]) {
   revalidatePath("/projects");
 }
 
-export async function bulkUpdateProjectId(formData: FormData) {
-  const supabase = await createClient();
-  const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
-  const projectId = String(formData.get("project_id") ?? "") || null;
-  if (ids.length === 0) return;
-
-  const { error } = await supabase
-    .from("transactions")
-    .update({ project_id: projectId, needs_classification: false })
-    .in("id", ids);
-  if (error) console.error("bulkUpdateProjectId failed:", error.message);
-
+function revalidateLedgerPages() {
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
   revalidatePath("/reports");
   revalidatePath("/projects");
 }
 
+export async function bulkUpdateProjectId(formData: FormData) {
+  const supabase = await createClient();
+  const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
+  const projectId = String(formData.get("project_id") ?? "") || null;
+  if (ids.length === 0) return { error: "선택된 거래가 없습니다." };
+
+  const { error } = await supabase
+    .from("transactions")
+    .update({ project_id: projectId, needs_classification: false })
+    .in("id", ids);
+  if (error) return { error: error.message };
+  revalidateLedgerPages();
+}
+
+// 거래처는 등록된 거래처(client_id)로 고르거나, 목록에 없으면 이름을 직접 적을 수 있다
+// (client_name_raw) — 둘 중 하나만 채우고 나머지는 비운다.
 export async function bulkUpdateClientId(formData: FormData) {
   const supabase = await createClient();
   const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
   const clientId = String(formData.get("client_id") ?? "") || null;
-  if (ids.length === 0) return;
+  const clientNameRaw = clientId ? null : String(formData.get("client_name_raw") ?? "").trim() || null;
+  if (ids.length === 0) return { error: "선택된 거래가 없습니다." };
 
   const { error } = await supabase
     .from("transactions")
-    .update({ client_id: clientId, client_name_raw: null })
+    .update({ client_id: clientId, client_name_raw: clientNameRaw })
     .in("id", ids);
-  if (error) console.error("bulkUpdateClientId failed:", error.message);
-
-  revalidatePath("/transactions");
-  revalidatePath("/reports");
+  if (error) return { error: error.message };
+  revalidateLedgerPages();
 }
 
 export async function bulkUpdateCategoryId(formData: FormData) {
   const supabase = await createClient();
   const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
   const categoryId = String(formData.get("category_id") ?? "") || null;
-  if (ids.length === 0) return;
+  if (ids.length === 0) return { error: "선택된 거래가 없습니다." };
 
   const { error } = await supabase.from("transactions").update({ category_id: categoryId }).in("id", ids);
-  if (error) console.error("bulkUpdateCategoryId failed:", error.message);
-
-  revalidatePath("/transactions");
-  revalidatePath("/reports");
+  if (error) return { error: error.message };
+  revalidateLedgerPages();
 }
 
 export async function bulkUpdatePaymentMethodId(formData: FormData) {
   const supabase = await createClient();
   const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
   const paymentMethodId = String(formData.get("payment_method_id") ?? "") || null;
-  if (ids.length === 0) return;
+  if (ids.length === 0) return { error: "선택된 거래가 없습니다." };
 
   const { error } = await supabase.from("transactions").update({ payment_method_id: paymentMethodId }).in("id", ids);
-  if (error) console.error("bulkUpdatePaymentMethodId failed:", error.message);
-
-  revalidatePath("/transactions");
-  revalidatePath("/reports");
+  if (error) return { error: error.message };
+  revalidateLedgerPages();
 }
 
 export async function bulkUpdateItemName(formData: FormData) {
   const supabase = await createClient();
   const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
   const itemName = String(formData.get("item_name") ?? "").trim() || null;
-  if (ids.length === 0) return;
+  if (ids.length === 0) return { error: "선택된 거래가 없습니다." };
 
   const { error } = await supabase.from("transactions").update({ item_name: itemName }).in("id", ids);
-  if (error) console.error("bulkUpdateItemName failed:", error.message);
-
-  revalidatePath("/transactions");
-  revalidatePath("/reports");
+  if (error) return { error: error.message };
+  revalidateLedgerPages();
 }
 
 export async function deleteTransactionRecord(formData: FormData) {
