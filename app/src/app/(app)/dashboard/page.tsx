@@ -52,7 +52,7 @@ function Stat({
   return (
     <div className={cx("rounded-xl p-4", emphasis ? "bg-slate-900 text-white" : "bg-slate-50")}>
       <p className={cx("text-xs", emphasis ? "text-slate-300" : "text-slate-500")}>{label}</p>
-      <p className={cx("mt-1 text-xl font-bold", emphasis ? "text-white" : "text-slate-900")}>{children}</p>
+      <p className={cx("mt-1 whitespace-nowrap text-xl font-bold", emphasis ? "text-white" : "text-slate-900")}>{children}</p>
       {sub && <div className={cx("mt-1 text-xs", emphasis ? "text-slate-300" : "text-slate-500")}>{sub}</div>}
     </div>
   );
@@ -244,7 +244,7 @@ export default async function DashboardPage({
         <SectionTitle note="개인사업자 종합소득세 기준 · 지방소득세 10% 포함 · 공제 미반영(참고용)">
           ① {selectedYear}년 이익과 세금
         </SectionTitle>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Stat
             label="상반기 확정 이익금 (세무사 결산)"
             sub={<HalfYearSettlementInput key={selectedYear} year={selectedYear} initialAmount={o.half1Profit} />}
@@ -283,7 +283,7 @@ export default async function DashboardPage({
       {/* ② 받을 돈 · 줄 돈 */}
       <Card>
         <SectionTitle note="외상은 정산 등록 전까지 매입매출장 합계에서 빠져 있음">② 받을 돈 · 줄 돈</SectionTitle>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Link href="/projects" className="rounded-xl transition hover:ring-2 hover:ring-slate-200">
             <Stat
               label="예상 미수액 (수주예상액 기준 · 진행중·공사 완료·수금 대기)"
@@ -357,7 +357,7 @@ export default async function DashboardPage({
       {/* 참고 현황 */}
       <Card>
         <SectionTitle note="매입매출장 기준 · 부가세 포함 금액">참고 현황</SectionTitle>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 xl:grid-cols-4">
           <Stat label={`${selectedYear}년 매출액`}>
             <Money value={yearSales} />
           </Stat>

@@ -46,6 +46,54 @@ body {
   background-color: inherit;
   box-shadow: inset -1px 0 0 var(--color-slate-200);
 }
+/* 휴대폰 화면(인쇄 제외 — A4 인쇄 폭도 768px 미만이라 screen으로 한정): 가로 스크롤 상자 안의 표는
+   - 모든 칸을 한 줄로(날짜 "2026- / 09-16", 금액 "원" 줄바꿈 방지 → 행 높이가 일정해 따라가기 쉬움)
+   - 고정 칸을 따로 정하지 않은 표(.sticky-col-table이 아닌 표)는 첫 칸을 왼쪽에 고정.
+     입력칸이 없는 칸은 폭을 화면의 40%로 제한하고 넘치면 말줄임 */
+@media screen and (max-width: 767.98px) {
+  :is(.overflow-x-auto, .overflow-auto) > table :is(th, td):not([colspan]) {
+    white-space: nowrap;
+  }
+  :is(.overflow-x-auto, .overflow-auto) > table:not(.sticky-col-table) tr > :first-child:not([colspan]) {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background-color: inherit;
+    box-shadow: inset -1px 0 0 var(--color-slate-200);
+  }
+  :is(.overflow-x-auto, .overflow-auto) > table:not(.sticky-col-table) thead tr > :first-child {
+    z-index: 20;
+  }
+  :is(.overflow-x-auto, .overflow-auto)
+    > table:not(.sticky-col-table)
+    tr
+    > :first-child:not([colspan]):not(:has(input, select, textarea)) {
+    /* width 1%: 표의 남는 폭이 고정 칸으로 몰려 화면을 덮지 않게(남는 폭은 다른 칸이 가져감) */
+    width: 1%;
+    max-width: 40vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* 첫 칸 안의 링크·버튼(거래처 이름 등)도 칸 폭 안에서 말줄임 */
+  :is(.overflow-x-auto, .overflow-auto)
+    > table:not(.sticky-col-table)
+    tr
+    > :first-child:not([colspan]):not(:has(input, select, textarea))
+    > :is(a, button) {
+    display: block;
+    max-width: 40vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+@layer base {
+  @media screen and (max-width: 767.98px) {
+    :is(.overflow-x-auto, .overflow-auto) > table:not(.sticky-col-table) tr {
+      background-color: #fff;
+    }
+  }
+}
+
 /* 머리글도 고정된 표(stickyHeader)에서 왼쪽 위 모서리 칸이 행들 위에 오게 */
 .sticky-col-table thead .sticky-col {
   z-index: 20;

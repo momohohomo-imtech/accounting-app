@@ -84,11 +84,11 @@ export function BusinessTripListClient({ logs }: { logs: BusinessTripLog[] }) {
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full min-w-[700px] text-sm">
+        <table className="sticky-col-table w-full min-w-[700px] text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-left text-slate-500">
               <th className="p-3">{headerButton("work_date", "공사일")}</th>
-              <th className="p-3">{headerButton("site_name", "현장명")}</th>
+              <th className="sticky-col p-3">{headerButton("site_name", "현장명")}</th>
               <th className="p-3">{headerButton("project_name", "프로젝트명")}</th>
               <th className="p-3">{headerButton("client_name", "원청사")}</th>
               <th className="p-3">{headerButton("work_types", "작업구분")}</th>
@@ -100,7 +100,7 @@ export function BusinessTripListClient({ logs }: { logs: BusinessTripLog[] }) {
             {sortedLogs.map((log) => (
               <tr key={log.id} className="border-b border-slate-100 last:border-0">
                 <td className="p-3 text-slate-700">{log.work_date}</td>
-                <td className="p-3 text-slate-700">{log.site_name ?? "-"}</td>
+                <td className="sticky-col p-3 text-slate-700">{log.site_name ?? "-"}</td>
                 <td className="p-3 text-slate-700">
                   {log.projects.map((p) => p.project_name).filter(Boolean).join(", ") || "-"}
                 </td>
