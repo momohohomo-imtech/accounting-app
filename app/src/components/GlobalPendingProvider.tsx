@@ -35,7 +35,7 @@ export function GlobalPendingProvider({ children }: { children: ReactNode }) {
       {children}
       {count > 0 && (
         <div className="fixed inset-0 z-[200] flex justify-center pt-6 print:hidden" style={{ cursor: "wait" }}>
-          <div className="flex items-center gap-2 rounded-full bg-slate-900/90 px-4 py-2 text-xs font-medium text-white shadow-lg">
+          <div className="flex items-center gap-2 rounded-full bg-brand-ink/90 px-4 py-2 text-xs font-medium text-white shadow-lg">
             <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
             처리 중...
           </div>

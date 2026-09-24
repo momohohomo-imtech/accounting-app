@@ -74,7 +74,7 @@ export function AccessListWorkerPicker({
               className={cx(
                 "cursor-pointer rounded-lg border px-2.5 py-1.5 text-xs transition-colors",
                 selectedOffices.has(o.id)
-                  ? "border-slate-900 bg-slate-900 text-white"
+                  ? "border-brand-navy bg-brand-navy text-white"
                   : "border-slate-300 text-slate-600 hover:bg-slate-100"
               )}
             >

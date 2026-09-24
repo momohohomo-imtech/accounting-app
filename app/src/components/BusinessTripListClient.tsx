@@ -127,7 +127,7 @@ export function BusinessTripListClient({ logs }: { logs: BusinessTripLog[] }) {
 
       {creating && (
         <ModalPortal>
-          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10">
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-brand-ink/50 p-4 py-10">
             <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
               <h2 className="mb-4 text-lg font-semibold text-slate-900">새 출장일지 작성</h2>
               <BusinessTripLogForm

@@ -104,7 +104,7 @@ export function ToolEditPopup({
 
   return (
     <ModalPortal>
-      <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10">
+      <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-brand-ink/50 p-4 py-10">
         <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
           <h2 className="mb-4 text-lg font-semibold text-slate-900">공구 수정</h2>
           <div className="space-y-3">

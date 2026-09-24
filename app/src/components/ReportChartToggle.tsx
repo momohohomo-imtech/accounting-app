@@ -12,14 +12,14 @@ export function ReportChartToggle() {
         <button
           type="button"
           onClick={() => setChartType("pie")}
-          className={`rounded px-2.5 py-1 ${chartType === "pie" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+          className={`rounded px-2.5 py-1 ${chartType === "pie" ? "bg-brand-navy text-white" : "text-slate-600 hover:bg-slate-100"}`}
         >
           파이
         </button>
         <button
           type="button"
           onClick={() => setChartType("bar")}
-          className={`rounded px-2.5 py-1 ${chartType === "bar" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+          className={`rounded px-2.5 py-1 ${chartType === "bar" ? "bg-brand-navy text-white" : "text-slate-600 hover:bg-slate-100"}`}
         >
           막대
         </button>

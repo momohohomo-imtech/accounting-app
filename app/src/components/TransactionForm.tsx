@@ -709,7 +709,7 @@ export function TransactionForm({
       <div className="flex items-center gap-2">
         <button
           type="submit"
-          className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
+          className="rounded-lg bg-brand-navy px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
         >
           {initial ? "수정 저장" : "거래 등록"}
         </button>

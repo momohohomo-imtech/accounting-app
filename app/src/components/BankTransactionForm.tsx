@@ -192,7 +192,7 @@ export function BankTransactionForm({
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <button type="submit" className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
+      <button type="submit" className="rounded-lg bg-brand-navy px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">
         {rows.length > 1 ? `${rows.length}건 등록` : "등록"}
       </button>
     </form>

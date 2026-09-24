@@ -78,7 +78,7 @@ function GroupedLinks({
             <p
               className={cx(
                 "mb-1.5 px-3 text-[11px] font-medium tracking-[0.12em]",
-                tone === "dark" ? "text-slate-500" : "text-slate-400"
+                tone === "dark" ? "text-white/35" : "text-slate-400"
               )}
             >
               {group.title}
@@ -97,15 +97,15 @@ function GroupedLinks({
                     "relative rounded-md px-3 py-2 text-sm transition-colors",
                     tone === "dark"
                       ? active
-                        ? "bg-white/[0.08] font-medium text-white"
-                        : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-100"
+                        ? "bg-white/[0.10] font-medium text-white"
+                        : "text-white/60 hover:bg-white/[0.06] hover:text-white"
                       : active
                         ? "bg-slate-100 font-medium text-slate-900"
                         : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                   )}
                 >
                   {active && (
-                    <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-brand" aria-hidden />
+                    <span className={cx("absolute inset-y-2 left-0 w-0.5 rounded-full", tone === "dark" ? "bg-brand-red" : "bg-brand")} aria-hidden />
                   )}
                   {item.label}
                 </Link>
@@ -141,9 +141,9 @@ export function MobileNav({ role }: { role: string | null }) {
   const tabClass = (active: boolean) =>
     cx(
       "relative flex flex-1 items-center justify-center py-3.5 text-[13px] transition-colors",
-      active ? "font-semibold text-white" : "text-slate-400 active:text-slate-200"
+      active ? "font-semibold text-white" : "text-white/55 active:text-white/80"
     );
-  const indicator = <span className="absolute inset-x-5 top-0 h-0.5 rounded-full bg-brand" aria-hidden />;
+  const indicator = <span className="absolute inset-x-5 top-0 h-0.5 rounded-full bg-brand-red" aria-hidden />;
 
   return (
     <>
@@ -152,7 +152,7 @@ export function MobileNav({ role }: { role: string | null }) {
           <button
             type="button"
             aria-label="메뉴 닫기"
-            className="absolute inset-0 bg-slate-900/40"
+            className="absolute inset-0 bg-brand-ink/50"
             onClick={() => setOpen(false)}
           />
           <div className="absolute inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto rounded-t-2xl bg-white px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3 shadow-xl">
@@ -161,7 +161,7 @@ export function MobileNav({ role }: { role: string | null }) {
           </div>
         </div>
       )}
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-800 bg-slate-900 pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
+      <nav className="brand-bottombar fixed inset-x-0 bottom-0 z-30 flex border-t border-white/10 bg-brand-ink pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
         {tabs.map((t) => {
           const active = isActive(pathname, t.href);
           return (

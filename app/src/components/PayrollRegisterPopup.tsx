@@ -21,7 +21,7 @@ export function PayrollRegisterPopup({
       <Button onClick={() => setOpen(true)}>+ 급여 지급 등록</Button>
       {open && (
         <ModalPortal>
-          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10">
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-brand-ink/50 p-4 py-10">
             <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-slate-900">급여 지급 등록</h2>

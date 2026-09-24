@@ -58,7 +58,7 @@ export function WorkLogProjectPicker({
       {open && (
         <ModalPortal>
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-brand-ink/50 p-4"
             onClick={() => setOpen(false)}
           >
             <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -91,7 +91,7 @@ export function WorkLogProjectPicker({
                     onChange("");
                     setOpen(false);
                   }}
-                  className={`w-full rounded-lg px-3 py-2 text-left text-sm ${!value ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
+                  className={`w-full rounded-lg px-3 py-2 text-left text-sm ${!value ? "bg-brand-navy text-white" : "text-slate-700 hover:bg-slate-100"}`}
                 >
                   프로젝트 없음
                 </button>
@@ -103,7 +103,7 @@ export function WorkLogProjectPicker({
                       onChange(p.id);
                       setOpen(false);
                     }}
-                    className={`w-full rounded-lg px-3 py-2 text-left text-sm ${value === p.id ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
+                    className={`w-full rounded-lg px-3 py-2 text-left text-sm ${value === p.id ? "bg-brand-navy text-white" : "text-slate-700 hover:bg-slate-100"}`}
                   >
                     {p.name}
                     {p.project_code ? ` (${p.project_code})` : ""}

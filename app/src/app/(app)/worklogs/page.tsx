@@ -391,7 +391,7 @@ async function WorkLogCalendarSection({
                     className={cx(
                       "rounded-lg px-2.5 py-1 text-xs font-medium transition-colors",
                       y === selectedYear && m === selectedMonth
-                        ? "bg-slate-900 text-white"
+                        ? "bg-brand-navy text-white"
                         : "border border-slate-300 text-slate-600 hover:bg-slate-100"
                     )}
                   >
@@ -407,7 +407,7 @@ async function WorkLogCalendarSection({
       <SiteColorLegend sites={sites ?? []} />
 
       {dayKey && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:hidden">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-brand-ink/50 p-4 py-10 print:hidden">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
             <WorkLogDayEditor dateKey={dayKey} closeHref={basePath} />
           </div>
