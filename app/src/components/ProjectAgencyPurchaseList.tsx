@@ -8,6 +8,7 @@ import { resolveCategoryColor } from "@/lib/categoryColor";
 import { Button } from "@/components/ui/Button";
 import { fieldClass } from "@/components/ui/field";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 
 type Category = { id: string; name: string; project_only: boolean; color: string | null };
 type AgencyPurchase = {
@@ -146,11 +147,9 @@ function AgencyRow({
           <CategorySelect value={categoryId} onChange={setCategoryId} categories={categories} />
         </td>
         <td className="py-2 pr-4 text-right">
-          <input
+          <MoneyInput
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            type="number"
-            step="1"
+            onValueChange={setAmount}
             placeholder="금액"
             className={`${fieldClass} w-full text-right`}
           />
@@ -318,7 +317,7 @@ export function ProjectAgencyPurchaseList({
         </datalist>
         <input name="item_name" placeholder="품목명" className={`${fieldClass} w-40`} />
         <CategorySelect name="category_id" value={newCategoryId} onChange={setNewCategoryId} categories={categories} />
-        <input name="amount" type="number" step="1" placeholder="금액 (비워두면 0원)" className={`${fieldClass} w-32`} />
+        <MoneyInput name="amount" placeholder="금액 (비워두면 0원)" className={`${fieldClass} w-32`} />
         <input name="memo" placeholder="메모 (무슨 물품/사항인지)" className={`${fieldClass} w-full min-w-[12rem] flex-1`} />
         <Button type="submit" size="xs" disabled={pending}>
           + 추가

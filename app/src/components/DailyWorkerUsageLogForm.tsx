@@ -6,6 +6,7 @@ import { createDailyWorkerUsageLogRecord } from "@/lib/actions/daily-worker-usag
 import { AccessListWorkerPicker } from "@/components/AccessListWorkerPicker";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { formatDate } from "@/lib/format";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 
 type OfficeOption = { id: string; name: string };
 type WorkerOption = { id: string; name: string; office_id: string; grade?: string | null };
@@ -111,10 +112,9 @@ export function DailyWorkerUsageLogForm({
       <div className="flex flex-wrap gap-3">
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-slate-500">일급 (선택, 직접 입력)</label>
-          <input
-            type="number"
+          <MoneyInput
             name="daily_wage"
-            placeholder="예: 150000"
+            placeholder="예: 150,000"
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm sm:w-40"
           />
         </div>

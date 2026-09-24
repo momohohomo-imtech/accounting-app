@@ -5,6 +5,7 @@ import { createBankTransactionsBulk } from "@/lib/actions/bank";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { todayString } from "@/lib/format";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 
 const inputClass = "shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-sm";
 const CLIENT_NAMES_DATALIST_ID = "bank-transaction-client-names";
@@ -139,10 +140,9 @@ export function BankTransactionForm({
                 <option value="입금">입금</option>
                 <option value="출금">출금</option>
               </select>
-              <input
-                type="number"
+              <MoneyInput
                 value={r.amount}
-                onChange={(e) => updateRow(i, { amount: e.target.value })}
+                onValueChange={(v) => updateRow(i, { amount: v })}
                 placeholder="금액"
                 required
                 className={`${inputClass} w-28 flex-1`}

@@ -6,6 +6,7 @@ import { formatWon } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 
 export type EmployeeOption = {
   id: string;
@@ -160,96 +161,89 @@ export function PayrollForm({
           <input type="number" name="work_days" defaultValue={initial?.work_days ?? undefined} className={fieldClass} />
         </Field>
         <Field label="기본급(월급)">
-          <input
-            type="number"
+          <MoneyInput
             name="amount"
             value={values.amount}
-            onChange={(e) => set("amount", e.target.value)}
+            onValueChange={(v) => set("amount", v)}
             required
             className={fieldClass}
           />
         </Field>
         <Field label="상여">
-          <input type="number" name="bonus" value={values.bonus} onChange={(e) => set("bonus", e.target.value)} className={fieldClass} />
+          <MoneyInput
+            name="bonus"
+            value={values.bonus}
+            onValueChange={(v) => set("bonus", v)} className={fieldClass} />
         </Field>
         <Field label="국민연금">
-          <input
-            type="number"
+          <MoneyInput
             name="national_pension"
             value={values.national_pension}
-            onChange={(e) => set("national_pension", e.target.value)}
+            onValueChange={(v) => set("national_pension", v)}
             className={fieldClass}
           />
         </Field>
         <Field label="건강보험">
-          <input
-            type="number"
+          <MoneyInput
             name="health_insurance"
             value={values.health_insurance}
-            onChange={(e) => set("health_insurance", e.target.value)}
+            onValueChange={(v) => set("health_insurance", v)}
             className={fieldClass}
           />
         </Field>
         <Field label="장기요양보험">
-          <input
-            type="number"
+          <MoneyInput
             name="long_term_care_insurance"
             value={values.long_term_care_insurance}
-            onChange={(e) => set("long_term_care_insurance", e.target.value)}
+            onValueChange={(v) => set("long_term_care_insurance", v)}
             className={fieldClass}
           />
         </Field>
         <Field label="고용보험">
-          <input
-            type="number"
+          <MoneyInput
             name="employment_insurance"
             value={values.employment_insurance}
-            onChange={(e) => set("employment_insurance", e.target.value)}
+            onValueChange={(v) => set("employment_insurance", v)}
             className={fieldClass}
           />
         </Field>
         <Field label="환급금">
-          <input
-            type="number"
+          <MoneyInput
             name="employment_insurance_refund"
             value={values.employment_insurance_refund}
-            onChange={(e) => set("employment_insurance_refund", e.target.value)}
+            onValueChange={(v) => set("employment_insurance_refund", v)}
             className={fieldClass}
           />
         </Field>
         <Field label="소득세">
-          <input
-            type="number"
+          <MoneyInput
             name="income_tax"
             value={values.income_tax}
-            onChange={(e) => set("income_tax", e.target.value)}
+            onValueChange={(v) => set("income_tax", v)}
             className={fieldClass}
           />
         </Field>
         <Field label="지방소득세">
-          <input
-            type="number"
+          <MoneyInput
             name="local_income_tax"
             value={values.local_income_tax}
-            onChange={(e) => set("local_income_tax", e.target.value)}
+            onValueChange={(v) => set("local_income_tax", v)}
             className={fieldClass}
           />
         </Field>
         <Field label="농특세">
-          <input
-            type="number"
+          <MoneyInput
             name="rural_tax"
             value={values.rural_tax}
-            onChange={(e) => set("rural_tax", e.target.value)}
+            onValueChange={(v) => set("rural_tax", v)}
             className={fieldClass}
           />
         </Field>
         <Field label="미제출비과세">
-          <input
-            type="number"
+          <MoneyInput
             name="non_taxable_unreported"
             value={values.non_taxable_unreported}
-            onChange={(e) => set("non_taxable_unreported", e.target.value)}
+            onValueChange={(v) => set("non_taxable_unreported", v)}
             className={fieldClass}
           />
         </Field>

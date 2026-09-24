@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { bulkImportPayroll } from "@/lib/actions/employees";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 
 type EmployeeRef = { id: string; employee_no: string | null; name: string };
 
@@ -198,10 +199,9 @@ export function PayrollImport({ employees }: { employees: EmployeeRef[] }) {
                       </td>
                       {NUMERIC_KEYS.map((key) => (
                         <td key={key} className="py-1 pr-2">
-                          <input
-                            type="number"
+                          <MoneyInput
                             value={r[key]}
-                            onChange={(e) => updateRow(i, { [key]: Number(e.target.value) } as Partial<EditableRow>)}
+                            onValueChange={(v) => updateRow(i, { [key]: Number(v) || 0 } as Partial<EditableRow>)}
                             className={cx(fieldClass, "w-24")}
                           />
                         </td>

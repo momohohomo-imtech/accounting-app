@@ -12,6 +12,7 @@ import { paymentMethodColorStyle } from "@/lib/paymentMethodColors";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { formatThousands, parseNumericInput } from "@/lib/numberInput";
 
 type Option = { id: string; name: string };
 type ClientOption = Option & { default_item_name?: string | null; default_category_id?: string | null };
@@ -36,19 +37,7 @@ function lineItemFromInitial(t: Transaction): LineItem {
   };
 }
 
-function formatThousands(raw: string) {
-  if (!raw) return "";
-  const [intPart, decPart] = raw.split(".");
-  const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return decPart !== undefined ? `${withCommas}.${decPart}` : withCommas;
-}
 
-function parseNumericInput(display: string) {
-  const cleaned = display.replace(/[^\d.]/g, "");
-  const firstDot = cleaned.indexOf(".");
-  if (firstDot === -1) return cleaned;
-  return cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, "");
-}
 
 export function TransactionForm({
   clients,

@@ -6,6 +6,7 @@ import { formatDate, formatWon } from "@/lib/format";
 import { updateDailyWorkerUsageLogRecord, deleteDailyWorkerUsageLogRecord } from "@/lib/actions/daily-worker-usage-logs";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 
 export type StatementRow = {
   id: string;
@@ -240,8 +241,7 @@ export function DailyWorkerUsageStatementTable({
                               </option>
                             ))}
                           </select>
-                          <input
-                            type="number"
+                          <MoneyInput
                             name="daily_wage"
                             defaultValue={r.daily_wage ?? ""}
                             placeholder="일급"

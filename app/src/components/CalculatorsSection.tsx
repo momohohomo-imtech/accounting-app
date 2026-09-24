@@ -3,22 +3,11 @@
 import { useState } from "react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { formatWon } from "@/lib/format";
+import { formatThousands, parseNumericInput } from "@/lib/numberInput";
 
 const inputClass = "rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none";
 
-function formatThousands(raw: string) {
-  if (!raw) return "";
-  const [intPart, decPart] = raw.split(".");
-  const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return decPart !== undefined ? `${withCommas}.${decPart}` : withCommas;
-}
 
-function parseNumericInput(display: string) {
-  const cleaned = display.replace(/[^\d.]/g, "");
-  const firstDot = cleaned.indexOf(".");
-  if (firstDot === -1) return cleaned;
-  return cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, "");
-}
 
 function CalcField({
   label,
