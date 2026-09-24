@@ -11,7 +11,7 @@ export function AccessListSubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
+      className="rounded-lg bg-brand-navy px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
     >
       {pending ? "생성 중..." : "출입명단 생성"}
     </button>

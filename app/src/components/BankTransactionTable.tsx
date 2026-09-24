@@ -224,7 +224,7 @@ export function BankTransactionTable({
                   <div className="flex gap-2 lg:col-span-7">
                     <button
                       type="submit"
-                      className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-700"
+                      className="rounded-lg bg-brand-navy px-3 py-1 text-xs font-semibold text-white hover:bg-brand-dark"
                     >
                       저장
                     </button>

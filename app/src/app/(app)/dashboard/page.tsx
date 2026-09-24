@@ -51,7 +51,7 @@ function Stat({
   emphasis?: boolean;
 }) {
   return (
-    <div className={cx("rounded-xl p-4", emphasis ? "bg-slate-900 text-white" : "bg-slate-50")}>
+    <div className={cx("rounded-xl p-4", emphasis ? "bg-linear-to-br from-brand-navy to-brand-dark text-white shadow-sm" : "bg-slate-50")}>
       <p className={cx("text-xs", emphasis ? "text-slate-300" : "text-slate-500")}>{label}</p>
       <p className={cx("mt-1 whitespace-nowrap text-xl font-bold", emphasis ? "text-white" : "text-slate-900")}>{children}</p>
       {sub && <div className={cx("mt-1 text-xs", emphasis ? "text-slate-300" : "text-slate-500")}>{sub}</div>}

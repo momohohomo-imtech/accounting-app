@@ -11,7 +11,7 @@ export function BusinessTripBlankFormPopup({ onClose }: { onClose: () => void })
   useEscapeKey(true, onClose);
   return (
     <ModalPortal>
-      <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:static print:block print:h-auto print:overflow-visible print:bg-white print:p-0">
+      <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-brand-ink/50 p-4 py-10 print:static print:block print:h-auto print:overflow-visible print:bg-white print:p-0">
         <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
           <div className="mb-3 flex items-center justify-between print:hidden">
             <h2 className="text-lg font-semibold text-slate-900">출장 업무 내역서 (빈 양식)</h2>

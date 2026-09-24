@@ -119,7 +119,7 @@ export function ReportAIInsights({
             <p
               className={cx(
                 "inline-block max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-left text-sm leading-relaxed",
-                m.role === "user" ? "bg-slate-900 text-white" : "border border-indigo-100 bg-white text-slate-700"
+                m.role === "user" ? "bg-brand-navy text-white" : "border border-indigo-100 bg-white text-slate-700"
               )}
             >
               {m.text}

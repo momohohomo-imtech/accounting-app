@@ -44,7 +44,7 @@ export function WorkLogMonthFilter({ year, month }: { year: number; month: numbe
             onClick={() => router.push(`/worklogs?year=${year}&month=${m}`, { scroll: false })}
             className={cx(
               "rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
-              m === month ? "bg-slate-900 text-white" : "border border-slate-300 text-slate-600 hover:bg-slate-100"
+              m === month ? "bg-brand-navy text-white" : "border border-slate-300 text-slate-600 hover:bg-slate-100"
             )}
           >
             {m}월

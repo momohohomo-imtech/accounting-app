@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { signIn } from "@/lib/actions/auth";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -12,9 +13,18 @@ export default async function LoginPage({
   const params = await searchParams;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <Card className="w-full max-w-sm" padding="lg">
-        <h1 className="text-xl font-bold text-slate-900">IM테크 회계 관리 시스템</h1>
+    <div className="brand-login flex min-h-screen flex-col items-center justify-center bg-brand-navy px-4 py-10">
+      <div className="mb-6 flex items-center gap-3 text-white">
+        <Image src="/logo-icon.png" alt="" width={44} height={44} priority className="rounded-xl shadow-lg shadow-black/30 ring-1 ring-white/15" />
+        <div className="leading-tight">
+          <p className="text-lg font-bold tracking-tight">IM테크</p>
+          <p className="text-xs text-white/60">Infinite Moves</p>
+        </div>
+      </div>
+      <Card className="w-full max-w-sm overflow-hidden border-white/40 shadow-2xl shadow-black/30" padding="lg">
+        {/* 로고 색(빨강 막대 + 파랑) 띠 */}
+        <div className="-mx-8 -mt-8 mb-7 h-1 bg-[linear-gradient(90deg,var(--brand-red)_0_28%,var(--brand)_28%_100%)]" aria-hidden />
+        <h1 className="text-xl font-bold text-slate-900">회계 관리 시스템</h1>
         <p className="mt-1 text-sm text-slate-500">로그인</p>
 
         {params.reason === "idle" && (

@@ -52,7 +52,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       {state && (
         <ModalPortal>
           <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 p-4"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-brand-ink/50 p-4"
             onClick={() => respond(false)}
           >
             <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>

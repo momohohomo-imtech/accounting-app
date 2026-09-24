@@ -117,7 +117,7 @@ function ProgressCell({ value }: { value: number }) {
   return (
     <div className="h-2 w-full shrink-0 overflow-hidden rounded-full bg-slate-100">
       <div
-        className={`h-full rounded-full ${pct >= 100 ? "bg-red-500" : "bg-brand"}`}
+        className={`h-full rounded-full ${pct >= 100 ? "bg-brand-green" : "bg-brand"}`}
         style={{ width: `${pct}%` }}
       />
     </div>
@@ -534,7 +534,7 @@ export function EntityTable({
     </Table>
 
     {editingRow && (
-      <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:hidden">
+      <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-brand-ink/50 p-4 py-10 print:hidden">
         <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
           <h2 className="mb-4 text-lg font-semibold text-slate-900">수정</h2>
           <form

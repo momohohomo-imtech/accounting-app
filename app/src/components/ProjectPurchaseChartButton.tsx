@@ -195,7 +195,7 @@ export function ProjectPurchaseChartButton({
       {open && (
         <ModalPortal>
           <div
-            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10 print:static print:block print:h-auto print:overflow-visible print:bg-white print:p-0"
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-brand-ink/50 p-4 py-10 print:static print:block print:h-auto print:overflow-visible print:bg-white print:p-0"
             onClick={() => setOpen(false)}
           >
             <div
@@ -209,14 +209,14 @@ export function ProjectPurchaseChartButton({
                     <button
                       type="button"
                       onClick={() => setChartType("pie")}
-                      className={`rounded px-2.5 py-1 ${chartType === "pie" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+                      className={`rounded px-2.5 py-1 ${chartType === "pie" ? "bg-brand-navy text-white" : "text-slate-600 hover:bg-slate-100"}`}
                     >
                       파이
                     </button>
                     <button
                       type="button"
                       onClick={() => setChartType("bar")}
-                      className={`rounded px-2.5 py-1 ${chartType === "bar" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+                      className={`rounded px-2.5 py-1 ${chartType === "bar" ? "bg-brand-navy text-white" : "text-slate-600 hover:bg-slate-100"}`}
                     >
                       막대
                     </button>

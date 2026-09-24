@@ -19,7 +19,7 @@ export function Pill({
       className={cx(
         "rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/30",
         size === "sm" ? "px-3 py-1.5 text-sm" : "px-3 py-1.5 text-xs",
-        active ? "bg-slate-900 text-white" : "border border-slate-300 text-slate-600 hover:bg-slate-100"
+        active ? "bg-brand-navy text-white" : "border border-slate-300 text-slate-600 hover:bg-slate-100"
       )}
     >
       {children}

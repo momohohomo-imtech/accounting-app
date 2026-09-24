@@ -7,6 +7,10 @@
   --brand-dark: #0a5a97;
   --brand-soft: #e7f0f7;
   --brand-red: #c20f25;
+  /* 로고 파랑에서 뽑은 짙은 남색(사이드바·상단바) + 완료·정상 표시용 녹색 */
+  --brand-navy: #0c3560;
+  --brand-ink: #071b33;
+  --brand-green: #0e9f6e;
 }
 
 @theme inline {
@@ -16,6 +20,9 @@
   --color-brand-dark: var(--brand-dark);
   --color-brand-soft: var(--brand-soft);
   --color-brand-red: var(--brand-red);
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-green: var(--brand-green);
   /* Pretendard는 app/fonts에 자체 포함(한글 조각별로 필요한 것만 내려받음) — 외부 CDN 의존 없음. */
   --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
     "Malgun Gothic", "Segoe UI", sans-serif;
@@ -176,5 +183,57 @@ textarea {
 @media print {
   html.modal-print body > *:not(#app-modal-portal) {
     display: none !important;
+  }
+}
+
+/* ── 브랜드 분위기: 로고(빨강 막대 + M)를 배경 무늬로. 화면에서만(인쇄에는 안 나옴). ── */
+@media screen {
+  /* 본문 배경: 오른쪽 위 파란빛·왼쪽 아래 녹색빛을 아주 옅게 + 오른쪽 아래 큰 로고 워터마크.
+     isolation + z-index:-1 → 워터마크는 배경 위, 카드·표 같은 내용 아래에 깔림. */
+  .app-backdrop {
+    isolation: isolate;
+    background-color: #f5f7fa;
+    background-image:
+      radial-gradient(60rem 32rem at 100% 0%, rgb(14 110 184 / 0.08), transparent 70%),
+      radial-gradient(48rem 28rem at 0% 100%, rgb(14 159 110 / 0.07), transparent 70%);
+    background-attachment: fixed;
+  }
+  .app-backdrop::after {
+    content: "";
+    position: fixed;
+    right: -4vw;
+    bottom: -6vh;
+    z-index: -1;
+    width: min(50vw, 600px);
+    aspect-ratio: 268 / 178;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 268 178'%3E%3Crect width='73' height='178' fill='rgba%28194%2C15%2C37%2C0.035%29'/%3E%3Cpath fill='rgba%2814%2C110%2C184%2C0.045%29' d='M73 0h34l50 124L208 0h60v178h-51V42l-55 118h-10L98 42v136H73z'/%3E%3C/svg%3E") no-repeat center / contain;
+    pointer-events: none;
+  }
+
+  /* 사이드바: 로고 파랑에서 이어지는 남색 그라데이션 + 맨 위 빨강·파랑 띠(로고 색) + 아래쪽 흰 로고 무늬
+     (어두운 바탕에서 빨강 무늬는 파랑과 섞여 탁해 보여서 무늬는 흰색 한 가지로) */
+  .brand-sidebar {
+    background:
+      linear-gradient(90deg, var(--brand-red) 0 28%, var(--brand) 28% 100%) top / 100% 3px no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 268 178'%3E%3Crect width='73' height='178' fill='rgba%28255%2C255%2C255%2C0.07%29'/%3E%3Cpath fill='rgba%28255%2C255%2C255%2C0.05%29' d='M73 0h34l50 124L208 0h60v178h-51V42l-55 118h-10L98 42v136H73z'/%3E%3C/svg%3E") left -36px bottom -24px / 300px auto no-repeat,
+      radial-gradient(22rem 18rem at 0% 100%, rgb(14 159 110 / 0.14), transparent 70%),
+      linear-gradient(180deg, var(--brand-navy) 0%, #0a2746 55%, var(--brand-ink) 100%);
+  }
+  .brand-topbar {
+    background:
+      linear-gradient(90deg, var(--brand-red) 0 28%, var(--brand) 28% 100%) top / 100% 2px no-repeat,
+      linear-gradient(90deg, var(--brand-navy), #0a2746);
+  }
+  .brand-bottombar {
+    background: linear-gradient(180deg, #0a2746, var(--brand-ink));
+  }
+
+  /* 로그인 화면: 로고 파랑 그라데이션 + 녹색빛 + 큰 흰 로고 무늬 */
+  .brand-login {
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 268 178'%3E%3Crect width='73' height='178' fill='rgba%28255%2C255%2C255%2C0.11%29'/%3E%3Cpath fill='rgba%28255%2C255%2C255%2C0.08%29' d='M73 0h34l50 124L208 0h60v178h-51V42l-55 118h-10L98 42v136H73z'/%3E%3C/svg%3E") right -12vw bottom -16vh / min(80vw, 760px) auto no-repeat,
+      radial-gradient(40rem 30rem at 0% 100%, rgb(14 159 110 / 0.28), transparent 70%),
+      radial-gradient(50rem 30rem at 100% 0%, rgb(255 255 255 / 0.10), transparent 70%),
+      linear-gradient(135deg, var(--brand-ink) 0%, var(--brand-navy) 45%, var(--brand) 100%);
   }
 }

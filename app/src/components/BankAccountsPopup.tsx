@@ -36,7 +36,7 @@ export function BankAccountsPopup({
       {open && (
         <ModalPortal>
           <div
-            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 py-10"
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-brand-ink/50 p-4 py-10"
             onClick={() => setOpen(false)}
           >
             <div className="w-full max-w-3xl space-y-4 rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>

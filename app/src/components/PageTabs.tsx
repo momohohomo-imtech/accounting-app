@@ -22,7 +22,7 @@ export function PageTabs({
           className={cx(
             "shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/20",
             active === t.key
-              ? "border-slate-900 text-slate-900"
+              ? "border-brand-navy text-slate-900"
               : "border-transparent text-slate-500 hover:text-slate-800"
           )}
         >
