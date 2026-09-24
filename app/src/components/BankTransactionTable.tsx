@@ -250,7 +250,7 @@ export function BankTransactionTable({
               <td className="whitespace-nowrap py-2 pr-4">
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                    t.direction === "입금" ? "bg-blue-50 text-blue-700" : "bg-orange-50 text-orange-700"
+                    t.direction === "입금" ? "bg-brand-soft text-brand-dark" : "bg-orange-50 text-orange-700"
                   }`}
                 >
                   {t.direction}

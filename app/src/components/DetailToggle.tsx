@@ -11,7 +11,7 @@ export function DetailToggle({ label, children }: { label: string; children: Rea
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900"
+        className="inline-flex items-center gap-1 text-xs font-medium text-brand underline underline-offset-2 hover:text-brand-dark"
       >
         {label}
         <span className="text-[10px]">{open ? "▲" : "▼"}</span>

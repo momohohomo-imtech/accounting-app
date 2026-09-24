@@ -161,7 +161,7 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
                   <span />
                   <span />
                   <span />
-                  <span className="text-right text-blue-600">VAT 제외</span>
+                  <span className="text-right text-brand">VAT 제외</span>
                   <span className="text-right">합계</span>
                   <span />
                   <span />
@@ -188,7 +188,7 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
                       </span>
                       <span className="truncate text-slate-700">{it.item_name ?? "-"}</span>
                       <span className="truncate text-right text-slate-400">{it.methodName ?? ""}</span>
-                      <span className="text-right text-blue-600">{formatWon(it.vatExcludedAmount)}</span>
+                      <span className="text-right text-brand">{formatWon(it.vatExcludedAmount)}</span>
                       <span className="text-right font-medium text-slate-900">{formatWon(it.amount)}</span>
                       <LinkButton
                         href={`/transactions?tab=credit&editTx=${it.id}`}

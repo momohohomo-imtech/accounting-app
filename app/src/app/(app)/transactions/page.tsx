@@ -279,7 +279,7 @@ async function TransactionListSection({
 
       <p className="text-sm text-slate-600">
         필터된 전체 금액{" "}
-        <span className={`tabular-nums font-semibold ${filteredNetTotal >= 0 ? "text-blue-700" : "text-red-600"}`}>
+        <span className={`tabular-nums font-semibold ${filteredNetTotal >= 0 ? "text-brand" : "text-red-600"}`}>
           {filteredNetTotal >= 0 ? "+" : "-"}
           {formatWon(Math.abs(filteredNetTotal))}
         </span>

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { cx } from "@/lib/cx";
 
 const variantClass = {
-  blue: "bg-blue-50 text-blue-700",
+  blue: "bg-brand-soft text-brand-dark",
   orange: "bg-orange-50 text-orange-700",
   emerald: "bg-emerald-50 text-emerald-700",
   amber: "bg-amber-50 text-amber-700",

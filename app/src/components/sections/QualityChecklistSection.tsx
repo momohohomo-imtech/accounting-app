@@ -11,6 +11,7 @@ import {
 } from "@/lib/actions/qualityChecklist";
 import { KnowHowSection } from "@/components/KnowHowSection";
 import { createKnowHowNote, updateKnowHowNote, deleteKnowHowNote } from "@/lib/actions/knowHow";
+import { Card } from "@/components/ui/Card";
 
 function buildFields(projectSearchOptions: { value: string; label: string; year: number; siteLabel: string }[]): FieldConfig[] {
   return [
@@ -99,9 +100,9 @@ export async function QualityChecklistSection({ projectId }: { projectId?: strin
       </div>
 
       {!projectId ? (
-        <p className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-400">
+        <Card padding="lg" className="text-center text-sm text-slate-400">
           위에서 프로젝트를 선택하면 품질 체크리스트를 볼 수 있어요.
-        </p>
+        </Card>
       ) : (
         <>
           <CreatePanel title="점검 항목" fields={fields} createAction={createBound} />

@@ -39,7 +39,7 @@ export function HalfYearSettlementInput({ year, initialAmount }: { year: number;
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="text-xs text-blue-700 underline underline-offset-2 hover:text-blue-900"
+        className="text-xs text-brand underline underline-offset-2 hover:text-brand-dark"
       >
         수정
       </button>

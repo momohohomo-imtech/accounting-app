@@ -378,7 +378,7 @@ async function WorkLogCalendarSection({
       </div>
 
       {savedYears.length > 0 && (
-        <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm print:hidden">
+        <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-5 text-sm shadow-sm print:hidden">
           <p className="text-xs font-semibold text-slate-500">저장된 연/월</p>
           <div className="space-y-1.5">
             {savedYears.map((y) => (
