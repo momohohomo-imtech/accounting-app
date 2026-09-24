@@ -251,9 +251,18 @@ export function EntityTable({
     window.addEventListener("mouseup", onUp);
   }
 
-  function colStyle(f: FieldConfig) {
+  // 지정 폭(%, 드래그한 px)은 PC·인쇄에서만 — 휴대폰에서 %로 고정하면 칸이 좁아져 금액이
+  // "5,000,…"처럼 잘림. 휴대폰은 내용 폭대로 늘어나고 표 전체를 옆으로 넘김.
+  function colWidth(f: FieldConfig) {
     const px = colWidths[f.name];
-    return px ? { width: `${px}px` } : f.width ? { width: f.width } : undefined;
+    return px ? `${px}px` : f.width;
+  }
+  function colStyle(f: FieldConfig) {
+    const w = colWidth(f);
+    return w ? ({ "--col-w": w } as CSSProperties) : undefined;
+  }
+  function colWidthClass(f: FieldConfig) {
+    return colWidth(f) ? "md:w-(--col-w) print:w-(--col-w)" : undefined;
   }
 
   function handleSort(name: string) {
@@ -336,7 +345,7 @@ export function EntityTable({
     <Table
       className={cx(
         "sticky-col-table min-w-(--entity-min-w) md:min-w-[700px]",
-        hasWidths && "table-fixed"
+        hasWidths && "md:table-fixed print:table-fixed"
       )}
       style={{ "--entity-min-w": `${mobileMinWidth}px` } as CSSProperties}
     >
@@ -348,7 +357,11 @@ export function EntityTable({
               thRefs.current[f.name] = el;
             }}
             style={colStyle(f)}
-            className={cx("relative whitespace-nowrap pb-2 pr-4 font-medium", f.name === stickyFieldName && "sticky-col")}
+            className={cx(
+              "relative whitespace-nowrap pb-2 pr-4 font-medium",
+              colWidthClass(f),
+              f.name === stickyFieldName && "sticky-col max-md:w-[1%]"
+            )}
           >
             <button
               type="button"
@@ -426,13 +439,23 @@ export function EntityTable({
                   title={f.display === "progress" ? undefined : displayValue(row, f)}
                   className={cx(
                     "max-w-[220px] truncate pr-4 print:whitespace-normal print:overflow-visible",
-                    f.name === stickyFieldName && "sticky-col"
+                    colWidthClass(f),
+                    // w-[1%]: 표의 남는 폭이 고정 칸으로 몰려 화면을 덮지 않게(globals.css와 같은 방식)
+                    f.name === stickyFieldName && "sticky-col max-md:w-[1%]",
+                    f.display === "progress" && "max-md:min-w-[5rem]"
                   )}
                 >
                   {f.display === "progress" ? (
                     <ProgressCell value={Number(row[f.name]) || 0} />
                   ) : (
-                    <>
+                    // 휴대폰에서 고정 칸(프로젝트명 등)은 화면을 너무 덮지 않게 폭 제한 + 말줄임
+                    // (칸 자체의 max-width는 자동 폭 표에서 무시돼서 안쪽 상자로 제한).
+                    <span
+                      className={cx(
+                        f.name === stickyFieldName &&
+                          "max-md:block max-md:max-w-[9rem] max-md:truncate print:max-w-none print:whitespace-normal print:overflow-visible"
+                      )}
+                    >
                       {cellColorClass(row, f) ? (
                         <span className={cellColorClass(row, f)}>{displayValue(row, f)}</span>
                       ) : (
@@ -443,7 +466,7 @@ export function EntityTable({
                           className={`ml-1.5 inline-block h-2 w-2 rounded-full align-middle ${dotColorClass(row, f)}`}
                         />
                       )}
-                    </>
+                    </span>
                   )}
                 </Td>
               ))}
