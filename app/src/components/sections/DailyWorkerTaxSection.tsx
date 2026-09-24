@@ -7,6 +7,18 @@ import { DailyWorkerUsageLogForm } from "@/components/DailyWorkerUsageLogForm";
 import { DailyWorkerUsageStatementTable } from "@/components/DailyWorkerUsageStatementTable";
 import { DailyWorkerUsageStatementExportButtons } from "@/components/DailyWorkerUsageStatementExportButtons";
 import { nowKst } from "@/lib/kstDate";
+import { fetchAllRows } from "@/lib/supabaseFetchAll";
+
+type UsageLogRow = {
+  id: string;
+  use_date: string;
+  daily_worker_id: string;
+  note: string | null;
+  daily_wage: number | null;
+  site_id: string | null;
+  daily_workers: { name: string; resident_id: string | null; phone: string | null } | { name: string; resident_id: string | null; phone: string | null }[] | null;
+  sites: { name: string } | { name: string }[] | null;
+};
 
 const FLOOR_YEAR = 2026;
 
@@ -25,14 +37,19 @@ export async function DailyWorkerTaxSection({ year, month }: { year?: string; mo
     supabase.from("daily_worker_offices").select("id, name").order("name"),
     supabase.from("daily_workers").select("id, name, office_id, status, grade").eq("status", "active").order("name"),
     supabase.from("sites").select("id, name").order("name"),
-    supabase
-      .from("daily_worker_usage_logs")
-      .select(
-        "id, use_date, daily_worker_id, note, daily_wage, site_id, daily_workers(name, resident_id, phone), sites(name)"
-      )
-      .gte("use_date", rangeStart)
-      .lte("use_date", rangeEnd)
-      .order("use_date", { ascending: false }),
+    // 세무사 제출용 문서라 한 달 사용 기록이 1000건을 넘어도 빠지면 안 됨 — 끝까지 가져온다.
+    fetchAllRows<UsageLogRow>((from, to) =>
+      supabase
+        .from("daily_worker_usage_logs")
+        .select(
+          "id, use_date, daily_worker_id, note, daily_wage, site_id, daily_workers(name, resident_id, phone), sites(name)"
+        )
+        .gte("use_date", rangeStart)
+        .lte("use_date", rangeEnd)
+        .order("use_date", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to)
+    ).then((data) => ({ data })),
     supabase.from("daily_worker_usage_logs").select("use_date").order("use_date", { ascending: true }).limit(1),
   ]);
 

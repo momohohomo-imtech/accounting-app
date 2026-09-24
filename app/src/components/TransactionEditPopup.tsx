@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllRawClientNames } from "@/lib/supabaseFetchAll";
 import { one } from "@/lib/relations";
 import { TransactionForm } from "@/components/TransactionForm";
 import { updateTransactionRecord } from "@/lib/actions/transactions";
@@ -17,7 +18,7 @@ export async function TransactionEditPopup({ editTx, redirectTo }: { editTx?: st
       supabase.from("payment_methods").select("*").order("sort_order"),
       supabase.from("expense_categories").select("*").order("sort_order"),
       supabase.from("transactions").select("*").eq("id", editTx).single(),
-      supabase.from("transactions").select("client_name_raw").not("client_name_raw", "is", null),
+      fetchAllRawClientNames(supabase),
     ]);
 
   if (!tx) return null;

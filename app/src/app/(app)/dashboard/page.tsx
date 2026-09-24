@@ -86,7 +86,15 @@ export default async function DashboardPage({
     { data: yearProjectRows },
     { data: categoryRows },
   ] = await Promise.all([
-    supabase.from("transactions").select("*").gte("trans_date", monthStart).lte("trans_date", monthEnd),
+    fetchAllRows<Transaction>((from, to) =>
+      supabase
+        .from("transactions")
+        .select("*")
+        .gte("trans_date", monthStart)
+        .lte("trans_date", monthEnd)
+        .order("id", { ascending: true })
+        .range(from, to)
+    ).then((data) => ({ data })),
     fetchAllRows<Transaction>((from, to) =>
       supabase.from("transactions").select("*").eq("payment_type", "credit").order("id", { ascending: true }).range(from, to)
     ),
