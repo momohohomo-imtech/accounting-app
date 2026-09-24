@@ -480,12 +480,19 @@ export function TransactionForm({
             ))}
           </datalist>
         </Field>
-        <ProjectPicker
-          sites={sites}
-          projects={projects}
-          value={values.project_id}
-          onChange={(v) => set("project_id", v)}
-        />
+        <div className="flex flex-col gap-1">
+          <ProjectPicker
+            sites={sites}
+            projects={projects}
+            value={values.project_id}
+            onChange={(v) => set("project_id", v)}
+          />
+          {values.type === "매출" && (
+            <p className="text-xs text-slate-400">
+              기성금·잔금 매출은 프로젝트를 꼭 선택하세요 — 받은 만큼 대시보드 예상 미수액에서 빠져요.
+            </p>
+          )}
+        </div>
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-slate-500">분류 상태</label>
           <label

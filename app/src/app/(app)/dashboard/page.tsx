@@ -138,7 +138,7 @@ export default async function DashboardPage({
   const receivableStatuses = new Set(EXPECTED_RECEIVABLE_STATUSES.map((st) => st.value));
   const receivableProjects = yearProjects.filter((p) => receivableStatuses.has(p.status ?? ""));
   const receivableProjectIds = receivableProjects.map((p) => p.id);
-  const [o, receivableAgencyRows] = await Promise.all([
+  const [o, receivableAgencyRows, receivableSalesRows] = await Promise.all([
     loadProfitOutlook(selectedYear, {
       payments,
       yearProjects,
@@ -154,10 +154,40 @@ export default async function DashboardPage({
             .range(from, to)
         )
       : Promise.resolve([]),
+    // 기성금 등 이미 받은 매출 — 연도와 상관없이 그 프로젝트로 등록된 매출 전부.
+    receivableProjectIds.length
+      ? fetchAllRows<{
+          id: string;
+          type: string;
+          payment_type: string;
+          project_id: string;
+          category_id: string | null;
+          sales_amount: number;
+          sales_vat: number;
+          purchase_amount: number;
+          purchase_vat: number;
+        }>((from, to) =>
+          supabase
+            .from("transactions")
+            .select("id, type, payment_type, project_id, category_id, sales_amount, sales_vat, purchase_amount, purchase_vat")
+            .eq("type", "매출")
+            .in("project_id", receivableProjectIds)
+            .order("id", { ascending: true })
+            .range(from, to)
+        )
+      : Promise.resolve([]),
   ]);
   const agencyByReceivableProject = new Map<string, number>();
   for (const a of receivableAgencyRows) {
     agencyByReceivableProject.set(a.project_id, (agencyByReceivableProject.get(a.project_id) ?? 0) + Number(a.amount));
+  }
+  // 받은 매출 = 현금·이체 매출 + 정산 끝난 외상 매출(부가세 제외 공급가액). 외상 정산은 금액과 상관없이
+  // 건 전체를 받은 것으로 처리하므로, 어음 할인으로 실제 입금액이 적어도 계산서 금액 전체가 빠진다.
+  const receivedSalesByProject = new Map<string, number>();
+  for (const t of receivableSalesRows) {
+    if (!isLedgerVisible(t, payments)) continue;
+    const supply = salesSupplyOf({ ...t, expense_categories: categoryRel(t.category_id) });
+    receivedSalesByProject.set(t.project_id, (receivedSalesByProject.get(t.project_id) ?? 0) + supply);
   }
 
   const monthTx = (monthTxRaw ?? []).filter((t) => isLedgerVisible(t as Transaction, payments));
@@ -177,18 +207,28 @@ export default async function DashboardPage({
   const yearPurchase = yearTx.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
   const yearProfit = yearSales - yearPurchase;
 
-  // 예상 미수액 — 아직 돈을 다 받지 않은 프로젝트(진행중·공사 완료·완료 수금대기)의 받을 금액.
-  // 프로젝트 목록의 "수주예상액"과 같은 기준: 발주액 − 대행구매액.
+  // 예상 미수액 — 아직 돈을 다 받지 않은 프로젝트(진행중·공사 완료·완료 수금대기)의 남은 받을 금액.
+  // 프로젝트 목록의 "수주예상액"(발주액 − 대행구매액)에서 이미 받은 매출(기성금 등)을 뺀다.
+  // 계산서 합계가 수주예상액과 딱 맞지 않을 수 있어(기타 공제 등) 프로젝트별로 0 아래로는 안 내려감.
   const expectedReceivableByStatus = EXPECTED_RECEIVABLE_STATUSES.map(({ value, label }) => {
     const rows = receivableProjects.filter((p) => p.status === value);
     return {
       label,
       count: rows.length,
-      amount: rows.reduce((s, p) => s + (p.quote_amount ?? 0) - (agencyByReceivableProject.get(p.id) ?? 0), 0),
+      amount: rows.reduce(
+        (s, p) =>
+          s +
+          Math.max(
+            0,
+            (p.quote_amount ?? 0) - (agencyByReceivableProject.get(p.id) ?? 0) - (receivedSalesByProject.get(p.id) ?? 0)
+          ),
+        0
+      ),
     };
   });
   const expectedReceivable = expectedReceivableByStatus.reduce((s, r) => s + r.amount, 0);
-  // "공사 완료 · 수금 대기" 칸도 같은 수주예상액 기준 — 두 칸의 수금 대기 금액이 항상 같게.
+  const receivedSalesTotal = receivableProjects.reduce((s, p) => s + (receivedSalesByProject.get(p.id) ?? 0), 0);
+  // "공사 완료 · 수금 대기" 칸도 같은 기준 — 두 칸의 수금 대기 금액이 항상 같게.
   const awaitingPayment = expectedReceivableByStatus[EXPECTED_RECEIVABLE_STATUSES.findIndex((st) => st.value === PROJECT_STATUS_AWAITING_PAYMENT)];
 
   // 선택 연도 전체 프로젝트 수주액 합계 — 프로젝트 페이지 하단 "수주액" 합계와 같은 값.
@@ -297,7 +337,7 @@ export default async function DashboardPage({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Link href="/projects" className="rounded-xl transition hover:ring-2 hover:ring-slate-200">
             <Stat
-              label="예상 미수액 (수주예상액 기준 · 진행중·공사 완료·수금 대기)"
+              label="예상 미수액 (수주예상액 − 받은 기성금 · 진행중·공사 완료·수금 대기)"
               emphasis
               sub={
                 <ul className="space-y-0.5">
@@ -309,6 +349,12 @@ export default async function DashboardPage({
                       <span className="tabular-nums">{formatWon(r.amount)}</span>
                     </li>
                   ))}
+                  {receivedSalesTotal > 0 && (
+                    <li className="flex justify-between gap-2 text-slate-400">
+                      <span>받은 기성금 (위 금액에서 이미 뺌 · 부가세 제외)</span>
+                      <span className="tabular-nums">{formatWon(receivedSalesTotal)}</span>
+                    </li>
+                  )}
                 </ul>
               }
             >
@@ -316,7 +362,7 @@ export default async function DashboardPage({
             </Stat>
           </Link>
           <Link href="/projects" className="rounded-xl transition hover:ring-2 hover:ring-slate-200">
-            <Stat label="공사 완료 · 수금 대기" sub={`${selectedYear}년 프로젝트 ${awaitingPayment.count}건 · 수주예상액 기준`}>
+            <Stat label="공사 완료 · 수금 대기" sub={`${selectedYear}년 프로젝트 ${awaitingPayment.count}건 · 받은 기성금 제외`}>
               <Money value={awaitingPayment.amount} />
             </Stat>
           </Link>
