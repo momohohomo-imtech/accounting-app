@@ -532,23 +532,9 @@ export default async function ReportsPage({
     agencyByVendorMap.set(name, entry);
   }
 
-  const byVendorPurchaseOnly = clientBreakdown("매입");
-  const byVendor = includeVendorAgency
-    ? (() => {
-        const merged = new Map<string, { name: string; count: number; amount: number }>();
-        for (const v of byVendorPurchaseOnly) merged.set(v.name, { ...v });
-        for (const a of agencyByVendorMap.values()) {
-          const existing = merged.get(a.name);
-          if (existing) {
-            existing.count += a.count;
-            existing.amount += a.amount;
-          } else {
-            merged.set(a.name, { ...a });
-          }
-        }
-        return Array.from(merged.values()).sort((x, y) => y.amount - x.amount);
-      })()
-    : byVendorPurchaseOnly;
+  // 매입(부가세 포함)과 대행구매(부가세 제외)는 기준이 달라서 합치지 않고, 토글을 켜면 별도 칸으로만 보여준다.
+  const byVendor = clientBreakdown("매입");
+  const agencyByVendor = Array.from(agencyByVendorMap.values());
 
   // 프로젝트 분류 대기 중인 거래 (엑셀 대량입력에서 프로젝트명은 인식했지만 실제
   // project_id 매칭을 못 찾아 담당자 확인이 필요한 건들)
@@ -832,7 +818,22 @@ export default async function ReportsPage({
     r.contractAmount - r.ledgerSales,
   ]);
 
-  const vendorExportRows = byVendor.map((v) => [v.name, v.count, v.amount]);
+  const vendorExportHeaders = includeVendorAgency
+    ? ["거래처", "매입 건수", "매입 합계(부가세 포함)", "대행구매 건수", "대행구매액(부가세 제외)"]
+    : ["거래처", "건수", "매입 합계"];
+  const vendorExportRows: (string | number)[][] = includeVendorAgency
+    ? (() => {
+        const map = new Map<string, (string | number)[]>();
+        for (const v of byVendor) map.set(v.name, [v.name, v.count, v.amount, 0, 0]);
+        for (const a of agencyByVendor) {
+          const row = map.get(a.name) ?? [a.name, 0, 0, 0, 0];
+          row[3] = a.count;
+          row[4] = a.amount;
+          map.set(a.name, row);
+        }
+        return Array.from(map.values()).sort((x, y) => Number(y[2]) - Number(x[2]));
+      })()
+    : byVendor.map((v) => [v.name, v.count, v.amount]);
 
   // 매입 품목 검색 — 올해 매입 거래 전부를 품목명으로 찾아볼 수 있게(검색어는 화면에서 입력).
   const purchaseItemRows = transactions
@@ -953,7 +954,7 @@ export default async function ReportsPage({
           totalPurchase={yearTotal.purchase}
           projectCount={byProject.length}
           bySite={bySite}
-          byVendor={byVendorPurchaseOnly}
+          byVendor={byVendor}
           byCategory={byCategory}
         />
       </CollapsibleSection>
@@ -1163,11 +1164,16 @@ export default async function ReportsPage({
           defaultOpen={printSection === "vendors"}
           headerExtra={sectionControls(
             "vendors",
-            { filename: `매입처별_집계_${selectedYear}.xlsx`, headers: ["거래처", "건수", "매입 합계"], rows: vendorExportRows },
+            { filename: `매입처별_집계_${selectedYear}.xlsx`, headers: vendorExportHeaders, rows: vendorExportRows },
             <VendorAgencyToggle checked={includeVendorAgency} />
           )}
         >
-          <VendorAggregateTable rows={byVendor} year={selectedYear} vendorAgency={includeVendorAgency} />
+          <VendorAggregateTable
+            rows={byVendor}
+            agencyRows={agencyByVendor}
+            year={selectedYear}
+            vendorAgency={includeVendorAgency}
+          />
         </CollapsibleSection>
 
         <CollapsibleSection

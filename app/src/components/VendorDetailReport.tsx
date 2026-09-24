@@ -91,7 +91,15 @@ export function VendorDetailReport({
       ),
     [rows, paymentFilter, statusFilter]
   );
-  const total = filteredRows.reduce((s, r) => s + r.amount, 0);
+  // 매입(부가세 포함 총액)과 대행구매(부가세 제외)는 기준이 달라서 합계를 따로 낸다.
+  const purchaseTotal = filteredRows.filter((r) => r.kind === "매입").reduce((s, r) => s + r.amount, 0);
+  const agencyTotal = filteredRows.filter((r) => r.kind === "대행구매").reduce((s, r) => s + r.amount, 0);
+  const totals: [string, number][] = hasAgency
+    ? [
+        ["매입 합계(부가세 포함)", purchaseTotal],
+        ["대행구매 합계(부가세 제외)", agencyTotal],
+      ]
+    : [["합계", purchaseTotal]];
 
   function editHrefFor(id: string) {
     return `/reports?year=${year}${vendorAgency ? "&vendorAgency=1" : ""}&vendor=${encodeURIComponent(vendorName)}&editTx=${id}`;
@@ -200,7 +208,7 @@ export function VendorDetailReport({
               ))}
             </select>
           )}
-          <VendorReportActions vendorName={vendorName} year={year} headers={exportHeaders} rows={exportRows} total={total} />
+          <VendorReportActions vendorName={vendorName} year={year} headers={exportHeaders} rows={exportRows} totals={totals} />
           <Link href={closeHref} className="text-sm text-slate-500 hover:text-slate-800">
             닫기
           </Link>
@@ -301,10 +309,13 @@ export function VendorDetailReport({
         </table>
       </div>
 
-      <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
-        <span className="text-sm font-semibold text-slate-900">
-          합계 <span className="ml-2 tabular-nums text-xl font-bold text-slate-900">{formatWon(total)}</span>
-        </span>
+      <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 border-t border-slate-100 pt-4">
+        {totals.map(([label, value]) => (
+          <span key={label} className="text-sm font-semibold text-slate-900">
+            {label}{" "}
+            <span className="ml-2 whitespace-nowrap tabular-nums text-xl font-bold text-slate-900">{formatWon(value)}</span>
+          </span>
+        ))}
       </div>
     </div>
   );

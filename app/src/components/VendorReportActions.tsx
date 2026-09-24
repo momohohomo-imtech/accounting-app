@@ -9,18 +9,21 @@ export function VendorReportActions({
   year,
   headers,
   rows,
-  total,
+  totals,
 }: {
   vendorName: string;
   year: number;
   headers: string[];
   rows: (string | number)[][];
-  total: number;
+  /** 맨 아래 합계 줄들 — [이름, 금액]. 기준이 다른 금액(매입/대행구매)은 줄을 나눠서 넘긴다. */
+  totals: [string, number][];
 }) {
   async function handleExport() {
     const blankRow = headers.map(() => "");
-    const totalRow = headers.map((_, i) => (i === headers.length - 2 ? "합계" : i === headers.length - 1 ? total : ""));
-    const data: (string | number)[][] = [...rows, blankRow, totalRow];
+    const totalRows = totals.map(([label, value]) =>
+      headers.map((_, i) => (i === headers.length - 2 ? label : i === headers.length - 1 ? value : ""))
+    );
+    const data: (string | number)[][] = [...rows, blankRow, ...totalRows];
     await downloadXlsx(`${vendorName}_매입내역_${year}.xlsx`, headers, data, `${vendorName} ${year}년`);
   }
 
