@@ -29,3 +29,16 @@ export function fetchAllCreditPayments(supabase: Awaited<ReturnType<typeof creat
     supabase.from("credit_payments").select("*").order("id", { ascending: true }).range(from, to)
   );
 }
+
+// 거래 등록·수정 화면의 "직접 입력한 거래처명" 자동완성용 — 거래가 1000건을 넘어도 이름이 빠지지 않게.
+// 기존 호출부의 `{ data }` 형태를 그대로 쓰도록 감싸서 돌려준다.
+export function fetchAllRawClientNames(supabase: Awaited<ReturnType<typeof createClient>>) {
+  return fetchAllRows<{ client_name_raw: string | null }>((from, to) =>
+    supabase
+      .from("transactions")
+      .select("client_name_raw")
+      .not("client_name_raw", "is", null)
+      .order("id", { ascending: true })
+      .range(from, to)
+  ).then((data) => ({ data }));
+}

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { fetchAllRawClientNames } from "@/lib/supabaseFetchAll";
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { TransactionForm } from "@/components/TransactionForm";
@@ -15,7 +16,7 @@ export default async function EditTransactionPage({ params }: { params: Promise<
       supabase.from("payment_methods").select("*").order("sort_order"),
       supabase.from("expense_categories").select("*").order("sort_order"),
       supabase.from("transactions").select("*").eq("id", id).single(),
-      supabase.from("transactions").select("client_name_raw").not("client_name_raw", "is", null),
+      fetchAllRawClientNames(supabase),
     ]);
 
   if (!tx) notFound();
