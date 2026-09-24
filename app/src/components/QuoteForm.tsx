@@ -6,7 +6,7 @@ import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components
 import { createQuote, updateQuote, fetchProjectPurchaseItems, type QuoteInput, type QuoteItemInput } from "@/lib/actions/quotes";
 import { QUOTE_STATUS_OPTIONS } from "@/lib/quoteStatus";
 import { formatWon } from "@/lib/format";
-import { computeConfirmedAmount, isVisibleQuoteItem } from "@/lib/quoteCalc";
+import { isVisibleQuoteItem, quoteLineAmounts } from "@/lib/quoteCalc";
 import { Button } from "@/components/ui/Button";
 import { labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -200,7 +200,7 @@ export function QuoteForm({
 
   const total = items
     .filter(isVisibleQuoteItem)
-    .reduce((s, it) => s + computeConfirmedAmount(it.amount || 0, it.handling_fee_pct || 0), 0);
+    .reduce((s, it) => s + quoteLineAmounts(it).confirmed, 0);
   const targetAmountNum = values.target_amount ? Number(values.target_amount) : null;
   const diff = targetAmountNum !== null ? targetAmountNum - total : null;
 
@@ -409,7 +409,14 @@ export function QuoteForm({
             <p className="text-xs text-slate-500">
               확정금액 미리보기{" "}
               <span className="tabular-nums font-semibold text-slate-900">
-                {formatWon(computeConfirmedAmount((Number(groupUnitPrice) || 0) * (Number(groupQuantity) || 1), Number(groupFeePct) || 0))}
+                {formatWon(
+                  quoteLineAmounts({
+                    amount: (Number(groupUnitPrice) || 0) * (Number(groupQuantity) || 1),
+                    unit_price: Number(groupUnitPrice) || 0,
+                    quantity: Number(groupQuantity) || 1,
+                    handling_fee_pct: Number(groupFeePct) || 0,
+                  }).confirmed
+                )}
               </span>
             </p>
             <div className="flex gap-2">
@@ -439,7 +446,7 @@ export function QuoteForm({
             <span className="w-8" />
           </div>
           {items.map((it, i) => {
-            const confirmed = computeConfirmedAmount(it.amount || 0, it.handling_fee_pct || 0);
+            const { confirmed } = quoteLineAmounts(it);
             const isHiddenMember = Boolean(it.group_label) && !it.is_group_summary;
             return (
               <div

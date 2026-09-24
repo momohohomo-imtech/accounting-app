@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { formatWon, formatDate } from "@/lib/format";
 import { numberToKoreanAmount } from "@/lib/numberToKorean";
-import { computeConfirmedAmount, isVisibleQuoteItem } from "@/lib/quoteCalc";
+import { isVisibleQuoteItem, quoteLineAmounts } from "@/lib/quoteCalc";
 import { PrintButton } from "@/components/PrintButton";
 import { QuoteExportButton } from "@/components/QuoteExportButton";
 import { fieldClass, labelClass } from "@/components/ui/field";
@@ -86,8 +86,7 @@ export function QuotePrintView({
   }
 
   const rows = items.filter(isVisibleQuoteItem).map((it) => {
-    const confirmed = computeConfirmedAmount(it.amount, it.handling_fee_pct);
-    const adjustedUnitPrice = it.unit_price != null ? computeConfirmedAmount(it.unit_price, it.handling_fee_pct) : null;
+    const { confirmed, adjustedUnitPrice } = quoteLineAmounts(it);
     return { ...it, confirmed, adjustedUnitPrice };
   });
   const total = rows.reduce((s, r) => s + r.confirmed, 0);
