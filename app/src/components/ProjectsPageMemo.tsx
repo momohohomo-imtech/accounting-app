@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { updateProjectsPageMemo } from "@/lib/actions/projectsPageMemo";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { fieldClass } from "@/components/ui/field";
+import { Card } from "@/components/ui/Card";
 
 export function ProjectsPageMemo({ initialContent }: { initialContent: string }) {
   const [content, setContent] = useState(initialContent);
@@ -19,7 +20,7 @@ export function ProjectsPageMemo({ initialContent }: { initialContent: string })
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm print:hidden">
+    <Card className="print:hidden">
       <textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
@@ -28,6 +29,6 @@ export function ProjectsPageMemo({ initialContent }: { initialContent: string })
         placeholder="프로젝트 관련 메모..."
         className={`${fieldClass} resize-y`}
       />
-    </div>
+    </Card>
   );
 }

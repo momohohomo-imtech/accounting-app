@@ -451,7 +451,7 @@ export function TransactionTable({
           {sorted.map((t) => (
             <Tr
               key={t.id}
-              className={selected.has(t.id) ? "bg-blue-50" : undefined}
+              className={selected.has(t.id) ? "bg-brand-soft" : undefined}
             >
               <Td className="pr-2">
                 <input

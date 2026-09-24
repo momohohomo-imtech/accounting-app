@@ -339,7 +339,7 @@ export function QuoteForm({
           {diff !== null && (
             <p className="text-sm text-slate-600">
               차액{" "}
-              <span className={`tabular-nums font-semibold ${diff >= 0 ? "text-blue-600" : "text-red-600"}`}>
+              <span className={`tabular-nums font-semibold ${diff >= 0 ? "text-brand" : "text-red-600"}`}>
                 {diff >= 0 ? "+" : ""}
                 {formatWon(diff)}
               </span>

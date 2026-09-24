@@ -62,7 +62,7 @@ export function CreditSettlementGroup({
         <CardTitle>{label}</CardTitle>
         <span className="text-sm text-slate-500">
           미정산 합계{" "}
-          <span className="font-medium text-blue-600">VAT 제외 {formatWon(groupVatExcludedTotal)}</span>{" "}
+          <span className="font-medium text-brand">VAT 제외 {formatWon(groupVatExcludedTotal)}</span>{" "}
           <span className="font-semibold text-slate-900">{formatWon(groupTotal)}</span>
         </span>
       </CardHeader>
@@ -87,7 +87,7 @@ export function CreditSettlementGroup({
               )}
             </span>
             <span className="flex-1 truncate text-slate-700">{tx.item_name ?? "-"}</span>
-            <span className="shrink-0 text-blue-600">
+            <span className="shrink-0 text-brand">
               {formatWon(supplyOf(tx))}
             </span>
             <span className="shrink-0 font-medium text-slate-900">{formatWon(remaining)}</span>
