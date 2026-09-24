@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { toSessionCookie } from "./sessionCookie";
 import { createAdminClient } from "./admin";
 import { TAX_AGENT_SUSPEND_DURATION } from "@/lib/taxAgentSuspend";
+import { isViewerBlockedApi, isViewerBlockedPage } from "@/lib/viewerAccess";
 
 // 인증 확인마다 Supabase에 네트워크 왕복이 있어서(페이지 이동/새로고침마다 매번),
 // 그 요청 하나가 응답 없이 멈추면 이 미들웨어를 거치는 전체 앱이 같이 멈춰버림 —
@@ -105,9 +106,9 @@ async function updateSessionInner(request: NextRequest) {
     }
     role = roleRow?.role ?? null;
 
-    // 세무사 계정을 "N시간만 열어주고" 해제했는데 그 시각이 지났으면, 지금 이 요청에서 바로
-    // 다시 정지시키고 세션을 끊는다 (관리자가 관리 화면을 다시 열 때까지 기다리지 않아도 됨).
-    if (role === "tax_agent" && roleRow?.resuspend_at && new Date(roleRow.resuspend_at).getTime() <= Date.now()) {
+    // 세무사·조회 전용 계정을 "N시간만 열어주고" 해제했는데 그 시각이 지났으면, 지금 이 요청에서
+    // 바로 다시 정지시키고 세션을 끊는다 (관리자가 관리 화면을 다시 열 때까지 기다리지 않아도 됨).
+    if ((role === "tax_agent" || role === "viewer") && roleRow?.resuspend_at && new Date(roleRow.resuspend_at).getTime() <= Date.now()) {
       try {
         const admin = createAdminClient();
         await withTimeout(
@@ -147,6 +148,21 @@ async function updateSessionInner(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/transactions";
     return NextResponse.redirect(url);
+  }
+
+  // viewer(조회 전용 계정)는 개인정보 화면·백업·계정 관리와 AI/OCR 호출을 쓸 수 없음 —
+  // 나머지 화면은 볼 수 있지만 저장·수정·삭제는 DB 권한(084 SQL)에서 거절된다.
+  if (user && role === "viewer") {
+    const path = request.nextUrl.pathname;
+    if (isViewerBlockedApi(path)) {
+      return NextResponse.json({ error: "조회 전용 계정은 사용할 수 없는 기능입니다." }, { status: 403 });
+    }
+    if (isViewerBlockedPage(path)) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;

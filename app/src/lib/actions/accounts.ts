@@ -7,8 +7,8 @@ import { requireAdmin } from "@/lib/actions/authGuard";
 import { TAX_AGENT_SUSPEND_DURATION } from "@/lib/taxAgentSuspend";
 import { PROTECTED_OWNER_EMAIL } from "@/lib/protectedAccount";
 
-export type Role = "admin" | "staff" | "tax_agent";
-const ROLES: Role[] = ["admin", "staff", "tax_agent"];
+export type Role = "admin" | "staff" | "tax_agent" | "viewer";
+const ROLES: Role[] = ["admin", "staff", "tax_agent", "viewer"];
 
 export type Account = {
   id: string;
