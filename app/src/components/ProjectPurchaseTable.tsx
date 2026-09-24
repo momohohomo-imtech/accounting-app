@@ -69,13 +69,14 @@ export function ProjectPurchaseTable({ rows }: { rows: PurchaseRow[] }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="sticky-col-table w-full min-w-[600px] table-fixed text-sm print:text-[10px]">
+      {/* 휴대폰에서는 거래처·카테고리 칸을 넓혀 덜 잘리게(표 전체를 옆으로 넘김), 인쇄는 원래 폭 그대로 */}
+      <table className="sticky-col-table w-full min-w-[600px] table-fixed text-sm max-md:min-w-[680px] print:min-w-[600px] print:text-[10px]">
         <thead>
           <tr className="border-b border-slate-200 text-left text-slate-500">
             <th className="w-[88px] pb-2 pr-4 print:pb-1">{headerButton("date", "날짜")}</th>
-            <th className="sticky-col w-[100px] pb-2 pr-4 print:pb-1">{headerButton("vendor", "거래처")}</th>
+            <th className="sticky-col w-[100px] pb-2 pr-4 max-md:w-[140px] print:w-[100px] print:pb-1">{headerButton("vendor", "거래처")}</th>
             <th className="pb-2 pr-4 print:pb-1">{headerButton("item", "품목")}</th>
-            <th className="w-[90px] pb-2 pr-4 print:pb-1">{headerButton("category", "카테고리")}</th>
+            <th className="w-[90px] pb-2 pr-4 max-md:w-[120px] print:w-[90px] print:pb-1">{headerButton("category", "카테고리")}</th>
             <th className="w-[110px] pb-2 text-right print:pb-1">{headerButton("amount", "금액")}</th>
           </tr>
         </thead>
@@ -93,6 +94,7 @@ export function ProjectPurchaseTable({ rows }: { rows: PurchaseRow[] }) {
                 )}
               </td>
               <td
+                title={r.category}
                 className={`truncate py-2 pr-4 print:py-0.5 ${r.category === "미분류" ? "text-red-600" : "text-slate-700"}`}
                 style={r.category === "미분류" ? undefined : { color: r.categoryColor }}
               >
