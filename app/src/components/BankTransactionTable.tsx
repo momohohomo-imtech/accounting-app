@@ -11,6 +11,7 @@ import { formatWon, formatDate } from "@/lib/format";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { MatchedClientField } from "@/components/MatchedClientField";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 
 type BankTxRow = {
   id: string;
@@ -202,7 +203,7 @@ export function BankTransactionTable({
                           <option value="출금">출금</option>
                         </select>
                       )}
-                      <input type="number" name="amount" required defaultValue={t.amount} className={inputClass} />
+                      <MoneyInput name="amount" required defaultValue={t.amount} className={inputClass} />
                     </>
                   )}
                   <input name="description" defaultValue={t.description ?? ""} placeholder="내용" className={inputClass} />

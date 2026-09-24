@@ -12,6 +12,7 @@ import { ModalPrintButton } from "@/components/ModalPrintButton";
 import { Button } from "@/components/ui/Button";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { formatThousands } from "@/lib/numberInput";
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -195,7 +196,7 @@ export function BusinessTripLogViewPopup({ log, onClose }: { log: BusinessTripLo
                       {p.expenses.map((e, i) => (
                         <tr key={i} className="border-b border-slate-100">
                           <td className="py-1 pr-2 text-slate-900">{e.vendor}</td>
-                          <td className="py-1 pr-2 text-slate-600">{e.amount}</td>
+                          <td className="py-1 pr-2 tabular-nums text-slate-600">{/^-?\d+(\.\d+)?$/.test(String(e.amount).trim()) ? formatThousands(String(e.amount).trim()) : e.amount}</td>
                           <td className="py-1 text-slate-600">{e.note}</td>
                         </tr>
                       ))}

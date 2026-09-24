@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/Button";
 import { labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 
 type ClientOption = { id: string; name: string };
 
@@ -246,17 +247,17 @@ export function PurchaseOrderForm({
                 placeholder="수량"
                 className={inputClass}
               />
-              <input
-                type="number"
+              <MoneyInput
+                allowDecimal
                 value={it.unit_price ?? ""}
-                onChange={(e) => handleUnitPrice(i, e.target.value)}
+                onValueChange={(v) => handleUnitPrice(i, v)}
                 placeholder="단가"
                 className={inputClass}
               />
-              <input
-                type="number"
+              <MoneyInput
+                allowDecimal
                 value={it.amount || ""}
-                onChange={(e) => updateItem(i, { amount: Number(e.target.value) || 0 })}
+                onValueChange={(v) => updateItem(i, { amount: Number(v) || 0 })}
                 placeholder="금액"
                 className={inputClass}
               />

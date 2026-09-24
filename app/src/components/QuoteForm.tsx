@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 
 type ClientOption = { id: string; name: string };
 
@@ -316,14 +317,12 @@ export function QuoteForm({
         <div className="flex flex-wrap items-end gap-4">
           <div className="flex flex-col gap-1">
             <label className={labelClass}>목표 견적금액 (내부용, 100원 단위)</label>
-            <input
-              type="number"
-              step={100}
+            <MoneyInput
               value={values.target_amount}
-              onChange={(e) => set("target_amount", e.target.value)}
-              onBlur={(e) => {
-                if (!e.target.value) return;
-                const rounded = Math.round(Number(e.target.value) / 100) * 100;
+              onValueChange={(v) => set("target_amount", v)}
+              onBlur={() => {
+                if (!values.target_amount) return;
+                const rounded = Math.round(Number(values.target_amount) / 100) * 100;
                 set("target_amount", String(rounded));
               }}
               placeholder="목표 금액"
@@ -391,10 +390,10 @@ export function QuoteForm({
                 placeholder="수량"
                 className={`${inputClass} w-24`}
               />
-              <input
-                type="number"
+              <MoneyInput
+                allowDecimal
                 value={groupUnitPrice}
-                onChange={(e) => setGroupUnitPrice(e.target.value)}
+                onValueChange={setGroupUnitPrice}
                 placeholder="단가 (기본: 선택 항목 금액 합)"
                 className={`${inputClass} w-40`}
               />
@@ -494,17 +493,17 @@ export function QuoteForm({
                   placeholder="수량"
                   className={`${compactInputClass} w-[10ch]`}
                 />
-                <input
-                  type="number"
+                <MoneyInput
+                  allowDecimal
                   value={it.unit_price ?? ""}
-                  onChange={(e) => handleUnitPrice(i, e.target.value)}
+                  onValueChange={(v) => handleUnitPrice(i, v)}
                   placeholder="단가"
                   className={`${compactInputClass} w-[15ch]`}
                 />
-                <input
-                  type="number"
+                <MoneyInput
+                  allowDecimal
                   value={it.amount || ""}
-                  onChange={(e) => updateItem(i, { amount: Number(e.target.value) || 0 })}
+                  onValueChange={(v) => updateItem(i, { amount: Number(v) || 0 })}
                   placeholder="금액"
                   className={`${compactInputClass} w-[20ch]`}
                 />

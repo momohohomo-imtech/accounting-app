@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { bulkImportTransactions, type BulkTransactionInput } from "@/lib/actions/transactions";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 
 type Option = { id: string; name: string };
 
@@ -252,10 +253,9 @@ export function TransactionBulkImport({
                       </select>
                     </td>
                     <td className="py-1 pr-2 text-right">
-                      <input
-                        type="number"
+                      <MoneyInput
                         value={r.amount}
-                        onChange={(e) => updateRow(i, { amount: Number(e.target.value) })}
+                        onValueChange={(v) => updateRow(i, { amount: Number(v) || 0 })}
                         className={cx(fieldClass, "w-28 text-right")}
                       />
                     </td>

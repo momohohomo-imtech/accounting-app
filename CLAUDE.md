@@ -78,6 +78,11 @@
   카테고리·결제수단·계좌처럼 몇십 행에서 늘지 않는 설정 목록이나, `.eq("id", …)`·
   `.maybeSingle()`처럼 결과가 정해진 조회는 그냥 조회해도 됨.
 
+- **금액 입력칸은 `@/components/ui/MoneyInput`을 쓸 것**(`type="number"` 대신). 입력하는 동안 천 단위
+  쉼표("1,234,567")가 보이고, 폼으로 제출되는 값(`name`)은 숨은 칸에 쉼표 없는 숫자로 들어감.
+  제어 모드는 `value` + `onValueChange`, 폼 제출용은 `name` + `defaultValue`. 음수는 `allowNegative`,
+  소수는 `allowDecimal`. 수량·%·연도·일수 같은 금액 아닌 숫자는 그대로 `type="number"`.
+
 - **금액 계산을 바꾸면 `npm test`(app 폴더)로 자동 검사를 돌릴 것.** 부가세 분리(`vatBasis`),
   외상 잔액(`credit`), 종합소득세(`tax`), 견적 금액·한글 금액(`quoteCalc`·`numberToKorean`),
   예상 미수액(`expectedReceivable`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이

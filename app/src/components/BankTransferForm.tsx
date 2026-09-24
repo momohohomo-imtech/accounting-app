@@ -5,6 +5,7 @@ import { createBankTransferRecord } from "@/lib/actions/bank";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { todayString } from "@/lib/format";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 
 const inputClass = "rounded-lg border border-slate-300 px-3 py-2 text-sm";
 
@@ -84,10 +85,9 @@ export function BankTransferForm({ accounts }: { accounts: { id: string; name: s
         <div className="flex flex-wrap gap-2">
           <div className="flex flex-1 flex-col gap-1">
             <label className="text-xs font-medium text-slate-500">금액</label>
-            <input
-              type="number"
+            <MoneyInput
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onValueChange={setAmount}
               required
               className={`${inputClass} w-full`}
             />

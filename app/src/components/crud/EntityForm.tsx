@@ -2,6 +2,7 @@ import type { FieldConfig } from "./types";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { ParentProjectField } from "@/components/ParentProjectField";
 import { ColorSwatchField } from "@/components/ColorSwatchField";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 
 export function EntityForm({
   fields,
@@ -66,6 +67,16 @@ export function EntityForm({
                   </option>
                 ))}
               </select>
+            ) : f.type === "number" && f.format ? (
+              // 금액 칸(발주액·수주액 등) — 입력하는 동안 천 단위 쉼표 표시
+              <MoneyInput
+                name={f.name}
+                defaultValue={value}
+                required={f.required}
+                placeholder={f.placeholder}
+                allowNegative
+                className={fieldClass}
+              />
             ) : (
               <input
                 type={f.type ?? "text"}

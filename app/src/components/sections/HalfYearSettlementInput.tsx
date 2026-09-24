@@ -6,6 +6,7 @@ import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { Button } from "@/components/ui/Button";
 import { fieldClass } from "@/components/ui/field";
 import { upsertHalfYearProfit } from "@/lib/actions/dashboard";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 
 export function HalfYearSettlementInput({ year, initialAmount }: { year: number; initialAmount: number | null }) {
   const router = useRouter();
@@ -48,11 +49,10 @@ export function HalfYearSettlementInput({ year, initialAmount }: { year: number;
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2">
-      <input
-        type="number"
-        inputMode="numeric"
+      <MoneyInput
+        allowNegative
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onValueChange={setValue}
         placeholder="상반기 확정 이익금"
         className={`${fieldClass} w-40`}
       />

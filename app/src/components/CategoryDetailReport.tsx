@@ -13,6 +13,7 @@ import { resolveCategoryColor } from "@/lib/categoryColor";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { updateAgencyPurchase } from "@/lib/actions/projectAgencyPurchases";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 
 type Category = { id: string; name: string; project_only: boolean; color: string | null };
 
@@ -127,11 +128,9 @@ function AgencyDetailRow({ row, categories, clientNames }: { row: DetailRow; cat
           />
         </td>
         <td className="py-2 pr-4 text-right">
-          <input
+          <MoneyInput
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            type="number"
-            step="1"
+            onValueChange={setAmount}
             className={`${fieldClass} w-full text-right`}
           />
         </td>
