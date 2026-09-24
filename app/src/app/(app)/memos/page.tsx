@@ -17,7 +17,7 @@ export default async function MemosPage() {
 
       <MemoCreateForm createAction={createMemoRecord} />
 
-      <div className="space-y-4">
+      <div className="space-y-2">
         {(memos ?? []).map((m, i) => (
           <MemoCard
             key={m.id}
