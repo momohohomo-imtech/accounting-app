@@ -1463,6 +1463,17 @@ admin/staff/tax_agent 전체 계정을 관리하는 `AccountPanel`/`lib/actions/
 - 주의: Tailwind에서 `print:`가 `max-md:`보다 뒤에 적용돼서, 휴대폰용 폭을 준 칸은 `print:`로
   원래 값을 다시 적어 두면 인쇄가 안 바뀜.
 
+### 금액 계산 자동 검사 (PR #20)
+- `npm test`(app 폴더) — Node 22 내장 `node:test` + 타입 제거로 .ts 직접 실행, 새 의존성 없음.
+  `scripts/test-hooks.mjs`/`test-resolve.mjs`가 `@/` 별칭과 확장자 없는 import를 .ts로 연결.
+  vitest는 설치 시 npm 오류(`Cannot read properties of null (reading 'edgesOut')`, 5.x는
+  @types/node 22+ 요구)라 포기.
+- 검사 대상(`src/lib/__tests__/`): 부가세 분리·비과세·불공제, 외상 잔액·장부 편입, 종합소득세
+  구간·지방세, 견적 금액(단가×수량·직접 입력)·부가세 분리·한글 금액, 예상 미수액(기성금·어음 할인·
+  대행구매·0 하한). 예상 미수액 계산은 대시보드에서 `lib/expectedReceivable.ts`로 옮김(결과 동일).
+- 계산을 일부러 틀리게 바꾸면 검사가 실패하는 것 확인.
+- 규칙은 `CLAUDE.md`에 추가.
+
 ### 열려 있는 것
 - 사용자 확인 필요: 배포 후 견적서 작성 화면 합계 = 인쇄 합계인지, 대시보드 예상 미수액이
   이전과 거의 같은지(기성금 없음), PC 인쇄 미리보기(발주서·매입매출장·보고서·견적서).
