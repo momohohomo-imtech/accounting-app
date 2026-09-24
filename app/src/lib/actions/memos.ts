@@ -2,12 +2,19 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { isMemoCategory, MEMO_UNCATEGORIZED } from "@/lib/memoCategories";
 
+// 구분(category)은 085 SQL 실행 후에만 폼에 나옴 — 폼에 칸이 없으면 아예 건드리지 않는다.
 function parse(formData: FormData) {
-  return {
+  const row: { title: string; content: string; category?: string | null } = {
     title: String(formData.get("title") ?? ""),
     content: String(formData.get("content") ?? ""),
   };
+  if (formData.has("category")) {
+    const category = String(formData.get("category") ?? "");
+    row.category = isMemoCategory(category) ? category : null;
+  }
+  return row;
 }
 
 export async function createMemoRecord(formData: FormData) {
@@ -40,17 +47,18 @@ export async function deleteMemoRecord(formData: FormData) {
 }
 
 // 메모 카드를 한 칸 위/아래로 — 화면에 보이는 순서(sort_order → created_at desc)상
-// 바로 이웃한 메모와 정렬순서 값을 맞바꾼다.
+// 바로 이웃한 메모와 정렬순서 값을 맞바꾼다. 구분 탭으로 걸러 보고 있으면(scope) 그 구분 안에서의
+// 이웃과 바꾼다("미분류"는 구분이 비어 있는 메모).
 export async function moveMemoRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
   const direction = String(formData.get("direction"));
+  const scope = formData.has("scope") ? String(formData.get("scope")) : null;
 
-  const { data: memos } = await supabase
-    .from("memos")
-    .select("id, sort_order")
-    .order("sort_order")
-    .order("created_at", { ascending: false });
+  let query = supabase.from("memos").select("id, sort_order");
+  if (scope === MEMO_UNCATEGORIZED) query = query.is("category", null);
+  else if (scope && isMemoCategory(scope)) query = query.eq("category", scope);
+  const { data: memos } = await query.order("sort_order").order("created_at", { ascending: false });
   if (!memos) return;
 
   const idx = memos.findIndex((m) => m.id === id);

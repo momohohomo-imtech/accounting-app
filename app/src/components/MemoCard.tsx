@@ -5,8 +5,10 @@ import { formatDate } from "@/lib/format";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { Button } from "@/components/ui/Button";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { MemoCategorySelect } from "@/components/MemoCategorySelect";
+import { MEMO_UNCATEGORIZED, memoCategoryBadge } from "@/lib/memoCategories";
 
-type Memo = { id: string; title: string; content: string | null; created_at: string; updated_at: string };
+type Memo = { id: string; title: string; content: string | null; category?: string | null; created_at: string; updated_at: string };
 
 export function MemoCard({
   memo,
@@ -15,8 +17,13 @@ export function MemoCard({
   updateAction,
   deleteAction,
   moveAction,
+  hasCategory = false,
+  moveScope,
 }: {
   memo: Memo;
+  hasCategory?: boolean;
+  /** 구분 탭으로 걸러 보는 중이면 그 구분 — 순서 이동을 그 안에서 한다. */
+  moveScope?: string | null;
   isFirst: boolean;
   isLast: boolean;
   updateAction: (formData: FormData) => void;
@@ -32,6 +39,7 @@ export function MemoCard({
     const fd = new FormData();
     fd.append("id", memo.id);
     fd.append("direction", direction);
+    if (moveScope) fd.append("scope", moveScope);
     await pending.run(() => Promise.resolve(moveAction(fd)));
   }
 
@@ -54,6 +62,7 @@ export function MemoCard({
           className="space-y-3"
         >
           <input type="hidden" name="id" value={memo.id} />
+          {hasCategory && <MemoCategorySelect defaultValue={memo.category} />}
           <div className="flex flex-col gap-1">
             <label className={labelClass}>제목</label>
             <input name="title" defaultValue={memo.title} required className={fieldClass} />
@@ -116,6 +125,13 @@ export function MemoCard({
           >
             ▶
           </span>
+          {hasCategory && (
+            <span
+              className={`shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium ${memoCategoryBadge(memo.category)}`}
+            >
+              {memo.category ?? MEMO_UNCATEGORIZED}
+            </span>
+          )}
           <span className="min-w-0 shrink truncate font-semibold text-slate-900">{memo.title}</span>
           {!open && preview && (
             <span className="hidden min-w-0 flex-1 truncate text-sm text-slate-400 sm:block print:hidden">{preview}</span>
