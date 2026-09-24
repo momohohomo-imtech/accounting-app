@@ -19,7 +19,7 @@ import { PROTECTED_OWNER_EMAIL } from "@/lib/protectedAccount";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
-const ROLE_LABEL: Record<Role, string> = { admin: "관리자", staff: "직원", tax_agent: "세무사" };
+const ROLE_LABEL: Record<Role, string> = { admin: "관리자", staff: "직원", tax_agent: "세무사", viewer: "조회 전용" };
 
 function formatDateTime(iso: string) {
   const d = new Date(iso);

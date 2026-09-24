@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cx } from "@/lib/cx";
 import { useEscapeKey } from "@/lib/useEscapeKey";
+import { isViewerBlockedPage } from "@/lib/viewerAccess";
 
 type NavItem = { href: string; label: string; short?: string };
 type NavGroup = { title: string | null; items: NavItem[] };
@@ -52,6 +53,11 @@ function isActive(pathname: string, href: string) {
 }
 
 function groupsFor(role: string | null): NavGroup[] {
+  if (role === "viewer") {
+    return NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => !isViewerBlockedPage(i.href)) })).filter(
+      (g) => g.items.length > 0
+    );
+  }
   if (role !== "tax_agent") return NAV_GROUPS;
   const allowed = new Set(["/dashboard", "/transactions"]);
   return NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => allowed.has(i.href)) })).filter(

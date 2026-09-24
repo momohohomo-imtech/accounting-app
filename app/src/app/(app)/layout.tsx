@@ -55,6 +55,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </form>
         </header>
         {/* pb-24: 휴대폰 하단 탭에 내용이 가리지 않게. 인쇄 폭(A4 ≈ 718px)도 md 미만이라 인쇄 땐 원래 여백으로. */}
+        {role === "viewer" && (
+          <p className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs font-medium text-amber-800 print:hidden">
+            조회 전용 계정이에요 — 보기만 가능하고 저장·수정·삭제는 되지 않아요.
+          </p>
+        )}
         <main className="flex-1 p-4 pb-24 md:p-8 print:pb-4">{children}</main>
         <MobileNav role={role} />
       </div>
