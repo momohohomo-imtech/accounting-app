@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
-import { computeConfirmedAmount, isVisibleQuoteItem } from "@/lib/quoteCalc";
+import { isVisibleQuoteItem, quoteLineAmounts } from "@/lib/quoteCalc";
 import { QuotesTable } from "@/components/QuotesTable";
 import { LinkButton } from "@/components/ui/Button";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
@@ -21,6 +21,8 @@ export async function QuotesSection() {
   type QuoteItemRow = {
     quote_id: string;
     amount: number;
+    unit_price: number | null;
+    quantity: number | null;
     handling_fee_pct: number | null;
     group_label: string | null;
     is_group_summary: boolean;
@@ -37,7 +39,7 @@ export async function QuotesSection() {
     fetchAllRows<QuoteItemRow>((from, to) =>
       supabase
         .from("quote_items")
-        .select("quote_id, amount, handling_fee_pct, group_label, is_group_summary")
+        .select("quote_id, amount, unit_price, quantity, handling_fee_pct, group_label, is_group_summary")
         .order("id", { ascending: true })
         .range(from, to)
     ),
@@ -45,7 +47,7 @@ export async function QuotesSection() {
 
   const totalByQuote = new Map<string, number>();
   for (const it of items.filter(isVisibleQuoteItem)) {
-    const confirmed = computeConfirmedAmount(it.amount, it.handling_fee_pct ?? 0);
+    const { confirmed } = quoteLineAmounts(it);
     totalByQuote.set(it.quote_id, (totalByQuote.get(it.quote_id) ?? 0) + confirmed);
   }
 
