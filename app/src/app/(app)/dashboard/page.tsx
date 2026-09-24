@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Table, THead, Th, Tr, Td, EmptyRow } from "@/components/ui/Table";
 import { cx } from "@/lib/cx";
 import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
+import { receivedSalesByProject, remainingReceivable } from "@/lib/expectedReceivable";
 import { nowKst } from "@/lib/kstDate";
 import { PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
 
@@ -181,14 +182,10 @@ export default async function DashboardPage({
   for (const a of receivableAgencyRows) {
     agencyByReceivableProject.set(a.project_id, (agencyByReceivableProject.get(a.project_id) ?? 0) + Number(a.amount));
   }
-  // 받은 매출 = 현금·이체 매출 + 정산 끝난 외상 매출(부가세 제외 공급가액). 외상 정산은 금액과 상관없이
-  // 건 전체를 받은 것으로 처리하므로, 어음 할인으로 실제 입금액이 적어도 계산서 금액 전체가 빠진다.
-  const receivedSalesByProject = new Map<string, number>();
-  for (const t of receivableSalesRows) {
-    if (!isLedgerVisible(t, payments)) continue;
-    const supply = salesSupplyOf({ ...t, expense_categories: categoryRel(t.category_id) });
-    receivedSalesByProject.set(t.project_id, (receivedSalesByProject.get(t.project_id) ?? 0) + supply);
-  }
+  const receivedByProject = receivedSalesByProject(
+    receivableSalesRows.map((t) => ({ ...t, expense_categories: categoryRel(t.category_id) })),
+    payments
+  );
 
   const monthTx = (monthTxRaw ?? []).filter((t) => isLedgerVisible(t as Transaction, payments));
   const recentTx = (recentTxRaw ?? []).filter((t) => isLedgerVisible(t as Transaction, payments)).slice(0, 8);
@@ -208,8 +205,8 @@ export default async function DashboardPage({
   const yearProfit = yearSales - yearPurchase;
 
   // 예상 미수액 — 아직 돈을 다 받지 않은 프로젝트(진행중·공사 완료·완료 수금대기)의 남은 받을 금액.
-  // 프로젝트 목록의 "수주예상액"(발주액 − 대행구매액)에서 이미 받은 매출(기성금 등)을 뺀다.
-  // 계산서 합계가 수주예상액과 딱 맞지 않을 수 있어(기타 공제 등) 프로젝트별로 0 아래로는 안 내려감.
+  // 프로젝트 목록의 "수주예상액"(발주액 − 대행구매액)에서 이미 받은 매출(기성금 등)을 뺀다
+  // (계산은 lib/expectedReceivable.ts — 자동 검사 있음).
   const expectedReceivableByStatus = EXPECTED_RECEIVABLE_STATUSES.map(({ value, label }) => {
     const rows = receivableProjects.filter((p) => p.status === value);
     return {
@@ -218,16 +215,13 @@ export default async function DashboardPage({
       amount: rows.reduce(
         (s, p) =>
           s +
-          Math.max(
-            0,
-            (p.quote_amount ?? 0) - (agencyByReceivableProject.get(p.id) ?? 0) - (receivedSalesByProject.get(p.id) ?? 0)
-          ),
+          remainingReceivable(p.quote_amount, agencyByReceivableProject.get(p.id) ?? 0, receivedByProject.get(p.id) ?? 0),
         0
       ),
     };
   });
   const expectedReceivable = expectedReceivableByStatus.reduce((s, r) => s + r.amount, 0);
-  const receivedSalesTotal = receivableProjects.reduce((s, p) => s + (receivedSalesByProject.get(p.id) ?? 0), 0);
+  const receivedSalesTotal = receivableProjects.reduce((s, p) => s + (receivedByProject.get(p.id) ?? 0), 0);
   // "공사 완료 · 수금 대기" 칸도 같은 기준 — 두 칸의 수금 대기 금액이 항상 같게.
   const awaitingPayment = expectedReceivableByStatus[EXPECTED_RECEIVABLE_STATUSES.findIndex((st) => st.value === PROJECT_STATUS_AWAITING_PAYMENT)];
 

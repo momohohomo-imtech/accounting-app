@@ -78,4 +78,11 @@
   카테고리·결제수단·계좌처럼 몇십 행에서 늘지 않는 설정 목록이나, `.eq("id", …)`·
   `.maybeSingle()`처럼 결과가 정해진 조회는 그냥 조회해도 됨.
 
+- **금액 계산을 바꾸면 `npm test`(app 폴더)로 자동 검사를 돌릴 것.** 부가세 분리(`vatBasis`),
+  외상 잔액(`credit`), 종합소득세(`tax`), 견적 금액·한글 금액(`quoteCalc`·`numberToKorean`),
+  예상 미수액(`expectedReceivable`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
+  Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
+  계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
+  (vitest는 npm 설치 오류로 못 씀 — 새 테스트 라이브러리를 넣지 말 것)
+
 프로젝트 진행 상황·이력은 저장소 루트의 `HANDOFF.md`를 참고할 것.
