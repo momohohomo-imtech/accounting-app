@@ -14,6 +14,7 @@ import {
 import { loadProfitOutlook, ProfitCalculationDetail } from "@/components/sections/ProfitOutlook";
 import { HalfYearSettlementInput } from "@/components/sections/HalfYearSettlementInput";
 import { DetailToggle } from "@/components/DetailToggle";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { VatQuarterTable } from "@/components/VatQuarterTable";
 import { YearFilter } from "@/components/YearFilter";
 import { Card } from "@/components/ui/Card";
@@ -45,6 +46,15 @@ function SectionTitle({ children, note }: { children: ReactNode; note?: ReactNod
       {note && <p className="text-[11px] text-slate-400">{note}</p>}
     </div>
   );
+}
+
+// 기본으로 접혀 있는 섹션 — 제목 옆에 핵심 숫자 하나만 작게.
+function FoldTitle({ children }: { children: ReactNode }) {
+  return <span className="text-sm font-bold text-slate-900">{children}</span>;
+}
+
+function FoldSummary({ children }: { children: ReactNode }) {
+  return <p className="tabular-nums text-[11px] text-slate-500">{children}</p>;
 }
 
 function Footnote({ children, className }: { children: ReactNode; className?: string }) {
@@ -387,15 +397,19 @@ export default async function DashboardPage({
           </Stat>
         </div>
         {isFirstBusinessYear && (
-          <div className="mt-3 border-t border-slate-100 pt-2">
-            <SectionTitle
-              note={`합계 약 ${formatWon(cashOutTotal)}${
-                cashOut.healthSettlement == null ? " (건강보험 정산 제외)" : ""
-              } · 첫해는 중간예납이 없어 이듬해에 몰림`}
-            >
-              사업 첫해라 {selectedYear + 1}년에 몰리는 돈
-            </SectionTitle>
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+          <CollapsibleSection
+            bare
+            className="mt-3 border-t border-slate-100 pt-2"
+            title={<FoldTitle>사업 첫해라 {selectedYear + 1}년에 몰리는 돈</FoldTitle>}
+            headerExtra={
+              <FoldSummary>
+                합계 약 {formatWon(cashOutTotal)}
+                {cashOut.healthSettlement == null && " (건강보험 정산 제외)"}
+              </FoldSummary>
+            }
+          >
+            <p className="mt-1 text-[11px] text-slate-400">첫해는 중간예납이 없어 이듬해에 몰림</p>
+            <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-5">
               <Stat label="1월 · 부가세 2기 확정 (7~12월)" sub="4분기 진행 중이라 늘어날 수 있음">
                 <Money value={cashOut.vat2} />
               </Stat>
@@ -432,7 +446,14 @@ export default async function DashboardPage({
                 <Money value={ownerInsurance.pensionMonthly} />
               </Stat>
             </div>
-          </div>
+            <Footnote>
+              <p>
+                사업 기간 {businessMonths}개월({businessStartMonth}월 첫 거래부터) 기준 · 건강보험 정산 = 올해 이익 기준 보험료 −
+                최고 급여 직원 기준으로 낸 금액(직원 공제액의 2배) · 국민연금은 1년치 정산 없이 7월부터 월 보험료만
+                오름(소득총액신고를 빠뜨리면 11월에 7월분부터 소급) · 금액은 세무사 확인 전 추정치
+              </p>
+            </Footnote>
+          </CollapsibleSection>
         )}
         <Footnote>
           <p>
@@ -452,13 +473,6 @@ export default async function DashboardPage({
             {(OWNER_INSURANCE_RATES.longTermCareOfHealth * 100).toFixed(2)}% ({OWNER_INSURANCE_RATES.year}년 요율 기준, 장기요양은
             2026년 요율 — 2027년분 10월 이후 결정) · 직원 4대보험은 제외
           </p>
-          {isFirstBusinessYear && (
-            <p>
-              몰리는 돈: 사업 기간 {businessMonths}개월({businessStartMonth}월 첫 거래부터) 기준 · 건강보험 정산 = 올해 이익 기준
-              보험료 − 최고 급여 직원 기준으로 낸 금액(직원 공제액의 2배) · 국민연금은 1년치 정산 없이 7월부터 월 보험료만
-              오름(소득총액신고를 빠뜨리면 11월에 7월분부터 소급) · 금액은 세무사 확인 전 추정치
-            </p>
-          )}
           {o.hasIncompleteProjects && (
             <p className="font-semibold text-red-600">진행 중인 프로젝트가 있어 추가 매입/매출이 생길 수 있습니다.</p>
           )}
@@ -469,9 +483,18 @@ export default async function DashboardPage({
       </Card>
 
       {/* ② 받을 돈 · 줄 돈 */}
-      <Card padding="none" className={CARD_PAD}>
-        <SectionTitle note="외상은 정산 등록 전까지 매입매출장 합계에서 빠져 있음">② 받을 돈 · 줄 돈</SectionTitle>
-        <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+      <CollapsibleSection
+        bare
+        className={cx("rounded-2xl border border-slate-200 bg-white shadow-sm", CARD_PAD)}
+        title={<FoldTitle>② 받을 돈 · 줄 돈</FoldTitle>}
+        headerExtra={
+          <FoldSummary>
+            예상 미수액 {formatWon(expectedReceivable)} · 줄 돈 {formatWon(creditPayable)}
+          </FoldSummary>
+        }
+      >
+        <p className="mt-1 text-[11px] text-slate-400">외상은 정산 등록 전까지 매입매출장 합계에서 빠져 있음</p>
+        <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-4">
           <Link href="/projects" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
             <Stat label="예상 미수액 (진행중·공사 완료·수금 대기)" emphasis>
               <Money value={expectedReceivable} />
@@ -501,29 +524,12 @@ export default async function DashboardPage({
           </p>
           <p>외상 매출 미수금 = 세금계산서 발행 후 입금 대기 · 공사 완료·수금 대기는 받은 기성금 제외</p>
         </Footnote>
-      </Card>
+      </CollapsibleSection>
 
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-5">
-        {/* ④ 부가세 */}
-        <Card padding="none" className={cx(CARD_PAD, "xl:col-span-3")}>
-          <SectionTitle note="총액(부가세 포함)에서 계산 · 비과세 제외 · 외상 미정산 포함(세금계산서 기준)">
-            ④ {selectedYear}년 부가세 (분기별)
-          </SectionTitle>
-          <div className="[&_table]:text-xs [&_td]:py-1 [&_th]:pb-1">
-            <VatQuarterTable rows={vatQuarters} total={vatTotal} />
-          </div>
-          <Footnote>
-            <p>
-              불공제 매입세액(승용차 렌트·유류비 등 &quot;매입세액 불공제&quot; 카테고리)은 납부 예상에서 빼지 않음 · 신고는
-              반기(1~6월, 7~12월) 기준, 실제 금액은 세무사 확인 후 확정
-            </p>
-          </Footnote>
-        </Card>
-
-        {/* 참고 현황 */}
-        <Card padding="none" className={cx(CARD_PAD, "xl:col-span-2")}>
+      {/* 참고 현황 */}
+      <Card padding="none" className={CARD_PAD}>
           <SectionTitle note="매입매출장 기준 · 부가세 포함">참고 현황</SectionTitle>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
             <Stat label={`${selectedYear}년 매출액`}>
               <Money value={yearSales} />
             </Stat>
@@ -546,8 +552,28 @@ export default async function DashboardPage({
               <Stat label="진행 중 프로젝트">{ongoingProjects?.length ?? 0}건</Stat>
             </Link>
           </div>
-        </Card>
-      </div>
+      </Card>
+
+      {/* ④ 부가세 */}
+      <CollapsibleSection
+        bare
+        className={cx("rounded-2xl border border-slate-200 bg-white shadow-sm", CARD_PAD)}
+        title={<FoldTitle>④ {selectedYear}년 부가세 (분기별)</FoldTitle>}
+        headerExtra={<FoldSummary>납부 예상 합계 {formatWon(vatTotal.net)}</FoldSummary>}
+      >
+        <p className="mt-1 text-[11px] text-slate-400">
+          총액(부가세 포함)에서 계산 · 비과세 제외 · 외상 미정산 포함(세금계산서 기준)
+        </p>
+        <div className="mt-2 [&_table]:text-xs [&_td]:py-1 [&_th]:pb-1">
+          <VatQuarterTable rows={vatQuarters} total={vatTotal} />
+        </div>
+        <Footnote>
+          <p>
+            불공제 매입세액(승용차 렌트·유류비 등 &quot;매입세액 불공제&quot; 카테고리)은 납부 예상에서 빼지 않음 · 신고는
+            반기(1~6월, 7~12월) 기준, 실제 금액은 세무사 확인 후 확정
+          </p>
+        </Footnote>
+      </CollapsibleSection>
 
       <Card padding="none" className={CARD_PAD}>
         <div className="mb-2 flex items-center justify-between">
