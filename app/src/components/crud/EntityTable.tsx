@@ -117,8 +117,10 @@ function ProgressCell({ value }: { value: number }) {
   const pct = Math.max(0, Math.min(100, value));
   const [label, color] =
     pct >= 100 ? ["공사완료", "bg-green-600"] : pct > 0 ? ["진행중", "bg-orange-500"] : ["준비중", "bg-yellow-400"];
+  // relative: 화면 낭독용 글자(sr-only = absolute)가 이 칸 기준으로 위치하게. 없으면 표의 가로 스크롤
+  // 상자를 빠져나가 페이지 폭을 넓혀서, 휴대폰에서 페이지 전체가 축소되고 오른쪽이 비어 보였음.
   return (
-    <span className="flex justify-center" title={`${label} (${pct}%)`}>
+    <span className="relative flex justify-center" title={`${label} (${pct}%)`}>
       <span className={`inline-block h-3.5 w-3.5 rounded-full ${color} print:[print-color-adjust:exact]`} />
       <span className="sr-only">{label}</span>
     </span>

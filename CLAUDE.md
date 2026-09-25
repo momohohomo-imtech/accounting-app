@@ -55,6 +55,11 @@
   - 칸이 많은 표는 휴대폰에서 칸마다 읽을 수 있는 최소 폭을 줄 것(`EntityTable`은 칸 수 ×
     105px). 긴 글자 칸은 휴대폰에서만 `max-md:max-w-[10rem] max-md:truncate` + `title`로
     한 줄 말줄임.
+  - 표 칸 안에 `absolute` 요소(`sr-only` 화면 낭독용 글자 포함)를 넣으면 칸 안의 감싸는 요소에
+    `relative`를 줄 것. 없으면 가로 스크롤 상자를 빠져나가 페이지 폭을 넓혀서, 휴대폰 크롬이
+    페이지 전체를 축소해 오른쪽이 텅 빈 화면이 됨(프로젝트 목록 진행률 동그라미에서 실제로 발생 —
+    `EntityTable`의 `ProgressCell`). 레이아웃 본문의 `relative overflow-x-clip`이 최후 방어로
+    잘라 주지만, 칸 안에서 막는 게 원칙.
   - 큰 금액은 `whitespace-nowrap`("원"만 떨어지지 않게). 큰 숫자 여러 개를 나란히 둘 때는
     휴대폰에서 한 줄에 하나(`grid-cols-1 min-[480px]:grid-cols-2`), 4칸 배치는 `xl:`부터.
     (예외: 대시보드는 스크롤을 줄여 달라는 요청으로 숫자를 `text-sm sm:text-base`로 줄이고 휴대폰에서도

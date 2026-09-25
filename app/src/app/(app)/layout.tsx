@@ -41,8 +41,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       {/* min-w-0: 없으면 넓은 표(min-w-[600px] 등)가 본문 폭을 밀어 휴대폰에서 페이지 전체가 옆으로
           늘어나고, 하단 탭이 화면 밖으로 밀려남. 넓은 표는 각자의 가로 스크롤 안에서만 넘치게 한다.
-          overflow-x-clip: 그래도 어딘가 넘치는 게 있으면 페이지 전체가 옆으로 늘어나는 대신 잘리게(최후 방어). */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-x-clip">
+          overflow-x-clip: 그래도 어딘가 넘치는 게 있으면 페이지 전체가 옆으로 늘어나는 대신 잘리게(최후 방어).
+          relative: absolute 요소(sr-only 글자 등)는 가장 가까운 position 조상 기준이라, 이게 없으면 위의
+          clip을 빠져나가 페이지를 넓힘(휴대폰에서 페이지 전체가 축소되고 오른쪽이 비어 보임). */}
+      <div className="relative flex min-w-0 flex-1 flex-col overflow-x-clip">
         <header className="brand-topbar flex items-center justify-between gap-2 bg-brand-navy px-4 py-3 md:hidden print:hidden">
           <div className="flex items-center gap-2">
             <Image src="/logo-icon.png" alt="" width={22} height={22} className="rounded-md" />
