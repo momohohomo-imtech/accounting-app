@@ -127,8 +127,8 @@ export default async function DashboardPage({
         .range(from, to)
     ),
     supabase.from("transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
-    // 선택 연도 프로젝트 — 수주액 합계·예상 미수액·이익 예상(loadProfitOutlook)이 같이 쓴다.
-    supabase.from("projects").select("id, name, status, quote_amount, contract_amount").eq("year", selectedYear),
+    // 선택 연도 프로젝트 — 예상 미수액·총 예상 매출·이익 예상(loadProfitOutlook)이 같이 쓴다.
+    supabase.from("projects").select("id, name, status, quote_amount").eq("year", selectedYear),
     // select("*") — 불공제·비과세 칸(082·083 마이그레이션) 실행 전에도 조회가 깨지지 않게.
     supabase.from("expense_categories").select("*"),
   ]);
@@ -224,9 +224,6 @@ export default async function DashboardPage({
   const receivedSalesTotal = receivableProjects.reduce((s, p) => s + (receivedByProject.get(p.id) ?? 0), 0);
   // "공사 완료 · 수금 대기" 칸도 같은 기준 — 두 칸의 수금 대기 금액이 항상 같게.
   const awaitingPayment = expectedReceivableByStatus[EXPECTED_RECEIVABLE_STATUSES.findIndex((st) => st.value === PROJECT_STATUS_AWAITING_PAYMENT)];
-
-  // 선택 연도 전체 프로젝트 수주액 합계 — 프로젝트 페이지 하단 "수주액" 합계와 같은 값.
-  const totalExpectedRevenue = yearProjects.reduce((s, p) => s + (p.contract_amount ?? 0), 0);
 
   // 부가세는 세금계산서(거래일) 기준이라 외상 미정산 건도 포함한다. 금액은 총액(부가세 포함)에서
   // 계산(lib/vatBasis.ts)하고, 매입세액 불공제 카테고리(승용차 등)는 공제 대상에서 빼서 따로 표시.
@@ -418,8 +415,8 @@ export default async function DashboardPage({
           <Stat label={`${selectedYear}년 매출−매입`}>
             <Money value={yearProfit} />
           </Stat>
-          <Stat label={`${selectedYear}년 총 예상 매출 (수주액)`}>
-            <Money value={totalExpectedRevenue} />
+          <Stat label={`${selectedYear}년 총 예상 매출 (발주액 − 대행구매)`}>
+            <Money value={o.expectedRevenue} />
           </Stat>
           <Stat label={`이번 달(${today.month}월) 매출`}>
             <Money value={monthSales} />

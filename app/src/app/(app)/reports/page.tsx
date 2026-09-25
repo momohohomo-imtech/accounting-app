@@ -441,11 +441,12 @@ export default async function ReportsPage({
     profitRate: projectSummaryQuoteAmount > 0 ? (projectSummaryProfit / projectSummaryQuoteAmount) * 100 : null,
   };
 
-  // 상단 박스의 "예상 순이익율" — 대시보드의 "총 예상 매출"/"이익 예상"과 동일한 기준(연도
-  // 전체, site 필터와 무관)으로 계산. 대시보드 이익 예상(components/sections/ProfitOutlook.tsx)과
-  // 같은 방식(발주액 기준 프로젝트 손익 − 프로젝트 미배정 일반경비 − 직원급여/상여/4대보험)을 그대로 따름.
+  // 상단 박스의 "예상 순이익율" — 대시보드 "이익 예상"과 동일한 기준(연도 전체, site 필터와 무관)으로
+  // 계산. 대시보드 이익 예상(components/sections/ProfitOutlook.tsx)과 같은 방식(발주액 기준 프로젝트
+  // 손익 − 프로젝트 미배정 일반경비 − 직원급여/상여/4대보험)을 그대로 따름.
   // 발주액 없는 프로젝트(귀속 하위·미정리 등)는 profit이 −(매입+대행구매)라 그 비용까지 빠짐없이 반영됨.
-  const totalExpectedRevenue = byProjectAll.reduce((s, p) => s + (p.contract_amount ?? 0), 0);
+  // 비율은 프로젝트 이익율과 같은 발주액 대비. 수주액(수기 입력)은 입력 확인용이라 계산에 안 씀.
+  const totalQuoteAmount = byProjectAll.reduce((s, p) => s + p.quoteAmount, 0);
   const yearProfitSum = byProjectAll.reduce((s, p) => s + p.profit, 0);
   const nullProjectPurchaseTx = transactions.filter((t) => !t.project_id && t.type === "매입");
   const generalExpense = nullProjectPurchaseTx
@@ -455,7 +456,7 @@ export default async function ReportsPage({
     .filter((t) => one(t.expense_categories)?.name === PAYROLL_CATEGORY_NAME)
     .reduce((s, t) => s + purchaseCostOf(t), 0);
   const yearProfitEstimate = yearProfitSum - generalExpense - payrollCost;
-  const yearProfitEstimateRate = totalExpectedRevenue > 0 ? (yearProfitEstimate / totalExpectedRevenue) * 100 : null;
+  const yearProfitEstimateRate = totalQuoteAmount > 0 ? (yearProfitEstimate / totalQuoteAmount) * 100 : null;
 
   // 현장별 손익 (프로젝트 없는 일반경비는 별도 묶음)
   const siteMap = new Map<string, { name: string; sales: number; purchase: number }>();
@@ -936,7 +937,7 @@ export default async function ReportsPage({
                 {yearProfitEstimateRate === null ? "-" : `${yearProfitEstimateRate.toFixed(2)}%`}
               </p>
               <p className="mt-1 text-[11px] leading-tight text-slate-400">
-                {selectedYear}년 이익 예상 ÷ 총 예상 매출(수주액) — site 필터와 무관한 연간 전체 기준
+                {selectedYear}년 이익 예상 ÷ 발주액 합계 — site 필터와 무관한 연간 전체 기준
               </p>
             </div>
           </div>

@@ -182,7 +182,12 @@ export async function loadProfitOutlook(
     half1Profit != null ? half1Profit + h2Profit + unbilledPendingProfit - h2PayrollCost : null;
   const combinedTax = combinedProfit != null ? taxEstimate(combinedProfit) : null;
 
+  // 선택 연도 총 예상 매출 = 발주액 − 대행구매(현대기계 마진 포함) — 프로젝트 목록 하단 "수주예상액" 합계와 같음.
+  // 수주액(수기 입력)은 입력 확인용이라 쓰지 않는다.
+  const expectedRevenue = yearRows.reduce((s, p) => s + (p.quote_amount ?? 0) - (agencyByProject.get(p.id) ?? 0), 0);
+
   return {
+    expectedRevenue,
     hasProjectsWithProfit: yearProjectsWithProfit.length > 0,
     profitEstimate,
     profitTax,
