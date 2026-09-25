@@ -17,7 +17,8 @@ import { PROJECT_STATUS_OPTIONS, PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/p
 import { formatWon } from "@/lib/format";
 import { ProjectListExportButtons } from "@/components/ProjectListExportButtons";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
-import { ProjectsPageMemo } from "@/components/ProjectsPageMemo";
+import { PageMemo } from "@/components/PageMemo";
+import { updateProjectsPageMemo } from "@/lib/actions/projectsPageMemo";
 import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
 import { purchaseCostOf } from "@/lib/vatBasis";
 import { groupProjectProfit } from "@/lib/projectProfit";
@@ -423,7 +424,11 @@ async function ProjectListSection({
           </CollapsibleSection>
         )}
 
-        <ProjectsPageMemo initialContent={pageMemo?.content ?? ""} />
+        <PageMemo
+          initialContent={pageMemo?.content ?? ""}
+          placeholder="프로젝트 관련 메모..."
+          save={updateProjectsPageMemo}
+        />
 
         <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
           <YearFilter

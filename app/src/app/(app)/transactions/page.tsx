@@ -14,6 +14,8 @@ import { ProjectTreeFilter } from "@/components/ProjectTreeFilter";
 import { PaymentMethodFilter } from "@/components/PaymentMethodFilter";
 import { TransactionBulkImport } from "@/components/TransactionBulkImport";
 import { TransactionEditPopup } from "@/components/TransactionEditPopup";
+import { PageMemo } from "@/components/PageMemo";
+import { updateTransactionsPageMemo } from "@/lib/actions/transactionsPageMemo";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { LinkButton } from "@/components/ui/Button";
@@ -114,6 +116,13 @@ export default async function TransactionsPage({
   );
 }
 
+// 086 SQL 실행 전이라 표가 없어도 에러 없이 빈 메모로 보이게 data만 쓴다.
+async function loadPageMemo() {
+  const supabase = await createClient();
+  const { data } = await supabase.from("transactions_page_memo").select("content").maybeSingle();
+  return data;
+}
+
 // 상단 합계와 아래 목록이 같은 조건의 거래를 쓰므로, 한 요청 안에서는 한 번만 조회해서 나눠 쓴다
 // (React cache — 같은 인자면 같은 결과를 재사용). 외상 미완납 건은 장부에서 제외한 결과.
 const loadLedgerTransactions = cache(
@@ -212,6 +221,7 @@ async function TransactionListSection({
     { data: importProjects },
     { data: importPaymentMethods },
     { data: importExpenseCategories },
+    pageMemo,
   ] = await Promise.all([
     loadLedgerTransactions(start, end, type ?? "", project_id ?? "", payment_method_id ?? ""),
     supabase.from("projects").select("id, name, year, site_id, sites(name, clients(name))").order("name"),
@@ -220,6 +230,7 @@ async function TransactionListSection({
     supabase.from("projects").select("id, name").order("name"),
     supabase.from("payment_methods").select("id, name, text_color, background_color").order("sort_order"),
     supabase.from("expense_categories").select("id, name").order("sort_order"),
+    loadPageMemo(),
   ]);
 
   const filteredNetTotal = transactions.reduce(
@@ -275,6 +286,15 @@ async function TransactionListSection({
           ))}
         </div>
         <TransactionExportButtons transactions={transactions as Transaction[]} />
+        <div className="min-w-[16rem] max-w-2xl flex-1 print:hidden">
+          <PageMemo
+            bare
+            rows={2}
+            initialContent={pageMemo?.content ?? ""}
+            placeholder="매입매출 관련 메모..."
+            save={updateTransactionsPageMemo}
+          />
+        </div>
       </div>
 
       <p className="text-sm text-slate-600">
