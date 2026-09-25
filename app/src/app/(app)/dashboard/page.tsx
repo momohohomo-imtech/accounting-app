@@ -30,15 +30,23 @@ function Money({ value, className }: { value: number; className?: string }) {
   return <span className={cx("tabular-nums", moneyClass(value), className)}>{formatWon(value)}</span>;
 }
 
+// 스크롤을 줄이려고 칸·글씨를 작게 — 설명은 칸 안이 아니라 칸 아래 Footnote로.
+const CARD_PAD = "p-3 sm:p-4";
+
 function SectionTitle({ children, note }: { children: ReactNode; note?: ReactNode }) {
   return (
-    <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-      <h2 className="text-base font-bold text-slate-900">{children}</h2>
-      {note && <p className="text-xs text-slate-400">{note}</p>}
+    <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-2">
+      <h2 className="text-sm font-bold text-slate-900">{children}</h2>
+      {note && <p className="text-[11px] text-slate-400">{note}</p>}
     </div>
   );
 }
 
+function Footnote({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cx("mt-1.5 space-y-0.5 text-[11px] leading-snug text-slate-400", className)}>{children}</div>;
+}
+
+// emphasis: 중요한 숫자 — 로고 포인트 녹색을 옅게 채운 칸.
 function Stat({
   label,
   children,
@@ -51,10 +59,17 @@ function Stat({
   emphasis?: boolean;
 }) {
   return (
-    <div className={cx("rounded-xl p-4", emphasis ? "bg-linear-to-br from-brand-navy to-brand-dark text-white shadow-sm" : "bg-slate-50")}>
-      <p className={cx("text-xs", emphasis ? "text-slate-300" : "text-slate-500")}>{label}</p>
-      <p className={cx("mt-1 whitespace-nowrap text-xl font-bold", emphasis ? "text-white" : "text-slate-900")}>{children}</p>
-      {sub && <div className={cx("mt-1 text-xs", emphasis ? "text-slate-300" : "text-slate-500")}>{sub}</div>}
+    <div
+      className={cx(
+        "h-full rounded-lg px-3 py-2",
+        emphasis ? "bg-brand-green/10 ring-1 ring-inset ring-brand-green/25" : "bg-slate-50"
+      )}
+    >
+      <p className={cx("text-[11px] leading-tight", emphasis ? "font-medium text-emerald-800" : "text-slate-500")}>{label}</p>
+      <p className={cx("mt-0.5 whitespace-nowrap text-sm font-bold sm:text-base", emphasis ? "text-emerald-900" : "text-slate-900")}>
+        {children}
+      </p>
+      {sub && <div className={cx("mt-0.5 text-[11px] leading-tight", emphasis ? "text-emerald-700" : "text-slate-500")}>{sub}</div>}
     </div>
   );
 }
@@ -270,174 +285,161 @@ export default async function DashboardPage({
 
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">대시보드</h1>
-          <p className="mt-0.5 tabular-nums text-xs text-slate-400">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-baseline gap-2">
+          <h1 className="text-xl font-bold text-slate-900">대시보드</h1>
+          <p className="tabular-nums text-xs text-slate-400">
             {today.year}.{mm}.{String(today.day).padStart(2, "0")} 기준
           </p>
         </div>
         <YearFilter basePath="/dashboard" years={years} selectedYear={selectedYear} />
       </div>
 
-      {/* ① 올해 번 돈과 세금 */}
-      <Card>
+      {/* ① 올해 이익과 세금 (+ 진행 중 포함 프로젝트 기준) */}
+      <Card padding="none" className={CARD_PAD}>
         <SectionTitle note="개인사업자 종합소득세 기준 · 지방소득세 10% 포함 · 공제 미반영(참고용)">
           ① {selectedYear}년 이익과 세금
         </SectionTitle>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
           <Stat
             label="상반기 확정 이익금 (세무사 결산)"
             sub={<HalfYearSettlementInput key={selectedYear} year={selectedYear} initialAmount={o.half1Profit} />}
           >
-            {o.half1Profit != null ? <Money value={o.half1Profit} /> : <span className="text-base text-slate-400">미입력</span>}
+            {o.half1Profit != null ? <Money value={o.half1Profit} /> : <span className="text-sm text-slate-400">미입력</span>}
           </Stat>
-          <Stat label="하반기 예상 이익금 (7~12월)" sub="장부 + 세금계산서 미발행분 − 인건비">
+          <Stat label="하반기 예상 이익금 (7~12월)">
             <Money value={o.h2EstimatedProfit} />
           </Stat>
-          <Stat label="연간 합계 예상 이익금">
+          <Stat label="연간 합계 예상 이익금" emphasis>
             {o.combinedProfit != null ? (
               <Money value={o.combinedProfit} />
             ) : (
-              <span className="text-base text-slate-400">상반기 입력 필요</span>
+              <span className="text-sm text-slate-400">상반기 입력 필요</span>
             )}
           </Stat>
-          <Stat
-            label="예상 세액"
-            emphasis
-            sub={o.combinedTax ? `세율 ${o.combinedTax.ratePct}% 구간` : "상반기 확정 이익금을 입력하면 계산됩니다"}
-          >
-            {o.combinedTax ? <Money value={o.combinedTax.totalTax} className="text-white" /> : "-"}
+          <Stat label="예상 세액" emphasis sub={o.combinedTax ? `세율 ${o.combinedTax.ratePct}% 구간` : "상반기 입력 필요"}>
+            {o.combinedTax ? <Money value={o.combinedTax.totalTax} /> : "-"}
           </Stat>
+          {o.hasProjectsWithProfit && (
+            <>
+              <Stat label="프로젝트 기준 이익금 (진행 중 포함)">
+                <Money value={o.profitEstimate} />
+              </Stat>
+              <Stat label="프로젝트 기준 예상 세액" sub={`세율 ${o.profitTax.ratePct}% 구간`}>
+                <Money value={o.profitTax.totalTax} />
+              </Stat>
+            </>
+          )}
         </div>
-        <div className="mt-3 flex flex-wrap items-start justify-between gap-2">
+        <Footnote>
+          <p>
+            하반기 예상 = 장부 + 세금계산서 미발행분 − 인건비 · 연간 합계 = 상반기 확정 + 하반기 예상
+            {o.hasProjectsWithProfit &&
+              " · 프로젝트 기준 = 프로젝트 총이익금(발주액 없는 프로젝트 비용 포함) − 일반경비 − 직원급여/상여/4대보험 (추가 지출이 생기면 실시간으로 바뀜)"}
+          </p>
+          <p>
+            참고: 장부 매출−매입(부가세 제외)만으로 보면 {formatWon(ledgerTax.taxBase)} 기준, 세율 {ledgerTax.ratePct}%, 예상
+            세액 약 {formatWon(ledgerTax.totalTax)}
+          </p>
+          {o.hasIncompleteProjects && (
+            <p className="font-semibold text-red-600">진행 중인 프로젝트가 있어 추가 매입/매출이 생길 수 있습니다.</p>
+          )}
           <DetailToggle label="계산 과정 보기">
             <ProfitCalculationDetail year={selectedYear} o={o} />
           </DetailToggle>
-          <p className="text-xs text-slate-500">
-            참고: 장부 매출−매입(부가세 제외)만으로 보면 {formatWon(ledgerTax.taxBase)} 기준, 세율 {ledgerTax.ratePct}%,
-            예상 세액 약 {formatWon(ledgerTax.totalTax)}
-          </p>
-        </div>
+        </Footnote>
       </Card>
 
       {/* ② 받을 돈 · 줄 돈 */}
-      <Card>
+      <Card padding="none" className={CARD_PAD}>
         <SectionTitle note="외상은 정산 등록 전까지 매입매출장 합계에서 빠져 있음">② 받을 돈 · 줄 돈</SectionTitle>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Link href="/projects" className="rounded-xl transition hover:ring-2 hover:ring-slate-200">
-            <Stat
-              label="예상 미수액 (수주예상액 − 받은 기성금 · 진행중·공사 완료·수금 대기)"
-              emphasis
-              sub={
-                <ul className="space-y-0.5">
-                  {expectedReceivableByStatus.map((r) => (
-                    <li key={r.label} className="flex justify-between gap-2">
-                      <span>
-                        {r.label} {r.count}건
-                      </span>
-                      <span className="tabular-nums">{formatWon(r.amount)}</span>
-                    </li>
-                  ))}
-                  {receivedSalesTotal > 0 && (
-                    <li className="flex justify-between gap-2 text-slate-400">
-                      <span>받은 기성금 (위 금액에서 이미 뺌 · 부가세 제외)</span>
-                      <span className="tabular-nums">{formatWon(receivedSalesTotal)}</span>
-                    </li>
-                  )}
-                </ul>
-              }
-            >
-              <Money value={expectedReceivable} className="text-white" />
+        <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+          <Link href="/projects" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
+            <Stat label="예상 미수액 (진행중·공사 완료·수금 대기)" emphasis>
+              <Money value={expectedReceivable} />
             </Stat>
           </Link>
-          <Link href="/projects" className="rounded-xl transition hover:ring-2 hover:ring-slate-200">
-            <Stat label="공사 완료 · 수금 대기" sub={`${selectedYear}년 프로젝트 ${awaitingPayment.count}건 · 받은 기성금 제외`}>
+          <Link href="/projects" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
+            <Stat label="공사 완료 · 수금 대기" sub={`${awaitingPayment.count}건`}>
               <Money value={awaitingPayment.amount} />
             </Stat>
           </Link>
-          <Link href="/transactions?tab=credit" className="rounded-xl transition hover:ring-2 hover:ring-slate-200">
-            <Stat label="외상 매출 미수금 (받을 돈)" sub={`세금계산서 발행 후 입금 대기 ${creditReceivableCount}건`}>
+          <Link href="/transactions?tab=credit" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
+            <Stat label="외상 매출 미수금 (받을 돈)" sub={`입금 대기 ${creditReceivableCount}건`}>
               <Money value={creditReceivable} />
             </Stat>
           </Link>
-          <Link href="/transactions?tab=credit" className="rounded-xl transition hover:ring-2 hover:ring-slate-200">
+          <Link href="/transactions?tab=credit" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
             <Stat label="외상 매입 미지급금 (줄 돈)" sub={`미정산 ${creditPayableCount}건`}>
               <Money value={creditPayable} className="text-slate-600" />
             </Stat>
           </Link>
         </div>
+        <Footnote>
+          <p>
+            예상 미수액 = 수주예상액 − 받은 기성금 ·{" "}
+            {expectedReceivableByStatus.map((r) => `${r.label} ${r.count}건 ${formatWon(r.amount)}`).join(" · ")}
+            {receivedSalesTotal > 0 && ` · 받은 기성금(이미 뺌, 부가세 제외) ${formatWon(receivedSalesTotal)}`}
+          </p>
+          <p>외상 매출 미수금 = 세금계산서 발행 후 입금 대기 · 공사 완료·수금 대기는 받은 기성금 제외</p>
+        </Footnote>
       </Card>
 
-      {/* ③ 진행 중 예상 이익금 */}
-      {o.hasProjectsWithProfit && (
-        <Card>
-          <SectionTitle note="추가 지출이 생기면 실시간으로 바뀜">③ {selectedYear}년 예상 이익금 (진행 중 포함)</SectionTitle>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Stat label="예상 이익금" sub="프로젝트 총이익금(발주액 없는 프로젝트 비용 포함) − 일반경비 − 직원급여/상여/4대보험">
-              <Money value={o.profitEstimate} />
-            </Stat>
-            <Stat label="이 기준 예상 세액" sub={`세율 ${o.profitTax.ratePct}% 구간`}>
-              <Money value={o.profitTax.totalTax} />
-            </Stat>
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-5">
+        {/* ④ 부가세 */}
+        <Card padding="none" className={cx(CARD_PAD, "xl:col-span-3")}>
+          <SectionTitle note="총액(부가세 포함)에서 계산 · 비과세 제외 · 외상 미정산 포함(세금계산서 기준)">
+            ④ {selectedYear}년 부가세 (분기별)
+          </SectionTitle>
+          <div className="[&_table]:text-xs [&_td]:py-1 [&_th]:pb-1">
+            <VatQuarterTable rows={vatQuarters} total={vatTotal} />
           </div>
-          {o.hasIncompleteProjects && (
-            <p className="mt-2 text-xs font-semibold text-red-600">
-              진행 중인 프로젝트가 있어 추가 매입/매출이 생길 수 있습니다.
+          <Footnote>
+            <p>
+              불공제 매입세액(승용차 렌트·유류비 등 &quot;매입세액 불공제&quot; 카테고리)은 납부 예상에서 빼지 않음 · 신고는
+              반기(1~6월, 7~12월) 기준, 실제 금액은 세무사 확인 후 확정
             </p>
-          )}
+          </Footnote>
         </Card>
-      )}
 
-      {/* ④ 부가세 */}
-      <Card>
-        <SectionTitle note="총액(부가세 포함)에서 계산 · 인건비 등 비과세 제외 · 외상 미정산 건 포함(세금계산서 기준)">
-          ④ {selectedYear}년 부가세 (분기별)
-        </SectionTitle>
-        <VatQuarterTable rows={vatQuarters} total={vatTotal} />
-        <p className="mt-2 text-xs text-slate-400">
-          불공제 매입세액은 지출카테고리에서 &quot;매입세액 불공제&quot;로 체크한 카테고리(승용차 렌트·유류비 등) 몫으로, 납부
-          예상에서 빼주지 않습니다. 부가세 신고는 반기(1~6월, 7~12월) 기준이며, 실제 신고 금액은 세무사 확인 후 확정됩니다.
-        </p>
-      </Card>
+        {/* 참고 현황 */}
+        <Card padding="none" className={cx(CARD_PAD, "xl:col-span-2")}>
+          <SectionTitle note="매입매출장 기준 · 부가세 포함">참고 현황</SectionTitle>
+          <div className="grid grid-cols-2 gap-2">
+            <Stat label={`${selectedYear}년 매출액`}>
+              <Money value={yearSales} />
+            </Stat>
+            <Stat label={`${selectedYear}년 매입액`}>
+              <Money value={yearPurchase} />
+            </Stat>
+            <Stat label={`${selectedYear}년 매출−매입`}>
+              <Money value={yearProfit} />
+            </Stat>
+            <Stat label={`${selectedYear}년 총 예상 매출 (발주액 − 대행구매)`}>
+              <Money value={o.expectedRevenue} />
+            </Stat>
+            <Stat label={`이번 달(${today.month}월) 매출`}>
+              <Money value={monthSales} />
+            </Stat>
+            <Stat label={`이번 달(${today.month}월) 매입`}>
+              <Money value={monthPurchase} />
+            </Stat>
+            <Link href="/projects" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
+              <Stat label="진행 중 프로젝트">{ongoingProjects?.length ?? 0}건</Stat>
+            </Link>
+          </div>
+        </Card>
+      </div>
 
-      {/* 참고 현황 */}
-      <Card>
-        <SectionTitle note="매입매출장 기준 · 부가세 포함 금액">참고 현황</SectionTitle>
-        <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 xl:grid-cols-4">
-          <Stat label={`${selectedYear}년 매출액`}>
-            <Money value={yearSales} />
-          </Stat>
-          <Stat label={`${selectedYear}년 매입액`}>
-            <Money value={yearPurchase} />
-          </Stat>
-          <Stat label={`${selectedYear}년 매출−매입`}>
-            <Money value={yearProfit} />
-          </Stat>
-          <Stat label={`${selectedYear}년 총 예상 매출 (발주액 − 대행구매)`}>
-            <Money value={o.expectedRevenue} />
-          </Stat>
-          <Stat label={`이번 달(${today.month}월) 매출`}>
-            <Money value={monthSales} />
-          </Stat>
-          <Stat label={`이번 달(${today.month}월) 매입`}>
-            <Money value={monthPurchase} />
-          </Stat>
-          <Link href="/projects" className="rounded-xl transition hover:ring-2 hover:ring-slate-200">
-            <Stat label="진행 중 프로젝트">{ongoingProjects?.length ?? 0}건</Stat>
-          </Link>
-        </div>
-      </Card>
-
-      <Card>
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-slate-900">최근 거래</h2>
-          <Link href="/transactions" className="text-sm text-slate-500 transition-colors hover:text-slate-800">
+      <Card padding="none" className={CARD_PAD}>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-sm font-bold text-slate-900">최근 거래</h2>
+          <Link href="/transactions" className="text-xs text-slate-500 transition-colors hover:text-slate-800">
             전체보기
           </Link>
         </div>
-        <div className="mt-4">
+        <div className="[&_table]:text-xs [&_td]:py-1 [&_th]:pb-1">
           <Table className="min-w-[600px]">
             <THead>
               <Th className="pr-4">날짜</Th>
