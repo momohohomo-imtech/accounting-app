@@ -8,7 +8,7 @@ import { one } from "@/lib/relations";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import { PAYROLL_CATEGORY_NAME } from "@/lib/vatExempt";
 import { purchaseCostOf, salesSupplyOf } from "@/lib/vatBasis";
-import { totalProjectProfit } from "@/lib/projectProfit";
+import { totalProjectProfit, unbilledH2Profit } from "@/lib/projectProfit";
 
 type YearTxRow = {
   id: string;
@@ -146,13 +146,28 @@ export async function loadProfitOutlook(
     ...unbilledRows.filter((p) => p.quote_amount != null),
     ...ongoingYearProjectsWithProfit,
   ];
+  const unbilledProjectIdSet = new Set(unbilledProjectsWithProfit.map((p) => p.id));
+  // 상반기에 이미 끊은 기성금 — 세무사 결산은 계산서 기준이라 외상 미정산 건도 포함(장부 표시 여부와 무관).
+  const h1BilledByProject = new Map<string, number>();
+  for (const t of yearTx) {
+    if (t.type !== "매출" || !t.project_id || !unbilledProjectIdSet.has(t.project_id)) continue;
+    if (t.trans_date >= `${year}-07-01`) continue;
+    h1BilledByProject.set(t.project_id, (h1BilledByProject.get(t.project_id) ?? 0) + salesSupplyOf(t));
+  }
+  const h1BilledSales = Array.from(h1BilledByProject.values()).reduce((s, v) => s + v, 0);
   const unbilledPendingProfit = unbilledProjectsWithProfit.reduce(
-    (s, p) => s + p.quote_amount! - (purchaseByProjectH2.get(p.id) ?? 0) - (agencyByProject.get(p.id) ?? 0),
+    (s, p) =>
+      s +
+      unbilledH2Profit(
+        p.quote_amount!,
+        h1BilledByProject.get(p.id) ?? 0,
+        purchaseByProjectH2.get(p.id) ?? 0,
+        agencyByProject.get(p.id) ?? 0
+      ),
     0
   );
   // 미발행 예상 이익금에 이미 하반기 매입이 반영된 프로젝트들과, 직원급여 카테고리(아래
   // h2PayrollCost에서 따로 뺌)는 하반기 매출-매입 집계에서 빼서 이중으로 차감되지 않게 한다.
-  const unbilledProjectIdSet = new Set(unbilledProjectsWithProfit.map((p) => p.id));
   const h2LedgerTx = h2Tx
     .filter((t) => !t.project_id || !unbilledProjectIdSet.has(t.project_id))
     .filter((t) => one(t.expense_categories)?.name !== PAYROLL_CATEGORY_NAME);
@@ -177,6 +192,7 @@ export async function loadProfitOutlook(
     h2Purchase,
     h2Profit,
     unbilledPendingProfit,
+    h1BilledSales,
     unbilledProjectNames: unbilledProjectsWithProfit.map((p) => p.name),
     h2PayrollCost,
     h2EstimatedProfit: h2Profit + unbilledPendingProfit - h2PayrollCost,
@@ -207,6 +223,13 @@ export function ProfitCalculationDetail({ year, o }: { year: number; o: ProfitOu
           {formatWon(o.unbilledPendingProfit)}
         </span>
         {` (완료 수금대기·공사 완료·진행중 ${o.unbilledProjectNames.length}건)`}
+        {o.h1BilledSales > 0 && (
+          <span className="text-slate-500">
+            {" — 상반기에 이미 끊은 기성금 "}
+            <span className="tabular-nums">{formatWon(o.h1BilledSales)}</span>
+            {"은 상반기 확정 이익금에 들어가 있어 뺐음"}
+          </span>
+        )}
       </p>
       {o.unbilledProjectNames.length > 0 && (
         <p className="pl-4 text-xs text-slate-500">{o.unbilledProjectNames.join(", ")}</p>
@@ -239,6 +262,11 @@ export function ProfitCalculationDetail({ year, o }: { year: number; o: ProfitOu
           계산에서 제외하고, 대신 &quot;세금계산서 미발행 예상 이익금&quot;에서 &quot;발주액 − 하반기
           매입 − 대행구매액&quot;으로 따로 추정합니다. 이렇게 하면 (나) 프로젝트의 매입이 어느 한쪽에서
           정확히 한 번만 반영됩니다.
+        </p>
+        <p>
+          (나) 프로젝트에 상반기(1~6월)에 이미 끊은 기성금이 있으면, 그 매출은 상반기 확정 이익금(세무사
+          결산)에 들어가 있으므로 발주액에서 빼고 남은 금액만 하반기 몫으로 더합니다. 예: 발주액 5,000만원 중
+          5월에 기성금 2,000만원을 끊었다면 하반기에는 3,000만원만 더합니다.
         </p>
         <p className="font-semibold text-slate-900">숫자 예시</p>
         <p>

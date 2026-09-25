@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { groupProjectProfit, totalProjectProfit } from "@/lib/projectProfit";
+import { groupProjectProfit, totalProjectProfit, unbilledH2Profit } from "@/lib/projectProfit";
 
 // 어미 A(발주 2,000만) + 귀속 하위 B(발주 없음) + 귀속 하위 C(발주 500만), 별개 프로젝트 D(발주 없음)
 const A = { id: "A", quote_amount: 20_000_000 };
@@ -40,4 +40,11 @@ test("이익 총합은 발주액 없는 프로젝트의 비용까지 뺀다", ()
 test("어미별로 합산한 이익의 합 + 발주액 없는 단독 프로젝트 비용 = 이익 총합", () => {
   const grouped = groupProjectProfit([A, B, C], purchase, agency).profit! - (purchase.get("D") ?? 0);
   assert.equal(grouped, totalProjectProfit([A, B, C, D], purchase, agency));
+});
+
+test("하반기 미발행 예상 이익: 상반기에 끊은 기성금은 상반기 결산에 있으니 빼서 두 번 안 잡음", () => {
+  // 발주 5,000만 중 5월에 기성금 2,000만 → 하반기 몫은 3,000만 − 하반기 매입 800만 − 대행구매 200만
+  assert.equal(unbilledH2Profit(50_000_000, 20_000_000, 8_000_000, 2_000_000), 20_000_000);
+  // 상반기 기성금이 없으면 예전과 같음
+  assert.equal(unbilledH2Profit(50_000_000, 0, 8_000_000, 2_000_000), 40_000_000);
 });
