@@ -112,11 +112,11 @@ function visibilityStorageKey(fields: FieldConfig[]) {
   return `entityTableColVisible:${fields.map((f) => f.name).join(",")}`;
 }
 
-// 진행률은 막대 대신 3단계 동그라미: 0% 준비중(노랑) · 1~99% 진행중(주황) · 100% 공사완료(빨강).
+// 진행률은 막대 대신 3단계 동그라미: 0% 준비중(노랑) · 1~99% 진행중(주황) · 100% 공사완료(녹색).
 function ProgressCell({ value }: { value: number }) {
   const pct = Math.max(0, Math.min(100, value));
   const [label, color] =
-    pct >= 100 ? ["공사완료", "bg-red-600"] : pct > 0 ? ["진행중", "bg-orange-500"] : ["준비중", "bg-yellow-400"];
+    pct >= 100 ? ["공사완료", "bg-green-600"] : pct > 0 ? ["진행중", "bg-orange-500"] : ["준비중", "bg-yellow-400"];
   return (
     <span className="flex justify-center" title={`${label} (${pct}%)`}>
       <span className={`inline-block h-3.5 w-3.5 rounded-full ${color} print:[print-color-adjust:exact]`} />
