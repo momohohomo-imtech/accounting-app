@@ -66,17 +66,20 @@ function Stat({
   children,
   sub,
   emphasis,
+  className,
 }: {
   label: ReactNode;
   children: ReactNode;
   sub?: ReactNode;
   emphasis?: boolean;
+  className?: string;
 }) {
   return (
     <div
       className={cx(
         "h-full rounded-lg px-3 py-2",
-        emphasis ? "bg-brand-green/10 ring-1 ring-inset ring-brand-green/25" : "bg-slate-50"
+        emphasis ? "bg-brand-green/10 ring-1 ring-inset ring-brand-green/25" : "bg-slate-50",
+        className
       )}
     >
       <p className={cx("text-[11px] leading-tight", emphasis ? "font-medium text-emerald-800" : "text-slate-500")}>{label}</p>
@@ -365,12 +368,23 @@ export default async function DashboardPage({
         <YearFilter basePath="/dashboard" years={years} selectedYear={selectedYear} />
       </div>
 
-      {/* 핵심 숫자 4개만 늘 보이게 — 나머지는 아래 접힘 목록에 한 줄 요약과 함께(사용자 요청: 정보는 다 두되 간결하게). */}
+      {/* 핵심 숫자 5칸만 늘 보이게 — 나머지는 아래 접힘 목록에 한 줄 요약과 함께(사용자 요청: 정보는 다 두되 간결하게).
+          휴대폰·태블릿(사이드바가 있어 본문이 좁음): 예상 매출액 한 줄 + 2칸씩 두 줄 / lg~: 예상 매출·이익·세액 3칸 + 받을 돈·줄 돈
+          2칸 / xl~: 5칸 한 줄. */}
       <Card padding="none" className={CARD_PAD}>
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-6 xl:grid-cols-5">
+          <Link
+            href="/projects"
+            className="col-span-2 rounded-lg transition hover:ring-2 hover:ring-slate-200 xl:col-span-1"
+          >
+            <Stat label={`${selectedYear}년 예상 매출액`} sub="발주액 − 대행구매 · 부가세 제외">
+              <Money value={o.expectedRevenue} />
+            </Stat>
+          </Link>
           <Stat
             label={`${selectedYear}년 예상 이익금`}
             emphasis
+            className="lg:col-span-2 xl:col-span-1"
             sub={
               o.combinedProfit != null
                 ? "상반기 확정 + 하반기 예상"
@@ -381,15 +395,23 @@ export default async function DashboardPage({
           >
             {headlineProfit != null ? <Money value={headlineProfit} /> : "-"}
           </Stat>
-          <Stat label="예상 세액 (소득세+지방소득세)" emphasis sub={headlineTax ? `세율 ${headlineTax.ratePct}% 구간` : undefined}>
+          <Stat
+            label="예상 세액 (소득세+지방소득세)"
+            emphasis
+            className="lg:col-span-2 xl:col-span-1"
+            sub={headlineTax ? `세율 ${headlineTax.ratePct}% 구간` : undefined}
+          >
             {headlineTax ? <Money value={headlineTax.totalTax} /> : "-"}
           </Stat>
-          <Link href="/projects" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
+          <Link href="/projects" className="rounded-lg transition hover:ring-2 hover:ring-slate-200 lg:col-span-3 xl:col-span-1">
             <Stat label="받을 돈 (예상 미수액)" sub={`프로젝트 ${receivableProjects.length}건`}>
               <Money value={expectedReceivable} />
             </Stat>
           </Link>
-          <Link href="/transactions?tab=credit" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
+          <Link
+            href="/transactions?tab=credit"
+            className="rounded-lg transition hover:ring-2 hover:ring-slate-200 lg:col-span-3 xl:col-span-1"
+          >
             <Stat label="줄 돈 (외상 매입)" sub={`미정산 ${creditPayableCount}건`}>
               <Money value={creditPayable} className="text-slate-600" />
             </Stat>
@@ -420,7 +442,7 @@ export default async function DashboardPage({
           <p className="mb-2 text-[11px] text-slate-400">
             개인사업자 종합소득세 기준 · 지방소득세 10% 포함 · 본인 기본공제만 반영(참고용)
           </p>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
             <Stat
               label="상반기 확정 이익금 (세무사 결산)"
               sub={<HalfYearSettlementInput key={selectedYear} year={selectedYear} initialAmount={o.half1Profit} />}
@@ -499,7 +521,7 @@ export default async function DashboardPage({
             summary={`합계 약 ${formatWon(cashOutTotal)}${cashOut.healthSettlement == null ? " (건강보험 정산 제외)" : ""}`}
           >
             <p className="text-[11px] text-slate-400">첫해는 중간예납이 없어 이듬해에 몰림</p>
-            <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-5">
+            <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-5">
               <Stat
                 label="1월 · 부가세 2기 확정 (7~12월)"
                 sub={[
@@ -602,7 +624,7 @@ export default async function DashboardPage({
 
         <FoldRow title="매출·매입 현황" summary={`${selectedYear}년 매출 ${formatWon(yearSales)} · 매입 ${formatWon(yearPurchase)}`}>
           <p className="text-[11px] text-slate-400">매입매출장 기준 · 부가세 포함</p>
-          <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
+          <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-4">
             <Stat label={`${selectedYear}년 매출액`}>
               <Money value={yearSales} />
             </Stat>
