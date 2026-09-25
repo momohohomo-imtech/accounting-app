@@ -5,13 +5,11 @@ import { formatWon } from "@/lib/format";
 import { autoSiteColorHex } from "@/lib/siteColor";
 import { ModalPortal } from "@/components/ModalPortal";
 import { ModalPrintButton } from "@/components/ModalPrintButton";
+import { HANDLING_FEE_PCT } from "@/lib/handlingFee";
 
 export type CategoryAmount = { name: string; amount: number };
 
 export const REMAINDER_LABEL = "잔여 (발주액 중 미지출분)";
-// 그래프·보고서 상단에서만 참고용으로 보여주는 이윤+잡비 비율 — 실제 이익금/이익율 계산에는
-// 영향 없음(순수 표시용).
-export const HANDLING_FEE_PCT = 25;
 
 function sliceColor(name: string) {
   return name === REMAINDER_LABEL ? "#cbd5e1" : autoSiteColorHex(name);
