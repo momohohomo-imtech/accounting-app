@@ -5,7 +5,7 @@ import { formatWon, formatDate, moneyClass } from "@/lib/format";
 import { remainingBalance, isLedgerVisible } from "@/lib/credit";
 import type { ExpenseCategory, Transaction } from "@/lib/types";
 import { vatOf, salesSupplyOf, purchaseCostOf } from "@/lib/vatBasis";
-import { taxEstimate, incomeTaxInstallment, interimPrepayment } from "@/lib/tax";
+import { taxEstimate, incomeTaxInstallment, interimPrepayment, vatPrepaymentNotice } from "@/lib/tax";
 import {
   estimateOwnerInsurance,
   ownerHealthSettlement,
@@ -263,12 +263,11 @@ export default async function DashboardPage({
   // 계산(lib/vatBasis.ts)하고, 매입세액 불공제 카테고리(승용차 등)는 공제 대상에서 빼서 따로 표시.
   // 참고: 장부 매출−매입(부가세 제외, 불공제 부가세는 비용) 기준 연간 예상 세금 — 위에서 받은
   // 연간 거래(외상 미정산 제외)로 바로 계산해서 같은 거래를 다시 조회하지 않는다.
-  const ledgerTax = taxEstimate(
-    yearTx.reduce((s, t) => {
-      const row = { ...t, expense_categories: categoryRel(t.category_id) };
-      return s + salesSupplyOf(row) - purchaseCostOf(row);
-    }, 0)
-  );
+  const ledgerProfit = yearTx.reduce((s, t) => {
+    const row = { ...t, expense_categories: categoryRel(t.category_id) };
+    return s + salesSupplyOf(row) - purchaseCostOf(row);
+  }, 0);
+  const ledgerTax = taxEstimate(ledgerProfit);
 
   const vatQuarters = [1, 2, 3, 4].map((q) => {
     let salesVat = 0;
@@ -319,8 +318,12 @@ export default async function DashboardPage({
     activeEmployees.length ? 2 * Math.max(...activeEmployees.map(pick)) : null;
   const ownerHealthPaidMonthly = ownerPaidMonthly((e) => Number(e.health_insurance) + Number(e.long_term_care_insurance));
   const ownerPensionPaidMonthly = ownerPaidMonthly((e) => Number(e.national_pension));
+  // 1월 부가세 2기 확정 = 7~12월 부가세 − 10월 예정고지(1~6월 납부세액의 1/2, 50만원 미만이면 고지 없음).
+  // 실제 예정고지는 세무사가 매입장 외 공제까지 반영해 신고한 1기 세액 기준이라 이 장부 기준 추정과 다를 수 있음.
+  const vat1 = vatQuarters[0].net + vatQuarters[1].net;
+  const vatOctoberNotice = vatPrepaymentNotice(vat1);
   const cashOut = {
-    vat2: vatQuarters[2].net + vatQuarters[3].net,
+    vat2: vatQuarters[2].net + vatQuarters[3].net - vatOctoberNotice,
     mayTax: nextYearTax.totalTax,
     installment: incomeTaxInstallment(nextYearTax.incomeTax),
     healthSettlement:
@@ -329,8 +332,9 @@ export default async function DashboardPage({
         : null,
     interim: interimPrepayment(nextYearTax.incomeTax),
   };
+  // 환급(음수)은 합계에서 뺌 — 건강보험 정산과 같은 기준.
   const cashOutTotal =
-    cashOut.vat2 + cashOut.mayTax + Math.max(cashOut.healthSettlement ?? 0, 0) + cashOut.interim;
+    Math.max(cashOut.vat2, 0) + cashOut.mayTax + Math.max(cashOut.healthSettlement ?? 0, 0) + cashOut.interim;
   const years = Array.from({ length: currentYear - firstYear + 1 }, (_, i) => currentYear - i);
   if (!years.includes(selectedYear)) years.unshift(selectedYear);
   years.sort((a, b) => b - a);
@@ -350,7 +354,7 @@ export default async function DashboardPage({
 
       {/* ① 올해 이익과 세금 (+ 진행 중 포함 프로젝트 기준) */}
       <Card padding="none" className={CARD_PAD}>
-        <SectionTitle note="개인사업자 종합소득세 기준 · 지방소득세 10% 포함 · 공제 미반영(참고용)">
+        <SectionTitle note="개인사업자 종합소득세 기준 · 지방소득세 10% 포함 · 본인 기본공제만 반영(참고용)">
           ① {selectedYear}년 이익과 세금
         </SectionTitle>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
@@ -410,7 +414,17 @@ export default async function DashboardPage({
           >
             <p className="mt-1 text-[11px] text-slate-400">첫해는 중간예납이 없어 이듬해에 몰림</p>
             <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-5">
-              <Stat label="1월 · 부가세 2기 확정 (7~12월)" sub="4분기 진행 중이라 늘어날 수 있음">
+              <Stat
+                label="1월 · 부가세 2기 확정 (7~12월)"
+                sub={[
+                  vatOctoberNotice > 0 && `10월 예정고지 약 ${formatWon(vatOctoberNotice)} 뺀 금액`,
+                  vatOctoberNotice === 0 && vat1 > 0 && "10월 예정고지 없음(50만원 미만)",
+                  cashOut.vat2 < 0 && "환급 예상",
+                  "4분기 진행 중이라 늘어날 수 있음",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              >
                 <Money value={cashOut.vat2} />
               </Stat>
               <Stat
@@ -430,7 +444,10 @@ export default async function DashboardPage({
               >
                 {cashOut.healthSettlement != null ? <Money value={cashOut.healthSettlement} /> : "-"}
               </Stat>
-              <Stat label={`11월 · ${selectedYear + 1}년 중간예납`} sub={`${selectedYear}년 소득세의 1/2`}>
+              <Stat
+                label={`11월 · ${selectedYear + 1}년 중간예납`}
+                sub={`${selectedYear}년 소득세의 1/2${cashOut.interim === 0 ? " · 50만원 미만이라 고지 없음" : ""}`}
+              >
                 <Money value={cashOut.interim} />
               </Stat>
               <Stat
@@ -452,6 +469,10 @@ export default async function DashboardPage({
                 최고 급여 직원 기준으로 낸 금액(직원 공제액의 2배) · 국민연금은 1년치 정산 없이 7월부터 월 보험료만
                 오름(소득총액신고를 빠뜨리면 11월에 7월분부터 소급) · 금액은 세무사 확인 전 추정치
               </p>
+              <p>
+                10월 부가세 예정고지(1기 납부세액의 1/2)·11월 중간예납(소득세의 1/2)은 50만원 미만이면 고지 없음 · 실제
+                고지 금액은 세무사가 매입장 외 공제까지 반영해 신고한 세액 기준이라 장부 기준인 여기 금액과 다름
+              </p>
             </Footnote>
           </CollapsibleSection>
         )}
@@ -467,8 +488,12 @@ export default async function DashboardPage({
                 " · 프로젝트 기준 = 프로젝트 총이익금(발주액 없는 프로젝트 비용 포함) − 일반경비 − 직원급여/상여/4대보험 (추가 지출이 생기면 실시간으로 바뀜)"}
             </p>
             <p>
-              참고: 장부 매출−매입(부가세 제외)만으로 보면 {formatWon(ledgerTax.taxBase)} 기준, 세율 {ledgerTax.ratePct}%, 예상
-              세액 약 {formatWon(ledgerTax.totalTax)}
+              예상 세액 = 이익금에서 본인 기본공제 150만원을 뺀 금액에 종합소득세율 적용 + 지방소득세 10% · 그 밖의 공제와
+              매입장에 없는 경비는 세무사가 신고 때 반영해서 실제 세액은 이와 다름
+            </p>
+            <p>
+              참고: 장부 매출−매입(부가세 제외)만으로 보면 이익 {formatWon(ledgerProfit)}, 기본공제 뺀 과세표준{" "}
+              {formatWon(ledgerTax.taxBase)}, 세율 {ledgerTax.ratePct}%, 예상 세액 약 {formatWon(ledgerTax.totalTax)}
             </p>
             <p>
               {selectedYear + 1}년 국민연금·건강보험 = {o.combinedProfit != null ? "연간 합계" : "프로젝트 기준"} 예상
@@ -573,7 +598,8 @@ export default async function DashboardPage({
         <Footnote>
           <p>
             불공제 매입세액(승용차 렌트·유류비 등 &quot;매입세액 불공제&quot; 카테고리)은 납부 예상에서 빼지 않음 · 신고는
-            반기(1~6월, 7~12월) 기준, 실제 금액은 세무사 확인 후 확정
+            반기(1~6월, 7~12월) 기준 · 4월·10월엔 직전 반기 납부세액의 1/2을 예정고지로 먼저 내고(50만원 미만이면 없음)
+            7월·1월 확정 때 뺌 · 매입장 외 공제는 세무사가 신고 때 반영해서 실제 납부액은 이와 다름
           </p>
         </Footnote>
       </CollapsibleSection>

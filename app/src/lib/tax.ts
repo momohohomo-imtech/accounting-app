@@ -19,9 +19,16 @@ export function currentBracketIndex(taxBase: number) {
   return INCOME_TAX_BRACKETS.findIndex((b) => taxBase <= b.upTo);
 }
 
-// 개인사업자 종합소득세 추정 — 이익이 0 이하면 0, 지방소득세(소득세의 10%) 포함.
+// 종합소득공제 중 본인 기본공제만 반영 — 그 밖의 공제와 매입장에 없는 경비는 세무사가 신고 때 반영해서
+// 실제 세액은 이 추정과 다름.
+export const BASIC_DEDUCTION = 1_500_000;
+
+// 중간예납·부가세 예정고지는 고지할 금액이 50만원 미만이면 고지하지 않음.
+export const MIN_NOTICE_AMOUNT = 500_000;
+
+// 개인사업자 종합소득세 추정 — 이익에서 본인 기본공제를 뺀 과세표준 기준(0 이하면 0), 지방소득세(소득세의 10%) 포함.
 export function taxEstimate(profit: number) {
-  const taxBase = Math.max(profit, 0);
+  const taxBase = Math.max(profit - BASIC_DEDUCTION, 0);
   const incomeTax = estimateIncomeTax(taxBase);
   const localTax = Math.round(incomeTax * 0.1);
   const bracket = INCOME_TAX_BRACKETS[currentBracketIndex(taxBase)];
@@ -36,7 +43,19 @@ export function incomeTaxInstallment(incomeTax: number) {
   return 0;
 }
 
+// 직전 세액의 절반을 고지 — 50만원 미만이면 고지 없음(0).
+function halfNotice(prevTax: number) {
+  const half = Math.floor(Math.max(prevTax, 0) / 2);
+  return half < MIN_NOTICE_AMOUNT ? 0 : half;
+}
+
 // 다음 해 11월 중간예납 — 직전 해 납부 소득세의 절반(사업 첫해에는 중간예납이 없어서 둘째 해부터).
 export function interimPrepayment(incomeTax: number) {
-  return Math.floor(Math.max(incomeTax, 0) / 2);
+  return halfNotice(incomeTax);
+}
+
+// 부가세 예정고지(개인 일반과세자) — 4월·10월에 직전 반기(2기·1기) 납부세액의 절반을 고지하고, 고지된 금액은
+// 그 반기 확정신고(7월·1월) 때 빼고 냄.
+export function vatPrepaymentNotice(prevHalfVat: number) {
+  return halfNotice(prevHalfVat);
 }
