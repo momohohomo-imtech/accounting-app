@@ -39,22 +39,21 @@ function Money({ value, className }: { value: number; className?: string }) {
 // 스크롤을 줄이려고 칸·글씨를 작게 — 설명은 칸 안이 아니라 칸 아래 Footnote로.
 const CARD_PAD = "p-3 sm:p-4";
 
-function SectionTitle({ children, note }: { children: ReactNode; note?: ReactNode }) {
+// 접힘 목록 한 줄 — 제목 오른쪽에 핵심 숫자 한 줄(휴대폰에선 줄마다 들쭉날쭉하지 않게 항상 제목 아래, 제목 글자에 맞춰),
+// 누르면 자세한 내용이 펼쳐짐. 기본은 모두 접힘.
+function FoldRow({ title, summary, children }: { title: ReactNode; summary: ReactNode; children: ReactNode }) {
   return (
-    <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-2">
-      <h2 className="text-sm font-bold text-slate-900">{children}</h2>
-      {note && <p className="text-[11px] text-slate-400">{note}</p>}
-    </div>
+    <CollapsibleSection
+      bare
+      className="px-3 py-2.5 sm:px-4"
+      title={<span className="text-sm font-bold text-slate-900">{title}</span>}
+      headerExtra={
+        <p className="tabular-nums text-[11px] text-slate-500 max-md:-mt-1.5 max-md:basis-full max-md:pl-[17px]">{summary}</p>
+      }
+    >
+      <div className="pt-2">{children}</div>
+    </CollapsibleSection>
   );
-}
-
-// 기본으로 접혀 있는 섹션 — 제목 옆에 핵심 숫자 하나만 작게.
-function FoldTitle({ children }: { children: ReactNode }) {
-  return <span className="text-sm font-bold text-slate-900">{children}</span>;
-}
-
-function FoldSummary({ children }: { children: ReactNode }) {
-  return <p className="tabular-nums text-[11px] text-slate-500">{children}</p>;
 }
 
 function Footnote({ children, className }: { children: ReactNode; className?: string }) {
@@ -340,6 +339,20 @@ export default async function DashboardPage({
   years.sort((a, b) => b - a);
 
 
+  // 맨 위 핵심 숫자 — 상반기 확정 이익금을 넣었으면 연간 합계, 아니면 프로젝트 기준(몰리는 돈·보험료 추정과 같은 기준).
+  const headlineProfit = o.combinedProfit ?? (o.hasProjectsWithProfit ? o.profitEstimate : null);
+  const headlineTax = o.combinedTax ?? (o.hasProjectsWithProfit ? o.profitTax : null);
+  const latestTx = recentTx[0];
+  const latestTxLabel = latestTx
+    ? `최근 ${Number(latestTx.trans_date.slice(5, 7))}/${Number(latestTx.trans_date.slice(8, 10))} ${
+        latestTx.clients?.name ?? latestTx.client_name_raw ?? ""
+      } ${latestTx.type} ${formatWon(
+        latestTx.type === "매출"
+          ? latestTx.sales_amount + latestTx.sales_vat
+          : latestTx.purchase_amount + latestTx.purchase_vat
+      )}`
+    : "거래 없음";
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -352,67 +365,140 @@ export default async function DashboardPage({
         <YearFilter basePath="/dashboard" years={years} selectedYear={selectedYear} />
       </div>
 
-      {/* ① 올해 이익과 세금 (+ 진행 중 포함 프로젝트 기준) */}
+      {/* 핵심 숫자 4개만 늘 보이게 — 나머지는 아래 접힘 목록에 한 줄 요약과 함께(사용자 요청: 정보는 다 두되 간결하게). */}
       <Card padding="none" className={CARD_PAD}>
-        <SectionTitle note="개인사업자 종합소득세 기준 · 지방소득세 10% 포함 · 본인 기본공제만 반영(참고용)">
-          ① {selectedYear}년 이익과 세금
-        </SectionTitle>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
           <Stat
-            label="상반기 확정 이익금 (세무사 결산)"
-            sub={<HalfYearSettlementInput key={selectedYear} year={selectedYear} initialAmount={o.half1Profit} />}
-          >
-            {o.half1Profit != null ? <Money value={o.half1Profit} /> : <span className="text-sm text-slate-400">미입력</span>}
-          </Stat>
-          <Stat label="하반기 예상 이익금 (7~12월)">
-            <Money value={o.h2EstimatedProfit} />
-          </Stat>
-          <Stat label="연간 합계 예상 이익금" emphasis>
-            {o.combinedProfit != null ? (
-              <Money value={o.combinedProfit} />
-            ) : (
-              <span className="text-sm text-slate-400">상반기 입력 필요</span>
-            )}
-          </Stat>
-          <Stat label="예상 세액" emphasis sub={o.combinedTax ? `세율 ${o.combinedTax.ratePct}% 구간` : "상반기 입력 필요"}>
-            {o.combinedTax ? <Money value={o.combinedTax.totalTax} /> : "-"}
-          </Stat>
-          {o.hasProjectsWithProfit && (
-            <>
-              <Stat label="프로젝트 기준 이익금 (진행 중 포함)">
-                <Money value={o.profitEstimate} />
-              </Stat>
-              <Stat label="프로젝트 기준 예상 세액" sub={`세율 ${o.profitTax.ratePct}% 구간`}>
-                <Money value={o.profitTax.totalTax} />
-              </Stat>
-            </>
-          )}
-          <Stat
-            label={`${selectedYear + 1}년 국민연금 (대표자, 월)`}
-            sub={`연 ${formatWon(ownerInsurance.pensionYearly)}${ofProfit(ownerInsurance.pensionYearly)}`}
-          >
-            <Money value={ownerInsurance.pensionMonthly} />
-          </Stat>
-          <Stat
-            label={`${selectedYear + 1}년 건강보험 (대표자, 월)`}
-            sub={`연 ${formatWon(ownerInsurance.healthYearly)}${ofProfit(ownerInsurance.healthYearly)} · 장기요양 포함`}
-          >
-            <Money value={ownerInsurance.healthMonthly} />
-          </Stat>
-        </div>
-        {isFirstBusinessYear && (
-          <CollapsibleSection
-            bare
-            className="mt-3 border-t border-slate-100 pt-2"
-            title={<FoldTitle>사업 첫해라 {selectedYear + 1}년에 몰리는 돈</FoldTitle>}
-            headerExtra={
-              <FoldSummary>
-                합계 약 {formatWon(cashOutTotal)}
-                {cashOut.healthSettlement == null && " (건강보험 정산 제외)"}
-              </FoldSummary>
+            label={`${selectedYear}년 예상 이익금`}
+            emphasis
+            sub={
+              o.combinedProfit != null
+                ? "상반기 확정 + 하반기 예상"
+                : headlineProfit != null
+                  ? "프로젝트 기준 (상반기 확정 미입력)"
+                  : "상반기 확정 이익금 입력 필요"
             }
           >
-            <p className="mt-1 text-[11px] text-slate-400">첫해는 중간예납이 없어 이듬해에 몰림</p>
+            {headlineProfit != null ? <Money value={headlineProfit} /> : "-"}
+          </Stat>
+          <Stat label="예상 세액 (소득세+지방소득세)" emphasis sub={headlineTax ? `세율 ${headlineTax.ratePct}% 구간` : undefined}>
+            {headlineTax ? <Money value={headlineTax.totalTax} /> : "-"}
+          </Stat>
+          <Link href="/projects" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
+            <Stat label="받을 돈 (예상 미수액)" sub={`프로젝트 ${receivableProjects.length}건`}>
+              <Money value={expectedReceivable} />
+            </Stat>
+          </Link>
+          <Link href="/transactions?tab=credit" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
+            <Stat label="줄 돈 (외상 매입)" sub={`미정산 ${creditPayableCount}건`}>
+              <Money value={creditPayable} className="text-slate-600" />
+            </Stat>
+          </Link>
+        </div>
+        {o.hasIncompleteProjects && (
+          <p className="mt-1.5 text-[11px] font-semibold text-red-600">진행 중인 프로젝트가 있어 추가 매입/매출이 생길 수 있습니다.</p>
+        )}
+      </Card>
+
+      {/* 자세한 내용은 한 카드 안의 접힘 목록 — 접힌 줄 오른쪽에 핵심 숫자 한 줄. */}
+      <Card padding="none" className="divide-y divide-slate-100">
+        <FoldRow
+          title="이익·세금 자세히"
+          summary={
+            <>
+              {o.half1Profit == null ? (
+                <span className="font-semibold text-amber-600">상반기 확정 이익금 미입력</span>
+              ) : (
+                `상반기 확정 ${formatWon(o.half1Profit)}`
+              )}
+              {` · ${selectedYear + 1}년 대표자 보험료 월 ${formatWon(
+                ownerInsurance.pensionMonthly + ownerInsurance.healthMonthly
+              )}`}
+            </>
+          }
+        >
+          <p className="mb-2 text-[11px] text-slate-400">
+            개인사업자 종합소득세 기준 · 지방소득세 10% 포함 · 본인 기본공제만 반영(참고용)
+          </p>
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            <Stat
+              label="상반기 확정 이익금 (세무사 결산)"
+              sub={<HalfYearSettlementInput key={selectedYear} year={selectedYear} initialAmount={o.half1Profit} />}
+            >
+              {o.half1Profit != null ? <Money value={o.half1Profit} /> : <span className="text-sm text-slate-400">미입력</span>}
+            </Stat>
+            <Stat label="하반기 예상 이익금 (7~12월)">
+              <Money value={o.h2EstimatedProfit} />
+            </Stat>
+            <Stat label="연간 합계 예상 이익금">
+              {o.combinedProfit != null ? (
+                <Money value={o.combinedProfit} />
+              ) : (
+                <span className="text-sm text-slate-400">상반기 입력 필요</span>
+              )}
+            </Stat>
+            <Stat label="연간 합계 예상 세액" sub={o.combinedTax ? `세율 ${o.combinedTax.ratePct}% 구간` : "상반기 입력 필요"}>
+              {o.combinedTax ? <Money value={o.combinedTax.totalTax} /> : "-"}
+            </Stat>
+            {o.hasProjectsWithProfit && (
+              <>
+                <Stat label="프로젝트 기준 이익금 (진행 중 포함)">
+                  <Money value={o.profitEstimate} />
+                </Stat>
+                <Stat label="프로젝트 기준 예상 세액" sub={`세율 ${o.profitTax.ratePct}% 구간`}>
+                  <Money value={o.profitTax.totalTax} />
+                </Stat>
+              </>
+            )}
+            <Stat
+              label={`${selectedYear + 1}년 국민연금 (대표자, 월)`}
+              sub={`연 ${formatWon(ownerInsurance.pensionYearly)}${ofProfit(ownerInsurance.pensionYearly)}`}
+            >
+              <Money value={ownerInsurance.pensionMonthly} />
+            </Stat>
+            <Stat
+              label={`${selectedYear + 1}년 건강보험 (대표자, 월)`}
+              sub={`연 ${formatWon(ownerInsurance.healthYearly)}${ofProfit(ownerInsurance.healthYearly)} · 장기요양 포함`}
+            >
+              <Money value={ownerInsurance.healthMonthly} />
+            </Stat>
+          </div>
+          <Footnote>
+            <DetailToggle label="설명 보기">
+              <p>
+                하반기 예상 = 장부 + 세금계산서 미발행분 − 인건비 · 연간 합계 = 상반기 확정 + 하반기 예상
+                {o.hasProjectsWithProfit &&
+                  " · 프로젝트 기준 = 프로젝트 총이익금(발주액 없는 프로젝트 비용 포함) − 일반경비 − 직원급여/상여/4대보험 (추가 지출이 생기면 실시간으로 바뀜)"}
+              </p>
+              <p>
+                예상 세액 = 이익금에서 본인 기본공제 150만원을 뺀 금액에 종합소득세율 적용 + 지방소득세 10% · 그 밖의 공제와
+                매입장에 없는 경비는 세무사가 신고 때 반영해서 실제 세액은 이와 다름
+              </p>
+              <p>
+                참고: 장부 매출−매입(부가세 제외)만으로 보면 이익 {formatWon(ledgerProfit)}, 기본공제 뺀 과세표준{" "}
+                {formatWon(ledgerTax.taxBase)}, 세율 {ledgerTax.ratePct}%, 예상 세액 약 {formatWon(ledgerTax.totalTax)}
+              </p>
+              <p>
+                {selectedYear + 1}년 국민연금·건강보험 = {o.combinedProfit != null ? "연간 합계" : "프로젝트 기준"} 예상
+                이익금으로 추정한 대표자 본인 부담(올해 이익이 내년 5월 종합소득세 신고 후 반영) · 국민연금{" "}
+                {OWNER_INSURANCE_RATES.pensionRate * 100}%, 기준소득월액 상한 {formatWon(OWNER_INSURANCE_RATES.pensionMonthlyCap)} ·
+                건강보험 {(OWNER_INSURANCE_RATES.healthRate * 100).toFixed(2)}% + 장기요양 건강보험료의{" "}
+                {(OWNER_INSURANCE_RATES.longTermCareOfHealth * 100).toFixed(2)}% ({OWNER_INSURANCE_RATES.year}년 요율 기준, 장기요양은
+                2026년 요율 — 2027년분 10월 이후 결정) · 직원 4대보험은 제외
+              </p>
+            </DetailToggle>
+            <DetailToggle label="계산 과정 보기">
+              <ProfitCalculationDetail year={selectedYear} o={o} />
+            </DetailToggle>
+          </Footnote>
+        </FoldRow>
+
+        {isFirstBusinessYear && (
+          <FoldRow
+            title={`사업 첫해라 ${selectedYear + 1}년에 몰리는 돈`}
+            summary={`합계 약 ${formatWon(cashOutTotal)}${cashOut.healthSettlement == null ? " (건강보험 정산 제외)" : ""}`}
+          >
+            <p className="text-[11px] text-slate-400">첫해는 중간예납이 없어 이듬해에 몰림</p>
             <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-5">
               <Stat
                 label="1월 · 부가세 2기 확정 (7~12월)"
@@ -474,90 +560,49 @@ export default async function DashboardPage({
                 고지 금액은 세무사가 매입장 외 공제까지 반영해 신고한 세액 기준이라 장부 기준인 여기 금액과 다름
               </p>
             </Footnote>
-          </CollapsibleSection>
+          </FoldRow>
         )}
-        <Footnote>
-          {o.hasIncompleteProjects && (
-            <p className="font-semibold text-red-600">진행 중인 프로젝트가 있어 추가 매입/매출이 생길 수 있습니다.</p>
-          )}
-          {/* 설명 글은 기본 접힘(사용자 요청) — 접힌 "몰리는 돈" 바로 아래에 긴 회색 글이 늘 펼쳐져 있었음. 경고(빨강)는 계속 보임. */}
-          <DetailToggle label="설명 보기">
-            <p>
-              하반기 예상 = 장부 + 세금계산서 미발행분 − 인건비 · 연간 합계 = 상반기 확정 + 하반기 예상
-              {o.hasProjectsWithProfit &&
-                " · 프로젝트 기준 = 프로젝트 총이익금(발주액 없는 프로젝트 비용 포함) − 일반경비 − 직원급여/상여/4대보험 (추가 지출이 생기면 실시간으로 바뀜)"}
-            </p>
-            <p>
-              예상 세액 = 이익금에서 본인 기본공제 150만원을 뺀 금액에 종합소득세율 적용 + 지방소득세 10% · 그 밖의 공제와
-              매입장에 없는 경비는 세무사가 신고 때 반영해서 실제 세액은 이와 다름
-            </p>
-            <p>
-              참고: 장부 매출−매입(부가세 제외)만으로 보면 이익 {formatWon(ledgerProfit)}, 기본공제 뺀 과세표준{" "}
-              {formatWon(ledgerTax.taxBase)}, 세율 {ledgerTax.ratePct}%, 예상 세액 약 {formatWon(ledgerTax.totalTax)}
-            </p>
-            <p>
-              {selectedYear + 1}년 국민연금·건강보험 = {o.combinedProfit != null ? "연간 합계" : "프로젝트 기준"} 예상
-              이익금으로 추정한 대표자 본인 부담(올해 이익이 내년 5월 종합소득세 신고 후 반영) · 국민연금{" "}
-              {OWNER_INSURANCE_RATES.pensionRate * 100}%, 기준소득월액 상한 {formatWon(OWNER_INSURANCE_RATES.pensionMonthlyCap)} ·
-              건강보험 {(OWNER_INSURANCE_RATES.healthRate * 100).toFixed(2)}% + 장기요양 건강보험료의{" "}
-              {(OWNER_INSURANCE_RATES.longTermCareOfHealth * 100).toFixed(2)}% ({OWNER_INSURANCE_RATES.year}년 요율 기준, 장기요양은
-              2026년 요율 — 2027년분 10월 이후 결정) · 직원 4대보험은 제외
-            </p>
-          </DetailToggle>
-          <DetailToggle label="계산 과정 보기">
-            <ProfitCalculationDetail year={selectedYear} o={o} />
-          </DetailToggle>
-        </Footnote>
-      </Card>
 
-      {/* ② 받을 돈 · 줄 돈 */}
-      <CollapsibleSection
-        bare
-        className={cx("rounded-2xl border border-slate-200 bg-white shadow-sm", CARD_PAD)}
-        title={<FoldTitle>② 받을 돈 · 줄 돈</FoldTitle>}
-        headerExtra={
-          <FoldSummary>
-            예상 미수액 {formatWon(expectedReceivable)} · 줄 돈 {formatWon(creditPayable)}
-          </FoldSummary>
-        }
-      >
-        <p className="mt-1 text-[11px] text-slate-400">외상은 정산 등록 전까지 매입매출장 합계에서 빠져 있음</p>
-        <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-4">
-          <Link href="/projects" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
-            <Stat label="예상 미수액 (진행중·공사 완료·수금 대기)" emphasis>
-              <Money value={expectedReceivable} />
-            </Stat>
-          </Link>
-          <Link href="/projects" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
-            <Stat label="공사 완료 · 수금 대기" sub={`${awaitingPayment.count}건`}>
-              <Money value={awaitingPayment.amount} />
-            </Stat>
-          </Link>
-          <Link href="/transactions?tab=credit" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
-            <Stat label="외상 매출 미수금 (받을 돈)" sub={`입금 대기 ${creditReceivableCount}건`}>
-              <Money value={creditReceivable} />
-            </Stat>
-          </Link>
-          <Link href="/transactions?tab=credit" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
-            <Stat label="외상 매입 미지급금 (줄 돈)" sub={`미정산 ${creditPayableCount}건`}>
-              <Money value={creditPayable} className="text-slate-600" />
-            </Stat>
-          </Link>
-        </div>
-        <Footnote>
-          <p>
-            예상 미수액 = 수주예상액 − 받은 기성금 ·{" "}
-            {expectedReceivableByStatus.map((r) => `${r.label} ${r.count}건 ${formatWon(r.amount)}`).join(" · ")}
-            {receivedSalesTotal > 0 && ` · 받은 기성금(이미 뺌, 부가세 제외) ${formatWon(receivedSalesTotal)}`}
-          </p>
-          <p>외상 매출 미수금 = 세금계산서 발행 후 입금 대기 · 공사 완료·수금 대기는 받은 기성금 제외</p>
-        </Footnote>
-      </CollapsibleSection>
+        <FoldRow
+          title="받을 돈 · 줄 돈 자세히"
+          summary={`수금 대기 ${awaitingPayment.count}건 ${formatWon(awaitingPayment.amount)} · 외상 미수금 ${formatWon(creditReceivable)}`}
+        >
+          <p className="text-[11px] text-slate-400">외상은 정산 등록 전까지 매입매출장 합계에서 빠져 있음</p>
+          <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-4">
+            <Link href="/projects" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
+              <Stat label="예상 미수액 (진행중·공사 완료·수금 대기)">
+                <Money value={expectedReceivable} />
+              </Stat>
+            </Link>
+            <Link href="/projects" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
+              <Stat label="공사 완료 · 수금 대기" sub={`${awaitingPayment.count}건`}>
+                <Money value={awaitingPayment.amount} />
+              </Stat>
+            </Link>
+            <Link href="/transactions?tab=credit" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
+              <Stat label="외상 매출 미수금 (받을 돈)" sub={`입금 대기 ${creditReceivableCount}건`}>
+                <Money value={creditReceivable} />
+              </Stat>
+            </Link>
+            <Link href="/transactions?tab=credit" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
+              <Stat label="외상 매입 미지급금 (줄 돈)" sub={`미정산 ${creditPayableCount}건`}>
+                <Money value={creditPayable} className="text-slate-600" />
+              </Stat>
+            </Link>
+          </div>
+          <Footnote>
+            <p>
+              예상 미수액 = 수주예상액 − 받은 기성금 ·{" "}
+              {expectedReceivableByStatus.map((r) => `${r.label} ${r.count}건 ${formatWon(r.amount)}`).join(" · ")}
+              {receivedSalesTotal > 0 && ` · 받은 기성금(이미 뺌, 부가세 제외) ${formatWon(receivedSalesTotal)}`}
+            </p>
+            <p>외상 매출 미수금 = 세금계산서 발행 후 입금 대기 · 공사 완료·수금 대기는 받은 기성금 제외</p>
+          </Footnote>
+        </FoldRow>
 
-      {/* 참고 현황 */}
-      <Card padding="none" className={CARD_PAD}>
-          <SectionTitle note="매입매출장 기준 · 부가세 포함">참고 현황</SectionTitle>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <FoldRow title="매출·매입 현황" summary={`${selectedYear}년 매출 ${formatWon(yearSales)} · 매입 ${formatWon(yearPurchase)}`}>
+          <p className="text-[11px] text-slate-400">매입매출장 기준 · 부가세 포함</p>
+          <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
             <Stat label={`${selectedYear}년 매출액`}>
               <Money value={yearSales} />
             </Stat>
@@ -580,66 +625,60 @@ export default async function DashboardPage({
               <Stat label="진행 중 프로젝트">{ongoingProjects?.length ?? 0}건</Stat>
             </Link>
           </div>
-      </Card>
+        </FoldRow>
 
-      {/* ④ 부가세 */}
-      <CollapsibleSection
-        bare
-        className={cx("rounded-2xl border border-slate-200 bg-white shadow-sm", CARD_PAD)}
-        title={<FoldTitle>④ {selectedYear}년 부가세 (분기별)</FoldTitle>}
-        headerExtra={<FoldSummary>납부 예상 합계 {formatWon(vatTotal.net)}</FoldSummary>}
-      >
-        <p className="mt-1 text-[11px] text-slate-400">
-          총액(부가세 포함)에서 계산 · 비과세 제외 · 외상 미정산 포함(세금계산서 기준)
-        </p>
-        <div className="mt-2 [&_table]:text-xs [&_td]:py-1 [&_th]:pb-1">
-          <VatQuarterTable rows={vatQuarters} total={vatTotal} />
-        </div>
-        <Footnote>
-          <p>
-            불공제 매입세액(승용차 렌트·유류비 등 &quot;매입세액 불공제&quot; 카테고리)은 납부 예상에서 빼지 않음 · 신고는
-            반기(1~6월, 7~12월) 기준 · 4월·10월엔 직전 반기 납부세액의 1/2을 예정고지로 먼저 내고(50만원 미만이면 없음)
-            7월·1월 확정 때 뺌 · 매입장 외 공제는 세무사가 신고 때 반영해서 실제 납부액은 이와 다름
+        <FoldRow title={`${selectedYear}년 부가세 (분기별)`} summary={`납부 예상 합계 ${formatWon(vatTotal.net)}`}>
+          <p className="text-[11px] text-slate-400">
+            총액(부가세 포함)에서 계산 · 비과세 제외 · 외상 미정산 포함(세금계산서 기준)
           </p>
-        </Footnote>
-      </CollapsibleSection>
+          <div className="mt-2 [&_table]:text-xs [&_td]:py-1 [&_th]:pb-1">
+            <VatQuarterTable rows={vatQuarters} total={vatTotal} />
+          </div>
+          <Footnote>
+            <p>
+              불공제 매입세액(승용차 렌트·유류비 등 &quot;매입세액 불공제&quot; 카테고리)은 납부 예상에서 빼지 않음 · 신고는
+              반기(1~6월, 7~12월) 기준 · 4월·10월엔 직전 반기 납부세액의 1/2을 예정고지로 먼저 내고(50만원 미만이면 없음)
+              7월·1월 확정 때 뺌 · 매입장 외 공제는 세무사가 신고 때 반영해서 실제 납부액은 이와 다름
+            </p>
+          </Footnote>
+        </FoldRow>
 
-      <Card padding="none" className={CARD_PAD}>
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-slate-900">최근 거래</h2>
-          <Link href="/transactions" className="text-xs text-slate-500 transition-colors hover:text-slate-800">
-            전체보기
-          </Link>
-        </div>
-        <div className="[&_table]:text-xs [&_td]:py-1 [&_th]:pb-1">
-          <Table className="min-w-[600px]">
-            <THead>
-              <Th className="pr-4">날짜</Th>
-              <Th className="pr-4">구분</Th>
-              <Th className="pr-4">거래처</Th>
-              <Th className="pr-4">프로젝트</Th>
-              <Th className="pr-4">품목</Th>
-              <Th className="text-right">금액</Th>
-            </THead>
-            <tbody>
-              {recentTx.map((t) => (
-                <Tr key={t.id}>
-                  <Td className="pr-4">{formatDate(t.trans_date)}</Td>
-                  <Td className="pr-4">
-                    <Badge variant={t.type === "매출" ? "blue" : "orange"}>{t.type}</Badge>
-                  </Td>
-                  <Td className="pr-4">{t.clients?.name ?? t.client_name_raw ?? "-"}</Td>
-                  <Td className="pr-4">{t.projects?.name ?? "-"}</Td>
-                  <Td className="pr-4">{t.item_name ?? "-"}</Td>
-                  <Td className="text-right font-medium text-slate-900">
-                    {formatWon(t.type === "매출" ? t.sales_amount + t.sales_vat : t.purchase_amount + t.purchase_vat)}
-                  </Td>
-                </Tr>
-              ))}
-              {recentTx.length === 0 && <EmptyRow colSpan={6}>거래 내역이 없습니다.</EmptyRow>}
-            </tbody>
-          </Table>
-        </div>
+        <FoldRow title="최근 거래" summary={latestTxLabel}>
+          <div className="[&_table]:text-xs [&_td]:py-1 [&_th]:pb-1">
+            <Table className="min-w-[600px]">
+              <THead>
+                <Th className="pr-4">날짜</Th>
+                <Th className="pr-4">구분</Th>
+                <Th className="pr-4">거래처</Th>
+                <Th className="pr-4">프로젝트</Th>
+                <Th className="pr-4">품목</Th>
+                <Th className="text-right">금액</Th>
+              </THead>
+              <tbody>
+                {recentTx.map((t) => (
+                  <Tr key={t.id}>
+                    <Td className="pr-4">{formatDate(t.trans_date)}</Td>
+                    <Td className="pr-4">
+                      <Badge variant={t.type === "매출" ? "blue" : "orange"}>{t.type}</Badge>
+                    </Td>
+                    <Td className="pr-4">{t.clients?.name ?? t.client_name_raw ?? "-"}</Td>
+                    <Td className="pr-4">{t.projects?.name ?? "-"}</Td>
+                    <Td className="pr-4">{t.item_name ?? "-"}</Td>
+                    <Td className="text-right font-medium text-slate-900">
+                      {formatWon(t.type === "매출" ? t.sales_amount + t.sales_vat : t.purchase_amount + t.purchase_vat)}
+                    </Td>
+                  </Tr>
+                ))}
+                {recentTx.length === 0 && <EmptyRow colSpan={6}>거래 내역이 없습니다.</EmptyRow>}
+              </tbody>
+            </Table>
+          </div>
+          <div className="mt-1.5 text-right">
+            <Link href="/transactions" className="text-xs text-slate-500 transition-colors hover:text-slate-800">
+              전체보기 →
+            </Link>
+          </div>
+        </FoldRow>
       </Card>
     </div>
   );
