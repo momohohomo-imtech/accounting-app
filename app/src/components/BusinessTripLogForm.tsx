@@ -10,7 +10,7 @@ import type {
 } from "@/lib/types";
 import { WORK_TYPE_OPTIONS } from "@/lib/businessTrip";
 import { getWorkLogsForDate, type WorkLogDateEntry } from "@/lib/actions/worklogs";
-import { fieldClass, labelClass } from "@/components/ui/field";
+import { fieldClass, inlineFieldClass, labelClass } from "@/components/ui/field";
 import { Button } from "@/components/ui/Button";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { todayString } from "@/lib/format";
@@ -184,16 +184,18 @@ function ProjectBlockEditor({
           </button>
         </div>
         <p className="mb-1.5 text-xs text-slate-400">근무일은 기본으로 공사일을 따라가며, 필요하면 인원별로 수정할 수 있습니다.</p>
+        {/* 휴대폰: 한 줄에 고정 폭 칸(날짜·추가근무·삭제)을 두면 작업자명·비고 칸이 20px 남짓으로 줄어 입력이 안 됐음 —
+            [공사일][작업자명][추가근무] / [비고][삭제] 두 줄로(max-md:는 A4 인쇄 폭에도 걸려서 print:로 원래 칸 배치) */}
         <div className="space-y-1.5">
-          <div className="grid grid-cols-[8rem_1fr_5rem_1fr_3rem] gap-2 px-1 text-xs font-medium text-slate-500">
+          <div className="grid grid-cols-[8rem_1fr_5rem_1fr_3rem] gap-2 px-1 text-xs font-medium text-slate-500 max-md:grid-cols-[1fr_1fr_auto] print:grid-cols-[8rem_1fr_5rem_1fr_3rem]">
             <span>공사일</span>
             <span>작업자명</span>
             <span>추가근무</span>
-            <span>비고</span>
+            <span className="max-md:col-span-2 print:col-span-1">비고</span>
             <span />
           </div>
           {project.workers.map((w, i) => (
-            <div key={i} className="grid grid-cols-[8rem_1fr_5rem_1fr_3rem] items-center gap-2">
+            <div key={i} className="grid grid-cols-[8rem_1fr_5rem_1fr_3rem] items-center gap-2 max-md:grid-cols-[1fr_1fr_auto] print:grid-cols-[8rem_1fr_5rem_1fr_3rem]">
               <input
                 type="date"
                 value={w.work_date}
@@ -207,7 +209,11 @@ function ProjectBlockEditor({
                 onChange={(e) => updateWorker(i, { overtime: e.target.checked })}
                 className="h-4 w-4 justify-self-center"
               />
-              <input value={w.note} onChange={(e) => updateWorker(i, { note: e.target.value })} className={fieldClass} />
+              <input
+                value={w.note}
+                onChange={(e) => updateWorker(i, { note: e.target.value })}
+                className={`${fieldClass} max-md:col-span-2 print:col-span-1`}
+              />
               {project.workers.length > 1 ? (
                 <button
                   type="button"
@@ -238,7 +244,8 @@ function ProjectBlockEditor({
               setManpowerTouched(true);
               onChange({ ...project, total_manpower: e.target.value });
             }}
-            className={`${fieldClass} w-20 text-right`}
+            // inlineFieldClass: fieldClass의 w-full이 w-20을 이겨 칸이 꽉 차게 늘어나 "총 공수"가 두 줄로 쪼개졌음
+            className={`${inlineFieldClass} w-20 text-right`}
           />
           <span className="text-sm text-slate-500">명</span>
         </div>
@@ -256,15 +263,15 @@ function ProjectBlockEditor({
           </button>
         </div>
         <div className="space-y-1.5">
-          <div className="grid grid-cols-[1fr_1fr_6rem_1fr_3rem] gap-2 px-1 text-xs font-medium text-slate-500">
+          <div className="grid grid-cols-[1fr_1fr_6rem_1fr_3rem] gap-2 px-1 text-xs font-medium text-slate-500 max-md:grid-cols-[1fr_1fr_4.5rem] print:grid-cols-[1fr_1fr_6rem_1fr_3rem]">
             <span>장비명</span>
             <span>사용처</span>
             <span>작업시간</span>
-            <span>비고</span>
+            <span className="max-md:col-span-2 print:col-span-1">비고</span>
             <span />
           </div>
           {project.equipment.map((eq, i) => (
-            <div key={i} className="grid grid-cols-[1fr_1fr_6rem_1fr_3rem] items-center gap-2">
+            <div key={i} className="grid grid-cols-[1fr_1fr_6rem_1fr_3rem] items-center gap-2 max-md:grid-cols-[1fr_1fr_4.5rem] print:grid-cols-[1fr_1fr_6rem_1fr_3rem]">
               <input value={eq.name} onChange={(e) => updateEquipment(i, { name: e.target.value })} className={fieldClass} />
               <input
                 value={eq.location}
@@ -272,7 +279,11 @@ function ProjectBlockEditor({
                 className={fieldClass}
               />
               <input value={eq.hours} onChange={(e) => updateEquipment(i, { hours: e.target.value })} className={fieldClass} />
-              <input value={eq.note} onChange={(e) => updateEquipment(i, { note: e.target.value })} className={fieldClass} />
+              <input
+                value={eq.note}
+                onChange={(e) => updateEquipment(i, { note: e.target.value })}
+                className={`${fieldClass} max-md:col-span-2 print:col-span-1`}
+              />
               {project.equipment.length > 1 ? (
                 <button
                   type="button"
@@ -301,17 +312,21 @@ function ProjectBlockEditor({
           </button>
         </div>
         <div className="space-y-1.5">
-          <div className="grid grid-cols-[1fr_8rem_1fr_3rem] gap-2 px-1 text-xs font-medium text-slate-500">
+          <div className="grid grid-cols-[1fr_8rem_1fr_3rem] gap-2 px-1 text-xs font-medium text-slate-500 max-md:grid-cols-[1fr_1fr_3rem] print:grid-cols-[1fr_8rem_1fr_3rem]">
             <span>사용처</span>
             <span>금액</span>
-            <span>비고</span>
+            <span className="max-md:col-span-2 max-md:col-start-1 print:col-span-1 print:col-start-auto">비고</span>
             <span />
           </div>
           {project.expenses.map((ex, i) => (
-            <div key={i} className="grid grid-cols-[1fr_8rem_1fr_3rem] items-center gap-2">
+            <div key={i} className="grid grid-cols-[1fr_8rem_1fr_3rem] items-center gap-2 max-md:grid-cols-[1fr_1fr_3rem] print:grid-cols-[1fr_8rem_1fr_3rem]">
               <input value={ex.vendor} onChange={(e) => updateExpense(i, { vendor: e.target.value })} className={fieldClass} />
               <input value={ex.amount} onChange={(e) => updateExpense(i, { amount: e.target.value })} className={fieldClass} />
-              <input value={ex.note} onChange={(e) => updateExpense(i, { note: e.target.value })} className={fieldClass} />
+              <input
+                value={ex.note}
+                onChange={(e) => updateExpense(i, { note: e.target.value })}
+                className={`${fieldClass} max-md:col-span-2 max-md:col-start-1 print:col-span-1 print:col-start-auto`}
+              />
               {project.expenses.length > 1 ? (
                 <button
                   type="button"

@@ -267,7 +267,7 @@ export function CategoryDetailReport({
         <h2 className="text-lg font-semibold text-slate-900">
           {categoryName} 총 매입내역 <span className="tabular-nums text-sm font-normal text-slate-400">{year}년</span>
         </h2>
-        <div className="flex items-center gap-3 print:hidden">
+        <div className="flex items-center gap-3 max-md:flex-wrap print:hidden">
           {statusOptions.length > 0 && (
             <select
               value={statusFilter}

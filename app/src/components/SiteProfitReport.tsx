@@ -115,7 +115,7 @@ export function SiteProfitReport({
         <h2 className="text-lg font-semibold text-slate-900">
           {siteName} 현장 내역서 <span className="tabular-nums text-sm font-normal text-slate-400">{year}년</span>
         </h2>
-        <div className="flex items-center gap-3 print:hidden">
+        <div className="flex items-center gap-3 max-md:flex-wrap print:hidden">
           <select
             value={kindFilter}
             onChange={(e) => setKindFilter(e.target.value as "" | "매출" | "매입")}

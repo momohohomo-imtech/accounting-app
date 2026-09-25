@@ -113,7 +113,8 @@ export function ProjectPicker({
         </select>
       ) : (
         <div className="flex flex-col gap-2 rounded-lg border border-dashed border-slate-300 p-2">
-          <div className="flex gap-2">
+          {/* 휴대폰: 연도·현장을 반씩 나누면 긴 현장 이름("(주)○○ · ○○ 현장")이 잘려서 위아래로 쌓음 */}
+          <div className="flex gap-2 max-md:flex-col print:flex-row">
             <select
               value={year}
               onChange={(e) => {

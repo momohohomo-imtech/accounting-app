@@ -456,26 +456,29 @@ export default async function DashboardPage({
           </CollapsibleSection>
         )}
         <Footnote>
-          <p>
-            하반기 예상 = 장부 + 세금계산서 미발행분 − 인건비 · 연간 합계 = 상반기 확정 + 하반기 예상
-            {o.hasProjectsWithProfit &&
-              " · 프로젝트 기준 = 프로젝트 총이익금(발주액 없는 프로젝트 비용 포함) − 일반경비 − 직원급여/상여/4대보험 (추가 지출이 생기면 실시간으로 바뀜)"}
-          </p>
-          <p>
-            참고: 장부 매출−매입(부가세 제외)만으로 보면 {formatWon(ledgerTax.taxBase)} 기준, 세율 {ledgerTax.ratePct}%, 예상
-            세액 약 {formatWon(ledgerTax.totalTax)}
-          </p>
-          <p>
-            {selectedYear + 1}년 국민연금·건강보험 = {o.combinedProfit != null ? "연간 합계" : "프로젝트 기준"} 예상
-            이익금으로 추정한 대표자 본인 부담(올해 이익이 내년 5월 종합소득세 신고 후 반영) · 국민연금{" "}
-            {OWNER_INSURANCE_RATES.pensionRate * 100}%, 기준소득월액 상한 {formatWon(OWNER_INSURANCE_RATES.pensionMonthlyCap)} ·
-            건강보험 {(OWNER_INSURANCE_RATES.healthRate * 100).toFixed(2)}% + 장기요양 건강보험료의{" "}
-            {(OWNER_INSURANCE_RATES.longTermCareOfHealth * 100).toFixed(2)}% ({OWNER_INSURANCE_RATES.year}년 요율 기준, 장기요양은
-            2026년 요율 — 2027년분 10월 이후 결정) · 직원 4대보험은 제외
-          </p>
           {o.hasIncompleteProjects && (
             <p className="font-semibold text-red-600">진행 중인 프로젝트가 있어 추가 매입/매출이 생길 수 있습니다.</p>
           )}
+          {/* 설명 글은 기본 접힘(사용자 요청) — 접힌 "몰리는 돈" 바로 아래에 긴 회색 글이 늘 펼쳐져 있었음. 경고(빨강)는 계속 보임. */}
+          <DetailToggle label="설명 보기">
+            <p>
+              하반기 예상 = 장부 + 세금계산서 미발행분 − 인건비 · 연간 합계 = 상반기 확정 + 하반기 예상
+              {o.hasProjectsWithProfit &&
+                " · 프로젝트 기준 = 프로젝트 총이익금(발주액 없는 프로젝트 비용 포함) − 일반경비 − 직원급여/상여/4대보험 (추가 지출이 생기면 실시간으로 바뀜)"}
+            </p>
+            <p>
+              참고: 장부 매출−매입(부가세 제외)만으로 보면 {formatWon(ledgerTax.taxBase)} 기준, 세율 {ledgerTax.ratePct}%, 예상
+              세액 약 {formatWon(ledgerTax.totalTax)}
+            </p>
+            <p>
+              {selectedYear + 1}년 국민연금·건강보험 = {o.combinedProfit != null ? "연간 합계" : "프로젝트 기준"} 예상
+              이익금으로 추정한 대표자 본인 부담(올해 이익이 내년 5월 종합소득세 신고 후 반영) · 국민연금{" "}
+              {OWNER_INSURANCE_RATES.pensionRate * 100}%, 기준소득월액 상한 {formatWon(OWNER_INSURANCE_RATES.pensionMonthlyCap)} ·
+              건강보험 {(OWNER_INSURANCE_RATES.healthRate * 100).toFixed(2)}% + 장기요양 건강보험료의{" "}
+              {(OWNER_INSURANCE_RATES.longTermCareOfHealth * 100).toFixed(2)}% ({OWNER_INSURANCE_RATES.year}년 요율 기준, 장기요양은
+              2026년 요율 — 2027년분 10월 이후 결정) · 직원 4대보험은 제외
+            </p>
+          </DetailToggle>
           <DetailToggle label="계산 과정 보기">
             <ProfitCalculationDetail year={selectedYear} o={o} />
           </DetailToggle>

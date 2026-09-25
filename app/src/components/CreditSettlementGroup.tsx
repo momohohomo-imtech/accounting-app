@@ -69,7 +69,9 @@ export function CreditSettlementGroup({
 
       <ul className="divide-y divide-slate-100">
         {items.map(({ tx, remaining }) => (
-          <li key={tx.id} className="flex items-center gap-3 py-2 text-sm">
+          // flex-wrap: 휴대폰에선 한 줄에 다 안 들어가 금액·수정·삭제가 화면 밖으로 잘렸음 — 넘치면 둘째 줄 오른쪽으로.
+          // PC·인쇄 폭에선 한 줄에 다 들어가서 예전과 같음.
+          <li key={tx.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-2 text-sm">
             <input
               type="checkbox"
               checked={selected.has(tx.id)}
@@ -87,52 +89,54 @@ export function CreditSettlementGroup({
               )}
             </span>
             <span className="flex-1 truncate text-slate-700">{tx.item_name ?? "-"}</span>
-            <span className="shrink-0 text-brand">
-              {formatWon(supplyOf(tx))}
-            </span>
-            <span className="shrink-0 font-medium text-slate-900">{formatWon(remaining)}</span>
-            <LinkButton href={`/transactions?tab=credit&editTx=${tx.id}`} variant="secondary" size="xs">
-              수정
-            </LinkButton>
-            {confirmDeleteId === tx.id ? (
-              <div className="flex shrink-0 items-center gap-1">
-                <span className="text-xs font-medium text-red-600">정말 삭제?</span>
-                <Button
-                  variant="danger"
-                  size="xs"
-                  type="button"
-                  onClick={async () => {
-                    const fd = new FormData();
-                    fd.append("id", tx.id);
-                    const result = await pending.run(() => deleteTransactionRecord(fd));
-                    if (result?.error) {
-                      setDeleteError(result.error);
-                      return;
-                    }
-                    setDeleteError(null);
-                    setConfirmDeleteId(null);
-                  }}
-                >
-                  확인
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
+              <span className="shrink-0 text-brand">
+                {formatWon(supplyOf(tx))}
+              </span>
+              <span className="shrink-0 font-medium text-slate-900">{formatWon(remaining)}</span>
+              <LinkButton href={`/transactions?tab=credit&editTx=${tx.id}`} variant="secondary" size="xs">
+                수정
+              </LinkButton>
+              {confirmDeleteId === tx.id ? (
+                <div className="flex shrink-0 items-center gap-1">
+                  <span className="text-xs font-medium text-red-600">정말 삭제?</span>
+                  <Button
+                    variant="danger"
+                    size="xs"
+                    type="button"
+                    onClick={async () => {
+                      const fd = new FormData();
+                      fd.append("id", tx.id);
+                      const result = await pending.run(() => deleteTransactionRecord(fd));
+                      if (result?.error) {
+                        setDeleteError(result.error);
+                        return;
+                      }
+                      setDeleteError(null);
+                      setConfirmDeleteId(null);
+                    }}
+                  >
+                    확인
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="xs"
+                    type="button"
+                    onClick={() => {
+                      setConfirmDeleteId(null);
+                      setDeleteError(null);
+                    }}
+                  >
+                    취소
+                  </Button>
+                  {deleteError && <span className="text-xs text-red-600">{deleteError}</span>}
+                </div>
+              ) : (
+                <Button variant="danger" size="xs" type="button" onClick={() => setConfirmDeleteId(tx.id)}>
+                  삭제
                 </Button>
-                <Button
-                  variant="secondary"
-                  size="xs"
-                  type="button"
-                  onClick={() => {
-                    setConfirmDeleteId(null);
-                    setDeleteError(null);
-                  }}
-                >
-                  취소
-                </Button>
-                {deleteError && <span className="text-xs text-red-600">{deleteError}</span>}
-              </div>
-            ) : (
-              <Button variant="danger" size="xs" type="button" onClick={() => setConfirmDeleteId(tx.id)}>
-                삭제
-              </Button>
-            )}
+              )}
+            </div>
           </li>
         ))}
       </ul>

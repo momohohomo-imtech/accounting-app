@@ -781,7 +781,9 @@ export default async function ReportsPage({
     extra?: ReactNode
   ) {
     return (
-      <div className="flex items-center gap-2 print:hidden">
+      // max-md:flex-wrap: 휴대폰에서 요약 글자·선택칸·버튼을 한 줄에 우겨넣어 요약은 몇 자씩 세로로 쪼개지고
+      // 선택칸은 "전체"·"프로"만 보였음 — 넘치면 다음 줄로.
+      <div className="flex items-center gap-2 max-md:flex-wrap print:hidden">
         {extra}
         <ReportExcelButton filename={excel.filename} headers={excel.headers} rows={excel.rows} />
         {printLink(section)}

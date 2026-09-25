@@ -237,7 +237,9 @@ export function AccessApplicationPopup({
               2. 추후 사내 촬영으로 인한 사진 및 동영상 유출 시 해당업체 및 서약자 본인이 민형사상 책임을 질것을 확인합니다.
             </p>
 
-            <div style={{ border: "2px solid #000", marginTop: 8 }}>
+            {/* 휴대폰: 서약자 표가 카드보다 넓어 오른쪽 칸이 카드 밖(어두운 배경 위)으로 나가 읽기 어려웠음 — 테두리 상자
+                안에서 옆으로 넘김. 인쇄는 그대로(print:overflow-visible). */}
+            <div className="overflow-x-auto print:overflow-visible" style={{ border: "2px solid #000", marginTop: 8 }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>

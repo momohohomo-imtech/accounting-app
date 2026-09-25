@@ -163,7 +163,7 @@ export function VendorDetailReport({
           {vendorName} {hasAgency ? "매입/대행구매 내역" : "매입 내역"}{" "}
           <span className="tabular-nums text-sm font-normal text-slate-400">{year}년</span>
         </h2>
-        <div className="flex items-center gap-3 print:hidden">
+        <div className="flex items-center gap-3 max-md:flex-wrap print:hidden">
           <label className="flex items-center gap-1.5 text-xs text-slate-600">
             <input type="checkbox" checked={showProject} onChange={(e) => setShowProject(e.target.checked)} className="h-3.5 w-3.5" />
             프로젝트

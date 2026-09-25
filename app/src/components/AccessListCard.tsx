@@ -295,7 +295,9 @@ export function AccessListCard({
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-2">
+      {/* 휴대폰: 버튼 5개를 글자 옆에 두면 글자는 몇 자씩 세로로 쪼개지고 "삭제"는 화면 밖으로 잘렸음 — 버튼을 글자 아래로.
+          max-md:는 A4 인쇄 폭에도 걸리므로 print:로 원래대로. */}
+      <div className="flex items-start justify-between gap-2 max-md:flex-col print:flex-row">
         <div>
           <p className="font-semibold text-slate-900">{companyName}</p>
           <p className="mt-1 text-sm text-slate-500">
@@ -317,7 +319,7 @@ export function AccessListCard({
                 ))}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2 max-md:flex-wrap print:flex-nowrap">
           <Button variant="secondary" size="xs" onClick={startEditing}>
             수정
           </Button>
