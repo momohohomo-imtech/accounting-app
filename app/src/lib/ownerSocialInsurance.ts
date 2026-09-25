@@ -4,7 +4,6 @@
 export const OWNER_INSURANCE_RATES = {
   year: 2027,
   pensionRate: 0.1, // 국민연금 2026 9.5% → 2027 10% (연금개혁: 매년 0.5%p씩 2033년 13%)
-  pensionRateThisYear: 0.095, // 2026 요율 — 가입 누락 시 올해분 소급 추정용
   pensionMonthlyCap: 6_590_000, // 기준소득월액 상한 (2026.7~2027.6)
   pensionMonthlyFloor: 410_000, // 기준소득월액 하한 (2026.7~2027.6)
   healthRate: 0.0719, // 건강보험 2026·2027 모두 7.19% (2027 동결 확정)
@@ -41,10 +40,4 @@ export function estimateOwnerInsurance(annualProfit: number, months = 12, rates 
 export function ownerHealthSettlement(annualProfit: number, months: number, paidMonthly: number, rates = OWNER_INSURANCE_RATES) {
   const owedMonthly = healthMonthlyAt(Math.max(annualProfit, 0) / Math.max(months, 1), rates);
   return (owedMonthly - paidMonthly) * months;
-}
-
-// 대표자 국민연금이 가입 누락돼 있으면 사업 시작 때로 거슬러 부과될 수 있는 올해분(올해 요율) — 확인용 추정.
-export function ownerPensionBackPay(annualProfit: number, months: number, rates = OWNER_INSURANCE_RATES) {
-  const monthlyIncome = Math.max(annualProfit, 0) / Math.max(months, 1);
-  return pensionMonthlyAt(monthlyIncome, rates.pensionRateThisYear, rates) * months;
 }

@@ -9,7 +9,6 @@ import { taxEstimate, incomeTaxInstallment, interimPrepayment } from "@/lib/tax"
 import {
   estimateOwnerInsurance,
   ownerHealthSettlement,
-  ownerPensionBackPay,
   OWNER_INSURANCE_RATES,
 } from "@/lib/ownerSocialInsurance";
 import { loadProfitOutlook, ProfitCalculationDetail } from "@/components/sections/ProfitOutlook";
@@ -153,9 +152,9 @@ export default async function DashboardPage({
     supabase.from("projects").select("id, name, status, quote_amount").eq("year", selectedYear),
     // select("*") — 불공제·비과세 칸(082·083 마이그레이션) 실행 전에도 조회가 깨지지 않게.
     supabase.from("expense_categories").select("*"),
-    // 대표자 건강보험(사업 첫해) = 최고 급여 직원 기준 — 직원 공제액(본인 절반)의 2배. 조회 전용 계정은
+    // 대표자 건강보험·국민연금(사업 첫해) = 최고 급여 직원 기준 — 직원 공제액(본인 절반)의 2배. 조회 전용 계정은
     // 직원 정보를 못 읽어서 null → 정산 추정 칸에 안내만 표시.
-    supabase.from("employees").select("health_insurance, long_term_care_insurance, resigned_date"),
+    supabase.from("employees").select("health_insurance, long_term_care_insurance, national_pension, resigned_date"),
   ]);
   const yearProjects = yearProjectRows ?? [];
   const categoryById = new Map(((categoryRows ?? []) as ExpenseCategory[]).map((c) => [c.id, c]));
@@ -305,9 +304,11 @@ export default async function DashboardPage({
   const activeEmployees = (employeeRows ?? []).filter(
     (e) => !e.resigned_date || e.resigned_date > `${today.year}-${mm}-${String(today.day).padStart(2, "0")}`
   );
-  const ownerHealthPaidMonthly = activeEmployees.length
-    ? 2 * Math.max(...activeEmployees.map((e) => Number(e.health_insurance) + Number(e.long_term_care_insurance)))
-    : null;
+  // 첫해 대표자 보험료는 최고 급여 직원 기준 — 직원 공제액(본인 절반)의 2배로 추정.
+  const ownerPaidMonthly = (pick: (e: (typeof activeEmployees)[number]) => number) =>
+    activeEmployees.length ? 2 * Math.max(...activeEmployees.map(pick)) : null;
+  const ownerHealthPaidMonthly = ownerPaidMonthly((e) => Number(e.health_insurance) + Number(e.long_term_care_insurance));
+  const ownerPensionPaidMonthly = ownerPaidMonthly((e) => Number(e.national_pension));
   const cashOut = {
     vat2: vatQuarters[2].net + vatQuarters[3].net,
     mayTax: nextYearTax.totalTax,
@@ -317,7 +318,6 @@ export default async function DashboardPage({
         ? ownerHealthSettlement(insuranceBaseProfit, businessMonths, ownerHealthPaidMonthly)
         : null,
     interim: interimPrepayment(nextYearTax.incomeTax),
-    pensionBackPay: ownerPensionBackPay(insuranceBaseProfit, businessMonths),
   };
   const cashOutTotal =
     cashOut.vat2 + cashOut.mayTax + Math.max(cashOut.healthSettlement ?? 0, 0) + cashOut.interim;
@@ -388,7 +388,11 @@ export default async function DashboardPage({
         </div>
         {isFirstBusinessYear && (
           <div className="mt-3 border-t border-slate-100 pt-2">
-            <SectionTitle note={`국민연금 제외 합계 약 ${formatWon(cashOutTotal)} · 첫해는 중간예납이 없어 이듬해에 몰림`}>
+            <SectionTitle
+              note={`합계 약 ${formatWon(cashOutTotal)}${
+                cashOut.healthSettlement == null ? " (건강보험 정산 제외)" : ""
+              } · 첫해는 중간예납이 없어 이듬해에 몰림`}
+            >
               사업 첫해라 {selectedYear + 1}년에 몰리는 돈
             </SectionTitle>
             <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
@@ -415,8 +419,17 @@ export default async function DashboardPage({
               <Stat label={`11월 · ${selectedYear + 1}년 중간예납`} sub={`${selectedYear}년 소득세의 1/2`}>
                 <Money value={cashOut.interim} />
               </Stat>
-              <Stat label="국민연금 (대표자) · 확인 필요" sub="가입 누락이면 올해분 소급 가능 · 10회 분할">
-                <Money value={cashOut.pensionBackPay} />
+              <Stat
+                label="7월~ · 대표자 국민연금 인상 (월)"
+                sub={
+                  ownerPensionPaidMonthly != null
+                    ? `지금 월 ${formatWon(ownerPensionPaidMonthly)} → +${formatWon(
+                        Math.max(ownerInsurance.pensionMonthly - ownerPensionPaidMonthly, 0)
+                      )} · 소급 정산 없음`
+                    : "지금 낸 금액은 직원 급여 정보를 볼 수 있는 계정에서 표시 · 소급 정산 없음"
+                }
+              >
+                <Money value={ownerInsurance.pensionMonthly} />
               </Stat>
             </div>
           </div>
@@ -442,8 +455,8 @@ export default async function DashboardPage({
           {isFirstBusinessYear && (
             <p>
               몰리는 돈: 사업 기간 {businessMonths}개월({businessStartMonth}월 첫 거래부터) 기준 · 건강보험 정산 = 올해 이익 기준
-              보험료 − 최고 급여 직원 기준으로 낸 금액(직원 공제액의 2배) · 국민연금은 건강보험과 달리 1년치 정산이 없어, 지금
-              안 나가고 있다면 가입 누락 여부를 세무사·국민연금공단(1355)에 확인 · 금액은 세무사 확인 전 추정치
+              보험료 − 최고 급여 직원 기준으로 낸 금액(직원 공제액의 2배) · 국민연금은 1년치 정산 없이 7월부터 월 보험료만
+              오름(소득총액신고를 빠뜨리면 11월에 7월분부터 소급) · 금액은 세무사 확인 전 추정치
             </p>
           )}
           {o.hasIncompleteProjects && (

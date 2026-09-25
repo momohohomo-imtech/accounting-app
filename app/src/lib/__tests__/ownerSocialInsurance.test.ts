@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { estimateOwnerInsurance, ownerHealthSettlement, ownerPensionBackPay } from "@/lib/ownerSocialInsurance";
+import { estimateOwnerInsurance, ownerHealthSettlement } from "@/lib/ownerSocialInsurance";
 
 test("국민연금은 기준소득월액 상한(659만원)까지만 — 이익이 커도 월 659,000원", () => {
   const r = estimateOwnerInsurance(264_000_000);
@@ -33,9 +33,4 @@ test("건강보험 정산 = (올해 이익 기준 월 보험료 − 매달 낸 �
   assert.equal(ownerHealthSettlement(120_000_000, 12, 300_000), 513_470 * 12);
   // 이미 더 많이 냈으면 음수(돌려받음)
   assert.ok(ownerHealthSettlement(12_000_000, 12, 300_000) < 0);
-});
-
-test("국민연금 가입 누락 시 올해분 소급 추정 = 올해 요율(9.5%) × 상한 적용 × 개월수", () => {
-  assert.equal(ownerPensionBackPay(264_000_000, 12), 626_050 * 12);
-  assert.equal(ownerPensionBackPay(0, 12), 0);
 });
