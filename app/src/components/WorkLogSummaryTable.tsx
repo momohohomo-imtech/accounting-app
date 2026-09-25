@@ -100,11 +100,12 @@ export function WorkLogSummaryTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[650px] text-sm">
+      {/* sticky-col-table: 옆으로 넘길 때 첫 칸(체크박스) 대신 현장 칸을 고정 — 체크박스만 남아 어느 현장 줄인지 몰랐음 */}
+      <table className="sticky-col-table w-full min-w-[650px] text-sm">
         <thead>
           <tr className="border-b border-slate-200 text-left text-slate-500">
             <th className="pb-2 pr-2 w-6" />
-            <th className="pb-2 pr-4">{headerButton("siteName", "현장")}</th>
+            <th className="sticky-col pb-2 pr-4">{headerButton("siteName", "현장")}</th>
             <th className="pb-2 pr-4">{headerButton("title", "내용")}</th>
             <th className="pb-2 pr-4 text-right">{headerButton("days", "일수")}</th>
             <th className="pb-2">{headerButton("dates", "날짜")}</th>
@@ -124,7 +125,7 @@ export function WorkLogSummaryTable({
                     className="h-3.5 w-3.5"
                   />
                 </td>
-                <td className="py-2 pr-4">
+                <td className="sticky-col py-2 pr-4">
                   <span className="inline-flex items-center gap-1.5">
                     <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: r.siteColor }} />
                     {r.siteName}
