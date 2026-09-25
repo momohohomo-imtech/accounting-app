@@ -444,8 +444,9 @@ export default async function ReportsPage({
   // 상단 박스의 "예상 순이익율" — 대시보드의 "총 예상 매출"/"이익 예상"과 동일한 기준(연도
   // 전체, site 필터와 무관)으로 계산. 대시보드 이익 예상(components/sections/ProfitOutlook.tsx)과
   // 같은 방식(발주액 기준 프로젝트 손익 − 프로젝트 미배정 일반경비 − 직원급여/상여/4대보험)을 그대로 따름.
+  // 발주액 없는 프로젝트(귀속 하위·미정리 등)는 profit이 −(매입+대행구매)라 그 비용까지 빠짐없이 반영됨.
   const totalExpectedRevenue = byProjectAll.reduce((s, p) => s + (p.contract_amount ?? 0), 0);
-  const yearProfitSum = byProjectAll.filter((p) => p.quote_amount != null).reduce((s, p) => s + p.profit, 0);
+  const yearProfitSum = byProjectAll.reduce((s, p) => s + p.profit, 0);
   const nullProjectPurchaseTx = transactions.filter((t) => !t.project_id && t.type === "매입");
   const generalExpense = nullProjectPurchaseTx
     .filter((t) => one(t.expense_categories)?.name !== PAYROLL_CATEGORY_NAME)

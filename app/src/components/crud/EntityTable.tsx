@@ -112,15 +112,16 @@ function visibilityStorageKey(fields: FieldConfig[]) {
   return `entityTableColVisible:${fields.map((f) => f.name).join(",")}`;
 }
 
+// 진행률은 막대 대신 3단계 동그라미: 0% 준비중(노랑) · 1~99% 진행중(주황) · 100% 공사완료(빨강).
 function ProgressCell({ value }: { value: number }) {
   const pct = Math.max(0, Math.min(100, value));
+  const [label, color] =
+    pct >= 100 ? ["공사완료", "bg-red-600"] : pct > 0 ? ["진행중", "bg-orange-500"] : ["준비중", "bg-yellow-400"];
   return (
-    <div className="h-2 w-full shrink-0 overflow-hidden rounded-full bg-slate-100">
-      <div
-        className={`h-full rounded-full ${pct >= 100 ? "bg-brand-green" : "bg-brand"}`}
-        style={{ width: `${pct}%` }}
-      />
-    </div>
+    <span className="flex justify-center" title={`${label} (${pct}%)`}>
+      <span className={`inline-block h-3.5 w-3.5 rounded-full ${color} print:[print-color-adjust:exact]`} />
+      <span className="sr-only">{label}</span>
+    </span>
   );
 }
 
@@ -441,8 +442,7 @@ export function EntityTable({
                     "max-w-[220px] truncate pr-4 print:whitespace-normal print:overflow-visible",
                     colWidthClass(f),
                     // w-[1%]: 표의 남는 폭이 고정 칸으로 몰려 화면을 덮지 않게(globals.css와 같은 방식)
-                    f.name === stickyFieldName && "sticky-col max-md:w-[1%]",
-                    f.display === "progress" && "max-md:min-w-[5rem]"
+                    f.name === stickyFieldName && "sticky-col max-md:w-[1%]"
                   )}
                 >
                   {f.display === "progress" ? (

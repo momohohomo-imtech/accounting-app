@@ -378,7 +378,7 @@ export default async function DashboardPage({
         <Card>
           <SectionTitle note="추가 지출이 생기면 실시간으로 바뀜">③ {selectedYear}년 예상 이익금 (진행 중 포함)</SectionTitle>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Stat label="예상 이익금" sub="프로젝트 총이익금 − 일반경비 − 직원급여/상여/4대보험">
+            <Stat label="예상 이익금" sub="프로젝트 총이익금(발주액 없는 프로젝트 비용 포함) − 일반경비 − 직원급여/상여/4대보험">
               <Money value={o.profitEstimate} />
             </Stat>
             <Stat label="이 기준 예상 세액" sub={`세율 ${o.profitTax.ratePct}% 구간`}>

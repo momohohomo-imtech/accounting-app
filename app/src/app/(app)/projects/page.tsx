@@ -20,6 +20,7 @@ import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { ProjectsPageMemo } from "@/components/ProjectsPageMemo";
 import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
 import { purchaseCostOf } from "@/lib/vatBasis";
+import { groupProjectProfit } from "@/lib/projectProfit";
 import { nowKst } from "@/lib/kstDate";
 
 const TABS = [
@@ -117,7 +118,7 @@ async function ProjectListSection({
   const [{ data: sites }, { data: allProjects }, { data: projects }, { data: allYears }, { data: pageMemo }] =
     await Promise.all([
       supabase.from("sites").select("id, name, clients(name)").order("name"),
-      supabase.from("projects").select("id, name, year, site_id"),
+      supabase.from("projects").select("id, name, year, site_id, parent_project_id, quote_amount"),
       projectsQuery,
       supabase.from("projects").select("year"),
       supabase.from("projects_page_memo").select("content").maybeSingle(),
@@ -136,7 +137,17 @@ async function ProjectListSection({
     siteLabel: siteLabelMap.get(p.site_id) ?? "미지정 현장",
   }));
 
-  const projectIds = (projects ?? []).map((p) => p.id);
+  // 어미 프로젝트의 이익금·이익율·총 매입은 손익보고서처럼 귀속 하위 프로젝트까지 합산 —
+  // 하위가 필터(상태·현장)에 안 걸려 목록에 없어도 합산되게 전체 프로젝트에서 찾는다.
+  const displayedIds = new Set((projects ?? []).map((p) => p.id));
+  const childrenByParent = new Map<string, { id: string; quote_amount: number | null }[]>();
+  for (const c of allProjects ?? []) {
+    if (!c.parent_project_id || !displayedIds.has(c.parent_project_id)) continue;
+    childrenByParent.set(c.parent_project_id, [...(childrenByParent.get(c.parent_project_id) ?? []), c]);
+  }
+  const projectIds = Array.from(
+    new Set([...displayedIds, ...Array.from(childrenByParent.values()).flat().map((c) => c.id)])
+  );
   type ProjectPurchaseRow = {
     id: string;
     type: string;
@@ -320,7 +331,8 @@ async function ProjectListSection({
     },
     {
       name: "progress_pct",
-      label: "진행률(%)",
+      label: "진행률(%) — 0: 준비중(노랑) · 1~99: 진행중(주황) · 100: 공사완료(빨강)",
+      tableLabel: "진행률",
       type: "number",
       display: "progress",
       width: "8%",
@@ -342,14 +354,19 @@ async function ProjectListSection({
     const contractMismatch =
       !p.settlement_finalized &&
       (p.contract_amount ?? 0) > 0 && (p.quote_amount ?? 0) - (p.contract_amount ?? 0) - agencyAmount !== 0;
-    const purchaseAmount = purchaseByProject.get(p.id) ?? 0;
-    const profit = p.quote_amount ? p.quote_amount - purchaseAmount - agencyAmount : null;
+    // 귀속 하위 행은 이익금·이익율을 비워 둠(어미 행에 합산돼 있어 합계에서 두 번 세지 않게).
+    // 총 매입은 참고로 자기 몫만 보여주고, 하단 합계에서는 어미가 목록에 있으면 뺀다.
+    const isChild = Boolean(p.parent_project_id);
+    const g = groupProjectProfit([p, ...(childrenByParent.get(p.id) ?? [])], purchaseByProject, agencyByProject);
+    const own = groupProjectProfit([p], purchaseByProject, agencyByProject);
+    const profit = isChild ? null : g.profit;
     // 이익율은 발주액 대비 비율 — 손익보고서 팝업/보고서 페이지와 동일한 계산 기준.
-    const profitRate = p.quote_amount && profit !== null ? `${((profit / p.quote_amount) * 100).toFixed(1)}%` : "-";
+    const profitRate = !isChild && g.rate !== null ? `${g.rate.toFixed(1)}%` : "-";
     // 수주예상액 = 발주액 - 구매 대행비.
     const contractAmountExpected = (p.quote_amount ?? 0) - agencyAmount;
     // 총 매입 = 매입 합계 + 구매대행 합계.
-    const totalPurchase = purchaseAmount + agencyAmount;
+    const totalPurchase = isChild ? own.purchase + own.agency : g.purchase + g.agency;
+    const countedInParent = isChild && displayedIds.has(p.parent_project_id as string);
     return {
       ...p,
       site_name: (one(p.sites) as { name: string } | undefined)?.name,
@@ -358,6 +375,7 @@ async function ProjectListSection({
       contractMismatch,
       contractAmountExpected,
       totalPurchase,
+      countedInParent,
     };
   });
 
@@ -388,7 +406,7 @@ async function ProjectListSection({
   const filteredQuoteSum = tableRows.reduce((sum, p) => sum + (p.quote_amount ?? 0), 0);
   const filteredContractSum = tableRows.reduce((sum, p) => sum + p.contractAmountExpected, 0);
   const filteredProfitSum = tableRows.reduce((sum, p) => sum + (p.profit ?? 0), 0);
-  const filteredPurchaseSum = tableRows.reduce((sum, p) => sum + p.totalPurchase, 0);
+  const filteredPurchaseSum = tableRows.reduce((sum, p) => sum + (p.countedInParent ? 0 : p.totalPurchase), 0);
 
   return (
     <div className="space-y-6">

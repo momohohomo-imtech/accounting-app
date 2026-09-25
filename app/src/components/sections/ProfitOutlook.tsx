@@ -8,6 +8,7 @@ import { one } from "@/lib/relations";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import { PAYROLL_CATEGORY_NAME } from "@/lib/vatExempt";
 import { purchaseCostOf, salesSupplyOf } from "@/lib/vatBasis";
+import { totalProjectProfit } from "@/lib/projectProfit";
 
 type YearTxRow = {
   id: string;
@@ -118,13 +119,10 @@ export async function loadProfitOutlook(
     agencyByProject.set(a.project_id, (agencyByProject.get(a.project_id) ?? 0) + a.amount);
   }
   const yearProjectsWithProfit = yearRows.filter((p) => p.quote_amount != null);
-  const yearProfitSum = yearProjectsWithProfit.reduce(
-    (s, p) => s + p.quote_amount! - (purchaseByProject.get(p.id) ?? 0) - (agencyByProject.get(p.id) ?? 0),
-    0
-  );
-  const hasIncompleteProjects = yearProjectsWithProfit.some(
-    (p) => p.status !== "done" && p.status !== PROJECT_STATUS_AWAITING_PAYMENT
-  );
+  // 발주액이 없는 프로젝트(귀속 하위·미정리·검토중 등)에 들어간 매입도 실제 지출이라 같이 뺀다.
+  const yearProfitSum = totalProjectProfit(yearRows, purchaseByProject, agencyByProject);
+  // 추가 매입/매출이 더 생길 수 있는 건 아직 공사 중이거나 검토 중인 프로젝트뿐 — 수금 완료·귀속·기타는 제외.
+  const hasIncompleteProjects = yearRows.some((p) => p.status === "ongoing" || p.status === "review");
 
   // 발주액·대행구매액이 부가세 제외라 매입·경비도 공급가(부가세 제외) 기준 — lib/vatBasis.ts.
   const generalExpense = generalTx.reduce((s, t) => s + purchaseCostOf(t), 0);
