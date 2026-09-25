@@ -25,5 +25,18 @@ export function taxEstimate(profit: number) {
   const incomeTax = estimateIncomeTax(taxBase);
   const localTax = Math.round(incomeTax * 0.1);
   const bracket = INCOME_TAX_BRACKETS[currentBracketIndex(taxBase)];
-  return { taxBase, totalTax: incomeTax + localTax, ratePct: Math.round(bracket.rate * 100) };
+  return { taxBase, incomeTax, localTax, totalTax: incomeTax + localTax, ratePct: Math.round(bracket.rate * 100) };
+}
+
+// 종합소득세 분납: 납부할 소득세가 1천만원을 넘으면 일부를 2개월 안(7월 말)에 나눠 낼 수 있음 —
+// 2천만원 이하면 1천만원 넘는 부분, 2천만원 넘으면 절반까지.
+export function incomeTaxInstallment(incomeTax: number) {
+  if (incomeTax > 20_000_000) return Math.floor(incomeTax / 2);
+  if (incomeTax > 10_000_000) return incomeTax - 10_000_000;
+  return 0;
+}
+
+// 다음 해 11월 중간예납 — 직전 해 납부 소득세의 절반(사업 첫해에는 중간예납이 없어서 둘째 해부터).
+export function interimPrepayment(incomeTax: number) {
+  return Math.floor(Math.max(incomeTax, 0) / 2);
 }

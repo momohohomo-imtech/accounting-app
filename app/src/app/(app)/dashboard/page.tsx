@@ -5,7 +5,13 @@ import { formatWon, formatDate, moneyClass } from "@/lib/format";
 import { remainingBalance, isLedgerVisible } from "@/lib/credit";
 import type { ExpenseCategory, Transaction } from "@/lib/types";
 import { vatOf, salesSupplyOf, purchaseCostOf } from "@/lib/vatBasis";
-import { taxEstimate } from "@/lib/tax";
+import { taxEstimate, incomeTaxInstallment, interimPrepayment } from "@/lib/tax";
+import {
+  estimateOwnerInsurance,
+  ownerHealthSettlement,
+  ownerPensionBackPay,
+  OWNER_INSURANCE_RATES,
+} from "@/lib/ownerSocialInsurance";
 import { loadProfitOutlook, ProfitCalculationDetail } from "@/components/sections/ProfitOutlook";
 import { HalfYearSettlementInput } from "@/components/sections/HalfYearSettlementInput";
 import { DetailToggle } from "@/components/DetailToggle";
@@ -101,6 +107,7 @@ export default async function DashboardPage({
     { data: firstTx },
     { data: yearProjectRows },
     { data: categoryRows },
+    { data: employeeRows },
   ] = await Promise.all([
     fetchAllRows<Transaction>((from, to) =>
       supabase
@@ -146,6 +153,9 @@ export default async function DashboardPage({
     supabase.from("projects").select("id, name, status, quote_amount").eq("year", selectedYear),
     // select("*") — 불공제·비과세 칸(082·083 마이그레이션) 실행 전에도 조회가 깨지지 않게.
     supabase.from("expense_categories").select("*"),
+    // 대표자 건강보험(사업 첫해) = 최고 급여 직원 기준 — 직원 공제액(본인 절반)의 2배. 조회 전용 계정은
+    // 직원 정보를 못 읽어서 null → 정산 추정 칸에 안내만 표시.
+    supabase.from("employees").select("health_insurance, long_term_care_insurance, resigned_date"),
   ]);
   const yearProjects = yearProjectRows ?? [];
   const categoryById = new Map(((categoryRows ?? []) as ExpenseCategory[]).map((c) => [c.id, c]));
@@ -275,10 +285,42 @@ export default async function DashboardPage({
     { salesVat: 0, purchaseVat: 0, nonDeductibleVat: 0, net: 0 }
   );
 
+  // 내년 대표자 국민연금·건강보험 — 연간 합계 예상 이익금(상반기 미입력이면 프로젝트 기준) 기준.
   const firstYear = Math.min(
     firstTx?.[0]?.trans_date ? Number(firstTx[0].trans_date.slice(0, 4)) : currentYear,
     currentYear
   );
+  // 사업 첫해: 첫 거래가 있는 해. 그해 사업 기간은 첫 거래 달부터 12월까지.
+  const isFirstBusinessYear = selectedYear === firstYear;
+  const businessStartMonth = isFirstBusinessYear && firstTx?.[0] ? Number(firstTx[0].trans_date.slice(5, 7)) : 1;
+  const businessMonths = 12 - businessStartMonth + 1;
+
+  const insuranceBaseProfit = o.combinedProfit ?? o.profitEstimate;
+  const ownerInsurance = estimateOwnerInsurance(insuranceBaseProfit, businessMonths);
+  const ofProfit = (yearly: number) =>
+    insuranceBaseProfit > 0 ? ` · 이익의 ${((yearly / insuranceBaseProfit) * 100).toFixed(1)}%` : "";
+
+  // 사업 첫해라 이듬해에 몰리는 돈 (첫해는 중간예납이 없어 올해 소득세 전액이 이듬해 5월, 11월엔 중간예납 시작).
+  const nextYearTax = o.combinedTax ?? o.profitTax;
+  const activeEmployees = (employeeRows ?? []).filter(
+    (e) => !e.resigned_date || e.resigned_date > `${today.year}-${mm}-${String(today.day).padStart(2, "0")}`
+  );
+  const ownerHealthPaidMonthly = activeEmployees.length
+    ? 2 * Math.max(...activeEmployees.map((e) => Number(e.health_insurance) + Number(e.long_term_care_insurance)))
+    : null;
+  const cashOut = {
+    vat2: vatQuarters[2].net + vatQuarters[3].net,
+    mayTax: nextYearTax.totalTax,
+    installment: incomeTaxInstallment(nextYearTax.incomeTax),
+    healthSettlement:
+      ownerHealthPaidMonthly != null
+        ? ownerHealthSettlement(insuranceBaseProfit, businessMonths, ownerHealthPaidMonthly)
+        : null,
+    interim: interimPrepayment(nextYearTax.incomeTax),
+    pensionBackPay: ownerPensionBackPay(insuranceBaseProfit, businessMonths),
+  };
+  const cashOutTotal =
+    cashOut.vat2 + cashOut.mayTax + Math.max(cashOut.healthSettlement ?? 0, 0) + cashOut.interim;
   const years = Array.from({ length: currentYear - firstYear + 1 }, (_, i) => currentYear - i);
   if (!years.includes(selectedYear)) years.unshift(selectedYear);
   years.sort((a, b) => b - a);
@@ -301,7 +343,7 @@ export default async function DashboardPage({
         <SectionTitle note="개인사업자 종합소득세 기준 · 지방소득세 10% 포함 · 공제 미반영(참고용)">
           ① {selectedYear}년 이익과 세금
         </SectionTitle>
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
           <Stat
             label="상반기 확정 이익금 (세무사 결산)"
             sub={<HalfYearSettlementInput key={selectedYear} year={selectedYear} initialAmount={o.half1Profit} />}
@@ -331,7 +373,54 @@ export default async function DashboardPage({
               </Stat>
             </>
           )}
+          <Stat
+            label={`${selectedYear + 1}년 국민연금 (대표자, 월)`}
+            sub={`연 ${formatWon(ownerInsurance.pensionYearly)}${ofProfit(ownerInsurance.pensionYearly)}`}
+          >
+            <Money value={ownerInsurance.pensionMonthly} />
+          </Stat>
+          <Stat
+            label={`${selectedYear + 1}년 건강보험 (대표자, 월)`}
+            sub={`연 ${formatWon(ownerInsurance.healthYearly)}${ofProfit(ownerInsurance.healthYearly)} · 장기요양 포함`}
+          >
+            <Money value={ownerInsurance.healthMonthly} />
+          </Stat>
         </div>
+        {isFirstBusinessYear && (
+          <div className="mt-3 border-t border-slate-100 pt-2">
+            <SectionTitle note={`국민연금 제외 합계 약 ${formatWon(cashOutTotal)} · 첫해는 중간예납이 없어 이듬해에 몰림`}>
+              사업 첫해라 {selectedYear + 1}년에 몰리는 돈
+            </SectionTitle>
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+              <Stat label="1월 · 부가세 2기 확정 (7~12월)" sub="4분기 진행 중이라 늘어날 수 있음">
+                <Money value={cashOut.vat2} />
+              </Stat>
+              <Stat
+                label={`5월 · ${selectedYear}년 종합소득세+지방소득세`}
+                emphasis
+                sub={cashOut.installment > 0 ? `7월 말까지 분납 가능 ${formatWon(cashOut.installment)}` : undefined}
+              >
+                <Money value={cashOut.mayTax} />
+              </Stat>
+              <Stat
+                label="7월~ · 대표자 건강보험 정산"
+                sub={
+                  ownerHealthPaidMonthly != null
+                    ? `올해 월 ${formatWon(ownerHealthPaidMonthly)}씩 낸 것 제외 · 분할납부 가능`
+                    : "직원 급여 정보를 볼 수 있는 계정에서 계산됨"
+                }
+              >
+                {cashOut.healthSettlement != null ? <Money value={cashOut.healthSettlement} /> : "-"}
+              </Stat>
+              <Stat label={`11월 · ${selectedYear + 1}년 중간예납`} sub={`${selectedYear}년 소득세의 1/2`}>
+                <Money value={cashOut.interim} />
+              </Stat>
+              <Stat label="국민연금 (대표자) · 확인 필요" sub="가입 누락이면 올해분 소급 가능 · 10회 분할">
+                <Money value={cashOut.pensionBackPay} />
+              </Stat>
+            </div>
+          </div>
+        )}
         <Footnote>
           <p>
             하반기 예상 = 장부 + 세금계산서 미발행분 − 인건비 · 연간 합계 = 상반기 확정 + 하반기 예상
@@ -342,6 +431,21 @@ export default async function DashboardPage({
             참고: 장부 매출−매입(부가세 제외)만으로 보면 {formatWon(ledgerTax.taxBase)} 기준, 세율 {ledgerTax.ratePct}%, 예상
             세액 약 {formatWon(ledgerTax.totalTax)}
           </p>
+          <p>
+            {selectedYear + 1}년 국민연금·건강보험 = {o.combinedProfit != null ? "연간 합계" : "프로젝트 기준"} 예상
+            이익금으로 추정한 대표자 본인 부담(올해 이익이 내년 5월 종합소득세 신고 후 반영) · 국민연금{" "}
+            {OWNER_INSURANCE_RATES.pensionRate * 100}%, 기준소득월액 상한 {formatWon(OWNER_INSURANCE_RATES.pensionMonthlyCap)} ·
+            건강보험 {(OWNER_INSURANCE_RATES.healthRate * 100).toFixed(2)}% + 장기요양 건강보험료의{" "}
+            {(OWNER_INSURANCE_RATES.longTermCareOfHealth * 100).toFixed(2)}% ({OWNER_INSURANCE_RATES.year}년 요율 기준, 장기요양은
+            2026년 요율 — 2027년분 10월 이후 결정) · 직원 4대보험은 제외
+          </p>
+          {isFirstBusinessYear && (
+            <p>
+              몰리는 돈: 사업 기간 {businessMonths}개월({businessStartMonth}월 첫 거래부터) 기준 · 건강보험 정산 = 올해 이익 기준
+              보험료 − 최고 급여 직원 기준으로 낸 금액(직원 공제액의 2배) · 국민연금은 건강보험과 달리 1년치 정산이 없어, 지금
+              안 나가고 있다면 가입 누락 여부를 세무사·국민연금공단(1355)에 확인 · 금액은 세무사 확인 전 추정치
+            </p>
+          )}
           {o.hasIncompleteProjects && (
             <p className="font-semibold text-red-600">진행 중인 프로젝트가 있어 추가 매입/매출이 생길 수 있습니다.</p>
           )}
