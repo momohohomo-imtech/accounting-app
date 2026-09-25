@@ -3,6 +3,7 @@ import { fieldClass, labelClass } from "@/components/ui/field";
 import { ParentProjectField } from "@/components/ParentProjectField";
 import { ColorSwatchField } from "@/components/ColorSwatchField";
 import { MoneyInput } from "@/components/ui/MoneyInput";
+import { ProgressStageField } from "@/components/ProgressStageField";
 
 export function EntityForm({
   fields,
@@ -57,6 +58,8 @@ export function EntityForm({
                 defaultValue={value}
                 required={f.required}
               />
+            ) : f.display === "progress" ? (
+              <ProgressStageField name={f.name} defaultValue={value} />
             ) : f.type === "color-swatch" ? (
               <ColorSwatchField name={f.name} options={f.options ?? []} defaultValue={value} />
             ) : f.type === "select" ? (

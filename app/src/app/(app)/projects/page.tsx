@@ -331,7 +331,7 @@ async function ProjectListSection({
     },
     {
       name: "progress_pct",
-      label: "진행률(%) — 0: 준비중(노랑) · 1~99: 진행중(주황) · 100: 공사완료(빨강)",
+      label: "진행률",
       tableLabel: "진행률",
       type: "number",
       display: "progress",
