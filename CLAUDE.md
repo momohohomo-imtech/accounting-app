@@ -60,6 +60,11 @@
     페이지 전체를 축소해 오른쪽이 텅 빈 화면이 됨(프로젝트 목록 진행률 동그라미에서 실제로 발생 —
     `EntityTable`의 `ProgressCell`). 레이아웃 본문의 `relative overflow-x-clip`이 최후 방어로
     잘라 주지만, 칸 안에서 막는 게 원칙.
+  - 표가 아닌 목록 줄(고정 폭 `grid-cols-[…]`·`shrink-0` 칸이 많은 flex 줄)도 휴대폰에선 넘쳐서 금액·버튼이
+    잘림 — 휴대폰에서만 두 줄로 나눌 것(`CreditSettlementGroup`·`CreditHistoryToggle`·`BusinessTripLogForm` 예시).
+    글자 옆 버튼 묶음도 `max-md:flex-wrap`/`max-md:flex-col`(`AccessListCard`).
+  - 선택칸 여러 개를 한 줄에 둘 땐 `inlineFieldClass`(폭 없음). `fieldClass`에 `w-auto`·`w-20` 등을 덧붙이면 빌드 CSS에서
+    `w-full`이 이겨서 안 먹고, 한 줄의 칸들이 폭을 똑같이 나눠 "2026년"·긴 현장 이름이 잘림(휴대폰에선 `max-md:flex-col`로 쌓아도 됨).
   - 큰 금액은 `whitespace-nowrap`("원"만 떨어지지 않게). 큰 숫자 여러 개를 나란히 둘 때는
     휴대폰에서 한 줄에 하나(`grid-cols-1 min-[480px]:grid-cols-2`), 4칸 배치는 `xl:`부터.
     (예외: 대시보드는 스크롤을 줄여 달라는 요청으로 숫자를 `text-sm sm:text-base`로 줄이고 휴대폰에서도

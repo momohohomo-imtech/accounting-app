@@ -153,7 +153,7 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
                   </span>
                 </CardHeader>
                 <div
-                  className="grid items-center gap-3 pb-1 text-[10px] text-slate-400"
+                  className="grid items-center gap-3 pb-1 text-[10px] text-slate-400 max-md:hidden print:grid"
                   style={{ gridTemplateColumns: HISTORY_GRID_COLS }}
                 >
                   <span />
@@ -168,16 +168,18 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
                 </div>
                 <ul className="divide-y divide-slate-100">
                   {g.items.map((it) => (
+                    // 휴대폰: 고정 폭 칸(합 약 784px)이 화면을 넘어 금액·수정·삭제가 잘렸음 — 외상 목록처럼 두 줄로
+                    // (날짜·상태·프로젝트·품목 / 결제수단·금액·버튼). max-md:는 인쇄 폭에도 걸리므로 print:로 원래 칸 배치.
                     <li
                       key={it.id}
-                      className="grid items-center gap-3 py-2 text-sm"
+                      className="grid items-center gap-3 py-2 text-sm max-md:flex max-md:flex-wrap max-md:gap-y-1.5 print:grid print:gap-3"
                       style={{ gridTemplateColumns: HISTORY_GRID_COLS }}
                     >
                       <span className="text-slate-500">{formatDate(it.trans_date)}</span>
                       <Badge variant={STATUS_VARIANT[it.status]} className="justify-center">
                         {it.status}
                       </Badge>
-                      <span className="truncate text-slate-500">
+                      <span className="truncate text-slate-500 max-md:min-w-0 max-md:flex-1">
                         {it.needs_classification ? (
                           <span className="inline-flex rounded-full bg-green-600 px-2 py-0.5 text-xs font-medium text-white">
                             분류 대기 중
@@ -186,63 +188,66 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
                           (it.project_name ?? <span className="font-medium text-red-600">일반경비</span>)
                         )}
                       </span>
-                      <span className="truncate text-slate-700">{it.item_name ?? "-"}</span>
-                      <span className="truncate text-right text-slate-400">{it.methodName ?? ""}</span>
-                      <span className="text-right text-brand">{formatWon(it.vatExcludedAmount)}</span>
-                      <span className="text-right font-medium text-slate-900">{formatWon(it.amount)}</span>
-                      <LinkButton
-                        href={`/transactions?tab=credit&editTx=${it.id}`}
-                        variant="secondary"
-                        size="xs"
-                        className="print:hidden"
-                      >
-                        수정
-                      </LinkButton>
-                      {confirmDeleteId === it.id ? (
-                        <div className="flex shrink-0 items-center gap-1 print:hidden">
-                          <span className="text-xs font-medium text-red-600">정말 삭제?</span>
+                      <span className="truncate text-slate-700 max-md:min-w-0 max-md:flex-1">{it.item_name ?? "-"}</span>
+                      {/* contents: PC·인쇄에선 감싸는 상자 없이 각자 격자 칸에 들어감, 휴대폰에선 둘째 줄 오른쪽 묶음 */}
+                      <div className="contents max-md:ml-auto max-md:flex max-md:flex-wrap max-md:items-center max-md:justify-end max-md:gap-3 print:contents">
+                        <span className="truncate text-right text-slate-400">{it.methodName ?? ""}</span>
+                        <span className="text-right text-brand">{formatWon(it.vatExcludedAmount)}</span>
+                        <span className="text-right font-medium text-slate-900">{formatWon(it.amount)}</span>
+                        <LinkButton
+                          href={`/transactions?tab=credit&editTx=${it.id}`}
+                          variant="secondary"
+                          size="xs"
+                          className="print:hidden"
+                        >
+                          수정
+                        </LinkButton>
+                        {confirmDeleteId === it.id ? (
+                          <div className="flex shrink-0 items-center gap-1 print:hidden">
+                            <span className="text-xs font-medium text-red-600">정말 삭제?</span>
+                            <Button
+                              variant="danger"
+                              size="xs"
+                              type="button"
+                              onClick={async () => {
+                                const fd = new FormData();
+                                fd.append("id", it.id);
+                                const result = await pending.run(() => deleteTransactionRecord(fd));
+                                if (result?.error) {
+                                  setDeleteError(result.error);
+                                  return;
+                                }
+                                setDeleteError(null);
+                                setConfirmDeleteId(null);
+                              }}
+                            >
+                              확인
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="xs"
+                              type="button"
+                              onClick={() => {
+                                setConfirmDeleteId(null);
+                                setDeleteError(null);
+                              }}
+                            >
+                              취소
+                            </Button>
+                            {deleteError && <span className="text-xs text-red-600">{deleteError}</span>}
+                          </div>
+                        ) : (
                           <Button
                             variant="danger"
                             size="xs"
                             type="button"
-                            onClick={async () => {
-                              const fd = new FormData();
-                              fd.append("id", it.id);
-                              const result = await pending.run(() => deleteTransactionRecord(fd));
-                              if (result?.error) {
-                                setDeleteError(result.error);
-                                return;
-                              }
-                              setDeleteError(null);
-                              setConfirmDeleteId(null);
-                            }}
+                            className="print:hidden"
+                            onClick={() => setConfirmDeleteId(it.id)}
                           >
-                            확인
+                            삭제
                           </Button>
-                          <Button
-                            variant="secondary"
-                            size="xs"
-                            type="button"
-                            onClick={() => {
-                              setConfirmDeleteId(null);
-                              setDeleteError(null);
-                            }}
-                          >
-                            취소
-                          </Button>
-                          {deleteError && <span className="text-xs text-red-600">{deleteError}</span>}
-                        </div>
-                      ) : (
-                        <Button
-                          variant="danger"
-                          size="xs"
-                          type="button"
-                          className="print:hidden"
-                          onClick={() => setConfirmDeleteId(it.id)}
-                        >
-                          삭제
-                        </Button>
-                      )}
+                        )}
+                      </div>
                     </li>
                   ))}
                 </ul>

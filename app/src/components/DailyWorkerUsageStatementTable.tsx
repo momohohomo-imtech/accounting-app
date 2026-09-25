@@ -189,7 +189,10 @@ export function DailyWorkerUsageStatementTable({
   return (
     <>
     {actionError && <p className="mb-2 text-sm text-red-600 print:hidden">{actionError}</p>}
-    <table className="w-full text-sm">
+    {/* 휴대폰: 표를 옆으로 넘기고(칸 한 줄, 이름 칸 고정) — 스크롤 상자 없이 두면 카드 밖으로 넘친 칸(일급 등)이
+        잘려서 안 보였음. @container: 소계·수정 줄을 보이는 폭(100cqw)에 맞춰 왼쪽에 붙여 두는 기준. */}
+    <div className="@container overflow-x-auto print:overflow-visible">
+    <table className="sticky-col-table w-full text-sm">
       <thead>
         <tr className="border-b border-slate-300 text-slate-500">
           <th className="py-1.5 pr-2 text-center">번호</th>
@@ -202,7 +205,7 @@ export function DailyWorkerUsageStatementTable({
               사용일자 <span className="text-[10px]">{dateSortDir === "desc" ? "▼" : "▲"}</span>
             </button>
           </th>
-          <th className="py-1.5 pr-2 text-center">이름</th>
+          <th className="sticky-col py-1.5 pr-2 text-center">이름</th>
           <th className="py-1.5 pr-2 text-center">주민번호</th>
           <th className="py-1.5 pr-2 text-center">전화번호</th>
           <th className="py-1.5 pr-2 text-center">일급</th>
@@ -223,7 +226,10 @@ export function DailyWorkerUsageStatementTable({
                   return (
                     <tr key={r.id} className={cx("border-b border-slate-200 bg-slate-50", hiddenOnScreen)}>
                       <td colSpan={COLS} className="py-3 pr-2">
-                        <form onSubmit={handleSaveEdit} className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-6">
+                        <form
+                          onSubmit={handleSaveEdit}
+                          className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-6 max-md:sticky max-md:left-0 max-md:w-[100cqw] print:static print:w-auto"
+                        >
                           <input type="hidden" name="id" value={r.id} />
                           <input type="date" name="use_date" required defaultValue={r.use_date} className={inputClass} />
                           <select name="daily_worker_id" required defaultValue={r.daily_worker_id} className={inputClass}>
@@ -296,7 +302,7 @@ export function DailyWorkerUsageStatementTable({
                   <tr key={r.id} className={cx("border-b border-slate-100 text-slate-700", hiddenOnScreen)}>
                     <td className="py-1.5 pr-2 text-center">{rowNo}</td>
                     <td className="py-1.5 pr-2 text-center">{formatDate(r.use_date)}</td>
-                    <td className="py-1.5 pr-2 text-center">
+                    <td className="sticky-col py-1.5 pr-2 text-center">
                       {r.name}{" "}
                       <span
                         className={
@@ -341,13 +347,15 @@ export function DailyWorkerUsageStatementTable({
                   <button
                     type="button"
                     onClick={() => toggleBlock(block.id)}
-                    className="flex w-full items-center justify-between gap-2 text-left print:pointer-events-none"
+                    // 휴대폰: 표 전체 폭(옆으로 넘겨야 보이는 곳)이 아니라 보이는 폭에 맞춰 왼쪽에 고정 — 소계 금액이 화면 밖에 있었음.
+                    // max-md:는 A4 인쇄 폭에도 걸리므로 print:로 원래대로.
+                    className="flex w-full items-center justify-between gap-2 text-left max-md:sticky max-md:left-0 max-md:w-[100cqw] print:pointer-events-none print:static print:w-full"
                   >
                     <span className="flex items-center gap-1.5">
                       <span className="text-xs text-slate-400 print:hidden">{open ? "▼" : "▶"}</span>
                       {block.siteName} · {blockDateLabel(block)} · 소계 ({block.days}일 · {block.rows.length}건)
                     </span>
-                    <span>{formatWon(block.amount)}</span>
+                    <span className="shrink-0 whitespace-nowrap">{formatWon(block.amount)}</span>
                   </button>
                 </td>
               </tr>
@@ -377,6 +385,7 @@ export function DailyWorkerUsageStatementTable({
         </tfoot>
       )}
     </table>
+    </div>
     </>
   );
 }
