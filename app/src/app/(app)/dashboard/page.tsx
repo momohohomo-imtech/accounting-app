@@ -13,6 +13,8 @@ import {
 } from "@/lib/ownerSocialInsurance";
 import { loadProfitOutlook, ProfitCalculationDetail } from "@/components/sections/ProfitOutlook";
 import { HalfYearSettlementInput } from "@/components/sections/HalfYearSettlementInput";
+import { PageMemo } from "@/components/PageMemo";
+import { updateDashboardPageMemo } from "@/lib/actions/dashboardPageMemo";
 import { DetailToggle } from "@/components/DetailToggle";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { VatQuarterTable } from "@/components/VatQuarterTable";
@@ -119,6 +121,7 @@ export default async function DashboardPage({
     { data: yearProjectRows },
     { data: categoryRows },
     { data: employeeRows },
+    { data: pageMemo },
   ] = await Promise.all([
     fetchAllRows<Transaction>((from, to) =>
       supabase
@@ -167,6 +170,8 @@ export default async function DashboardPage({
     // 대표자 건강보험·국민연금(사업 첫해) = 최고 급여 직원 기준 — 직원 공제액(본인 절반)의 2배. 조회 전용 계정은
     // 직원 정보를 못 읽어서 null → 정산 추정 칸에 안내만 표시.
     supabase.from("employees").select("health_insurance, long_term_care_insurance, national_pension, resigned_date"),
+    // 맨 위 메모칸 — 087 SQL 실행 전이라 표가 없어도 에러 없이 빈 메모로 보이게 data만 쓴다.
+    supabase.from("dashboard_page_memo").select("content").maybeSingle(),
   ]);
   const yearProjects = yearProjectRows ?? [];
   const categoryById = new Map(((categoryRows ?? []) as ExpenseCategory[]).map((c) => [c.id, c]));
@@ -367,6 +372,15 @@ export default async function DashboardPage({
         </div>
         <YearFilter basePath="/dashboard" years={years} selectedYear={selectedYear} />
       </div>
+
+      {/* 맨 위 메모칸 — 제목 없이 입력칸만(사용자 요청). 입력칸에서 벗어나면 자동 저장. */}
+      <PageMemo
+        bare
+        rows={3}
+        initialContent={pageMemo?.content ?? ""}
+        placeholder="메모를 입력하세요"
+        save={updateDashboardPageMemo}
+      />
 
       {/* 핵심 숫자 5칸만 늘 보이게 — 나머지는 아래 접힘 목록에 한 줄 요약과 함께(사용자 요청: 정보는 다 두되 간결하게).
           휴대폰·태블릿(사이드바가 있어 본문이 좁음): 예상 매출액 한 줄 + 2칸씩 두 줄 / lg~: 예상 매출·이익·세액 3칸 + 수금·지급
