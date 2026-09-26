@@ -53,7 +53,7 @@ export function HalfYearSettlementInput({ year, initialAmount }: { year: number;
         allowNegative
         value={value}
         onValueChange={setValue}
-        placeholder="상반기 확정 이익금"
+        placeholder="상반기 확정 이익"
         className={`${fieldClass} w-40`}
       />
       <Button type="submit" size="xs">

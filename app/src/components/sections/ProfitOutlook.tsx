@@ -219,20 +219,20 @@ export function ProfitCalculationDetail({ year, o }: { year: number; o: ProfitOu
         <span className="tabular-nums font-semibold">{formatWon(o.h2Purchase)}</span>
         {" = "}
         <span className={`tabular-nums font-semibold ${moneyClass(o.h2Profit)}`}>{formatWon(o.h2Profit)}</span>
-        {" (7~12월 원장 기준, 부가세 제외, 일반경비 포함)"}
+        {" (7~12월 원장 기준, 공급가액, 일반경비 포함)"}
       </p>
       <p>
-        <span className="font-semibold">{year}년 세금계산서 미발행 예상 이익금</span>
+        <span className="font-semibold">{year}년 세금계산서 미발행분 예상 이익</span>
         {" — "}
         <span className={`tabular-nums font-semibold ${moneyClass(o.unbilledPendingProfit)}`}>
           {formatWon(o.unbilledPendingProfit)}
         </span>
-        {` (완료 수금대기·공사 완료·진행중 ${o.unbilledProjectNames.length}건)`}
+        {` (수금 대기·공사 완료·진행중 ${o.unbilledProjectNames.length}건)`}
         {o.h1BilledSales > 0 && (
           <span className="text-slate-500">
-            {" — 상반기에 이미 끊은 기성금 "}
+            {" — 상반기에 이미 발행한 기성금 "}
             <span className="tabular-nums">{formatWon(o.h1BilledSales)}</span>
-            {"은 상반기 확정 이익금에 들어가 있어 뺐음"}
+            {"은 상반기 확정 이익에 포함되어 차감"}
           </span>
         )}
       </p>
@@ -245,38 +245,38 @@ export function ProfitCalculationDetail({ year, o }: { year: number; o: ProfitOu
         <span className="tabular-nums font-semibold">{formatWon(o.h2PayrollCost)}</span>
       </p>
       <p className="text-slate-500">
-        하반기 예상 이익금 = 하반기 매출-매입 + 세금계산서 미발행 예상 이익금 − 하반기 인건비
+        하반기 예상 이익 = 하반기 매출-매입 + 세금계산서 미발행분 예상 이익 − 하반기 인건비
         <br />
-        연간 합계 = 상반기 확정 + 하반기 예상 이익금
+        연간 예상 이익 = 상반기 확정 이익 + 하반기 예상 이익
       </p>
 
       <div className="mt-2 space-y-2 rounded-lg bg-slate-50 p-3 text-xs leading-relaxed text-slate-700">
-        <p className="font-semibold text-slate-900">왜 이렇게 나눠서 계산하나요?</p>
+        <p className="font-semibold text-slate-900">산출 방식 안내</p>
         <p>
           하반기(7~12월) 원장에는 두 종류의 프로젝트가 섞여 있습니다.
           <br />
-          (가) 세금계산서를 다 발행하고 마감된 프로젝트 — 매출·매입이 둘 다 원장에 찍혀 있어 원장 합계만으로
-          손익이 그대로 나옵니다.
+          (가) 세금계산서를 모두 발행하고 마감된 프로젝트 — 매출·매입이 모두 원장에 반영되어 있어 원장
+          합계만으로 손익이 산출됩니다.
           <br />
-          (나) 완료수금대기·공사완료·진행중(발주액 있음) 프로젝트 — 자재비·인건비 등 매입은 이미
-          원장에 찍혔지만, 세금계산서(매출)는 아직 발행 전이라 매출 쪽이 비어 있습니다.
+          (나) 수금 대기·공사 완료·진행중(발주액 등록) 프로젝트 — 자재비·인건비 등 매입은 이미 원장에
+          반영되었으나, 세금계산서(매출)는 아직 발행 전이어서 매출이 누락되어 있습니다.
         </p>
         <p>
-          (나)를 원장 그대로 &quot;하반기 매출-매입&quot;에 합산하면 매입만 잡히고 매출은 안 잡힌 반쪽짜리
-          숫자가 섞여 전체를 왜곡시킵니다. 그래서 (나)에 해당하는 거래는 &quot;하반기 매출-매입&quot;
-          계산에서 제외하고, 대신 &quot;세금계산서 미발행 예상 이익금&quot;에서 &quot;발주액 − 하반기
-          매입 − 대행구매액&quot;으로 따로 추정합니다. 이렇게 하면 (나) 프로젝트의 매입이 어느 한쪽에서
+          (나)를 원장 그대로 &quot;하반기 매출-매입&quot;에 합산하면 매입만 반영되고 매출은 누락된 불완전한
+          수치가 섞여 전체 손익이 왜곡됩니다. 따라서 (나)에 해당하는 거래는 &quot;하반기 매출-매입&quot;
+          계산에서 제외하고, 대신 &quot;세금계산서 미발행분 예상 이익&quot;에서 &quot;발주액 − 하반기
+          매입 − 대행구매액&quot;으로 별도 추정합니다. 이 방식으로 (나) 프로젝트의 매입은 어느 한쪽에서
           정확히 한 번만 반영됩니다.
         </p>
         <p>
-          (나) 프로젝트에 상반기(1~6월)에 이미 끊은 기성금이 있으면, 그 매출은 상반기 확정 이익금(세무사
-          결산)에 들어가 있으므로 발주액에서 빼고 남은 금액만 하반기 몫으로 더합니다. 예: 발주액 5,000만원 중
-          5월에 기성금 2,000만원을 끊었다면 하반기에는 3,000만원만 더합니다.
+          (나) 프로젝트에 상반기(1~6월)에 이미 발행한 기성금이 있으면, 해당 매출은 상반기 확정 이익(세무사
+          결산)에 포함되어 있으므로 발주액에서 차감한 잔액만 하반기분으로 반영합니다. 예: 발주액 5,000만원 중
+          5월에 기성금 2,000만원을 발행했다면 하반기에는 3,000만원만 반영합니다.
         </p>
-        <p className="font-semibold text-slate-900">숫자 예시</p>
+        <p className="font-semibold text-slate-900">산출 예시</p>
         <p>
-          하반기 전체 매출 8,000만원, 전체 매입 1억 2,000만원(그중 (나) 프로젝트들의 매입이 5,000만원)이라고
-          하면:
+          하반기 전체 매출 8,000만원, 전체 매입 1억 2,000만원(그중 (나) 프로젝트 매입 5,000만원)인
+          경우:
         </p>
         <ul className="ml-4 list-disc space-y-1">
           <li>
@@ -284,22 +284,22 @@ export function ProfitCalculationDetail({ year, o }: { year: number; o: ProfitOu
             <span className="font-semibold">1,000만원</span> ((나) 매입 5,000만원 제외)
           </li>
           <li>
-            (나) 프로젝트들 발주액 합계 9,000만원, 하반기 매입 5,000만원(위에서 뺀 것과 동일), 대행구매
-            500만원이라면 → 세금계산서 미발행 예상 이익금 = 9,000만원 − 5,000만원 − 500만원 ={" "}
+            (나) 프로젝트 발주액 합계 9,000만원, 하반기 매입 5,000만원(위에서 제외한 금액과 동일), 대행구매
+            500만원인 경우 → 세금계산서 미발행분 예상 이익 = 9,000만원 − 5,000만원 − 500만원 ={" "}
             <span className="font-semibold">3,500만원</span>
           </li>
-          <li>여기서 (나)의 매입 5,000만원은 위 두 줄 중 한쪽에서만 한 번 빠졌습니다.</li>
+          <li>여기서 (나)의 매입 5,000만원은 위 두 항목 중 한쪽에서만 한 번 차감되었습니다.</li>
         </ul>
         <p>
-          상반기 확정 3,000만원, 하반기 인건비 800만원까지 더하면:
+          상반기 확정 이익 3,000만원, 하반기 인건비 800만원까지 반영하면:
           <br />
-          연간 합계 = 3,000만원 + 1,000만원 + 3,500만원 − 800만원 ={" "}
+          연간 예상 이익 = 3,000만원 + 1,000만원 + 3,500만원 − 800만원 ={" "}
           <span className="font-semibold">6,700만원</span>
         </p>
         <p className="text-slate-500">
-          참고로 (나)를 제외하지 않고 &quot;하반기 매출-매입&quot;을 원장 그대로 다 더한 뒤 &quot;세금계산서
-          미발행 예상 이익금&quot;을 그냥 더하면, (나) 프로젝트의 매입 5,000만원이 두 번(①하반기 매출-매입에서,
-          ②미발행 예상 이익금 계산에서) 빠져서 실제보다 5,000만원만큼 적게(더 마이너스로) 나옵니다.
+          참고로 (나)를 제외하지 않고 &quot;하반기 매출-매입&quot;을 원장 그대로 합산한 뒤 &quot;세금계산서
+          미발행분 예상 이익&quot;을 더하면, (나) 프로젝트의 매입 5,000만원이 두 번(①하반기 매출-매입,
+          ②미발행분 예상 이익 계산) 차감되어 실제보다 5,000만원 적게 산출됩니다.
         </p>
       </div>
     </div>
