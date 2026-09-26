@@ -20,7 +20,7 @@ const COLUMNS: { key: SortKey; label: string; className?: string }[] = [
   { key: "salesVat", label: "매출세액", className: "text-right" },
   { key: "purchaseVat", label: "공제 매입세액", className: "text-right" },
   { key: "nonDeductibleVat", label: "불공제 매입세액", className: "text-right" },
-  { key: "net", label: "납부(−환급) 예상", className: "text-right" },
+  { key: "net", label: "예상 납부(환급)세액", className: "text-right" },
 ];
 
 function Money({ value, className }: { value: number; className?: string }) {
