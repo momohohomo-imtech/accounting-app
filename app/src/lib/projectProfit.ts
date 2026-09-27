@@ -1,3 +1,7 @@
+import type { CreditPayment } from "@/lib/types";
+import { isLedgerVisible } from "@/lib/credit";
+import { purchaseCostOf } from "@/lib/vatBasis";
+
 type ProjectAmountRow = { id: string; quote_amount: number | null };
 
 // 프로젝트 하나 + 귀속 하위 프로젝트들을 합친 이익 — 손익보고서(ProjectProfitReport)와 같은 기준.
@@ -33,4 +37,15 @@ export function totalProjectProfit(
     (s, p) => s + (p.quote_amount ?? 0) - (purchaseByProject.get(p.id) ?? 0) - (agencyByProject.get(p.id) ?? 0),
     0
   );
+}
+
+// 외상 미정산(완납 전) 매입 — 손익보고서의 매입 합계·이익금에는 빠져 있어서 따로 합산한다. 이익금과 같은
+// 기준(공급가, 매입세액 불공제 카테고리는 부가세 포함 — purchaseCostOf). 일부만 갚은 외상도 완납 전까지는
+// 거래 전체가 장부에서 빠지므로 거래 전체 금액을 센다.
+export function unsettledCreditPurchase(
+  rows: (Parameters<typeof isLedgerVisible>[0] & Parameters<typeof purchaseCostOf>[0])[],
+  payments: CreditPayment[]
+) {
+  const unsettled = rows.filter((t) => t.type === "매입" && !isLedgerVisible(t, payments));
+  return { count: unsettled.length, cost: unsettled.reduce((s, t) => s + purchaseCostOf(t), 0) };
 }
