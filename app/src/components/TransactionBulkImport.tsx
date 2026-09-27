@@ -138,7 +138,8 @@ export function TransactionBulkImport({
   return (
     <div className="space-y-3">
       <p className="text-xs text-slate-500">
-        정해진 엑셀 양식을 올리면 AI가 표를 읽어서 아래에 미리보기로 보여줘요. 거래처/프로젝트/결제수단/카테고리는
+        정해진 엑셀 양식(첫 줄 머리글: 날짜·구분·거래처명·프로젝트명·품목·종류구분·수량·단가·총금액·결제수단·결제시점·
+        세금계산서발행·메모1·메모2)을 올리면 표를 읽어서 아래에 미리보기로 보여줘요. 거래처/프로젝트/결제수단/카테고리는
         등록된 이름과 일치하면 자동 연결되고, 안 맞으면 직접 선택해서 고치면 돼요.
       </p>
       <input
@@ -147,7 +148,7 @@ export function TransactionBulkImport({
         onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
         className="text-sm"
       />
-      {loading && <p className="text-sm text-slate-500">AI가 엑셀 표를 인식하는 중입니다...</p>}
+      {loading && <p className="text-sm text-slate-500">엑셀 표를 읽는 중입니다...</p>}
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
       {savedCount != null && (
         <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{savedCount}건 등록 완료했습니다.</p>
