@@ -1,4 +1,7 @@
+import { createClient } from "@/lib/supabase/server";
 import { PageTabs } from "@/components/PageTabs";
+import { PageMemo } from "@/components/PageMemo";
+import { updateProjectsPageMemo } from "@/lib/actions/projectsPageMemo";
 import { QualityChecklistSection } from "@/components/sections/QualityChecklistSection";
 import { ConstructionMemoSection } from "@/components/sections/ConstructionMemoSection";
 import { ToolListSection } from "@/components/sections/ToolListSection";
@@ -40,10 +43,18 @@ export default async function QualityConstructionPage({
     historySite,
   } = await searchParams;
   const active = tab ?? "tools";
+  // 프로젝트·현장 페이지 메모장과 같은 메모 한 장 — 어느 쪽에서 고쳐도 같이 바뀜(사용자 요청).
+  const supabase = await createClient();
+  const { data: pageMemo } = await supabase.from("projects_page_memo").select("content").maybeSingle();
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-slate-900 print:hidden">공사 관리</h1>
+      <PageMemo
+        initialContent={pageMemo?.content ?? ""}
+        placeholder="프로젝트 관련 메모..."
+        save={updateProjectsPageMemo}
+      />
       <div className="print:hidden">
         <PageTabs basePath="/quality-construction" tabs={TABS} active={active} />
       </div>

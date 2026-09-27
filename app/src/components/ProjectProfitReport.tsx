@@ -22,6 +22,7 @@ import { ReportChartToggle } from "@/components/ReportChartToggle";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import { purchaseCostOf } from "@/lib/vatBasis";
+import { unsettledCreditPurchase } from "@/lib/projectProfit";
 
 export async function ProjectProfitReport({ projectId, closeHref }: { projectId: string; closeHref: string }) {
   const supabase = await createClient();
@@ -135,6 +136,10 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
   const profit = quoteTotal ? quoteTotal - purchaseTotal - agencyTotal : null;
   // 이익율은 발주액 대비 비율
   const margin = quoteTotal && profit !== null ? (profit / quoteTotal) * 100 : null;
+  // 외상 미정산(완납 전) 매입은 위 매입 합계·이익금에서 빠져 있음 — 따로 합산해서 보여주고, 이익금에서 뺀
+  // 금액을 노란 글씨로(사용자 요청). 정산되면 매입 합계로 옮겨 가서 두 번 빠지지 않음.
+  const unsettled = unsettledCreditPurchase(purchaseRowsRaw, creditPayments);
+  const profitAfterUnsettled = profit !== null ? profit - unsettled.cost : null;
   // 그래프·보고서 상단 참고용 — 발주액의 25%를 이윤+잡비로 가정했을 때 금액(실제 이익금/이익율
   // 계산에는 영향 없는 순수 표시용 수치).
   const handlingFeeAmount = quoteTotal > 0 ? Math.round((quoteTotal * HANDLING_FEE_PCT) / 100) : 0;
@@ -162,7 +167,16 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
       formatWon(contractTotal),
     ],
     ["매입 합계 (부가세 제외)", `-${formatWon(purchaseTotal)}`],
+    ...(unsettled.count > 0
+      ? ([[`외상 미정산분 (부가세 제외, ${unsettled.count}건, 매입 합계 미포함)`, `-${formatWon(unsettled.cost)}`]] as [
+          string,
+          string,
+        ][])
+      : []),
     ["이익금", profit === null ? "발주액 미입력" : formatWon(profit)],
+    ...(unsettled.count > 0 && profitAfterUnsettled !== null
+      ? ([["이익금 − 외상 미정산분", formatWon(profitAfterUnsettled)]] as [string, string][])
+      : []),
     ["이익율", margin === null ? "-" : `${margin.toFixed(2)}%`],
   ];
 
@@ -252,7 +266,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
         </div>
       )}
 
-      <div className="order-5 print:order-2 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 print:grid-cols-4 print:gap-2 print:border-b print:pt-2 print:pb-2 print:break-inside-avoid">
+      <div className="order-5 print:order-2 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3 md:grid-cols-4 print:grid-cols-4 print:gap-2 print:border-b print:pt-2 print:pb-2 print:break-inside-avoid">
         <div>
           <p className="text-xs text-slate-500 print:text-[9px]">발주액 (원청 발주금액)</p>
           <p className="tabular-nums text-sm font-bold whitespace-nowrap text-slate-900 print:text-xs">{formatWon(quoteTotal)}</p>
@@ -292,11 +306,24 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
           <p className="text-xs text-slate-500 print:text-[9px]">매입 합계 (부가세 제외)</p>
           <p className="tabular-nums text-sm font-bold whitespace-nowrap text-slate-500 print:text-xs">-{formatWon(purchaseTotal)}</p>
         </div>
+        {unsettled.count > 0 && (
+          <div>
+            <p className="text-xs text-slate-500 print:text-[9px]">외상 미정산분 (부가세 제외)</p>
+            <p className="tabular-nums text-sm font-bold whitespace-nowrap text-slate-500 print:text-xs">-{formatWon(unsettled.cost)}</p>
+            <p className="mt-0.5 text-[11px] text-slate-400 print:text-[8px]">{unsettled.count}건 · 매입 합계·이익금 미포함</p>
+          </div>
+        )}
         <div>
           <p className="text-xs text-slate-500 print:text-[9px]">이익금</p>
           <p className={`tabular-nums text-sm font-bold whitespace-nowrap print:text-xs ${profit === null ? "text-slate-400" : profit >= 0 ? "text-slate-900" : "text-red-600"}`}>
             {profit === null ? "발주액 미입력" : formatWon(profit)}
           </p>
+          {unsettled.count > 0 && profitAfterUnsettled !== null && (
+            <div className="mt-0.5 text-yellow-600">
+              <p className="text-[11px] leading-tight print:text-[8px]">− 외상 미정산분</p>
+              <p className="tabular-nums text-sm font-bold whitespace-nowrap print:text-xs">{formatWon(profitAfterUnsettled)}</p>
+            </div>
+          )}
         </div>
         <div>
           <p className="text-xs text-slate-500 print:text-[9px]">이익율</p>
@@ -329,7 +356,8 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
           />
           {purchaseRowsRaw.some((t) => !isLedgerVisible(t, creditPayments)) && (
             <p className="text-xs text-amber-600">
-              &quot;외상 미정산&quot; 항목은 참고용 표시이며, 정산 전까지 매입 합계·이익금 계산에는 포함되지 않습니다.
+              &quot;외상 미정산&quot; 항목은 참고용 표시이며, 정산 전까지 매입 합계·이익금 계산에는 포함되지 않습니다. 합계는
+              요약의 &quot;외상 미정산분&quot;, 이를 뺀 이익금은 이익금 아래 노란 글씨로 보입니다.
             </p>
           )}
 

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
 // 프로젝트 목록 페이지 메모는 항목 구분 없는 단일 텍스트라, 고정 id 행 하나만
-// 계속 upsert함(여러 사용자가 같은 메모장을 공유).
+// 계속 upsert함(여러 사용자가 같은 메모장을 공유). 공사 관리 페이지 맨 위에도 같은 메모가 보임.
 const MEMO_ID = "00000000-0000-0000-0000-000000000001";
 
 export async function updateProjectsPageMemo(formData: FormData) {
@@ -20,5 +20,6 @@ export async function updateProjectsPageMemo(formData: FormData) {
   if (error) return { error: error.message };
 
   revalidatePath("/projects");
+  revalidatePath("/quality-construction");
   return {};
 }
