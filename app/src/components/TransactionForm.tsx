@@ -412,8 +412,8 @@ export function TransactionForm({
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="mb-3 font-semibold text-slate-900">영수증 업로드 (선택, AI 자동 인식)</h2>
         <p className="mb-2 text-xs text-slate-400">
-          사진(여러 장 선택 시 장당 한 줄씩 등록), PDF, 엑셀(여러 품목 정리본)을 올리면 AI가 자동으로 항목을
-          채워줘요. 사진/PDF 원본은 저장되지 않으니 직접 보관해주세요.
+          사진(여러 장 선택 시 장당 한 줄씩 등록)·PDF는 AI가 읽고, 엑셀(여러 품목 정리본)은 첫 줄 머리글(품목·수량·단가·
+          총금액 등)로 읽어서 자동으로 항목을 채워줘요. 사진/PDF 원본은 저장되지 않으니 직접 보관해주세요.
         </p>
         <input
           type="file"
@@ -422,7 +422,7 @@ export function TransactionForm({
           onChange={(e) => e.target.files && handleFiles(e.target.files)}
           className="text-sm"
         />
-        {ocrLoading && <p className="mt-2 text-sm text-slate-500">AI가 영수증을 인식하는 중입니다...</p>}
+        {ocrLoading && <p className="mt-2 text-sm text-slate-500">영수증을 인식하는 중입니다...</p>}
         {preview && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={preview} alt="영수증 미리보기" className="mt-3 max-h-64 rounded-lg border border-slate-200" />

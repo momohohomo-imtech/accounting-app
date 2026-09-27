@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import ExcelJS from "exceljs";
 import { createClient } from "@/lib/supabase/server";
+import { nowKst } from "@/lib/kstDate";
+import { parseTransactionSheet } from "@/lib/transactionExcel";
+
+// 엑셀 거래 일괄 등록 — 표를 첫 줄 머리글 이름으로 읽음(lib/transactionExcel.ts). 예전엔 제미나이가 읽었지만
+// 사용자 요청으로 제미나이는 영수증·급여대장 인식에만 남기고 여기서는 외부로 아무것도 보내지 않는다.
 
 function cellToString(v: unknown): string {
   if (v == null) return "";
@@ -10,6 +14,7 @@ function cellToString(v: unknown): string {
     const anyV = v as { text?: string; result?: unknown; richText?: { text: string }[] };
     if (anyV.richText) return anyV.richText.map((r) => r.text).join("");
     if (anyV.text) return anyV.text;
+    if (anyV.result instanceof Date) return anyV.result.toISOString().slice(0, 10);
     if (anyV.result != null) return String(anyV.result);
     return "";
   }
@@ -25,18 +30,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: "GEMINI_API_KEY가 설정되지 않았습니다." }, { status: 500 });
-  }
-
   const formData = await req.formData();
   const file = formData.get("file");
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "파일이 없습니다." }, { status: 400 });
   }
 
-  let csv: string;
+  const table: string[][] = [];
   try {
     const buf = Buffer.from(await file.arrayBuffer());
     const workbook = new ExcelJS.Workbook();
@@ -45,54 +45,20 @@ export async function POST(req: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await workbook.xlsx.load(buf as any);
     const worksheet = workbook.worksheets[0];
-    const lines: string[] = [];
     worksheet.eachRow((row) => {
-      const values = (row.values as unknown[]).slice(1).map(cellToString);
-      lines.push(values.join(","));
+      // row.values는 1부터 시작하고 빈 칸은 구멍(hole)이라 Array.from으로 빈 글자로 채움.
+      table.push(Array.from((row.values as unknown[]).slice(1), cellToString));
     });
-    csv = lines.join("\n");
   } catch {
     return NextResponse.json({ error: "엑셀 파일을 읽지 못했습니다." }, { status: 400 });
   }
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL ?? "gemini-3.6-flash" });
-
-  const prompt = `다음은 매입매출 거래를 여러 건 등록하기 위한 엑셀 표를 CSV로 변환한 거야. 각 행을 아래 JSON 형식으로 변환해서 배열로만 답해줘, 다른 설명 없이 JSON 배열만 출력해.
-
-컬럼은 보통 이 순서: 날짜, 구분(매입/매출), 거래처명, 프로젝트명, 품목, 종류구분, 수량, 단가, 총금액, 결제수단, 결제시점(즉시/외상), 세금계산서발행(Y/N), 메모1, 메모2.
-헤더 이름이 정확히 안 맞거나 순서가 달라도 의미로 알아서 매칭해줘. 헤더 행, 안내/예시 행, 완전히 빈 행은 결과에서 제외해.
-날짜는 YYYY-MM-DD로 변환. 금액에 쉼표나 "원"이 붙어있으면 숫자만 추출. 총금액은 최종 합계로 그대로 쓰고 별도로 세금을 더하거나 빼지 마.
-
-[
-  {
-    "trans_date": "YYYY-MM-DD",
-    "type": "매입 또는 매출",
-    "client_name": "거래처명 (없으면 빈 문자열)",
-    "project_name": "프로젝트명 (없으면 빈 문자열)",
-    "item_name": "품목 (없으면 빈 문자열)",
-    "category_name": "종류구분 (없으면 빈 문자열)",
-    "quantity": 숫자 또는 null,
-    "unit_price": 숫자 또는 null,
-    "amount": 숫자 (필수, 최종 합계),
-    "payment_method_name": "결제수단 (없으면 빈 문자열)",
-    "payment_type": "immediate 또는 credit",
-    "tax_invoice_issued": true 또는 false,
-    "note1": "메모1 (없으면 빈 문자열)",
-    "note2": "메모2 (없으면 빈 문자열)"
+  const rows = parseTransactionSheet(table, nowKst().year);
+  if (rows.length === 0) {
+    return NextResponse.json({
+      error:
+        "표에서 거래를 찾지 못했습니다. 첫 줄에 날짜·구분·거래처명·프로젝트명·품목·종류구분·수량·단가·총금액·결제수단·결제시점·세금계산서발행·메모1·메모2 머리글이 있는지 확인해 주세요.",
+    });
   }
-]
-
-CSV:
-${csv}`;
-
-  try {
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
-    return NextResponse.json({ rows: parsed });
-  } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "인식 실패" }, { status: 500 });
-  }
+  return NextResponse.json({ rows });
 }

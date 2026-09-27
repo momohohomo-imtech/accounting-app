@@ -14,6 +14,5 @@ test("조회 전용 계정: 개인정보·백업 화면은 막고 나머지는 �
 test("조회 전용 계정: AI·OCR 호출은 막고 엑셀 내려받기는 허용", () => {
   assert.equal(isViewerBlockedApi("/api/ocr"), true);
   assert.equal(isViewerBlockedApi("/api/payroll-ocr"), true);
-  assert.equal(isViewerBlockedApi("/api/reports-ai"), true);
   assert.equal(isViewerBlockedApi("/api/transactions-excel"), false);
 });

@@ -12,11 +12,8 @@ import { AnnualSettlementSummary } from "@/components/AnnualSettlementSummary";
 import { ProjectSummaryReport, type ProjectSummaryRow } from "@/components/ProjectSummaryReport";
 import { projectStatusLabel } from "@/lib/projectStatus";
 import { AutoPrint } from "@/components/AutoPrint";
-import { ReportAIInsights } from "@/components/ReportAIInsights";
-import { saveReportAiInsight, deleteReportAiInsight } from "@/lib/actions/reportAiInsights";
 import { isLedgerVisible, remainingBalance } from "@/lib/credit";
 import { resolveCategoryColor } from "@/lib/categoryColor";
-import type { ReportAiInsight } from "@/lib/types";
 import { VendorAggregateTable } from "@/components/VendorAggregateTable";
 import { PurchaseItemSearchTable } from "@/components/PurchaseItemSearchTable";
 import { VendorAgencyToggle } from "@/components/VendorAgencyToggle";
@@ -137,7 +134,6 @@ export default async function ReportsPage({
     rawTx,
     { data: projects },
     { data: firstTx },
-    { data: savedInsights },
     creditPayments,
     { data: agencyPurchases },
     { data: expenseCategories },
@@ -163,11 +159,6 @@ export default async function ReportsPage({
         )
         .eq("year", selectedYear),
       supabase.from("transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
-      supabase
-        .from("report_ai_insights")
-        .select("*")
-        .eq("year", selectedYear)
-        .order("created_at", { ascending: false }),
       fetchAllCreditPayments(supabase),
       fetchAllRows<AgencyPurchaseRow>((from, to) =>
         supabase
@@ -896,17 +887,6 @@ export default async function ReportsPage({
 
   const unassignedExportRows = unassignedRows.map((r) => [formatDate(r.date), r.siteName, r.title]);
 
-  const aiSummary = {
-    year: selectedYear,
-    yearTotalSales: yearTotal.sales,
-    yearTotalPurchase: yearTotal.purchase,
-    monthly: monthly.map((m) => ({ month: m.label, sales: m.sales, purchase: m.purchase, profit: m.profit })),
-    projectSummary,
-    bySite: bySite.slice(0, 8).map((s) => ({ site: s.name, sales: s.sales, purchase: s.purchase, profit: s.profit })),
-    topVendors: byVendor.slice(0, 5).map((v) => ({ vendor: v.name, count: v.count, amount: v.amount })),
-    topCustomers: byCustomer.slice(0, 5).map((v) => ({ customer: v.name, count: v.count, amount: v.amount })),
-  };
-
   return (
     <div className="space-y-6">
       {isolate && <AutoPrint cleanupHref={reportUrl()} />}
@@ -1287,13 +1267,6 @@ export default async function ReportsPage({
         </CollapsibleSection>
        </div>
       </CollapsibleSection>
-
-      <ReportAIInsights
-        summary={aiSummary}
-        savedInsights={(savedInsights ?? []) as unknown as ReportAiInsight[]}
-        saveAction={saveReportAiInsight}
-        deleteAction={deleteReportAiInsight}
-      />
 
       {project && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-brand-ink/50 p-4 py-10 print:static print:bg-transparent print:p-0">

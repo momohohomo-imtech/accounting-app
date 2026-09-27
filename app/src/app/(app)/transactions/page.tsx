@@ -325,7 +325,7 @@ async function TransactionListSection({
       )}
 
       <Card className="print:hidden">
-        <h2 className="mb-3 font-semibold text-slate-900">엑셀로 여러 거래 한 번에 등록 (AI 자동 인식)</h2>
+        <h2 className="mb-3 font-semibold text-slate-900">엑셀로 여러 거래 한 번에 등록</h2>
         <TransactionBulkImport
           clients={importClients ?? []}
           projects={importProjects ?? []}

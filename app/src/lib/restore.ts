@@ -5,7 +5,6 @@ import { runBackup } from "@/lib/backup";
 const DELETE_ORDER = [
   "memos",
   "business_trip_logs",
-  "report_ai_insights",
   "bank_transactions",
   "access_list_workers",
   "access_lists",
