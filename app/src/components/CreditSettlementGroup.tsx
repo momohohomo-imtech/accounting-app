@@ -9,6 +9,7 @@ import { fieldClass, labelClass } from "@/components/ui/field";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { paymentMethodColorStyle } from "@/lib/paymentMethodColors";
 import { supplyOf } from "@/lib/vatBasis";
+import { TaxInvoiceBadge } from "@/components/TaxInvoiceBadge";
 import type { PaymentMethod, Transaction } from "@/lib/types";
 
 export type OutstandingItem = { tx: Transaction; remaining: number };
@@ -55,12 +56,14 @@ export function CreditSettlementGroup({
   const groupTotal = items.reduce((s, i) => s + i.remaining, 0);
   const groupVatExcludedTotal = items.reduce((s, i) => s + supplyOf(i.tx), 0);
   const selectedTotal = items.filter((i) => selected.has(i.tx.id)).reduce((s, i) => s + i.remaining, 0);
+  const unissuedCount = items.filter((i) => !i.tx.tax_invoice_issued).length;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>{label}</CardTitle>
         <span className="text-sm text-slate-500">
+          {unissuedCount > 0 && <span className="text-xs">계산서 미발행 {unissuedCount}건 · </span>}
           미정산 합계{" "}
           <span className="font-medium text-brand">VAT 제외 {formatWon(groupVatExcludedTotal)}</span>{" "}
           <span className="font-semibold text-slate-900">{formatWon(groupTotal)}</span>
@@ -89,7 +92,8 @@ export function CreditSettlementGroup({
               )}
             </span>
             <span className="flex-1 truncate text-slate-700">{tx.item_name ?? "-"}</span>
-            <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-3 max-md:gap-2 print:gap-3">
+              <TaxInvoiceBadge issued={tx.tax_invoice_issued} />
               <span className="shrink-0 text-brand">
                 {formatWon(supplyOf(tx))}
               </span>
