@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { fieldClass } from "@/components/ui/field";
+import { inlineFieldClass } from "@/components/ui/field";
 
 const MONTH_OPTIONS = [
   { value: "all", label: "전체" },
@@ -15,27 +15,38 @@ export function ToolChecklistHistoryFilter({
   selectedMonth,
   sites,
   selectedSiteId,
+  currentYear,
+  recentCount,
 }: {
   basePath: string;
   years: number[];
+  // "recent" = 기본(최근 작성 recentCount건), "all" = 전체 연도, 그 외 연도 숫자
   selectedYear: string;
   selectedMonth: string;
   sites: { id: string; name: string }[];
   selectedSiteId: string;
+  currentYear: number;
+  recentCount: number;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   function update(next: { year?: string; month?: string; site?: string }) {
     const params = new URLSearchParams(searchParams.toString());
-    const year = next.year ?? selectedYear;
+    let year = next.year ?? selectedYear;
     const month = next.month ?? selectedMonth;
     const site = next.site ?? selectedSiteId;
+    // "최근 N건" 상태에서 월을 고르면 올해 그 달로.
+    if (year === "recent" && next.month && next.month !== "all") year = String(currentYear);
 
-    // "전체"도 명시적으로 URL에 남겨야 함 — 지우면 파라미터 없음과 구분이 안 돼서
-    // 서버 쪽 기본값(이번 달)으로 되돌아가 버림.
-    params.set("historyYear", year);
-    params.set("historyMonth", month);
+    // 기본(최근 N건)은 파라미터 없음. 연도("전체" 포함)를 고르면 연/월을 URL에 남겨서 기본과 구분.
+    if (year === "recent") {
+      params.delete("historyYear");
+      params.delete("historyMonth");
+    } else {
+      params.set("historyYear", year);
+      params.set("historyMonth", month);
+    }
     if (site === "all") params.delete("historySite");
     else params.set("historySite", site);
 
@@ -47,9 +58,10 @@ export function ToolChecklistHistoryFilter({
       <select
         value={selectedYear}
         onChange={(e) => update({ year: e.target.value })}
-        className={`${fieldClass} w-auto`}
+        className={`${inlineFieldClass} max-w-full`}
         aria-label="연도"
       >
+        <option value="recent">최근 {recentCount}건</option>
         <option value="all">전체 연도</option>
         {years.map((y) => (
           <option key={y} value={y}>
@@ -60,7 +72,7 @@ export function ToolChecklistHistoryFilter({
       <select
         value={selectedMonth}
         onChange={(e) => update({ month: e.target.value })}
-        className={`${fieldClass} w-auto`}
+        className={`${inlineFieldClass} max-w-full`}
         aria-label="월"
       >
         {MONTH_OPTIONS.map((m) => (
@@ -72,7 +84,7 @@ export function ToolChecklistHistoryFilter({
       <select
         value={selectedSiteId}
         onChange={(e) => update({ site: e.target.value })}
-        className={`${fieldClass} w-auto`}
+        className={`${inlineFieldClass} max-w-full`}
         aria-label="현장"
       >
         <option value="all">전체 현장</option>

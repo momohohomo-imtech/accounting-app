@@ -51,6 +51,9 @@ function buildInitialFormState(items: ChecklistItemRow[]) {
   return { initialQuantities, initialToolNames, initialAdhocItems };
 }
 
+// 공구명세서 이력 기본 표시 건수(최근 작성순).
+const HISTORY_RECENT_COUNT = 15;
+
 export async function ToolListSection({
   copyFrom,
   editFrom,
@@ -127,13 +130,12 @@ export async function ToolListSection({
     };
   });
 
-  // 이력 목록은 출장일(trip_date) 기준으로 연/월/현장 필터링 — 기본은 이번 달만
-  // 보여주고, "전체"를 고르면 명시적으로 URL에 남겨서(연/월 다 포함) 파라미터가
-  // 없는 최초 진입 상태와 구분되게 함(안 그러면 "전체"를 눌러도 다시 이번
-  // 달로 되돌아가 버림).
-  const { year: currentYear, month: currentMonth } = nowKst();
-  const selectedHistoryYear = historyYear ?? String(currentYear);
-  const selectedHistoryMonth = historyMonth ?? String(currentMonth);
+  // 이력 목록 기본은 "최근 작성 15건"(저장일 최신순, 사용자 요청 — 예전엔 출장일 기준 이번 달만 보여서 다른 달
+  // 출장으로 새로 쓴 명세서가 안 보였음). 연도를 고르면 출장일(trip_date) 기준 연/월 필터로 그 기간 전체를 보여주고,
+  // 그때는 연/월을 URL에 남겨서 파라미터가 없는 기본(최근 15건)과 구분함. 현장 필터는 두 경우 모두 적용.
+  const { year: currentYear } = nowKst();
+  const selectedHistoryYear = historyYear ?? "recent";
+  const selectedHistoryMonth = historyYear ? (historyMonth ?? "all") : "all";
   const selectedHistorySiteId = historySite ?? "all";
 
   const historyYears = Array.from(
@@ -141,19 +143,23 @@ export async function ToolListSection({
       historyRows
         .filter((r) => r.trip_date)
         .map((r) => Number(r.trip_date!.slice(0, 4)))
-        .concat(selectedHistoryYear === "all" ? [] : [Number(selectedHistoryYear)])
+        .concat(selectedHistoryYear === "all" || selectedHistoryYear === "recent" ? [] : [Number(selectedHistoryYear)])
     )
   ).sort((a, b) => b - a);
 
-  const filteredHistoryRows = historyRows.filter((r) => {
-    const [tripYear, tripMonth] = r.trip_date
-      ? [r.trip_date.slice(0, 4), String(Number(r.trip_date.slice(5, 7)))]
-      : [null, null];
-    const yearMatches = selectedHistoryYear === "all" || tripYear === selectedHistoryYear;
-    const monthMatches = selectedHistoryMonth === "all" || tripMonth === selectedHistoryMonth;
-    const siteMatches = selectedHistorySiteId === "all" || r.site_id === selectedHistorySiteId;
-    return yearMatches && monthMatches && siteMatches;
-  });
+  const siteHistoryRows = historyRows.filter((r) => selectedHistorySiteId === "all" || r.site_id === selectedHistorySiteId);
+  // historyRows는 저장일(created_at) 최신순으로 조회돼 있어서 앞에서 15건이 최근 작성분.
+  const filteredHistoryRows =
+    selectedHistoryYear === "recent"
+      ? siteHistoryRows.slice(0, HISTORY_RECENT_COUNT)
+      : siteHistoryRows.filter((r) => {
+          const [tripYear, tripMonth] = r.trip_date
+            ? [r.trip_date.slice(0, 4), String(Number(r.trip_date.slice(5, 7)))]
+            : [null, null];
+          const yearMatches = selectedHistoryYear === "all" || tripYear === selectedHistoryYear;
+          const monthMatches = selectedHistoryMonth === "all" || tripMonth === selectedHistoryMonth;
+          return yearMatches && monthMatches;
+        });
 
   const toolOptions = (tools ?? []).map((t) => ({
     id: t.id as string,
@@ -314,9 +320,16 @@ export async function ToolListSection({
               selectedMonth={selectedHistoryMonth}
               sites={siteOptions}
               selectedSiteId={selectedHistorySiteId}
+              currentYear={currentYear}
+              recentCount={HISTORY_RECENT_COUNT}
             />
           }
         >
+          {selectedHistoryYear === "recent" && siteHistoryRows.length > HISTORY_RECENT_COUNT && (
+            <p className="mb-2 text-xs text-slate-400">
+              최근 작성한 {HISTORY_RECENT_COUNT}건 (전체 {siteHistoryRows.length}건) · 이전 명세서는 연도·월을 골라서 보세요
+            </p>
+          )}
           <ToolChecklistHistoryTable rows={filteredHistoryRows} />
         </CollapsibleSection>
 
