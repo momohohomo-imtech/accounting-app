@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createToolChecklist, updateToolChecklist } from "@/lib/actions/toolChecklists";
 import { Button } from "@/components/ui/Button";
-import { fieldClass, labelClass } from "@/components/ui/field";
+import { fieldClass, inlineFieldClass, labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { groupToolsBySortOrder, toolGroupLabel } from "@/lib/tools";
@@ -85,9 +85,11 @@ export function ToolChecklistCreateForm({
   const [error, setError] = useState<string | null>(null);
 
   const groups = groupToolsBySortOrder(tools);
-  const selectedCount =
-    Object.values(quantities).filter((v) => v.trim() !== "").length +
-    adhocItems.filter((a) => a.name.trim() !== "").length;
+  const isSelected = (id: string) => (quantities[id] ?? "").trim() !== "";
+  // 저장될 품목(수량 적은 공구 + 이름 적은 임의 추가) — 아래 "담긴 품목" 요약·개수에 씀.
+  const selectedTools = groups.flatMap(([, groupTools]) => groupTools).filter((t) => isSelected(t.id));
+  const namedAdhocItems = adhocItems.filter((a) => a.name.trim() !== "");
+  const selectedCount = selectedTools.length + namedAdhocItems.length;
 
   function setQuantity(id: string, value: string) {
     setQuantities((prev) => {
@@ -113,6 +115,15 @@ export function ToolChecklistCreateForm({
   }
   function removeAdhocItem(key: string) {
     setAdhocItems((prev) => prev.filter((a) => a.key !== key));
+  }
+
+  // "담긴 품목" 칩을 누르면 목록의 그 품목 수량칸으로 가서 바로 고칠 수 있게 함.
+  function focusQuantity(inputId: string) {
+    const el = document.getElementById(inputId);
+    if (!(el instanceof HTMLInputElement)) return;
+    el.scrollIntoView({ block: "center" });
+    el.focus({ preventScroll: true });
+    el.select();
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -166,7 +177,10 @@ export function ToolChecklistCreateForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm print:hidden">
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm max-md:p-3 print:hidden"
+    >
       {isEdit && (
         <div className="flex justify-end">
           <button
@@ -179,13 +193,13 @@ export function ToolChecklistCreateForm({
         </div>
       )}
       <div className="flex flex-wrap gap-3">
-        <div className="flex flex-col gap-1">
+        <div className="flex w-full flex-col gap-1 sm:w-64">
           <label className={labelClass}>제목</label>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="예: OO현장 출장 준비물"
-            className={`${fieldClass} w-64`}
+            className={fieldClass}
             required
           />
         </div>
@@ -199,11 +213,11 @@ export function ToolChecklistCreateForm({
               value={helperCount}
               onChange={(e) => setHelperCount(e.target.value)}
               placeholder="0"
-              className={`${fieldClass} w-16`}
+              className={`${inlineFieldClass} w-20`}
             />
           </div>
         </div>
-        <div className="w-72">
+        <div className="w-full sm:w-72">
           <ProjectPicker
             sites={sites}
             projects={projects}
@@ -219,7 +233,7 @@ export function ToolChecklistCreateForm({
             type="date"
             value={tripDate}
             onChange={(e) => setTripDate(e.target.value)}
-            className={`${fieldClass} w-40`}
+            className={`${inlineFieldClass} w-40`}
           />
         </div>
       </div>
@@ -227,92 +241,143 @@ export function ToolChecklistCreateForm({
       {tools.length === 0 ? (
         <p className="text-sm text-slate-400">등록된 공구가 없습니다 — 아래에서 직접 추가해도 됩니다.</p>
       ) : (
-        <div className="space-y-4">
-          {groups.map(([sortOrder, groupTools], groupIndex) => (
-            <div
-              key={sortOrder}
-              className={cx("rounded-xl p-3", groupIndex % 2 === 0 ? "bg-white" : "bg-slate-100")}
-            >
-              <p className="mb-1.5 text-sm font-bold text-black underline">{toolGroupLabel(sortOrder)}</p>
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2">
-                {groupTools.map((t) => (
-                  <div
-                    key={t.id}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm hover:bg-slate-50"
-                    style={{ backgroundColor: t.background_color ?? undefined }}
-                  >
-                    <input
-                      value={toolNames[t.id] ?? t.name}
-                      onChange={(e) => setToolNames((prev) => ({ ...prev, [t.id]: e.target.value }))}
-                      title="이 명세서에서만 표시될 이름 — 공구 마스터의 이름은 바뀌지 않음"
-                      className="min-w-0 flex-1 truncate border-none p-0 text-sm focus:outline-none"
-                      style={{ backgroundColor: "transparent", color: t.text_color ?? undefined }}
-                    />
-                    <input
-                      type="text"
-                      value={quantities[t.id] ?? ""}
-                      onChange={(e) => setQuantity(t.id, e.target.value)}
-                      className="w-16 shrink-0 rounded border border-slate-300 px-1.5 py-1 text-right text-sm focus:border-slate-500 focus:outline-none"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+        <div className="space-y-3">
+          {groups.map(([sortOrder, groupTools]) => {
+            const groupSelected = groupTools.filter((t) => isSelected(t.id)).length;
+            return (
+              <section key={sortOrder} className="rounded-xl border border-slate-200 bg-slate-50 p-3 max-md:p-2">
+                <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 px-0.5">
+                  <h3 className="text-sm font-bold text-slate-900">{toolGroupLabel(sortOrder)}</h3>
+                  <span className="text-xs text-slate-400">{groupTools.length}개</span>
+                  {groupSelected > 0 && (
+                    <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-white">
+                      {groupSelected}개 선택
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-1.5">
+                  {groupTools.map((t) => {
+                    const selected = isSelected(t.id);
+                    return (
+                      <div
+                        key={t.id}
+                        className={cx(
+                          "flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-sm transition-colors",
+                          selected ? "border-slate-900 ring-1 ring-slate-900" : "border-slate-200 hover:border-slate-400",
+                          !t.background_color && "bg-white"
+                        )}
+                        style={{ backgroundColor: t.background_color ?? undefined }}
+                      >
+                        {selected && (
+                          <span
+                            aria-hidden
+                            className="shrink-0 text-xs font-bold text-slate-900"
+                            style={{ color: t.text_color ?? undefined }}
+                          >
+                            ✓
+                          </span>
+                        )}
+                        {/* globals.css가 입력칸 배경·글자색을 흰색·검정으로 고정해서(레이어 밖 규칙이라
+                            bg·text 색 클래스가 안 먹음) 입력칸 색은 style로 줌. */}
+                        <input
+                          value={toolNames[t.id] ?? t.name}
+                          onChange={(e) => setToolNames((prev) => ({ ...prev, [t.id]: e.target.value }))}
+                          title="이 명세서에서만 표시될 이름 — 공구 마스터의 이름은 바뀌지 않음"
+                          aria-label={`${t.name} 이름`}
+                          className={cx(
+                            "min-w-0 flex-1 truncate border-none p-0 text-sm focus:outline-none",
+                            selected && "font-semibold"
+                          )}
+                          style={{
+                            backgroundColor: "transparent",
+                            color: t.text_color ?? (selected ? undefined : "var(--color-slate-600)"),
+                          }}
+                        />
+                        <input
+                          id={`tool-qty-${t.id}`}
+                          type="text"
+                          value={quantities[t.id] ?? ""}
+                          onChange={(e) => setQuantity(t.id, e.target.value)}
+                          aria-label={`${t.name} 수량`}
+                          className={cx(
+                            "w-16 shrink-0 rounded-md border px-1.5 py-0.5 text-right text-sm focus:outline-none",
+                            selected ? "border-slate-900 font-semibold" : "border-slate-200 focus:border-slate-500"
+                          )}
+                          style={selected ? undefined : { backgroundColor: "var(--color-slate-100)" }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
         </div>
       )}
 
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-xs font-semibold text-slate-500">임의 추가 (목록에 없는 공구 직접 입력)</p>
-          <button
-            type="button"
-            onClick={addAdhocItem}
-            className="text-xs font-medium text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
-          >
+      <section className="rounded-xl border border-dashed border-slate-300 p-3 max-md:p-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-0.5">
+          <p className="flex flex-wrap items-baseline gap-x-2">
+            <span className="text-sm font-bold text-slate-900">임의 추가</span>
+            <span className="text-xs text-slate-400">목록에 없는 공구 직접 입력</span>
+          </p>
+          <Button type="button" variant="secondary" size="xs" onClick={addAdhocItem}>
             + 항목 추가
-          </button>
+          </Button>
         </div>
         {adhocItems.length > 0 && (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-2">
-            {adhocItems.map((a) => (
-              <div
-                key={a.key}
-                className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
-              >
-                <input
-                  value={a.name}
-                  onChange={(e) => updateAdhocItem(a.key, { name: e.target.value })}
-                  placeholder="품명/메모"
-                  className="min-w-0 flex-1 border-none p-0 text-sm focus:outline-none"
-                />
-                <input
-                  type="text"
-                  value={a.quantity}
-                  onChange={(e) => updateAdhocItem(a.key, { quantity: e.target.value })}
-                  className="w-14 shrink-0 rounded border border-slate-300 px-1.5 py-1 text-right text-sm focus:border-slate-500 focus:outline-none"
-                />
-                <label className="flex shrink-0 items-center gap-1 text-[11px] text-slate-500" title="반입반출증용">
-                  <input
-                    type="checkbox"
-                    checked={a.forAccessPass}
-                    onChange={(e) => updateAdhocItem(a.key, { forAccessPass: e.target.checked })}
-                    className="h-3.5 w-3.5"
-                  />
-                  반입반출
-                </label>
-                <button
-                  type="button"
-                  onClick={() => removeAdhocItem(a.key)}
-                  className="shrink-0 text-xs text-red-500 hover:text-red-700"
+          <div className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-1.5">
+            {adhocItems.map((a) => {
+              const named = a.name.trim() !== "";
+              return (
+                <div
+                  key={a.key}
+                  className={cx(
+                    "flex items-center gap-1.5 rounded-lg border bg-white px-2 py-1 text-sm",
+                    named ? "border-slate-900 ring-1 ring-slate-900" : "border-slate-200"
+                  )}
                 >
-                  삭제
-                </button>
-              </div>
-            ))}
+                  <input
+                    value={a.name}
+                    onChange={(e) => updateAdhocItem(a.key, { name: e.target.value })}
+                    placeholder="품명/메모"
+                    aria-label="임의 추가 품명"
+                    className={cx(
+                      "min-w-0 flex-1 border-none p-0 text-sm focus:outline-none",
+                      named && "font-semibold"
+                    )}
+                  />
+                  <input
+                    id={`adhoc-qty-${a.key}`}
+                    type="text"
+                    value={a.quantity}
+                    onChange={(e) => updateAdhocItem(a.key, { quantity: e.target.value })}
+                    placeholder="1"
+                    aria-label="임의 추가 수량"
+                    className="w-14 shrink-0 rounded-md border border-slate-300 px-1.5 py-0.5 text-right text-sm focus:border-slate-500 focus:outline-none"
+                  />
+                  <label className="flex shrink-0 items-center gap-1 text-[11px] text-slate-500" title="반입반출증용">
+                    <input
+                      type="checkbox"
+                      checked={a.forAccessPass}
+                      onChange={(e) => updateAdhocItem(a.key, { forAccessPass: e.target.checked })}
+                      className="h-3.5 w-3.5"
+                    />
+                    반입반출
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => removeAdhocItem(a.key)}
+                    className="shrink-0 text-xs text-red-500 hover:text-red-700"
+                  >
+                    삭제
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
-      </div>
+      </section>
 
       <div className="flex flex-col gap-1">
         <label className={labelClass}>메모 (선택, 인쇄 시 표시됨)</label>
@@ -321,16 +386,47 @@ export function ToolChecklistCreateForm({
           onChange={(e) => setMemo(e.target.value)}
           placeholder="예: 오전 7시 집합, 현장 도착 후 사무실에 연락"
           rows={2}
-          className={`${fieldClass} w-full resize-y`}
+          className={`${fieldClass} resize-y`}
         />
       </div>
+
+      {selectedCount > 0 && (
+        <div className="rounded-xl bg-slate-50 p-3 max-md:p-2">
+          <p className="mb-2 px-0.5 text-xs text-slate-500">
+            <span className="font-semibold text-slate-700">담긴 품목 {selectedCount}개</span> · 누르면 그 품목 수량칸으로 이동
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {selectedTools.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => focusQuantity(`tool-qty-${t.id}`)}
+                className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 transition-colors hover:border-slate-400"
+              >
+                {(toolNames[t.id] ?? t.name).trim() || t.name}{" "}
+                <span className="font-semibold text-slate-900">{quantities[t.id].trim()}</span>
+              </button>
+            ))}
+            {namedAdhocItems.map((a) => (
+              <button
+                key={a.key}
+                type="button"
+                onClick={() => focusQuantity(`adhoc-qty-${a.key}`)}
+                className="rounded-full border border-dashed border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-700 transition-colors hover:border-slate-400"
+              >
+                {a.name.trim()} <span className="font-semibold text-slate-900">{a.quantity.trim() || "1"}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={pending || selectedCount === 0}>
           {isEdit ? "수정 저장" : "저장"}
         </Button>
-        <span className="text-xs text-slate-400">{selectedCount}개 품목 선택됨</span>
+        <span className="text-sm text-slate-500">{selectedCount}개 품목 선택됨</span>
       </div>
     </form>
   );
