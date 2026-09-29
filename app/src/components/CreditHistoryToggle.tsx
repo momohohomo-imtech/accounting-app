@@ -9,6 +9,7 @@ import { fieldClass } from "@/components/ui/field";
 import { downloadXlsx } from "@/lib/xlsxExport";
 import { deleteTransactionRecord } from "@/lib/actions/transactions";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { TaxInvoiceBadge } from "@/components/TaxInvoiceBadge";
 
 export type VendorHistoryItem = {
   id: string;
@@ -20,6 +21,8 @@ export type VendorHistoryItem = {
   vatExcludedAmount: number;
   status: "미정산" | "즉시결제" | "정산완료" | "정산 합계";
   methodName: string | null;
+  // 세금계산서 체크 여부 — "정산 합계" 줄(외상 정산으로 생긴 합계 거래)은 계산서와 무관해서 표시 안 함.
+  taxInvoiceIssued: boolean;
 };
 export type VendorHistoryGroup = {
   key: string;
@@ -85,6 +88,7 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
           it.project_name ?? "일반경비",
           it.item_name ?? "-",
           it.methodName ?? "",
+          it.status === "정산 합계" ? "" : it.taxInvoiceIssued ? "발행" : "미발행",
           it.vatExcludedAmount,
           it.amount,
         ]);
@@ -93,7 +97,7 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
     const label = year === "all" ? "전체" : month === "all" ? `${year}년` : `${year}-${month}`;
     await downloadXlsx(
       `외상이력_${label}.xlsx`,
-      ["상태", "거래처", "날짜", "프로젝트", "품목", "결제수단", "VAT 제외 금액", "금액"],
+      ["상태", "거래처", "날짜", "프로젝트", "품목", "결제수단", "세금계산서", "VAT 제외 금액", "금액"],
       rows,
       "외상이력"
     );
@@ -188,7 +192,11 @@ export function CreditHistoryToggle({ groups }: { groups: VendorHistoryGroup[] }
                           (it.project_name ?? <span className="font-medium text-red-600">일반경비</span>)
                         )}
                       </span>
-                      <span className="truncate text-slate-700 max-md:min-w-0 max-md:flex-1">{it.item_name ?? "-"}</span>
+                      {/* 세금계산서 표시는 칸 폭이 고정된 격자라 새 칸 대신 품목 칸 앞에 작게 */}
+                      <span className="flex min-w-0 items-center gap-1.5 text-slate-700 max-md:flex-1">
+                        {it.status !== "정산 합계" && <TaxInvoiceBadge issued={it.taxInvoiceIssued} />}
+                        <span className="truncate">{it.item_name ?? "-"}</span>
+                      </span>
                       {/* contents: PC·인쇄에선 감싸는 상자 없이 각자 격자 칸에 들어감, 휴대폰에선 둘째 줄 오른쪽 묶음 */}
                       <div className="contents max-md:ml-auto max-md:flex max-md:flex-wrap max-md:items-center max-md:justify-end max-md:gap-3 print:contents">
                         <span className="truncate text-right text-slate-400">{it.methodName ?? ""}</span>

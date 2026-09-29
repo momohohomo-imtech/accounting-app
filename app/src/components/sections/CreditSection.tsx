@@ -120,6 +120,7 @@ export async function CreditSection() {
       vatExcludedAmount: supplyOf(tx),
       status,
       methodName: tx.payment_methods?.name ?? null,
+      taxInvoiceIssued: Boolean(tx.tax_invoice_issued),
     });
   }
   const vendorHistoryGroups = Array.from(vendorGroupMap.values()).sort((a, b) => a.label.localeCompare(b.label));
