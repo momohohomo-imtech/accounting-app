@@ -1,14 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import type { BusinessTripLog } from "@/lib/types";
 import { tripDayCount } from "@/lib/businessTrip";
-import { createBusinessTripLog } from "@/lib/actions/businessTripLogs";
-import { BusinessTripLogForm } from "@/components/BusinessTripLogForm";
 import { BusinessTripLogViewPopup } from "@/components/BusinessTripLogViewPopup";
-import { BusinessTripBlankFormPopup } from "@/components/BusinessTripBlankFormPopup";
-import { ModalPortal } from "@/components/ModalPortal";
 import { Button } from "@/components/ui/Button";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 
@@ -31,15 +26,11 @@ function sortValue(log: BusinessTripLog, key: SortKey): string | number {
   }
 }
 
+// 예전 방식 출장일지(090 이전, business_trip_logs) — 새 출장일지는 TripLogList. 여기서는 보기·인쇄·엑셀·삭제만.
 export function BusinessTripListClient({ logs }: { logs: BusinessTripLog[] }) {
-  const router = useRouter();
-  const [creating, setCreating] = useState(false);
-  const [blankForm, setBlankForm] = useState(false);
   const [viewing, setViewing] = useState<BusinessTripLog | null>(null);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  useEscapeKey(creating, () => setCreating(false));
-  useEscapeKey(blankForm, () => setBlankForm(false));
   useEscapeKey(Boolean(viewing), () => setViewing(null));
 
   function handleSort(key: SortKey) {
@@ -74,15 +65,6 @@ export function BusinessTripListClient({ logs }: { logs: BusinessTripLog[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" onClick={() => setCreating(true)}>
-          + 새 출장일지 작성
-        </Button>
-        <Button type="button" variant="secondary" onClick={() => setBlankForm(true)}>
-          폼인쇄
-        </Button>
-      </div>
-
       <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
         <table className="sticky-col-table w-full min-w-[700px] text-sm">
           <thead>
@@ -124,26 +106,6 @@ export function BusinessTripListClient({ logs }: { logs: BusinessTripLog[] }) {
           </tbody>
         </table>
       </div>
-
-      {creating && (
-        <ModalPortal>
-          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-brand-ink/50 p-4 py-10">
-            <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
-              <h2 className="mb-4 text-lg font-semibold text-slate-900">새 출장일지 작성</h2>
-              <BusinessTripLogForm
-                action={createBusinessTripLog}
-                onSaved={() => {
-                  router.refresh();
-                  setCreating(false);
-                }}
-                onCancel={() => setCreating(false)}
-              />
-            </div>
-          </div>
-        </ModalPortal>
-      )}
-
-      {blankForm && <BusinessTripBlankFormPopup onClose={() => setBlankForm(false)} />}
 
       {viewing && <BusinessTripLogViewPopup log={viewing} onClose={() => setViewing(null)} />}
     </div>

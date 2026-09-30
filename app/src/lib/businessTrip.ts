@@ -7,8 +7,3 @@ export function tripDayCount(log: BusinessTripLog): number {
   if (log.day_count != null) return log.day_count;
   return new Set(log.projects.map((p) => p.work_date)).size;
 }
-
-// "폼인쇄" 빈 양식에 미리 그려둘 줄 수.
-export const BLANK_WORKER_ROWS = 15;
-export const BLANK_EQUIPMENT_ROWS = 5;
-export const BLANK_EXPENSE_ROWS = 8;
