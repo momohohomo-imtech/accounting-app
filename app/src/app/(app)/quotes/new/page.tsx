@@ -1,13 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { QuoteForm } from "@/components/QuoteForm";
+import { fetchCompanyProfiles } from "@/lib/companyProfileQuery";
 
 export default async function NewQuotePage() {
   const supabase = await createClient();
-  const [{ data: clients }, { data: sites }, { data: projects }] = await Promise.all([
+  const [{ data: clients }, { data: sites }, { data: projects }, { data: profiles }] = await Promise.all([
     supabase.from("clients").select("id, name").order("name"),
     supabase.from("sites").select("id, name, clients(name)").order("name"),
     supabase.from("projects").select("id, name, site_id, status, year, project_code").order("name"),
+    fetchCompanyProfiles(supabase),
   ]);
 
   const siteOptions = (sites ?? []).map((s) => ({
@@ -19,7 +21,7 @@ export default async function NewQuotePage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-slate-900">견적서 작성</h1>
-      <QuoteForm clients={clients ?? []} sites={siteOptions} projects={projects ?? []} />
+      <QuoteForm clients={clients ?? []} sites={siteOptions} projects={projects ?? []} supplierProfiles={profiles ?? []} />
     </div>
   );
 }

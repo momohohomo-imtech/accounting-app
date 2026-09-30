@@ -72,9 +72,9 @@ const HIGHLIGHT_COLOR_IDENTITY_MAP: Record<string, RowBgColor> = Object.fromEntr
 export default async function ProjectsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; year?: string; site_id?: string; status?: string; report?: string }>;
+  searchParams: Promise<{ tab?: string; year?: string; site_id?: string; status?: string; report?: string; suppliers?: string }>;
 }) {
-  const { tab, year, site_id, status, report } = await searchParams;
+  const { tab, year, site_id, status, report, suppliers } = await searchParams;
   const active = tab ?? "list";
 
   return (
@@ -84,7 +84,7 @@ export default async function ProjectsPage({
         <PageTabs basePath="/projects" tabs={TABS} active={active} />
       </div>
       {active === "sites" && <SitesSection />}
-      {active === "quotes" && <QuotesSection />}
+      {active === "quotes" && <QuotesSection suppliersOpen={suppliers === "1"} />}
       {active === "purchase_orders" && <PurchaseOrdersSection />}
       {active === "list" && <ProjectListSection year={year} siteId={site_id} status={status} report={report} />}
     </div>

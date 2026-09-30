@@ -2,29 +2,41 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { formatWon, formatDate } from "@/lib/format";
 import { numberToKoreanAmount } from "@/lib/numberToKorean";
 import { isVisibleQuoteItem, quoteLineAmounts } from "@/lib/quoteCalc";
 import { PrintButton } from "@/components/PrintButton";
 import { QuoteExportButton } from "@/components/QuoteExportButton";
-import { fieldClass, labelClass } from "@/components/ui/field";
-import { updateQuoteCompanyInfo, type QuoteCompanyInfo } from "@/lib/actions/quotes";
+import { fieldClass, inlineFieldClass, labelClass } from "@/components/ui/field";
+import { updateQuoteCompanyInfo } from "@/lib/actions/quotes";
+import { addCompanyProfileFromQuote } from "@/lib/actions/companyProfiles";
+import {
+  defaultCompanyInfo,
+  findMatchingProfile,
+  profileToCompanyInfo,
+  toCompanyInfo,
+  type CompanyProfileRow,
+  type QuoteCompanyInfo,
+} from "@/lib/companyProfile";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { Button } from "@/components/ui/Button";
+import { cx } from "@/lib/cx";
 
 const MIN_PRINT_ROWS = 8;
 
-// 저장된 회사 정보가 없는(company_info가 null인) 견적서 — 새 견적서 포함 — 는 항상 이 기본값으로 보임.
-const DEFAULT_COMPANY_INFO: QuoteCompanyInfo = {
-  companyName: "아이엠테크",
-  representativeName: "",
-  bizRegNo: "521-32-01642",
-  address: "인천 남동구 호구포로 44번길 77",
-  bizType: "제조업",
-  bizItem: "컨베이어 장치 제조업",
-  phone: "",
-  fax: "032-232-0914",
-};
+// 공급자 입력칸 — 인쇄 문서·엑셀에 찍히는 공급자 정보는 모두 이 칸들의 지금 값.
+const COMPANY_FIELDS: { key: keyof QuoteCompanyInfo; label: string; placeholder?: string; wide?: boolean }[] = [
+  { key: "companyName", label: "상호" },
+  { key: "representativeName", label: "대표자", placeholder: "선택 입력" },
+  { key: "bizRegNo", label: "사업자등록번호", placeholder: "000-00-00000" },
+  { key: "phone", label: "전화", placeholder: "선택 입력" },
+  { key: "fax", label: "팩스", placeholder: "선택 입력" },
+  { key: "address", label: "사업장 소재지", placeholder: "선택 입력", wide: true },
+  { key: "bizType", label: "업태" },
+  { key: "bizItem", label: "종목" },
+];
 
 type QuoteItemRow = {
   id: string;
@@ -45,6 +57,8 @@ export function QuotePrintView({
   items,
   quoteId,
   companyInfo,
+  profiles,
+  profilesUnavailable = false,
 }: {
   quote: {
     quote_number: string | null;
@@ -56,32 +70,54 @@ export function QuotePrintView({
   };
   items: QuoteItemRow[];
   quoteId: string;
-  /** 이 견적서에 저장된 공급자 정보 — null이면(새 견적서 등) 기본값을 씀. */
-  companyInfo: QuoteCompanyInfo | null;
+  /** 이 견적서에 저장된 공급자 정보(quotes.company_info) — 저장한 적 없으면(null) 기본 공급자를 보여줌. */
+  companyInfo: unknown;
+  /** 공급자 목록(company_profiles) — 기본 공급자가 맨 앞. */
+  profiles: CompanyProfileRow[];
+  /** 공급자 목록을 못 읽음(SQL 089 실행 전 등) — 예전처럼 칸에 직접 입력해서 이 견적서에만 저장. */
+  profilesUnavailable?: boolean;
 }) {
   const pending = useGlobalPending();
-  const initial = companyInfo ?? DEFAULT_COMPANY_INFO;
-  const [companyName, setCompanyName] = useState(initial.companyName);
-  const [representativeName, setRepresentativeName] = useState(initial.representativeName);
-  const [bizRegNo, setBizRegNo] = useState(initial.bizRegNo);
-  const [address, setAddress] = useState(initial.address);
-  const [bizType, setBizType] = useState(initial.bizType);
-  const [bizItem, setBizItem] = useState(initial.bizItem);
-  const [phone, setPhone] = useState(initial.phone);
-  const [fax, setFax] = useState(initial.fax);
+  const confirm = useConfirm();
+  const [info, setInfo] = useState<QuoteCompanyInfo>(() => toCompanyInfo(companyInfo) ?? defaultCompanyInfo(profiles));
+  const [message, setMessage] = useState<{ error: boolean; text: string } | null>(null);
+  // 지금 칸의 값과 똑같은 목록 공급자 — 없으면 직접 입력한(또는 목록과 달라진) 정보.
+  const matched = findMatchingProfile(profiles, info);
+  const { companyName, representativeName, bizRegNo, address, bizType, bizItem, phone, fax } = info;
 
-  async function handleSaveCompanyInfo() {
-    await pending.run(() =>
-      updateQuoteCompanyInfo(quoteId, {
-        companyName,
-        representativeName,
-        bizRegNo,
-        address,
-        bizType,
-        bizItem,
-        phone,
-        fax,
-      })
+  function setField(key: keyof QuoteCompanyInfo, value: string) {
+    setInfo((prev) => ({ ...prev, [key]: value }));
+    setMessage(null);
+  }
+
+  async function saveToQuote(next: QuoteCompanyInfo, okText: string) {
+    const result = await pending.run(() => updateQuoteCompanyInfo(quoteId, next));
+    setMessage(result?.error ? { error: true, text: result.error } : { error: false, text: okText });
+  }
+
+  // 목록에서 고르면 칸을 그 공급자로 채우고 이 견적서에 바로 저장.
+  async function handleSelectProfile(id: string) {
+    const profile = profiles.find((p) => p.id === id);
+    if (!profile) return;
+    if (
+      !matched &&
+      !(await confirm(
+        "지금 칸의 공급자 정보는 공급자 목록에 없습니다. 선택한 공급자로 바꾸면 이 견적서에서 지워집니다. 바꾸시겠습니까?"
+      ))
+    ) {
+      return;
+    }
+    const next = profileToCompanyInfo(profile);
+    setInfo(next);
+    await saveToQuote(next, `이 견적서의 공급자를 저장했습니다: ${profile.company_name}`);
+  }
+
+  async function handleAddToList() {
+    const result = await pending.run(() => addCompanyProfileFromQuote(info));
+    setMessage(
+      result?.error
+        ? { error: true, text: result.error }
+        : { error: false, text: `공급자 목록에 추가했습니다: ${info.companyName.trim()}` }
     );
   }
 
@@ -93,65 +129,86 @@ export function QuotePrintView({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 print:hidden sm:grid-cols-4">
-        <div>
-          <label className={labelClass}>상호</label>
-          <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} className={fieldClass} />
+      <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm max-md:p-4 print:hidden">
+        <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+          <div className="flex min-w-0 max-w-full flex-col gap-1">
+            <label htmlFor="quote-supplier-select" className={labelClass}>
+              공급자 선택
+            </label>
+            <select
+              id="quote-supplier-select"
+              value={matched?.id ?? ""}
+              onChange={(e) => handleSelectProfile(e.target.value)}
+              disabled={profiles.length === 0}
+              className={`${inlineFieldClass} max-w-full`}
+            >
+              {!matched && (
+                <option value="">{profiles.length === 0 ? "목록 없음 — 아래 칸에 직접 입력" : "직접 입력한 정보 (목록에 없음)"}</option>
+              )}
+              {profiles.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.company_name}
+                  {p.biz_reg_no ? ` (${p.biz_reg_no})` : ""}
+                  {p.is_default ? " · 기본" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+          {!matched && !profilesUnavailable && companyName.trim() !== "" && (
+            <Button type="button" variant="secondary" size="sm" className="mb-0.5" onClick={handleAddToList}>
+              이 정보를 공급자 목록에 추가
+            </Button>
+          )}
+          <Link
+            href="/projects?tab=quotes&suppliers=1"
+            className="mb-2 text-xs text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
+          >
+            공급자 목록 관리
+          </Link>
         </div>
-        <div>
-          <label className={labelClass}>대표자</label>
-          <input
-            value={representativeName}
-            onChange={(e) => setRepresentativeName(e.target.value)}
-            className={fieldClass}
-            placeholder="선택 입력"
-          />
+        {profilesUnavailable ? (
+          <p className="text-xs text-amber-700">
+            공급자 목록 표가 아직 없습니다(SQL 089 실행 전) — 지금은 예전처럼 아래 칸에 직접 입력해서 이 견적서에만 저장됩니다.
+          </p>
+        ) : (
+          <p className="text-xs text-slate-400">
+            목록에서 고르면 이 견적서에 바로 저장됩니다. 칸을 직접 고쳤으면 아래 &lsquo;공급자 정보 저장&rsquo;을 누르세요 — 이
+            견적서에만 저장되고 목록은 그대로입니다.
+          </p>
+        )}
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {COMPANY_FIELDS.map((f) => (
+            <div key={f.key} className={f.wide ? "sm:col-span-2" : undefined}>
+              <label htmlFor={`quote-company-${f.key}`} className={labelClass}>
+                {f.label}
+              </label>
+              <input
+                id={`quote-company-${f.key}`}
+                value={info[f.key]}
+                onChange={(e) => setField(f.key, e.target.value)}
+                className={fieldClass}
+                placeholder={f.placeholder}
+              />
+            </div>
+          ))}
         </div>
-        <div>
-          <label className={labelClass}>사업자등록번호</label>
-          <input
-            value={bizRegNo}
-            onChange={(e) => setBizRegNo(e.target.value)}
-            className={fieldClass}
-            placeholder="000-00-00000"
-          />
-        </div>
-        <div>
-          <label className={labelClass}>전화</label>
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} className={fieldClass} placeholder="선택 입력" />
-        </div>
-        <div>
-          <label className={labelClass}>팩스</label>
-          <input value={fax} onChange={(e) => setFax(e.target.value)} className={fieldClass} placeholder="선택 입력" />
-        </div>
-        <div className="sm:col-span-2">
-          <label className={labelClass}>사업장 소재지</label>
-          <input value={address} onChange={(e) => setAddress(e.target.value)} className={fieldClass} placeholder="선택 입력" />
-        </div>
-        <div>
-          <label className={labelClass}>업태</label>
-          <input value={bizType} onChange={(e) => setBizType(e.target.value)} className={fieldClass} />
-        </div>
-        <div>
-          <label className={labelClass}>종목</label>
-          <input value={bizItem} onChange={(e) => setBizItem(e.target.value)} className={fieldClass} />
-        </div>
+        {message && <p className={cx("text-xs", message.error ? "text-red-600" : "text-emerald-700")}>{message.text}</p>}
       </div>
 
       <div className="flex flex-wrap items-center justify-end gap-2 print:hidden">
         <p className="mr-auto text-xs text-slate-400">
-          이 견적서에만 저장되며, 새 견적서는 항상 기본값(아이엠테크)으로 시작합니다. PDF로 저장하려면 인쇄
-          대화상자의 대상(프린터)에서 &ldquo;PDF로 저장&rdquo;을 선택하세요.
+          PDF로 저장하려면 인쇄 대화상자의 대상(프린터)에서 &ldquo;PDF로 저장&rdquo;을 선택하세요.
         </p>
-        <Button type="button" variant="secondary" size="sm" onClick={handleSaveCompanyInfo}>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => saveToQuote(info, "이 견적서에 공급자 정보를 저장했습니다.")}
+        >
           공급자 정보 저장
         </Button>
-        <QuoteExportButton
-          quote={quote}
-          companyInfo={{ companyName, representativeName, bizRegNo, address, bizType, bizItem, phone, fax }}
-          rows={rows}
-          total={total}
-        />
+        <QuoteExportButton quote={quote} companyInfo={info} rows={rows} total={total} />
         <PrintButton />
       </div>
 

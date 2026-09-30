@@ -3,16 +3,25 @@ import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { QuoteForm } from "@/components/QuoteForm";
 import { QuotePrintView } from "@/components/QuotePrintView";
+import { fetchCompanyProfiles } from "@/lib/companyProfileQuery";
 
 export default async function EditQuotePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  const [{ data: quote }, { data: items }, { data: clients }, { data: sites }, { data: projects }] = await Promise.all([
+  const [
+    { data: quote },
+    { data: items },
+    { data: clients },
+    { data: sites },
+    { data: projects },
+    { data: profiles, error: profilesError },
+  ] = await Promise.all([
     supabase.from("quotes").select("*, clients(name)").eq("id", id).single(),
     supabase.from("quote_items").select("*").eq("quote_id", id).order("sort_order", { ascending: true }),
     supabase.from("clients").select("id, name").order("name"),
     supabase.from("sites").select("id, name, clients(name)").order("name"),
     supabase.from("projects").select("id, name, site_id, status, year, project_code").order("name"),
+    fetchCompanyProfiles(supabase),
   ]);
 
   if (!quote) notFound();
@@ -76,6 +85,8 @@ export default async function EditQuotePage({ params }: { params: Promise<{ id: 
         items={items ?? []}
         quoteId={quote.id}
         companyInfo={quote.company_info}
+        profiles={profiles ?? []}
+        profilesUnavailable={Boolean(profilesError)}
       />
     </div>
   );
