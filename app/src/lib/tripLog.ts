@@ -62,13 +62,47 @@ export function inputToTripDayFields(input: TripDayInput) {
   };
 }
 
-export type TripTotals = {
-  /** 출장 날짜 수 */
-  days: number;
+export type Headcount = {
   staff: number;
   helper: number;
   /** 총 투입 인원(연인원) = 날짜별 사내 + 조공의 합 */
   people: number;
+};
+
+/** 날짜 줄들의 사내·조공 인원 합(연인원). 출장일지 맨 위 합계와 보고서(프로젝트 요약·프로젝트 보고서)가 같이 씀. */
+export function sumHeadcount(days: Pick<TripDayRow, "staff_count" | "helper_count">[]): Headcount {
+  const staff = days.reduce((s, d) => s + parseCount(d.staff_count), 0);
+  const helper = days.reduce((s, d) => s + parseCount(d.helper_count), 0);
+  return { staff, helper, people: staff + helper };
+}
+
+/**
+ * 보고서의 투입 인원 — 프로젝트(+귀속 하위 프로젝트) 묶음의 출장 날짜 줄을 합산. 인원을 적은 날(출장 체크한 날)이
+ * 하나도 없거나 출장일지 표(090)가 없어서 days가 null이면 null.
+ */
+export function headcountForProjects(
+  days: Pick<TripDayRow, "project_id" | "staff_count" | "helper_count">[] | null,
+  projectIds: Iterable<string>
+): Headcount | null {
+  if (!days) return null;
+  const ids = new Set(projectIds);
+  const mine = days.filter((d) => ids.has(d.project_id));
+  return mine.length ? sumHeadcount(mine) : null;
+}
+
+/** 보고서 표시용 조각 — ["사내 3명", "조공 2명", "총 5명"]. 휴대폰에서 "사내 / 3명"처럼 끊기지 않게 조각별로 묶으려고 나눔. */
+export function headcountParts(h: Headcount): string[] {
+  return [`사내 ${h.staff}명`, `조공 ${h.helper}명`, `총 ${h.people}명`];
+}
+
+/** 보고서 표시용 — "사내 3명, 조공 2명, 총 5명". 인원을 적은 날이 없으면(null) "-". */
+export function formatHeadcount(h: Headcount | null): string {
+  return h ? headcountParts(h).join(", ") : "-";
+}
+
+export type TripTotals = Headcount & {
+  /** 출장 날짜 수 */
+  days: number;
   /** 장비를 투입한 날짜 수 */
   equipmentDays: number;
   from: string | null;
@@ -80,14 +114,10 @@ export function tripTotals(
 ): TripTotals {
   const dates = new Set(days.map((d) => d.work_date));
   const equipmentDates = new Set(days.filter((d) => d.equipment_used).map((d) => d.work_date));
-  const staff = days.reduce((s, d) => s + parseCount(d.staff_count), 0);
-  const helper = days.reduce((s, d) => s + parseCount(d.helper_count), 0);
   const sorted = Array.from(dates).sort();
   return {
     days: dates.size,
-    staff,
-    helper,
-    people: staff + helper,
+    ...sumHeadcount(days),
     equipmentDays: equipmentDates.size,
     from: sorted[0] ?? null,
     to: sorted[sorted.length - 1] ?? null,

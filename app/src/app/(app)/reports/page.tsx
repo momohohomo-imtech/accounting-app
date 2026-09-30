@@ -31,6 +31,7 @@ import { WorkLogSiteFilter } from "@/components/WorkLogSiteFilter";
 import { UnassignedWorkLogTable } from "@/components/UnassignedWorkLogTable";
 import { UnassignedWorkLogMonthFilter } from "@/components/UnassignedWorkLogMonthFilter";
 import { buildWorkLogSummary } from "@/lib/workLogSummary";
+import { headcountForProjects, type TripDayRow } from "@/lib/tripLog";
 import { parseMonthRange } from "@/lib/monthRange";
 import { ReportExcelButton } from "@/components/ReportExcelButton";
 import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
@@ -69,6 +70,8 @@ type Row = {
     | { name: string; text_color: string | null; background_color: string | null }[]
     | null;
 };
+
+type TripHeadcountRow = Pick<TripDayRow, "project_id" | "staff_count" | "helper_count">;
 
 type AgencyPurchaseRow = {
   id: string;
@@ -205,9 +208,11 @@ export default async function ReportsPage({
 
   // 프로젝트 손익은 거래일 연도와 무관하게 그 프로젝트에 붙은 거래 전부로 계산 — 연도를 넘겨
   // 들어온 매입/매출(예: 작년 프로젝트의 올해 1월 매입)이 어느 해 보고서에서도 빠지지 않게.
-  // 프로젝트 목록·손익 팝업·대시보드 이익 예상과 같은 기준. 작업일수도 같은 이유로 기간 제한 없음.
+  // 프로젝트 목록·손익 팝업·대시보드 이익 예상과 같은 기준. 작업일수·투입 인원도 같은 이유로 기간 제한 없음.
+  // 투입 인원은 작업일지 팝업에서 "출장"을 체크하고 적은 사내·조공 인원(trip_log_days) — 090 SQL 전이라
+  // 표가 없으면 null(프로젝트 요약에 "-").
   const projectIdList = (projects ?? []).map((p) => p.id);
-  const [projectTxRaw, projectWorkLogRows] = projectIdList.length
+  const [projectTxRaw, projectWorkLogRows, projectTripDays] = projectIdList.length
     ? await Promise.all([
         fetchAllRows<Row>((from, to) =>
           supabase
@@ -225,8 +230,16 @@ export default async function ReportsPage({
             .order("id", { ascending: true })
             .range(from, to)
         ),
+        fetchAllRows<TripHeadcountRow>((from, to) =>
+          supabase
+            .from("trip_log_days")
+            .select("project_id, staff_count, helper_count")
+            .in("project_id", projectIdList)
+            .order("id", { ascending: true })
+            .range(from, to)
+        ).catch(() => null),
       ])
-    : [[] as Row[], [] as { log_date: string; project_id: string | null }[]];
+    : [[] as Row[], [] as { log_date: string; project_id: string | null }[], [] as TripHeadcountRow[]];
   const projectTx = projectTxRaw.filter((t) => isLedgerVisible(t, creditPayments));
 
   // 현재 자금 내역 — 선택 연도와 무관한 "현재" 스냅샷. 은행 총 잔액(마이너스 통장 있으면
@@ -364,6 +377,7 @@ export default async function ReportsPage({
       const workDayCount = new Set(
         projectWorkLogRows.filter((r) => r.project_id && groupIds.has(r.project_id)).map((r) => r.log_date)
       ).size;
+      const headcount = headcountForProjects(projectTripDays, groupIds);
       return {
         id: p.id,
         projectCode: p.project_code ?? null,
@@ -375,6 +389,7 @@ export default async function ReportsPage({
         orderDate: p.order_date ?? null,
         memo: p.memo ?? null,
         workDayCount,
+        headcount,
         childNames: group.length > 1 ? group.slice(1).map((g) => g.name) : [],
         quoteAmount,
         agencyAmount,
@@ -395,6 +410,9 @@ export default async function ReportsPage({
     p.siteName ?? "-",
     projectStatusLabel(p.status),
     p.workDayCount,
+    p.headcount?.staff ?? "-",
+    p.headcount?.helper ?? "-",
+    p.headcount?.people ?? "-",
     p.quoteAmount,
     p.agencyAmount,
     p.purchaseSupply,
@@ -1119,6 +1137,9 @@ export default async function ReportsPage({
               "현장",
               "상태",
               "작업일수",
+              "사내 인원",
+              "조공 인원",
+              "총 투입 인원",
               "발주액",
               "대행구매액",
               "매입 공급가액",

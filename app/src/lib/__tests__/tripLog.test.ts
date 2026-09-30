@@ -1,6 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { EMPTY_TRIP_DAY_INPUT, inputToTripDayFields, parseCount, tripDayToInput, tripTotals } from "@/lib/tripLog";
+import {
+  EMPTY_TRIP_DAY_INPUT,
+  formatHeadcount,
+  headcountForProjects,
+  headcountParts,
+  inputToTripDayFields,
+  parseCount,
+  sumHeadcount,
+  tripDayToInput,
+  tripTotals,
+} from "@/lib/tripLog";
 
 test("인원 칸: 빈칸·글자·음수는 0, 소수는 버림", () => {
   assert.equal(parseCount("3"), 3);
@@ -39,4 +49,38 @@ test("합계: 총 일수·사내·조공·총 투입 인원(연인원)·장비 �
   ]);
   assert.deepEqual(t, { days: 3, staff: 7, helper: 3, people: 10, equipmentDays: 2, from: "2026-09-16", to: "2026-09-18" });
   assert.deepEqual(tripTotals([]), { days: 0, staff: 0, helper: 0, people: 0, equipmentDays: 0, from: null, to: null });
+});
+
+test("투입 인원 합: 사내·조공·총(연인원), 잘못 들어간 값은 0", () => {
+  assert.deepEqual(
+    sumHeadcount([
+      { staff_count: 2, helper_count: 1 },
+      { staff_count: 3, helper_count: 0 },
+      { staff_count: -1, helper_count: 2 },
+    ]),
+    { staff: 5, helper: 3, people: 8 }
+  );
+  assert.deepEqual(sumHeadcount([]), { staff: 0, helper: 0, people: 0 });
+});
+
+test("보고서 투입 인원: 프로젝트 묶음(귀속 하위 포함)만 합산, 적은 날이 없거나 표가 없으면 null", () => {
+  const days = [
+    { project_id: "p-parent", staff_count: 2, helper_count: 1 },
+    { project_id: "p-child", staff_count: 1, helper_count: 1 },
+    { project_id: "p-other", staff_count: 4, helper_count: 4 },
+    { project_id: "p-zero", staff_count: 0, helper_count: 0 },
+  ];
+  assert.deepEqual(headcountForProjects(days, ["p-parent", "p-child"]), { staff: 3, helper: 2, people: 5 });
+  assert.deepEqual(headcountForProjects(days, new Set(["p-other"])), { staff: 4, helper: 4, people: 8 });
+  // 출장 체크는 했는데 인원을 안 적은 날뿐이면 0명(적은 기록은 있음)
+  assert.deepEqual(headcountForProjects(days, ["p-zero"]), { staff: 0, helper: 0, people: 0 });
+  assert.equal(headcountForProjects(days, ["p-none"]), null);
+  assert.equal(headcountForProjects(null, ["p-parent"]), null);
+});
+
+test("투입 인원 표시: \"사내 N명, 조공 N명, 총 N명\", 없으면 \"-\"", () => {
+  assert.equal(formatHeadcount({ staff: 12, helper: 5, people: 17 }), "사내 12명, 조공 5명, 총 17명");
+  assert.equal(formatHeadcount({ staff: 0, helper: 0, people: 0 }), "사내 0명, 조공 0명, 총 0명");
+  assert.equal(formatHeadcount(null), "-");
+  assert.deepEqual(headcountParts({ staff: 3, helper: 0, people: 3 }), ["사내 3명", "조공 0명", "총 3명"]);
 });
