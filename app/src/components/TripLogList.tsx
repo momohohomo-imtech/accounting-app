@@ -2,13 +2,21 @@
 
 import { useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { tripProjectLabel, tripTotals, type TripProjectDoc, type TripTotals } from "@/lib/tripLog";
+import {
+  countLabel,
+  formatTripPeriod,
+  latestTripContents,
+  tripProjectLabel,
+  tripTotals,
+  type TripProjectDoc,
+  type TripTotals,
+} from "@/lib/tripLog";
 import { TripLogPopup } from "@/components/TripLogPopup";
 import { TripLogBlankFormPopup } from "@/components/TripLogBlankFormPopup";
 import { Button } from "@/components/ui/Button";
 
-type Row = { doc: TripProjectDoc; totals: TripTotals };
-type SortKey = "project" | "site" | "client" | "period" | "days" | "staff" | "helper" | "people" | "equipment";
+type Row = { doc: TripProjectDoc; totals: TripTotals; latest: string };
+type SortKey = "project" | "site" | "client" | "period" | "latest" | "days" | "staff" | "helper" | "people" | "equipment";
 
 function sortValue(r: Row, key: SortKey): string | number {
   switch (key) {
@@ -19,7 +27,10 @@ function sortValue(r: Row, key: SortKey): string | number {
     case "client":
       return r.doc.clientName ?? "";
     case "period":
-      return r.totals.from ?? "";
+      // 최근 작업(마지막 출장 날짜) 순 — 같으면 시작 날짜
+      return `${r.totals.to ?? ""}|${r.totals.from ?? ""}`;
+    case "latest":
+      return r.latest;
     case "days":
       return r.totals.days;
     case "staff":
@@ -34,18 +45,21 @@ function sortValue(r: Row, key: SortKey): string | number {
 }
 
 // 출장일지(새 방식) 목록 — 프로젝트 하나에 한 줄(한 장). 작업일지 팝업에서 "출장"을 체크한 날짜로만 채워짐.
+// 기본은 최근 작업이 위로(기간 ▼), 안 적은 값(0명·장비 없음·현장 없음)은 공란(사용자 요청).
 export function TripLogList({ docs, openProjectId }: { docs: TripProjectDoc[]; openProjectId?: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [openId, setOpenId] = useState<string | null>(openProjectId ?? null);
   const [blankForm, setBlankForm] = useState(false);
-  const [sortKey, setSortKey] = useState<SortKey | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [sortKey, setSortKey] = useState<SortKey>("period");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
-  const rows = useMemo<Row[]>(() => docs.map((doc) => ({ doc, totals: tripTotals(doc.days) })), [docs]);
+  const rows = useMemo<Row[]>(
+    () => docs.map((doc) => ({ doc, totals: tripTotals(doc.days), latest: latestTripContents(doc.days) })),
+    [docs]
+  );
   const sorted = useMemo(() => {
-    if (!sortKey) return rows;
     const copy = [...rows];
     copy.sort((a, b) => {
       const va = sortValue(a, sortKey);
@@ -95,14 +109,15 @@ export function TripLogList({ docs, openProjectId }: { docs: TripProjectDoc[]; o
         </Button>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full min-w-[860px] text-sm">
+      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm print:overflow-visible">
+        <table className="w-full min-w-[940px] text-sm print:min-w-0">
           <thead>
             <tr className="border-b border-slate-200 text-left text-slate-500">
               <th className="p-3">{headerButton("project", "프로젝트")}</th>
               <th className="p-3">{headerButton("site", "현장")}</th>
               <th className="p-3">{headerButton("client", "원청사")}</th>
               <th className="p-3">{headerButton("period", "기간")}</th>
+              <th className="p-3">{headerButton("latest", "최근 작업 내용")}</th>
               <th className="p-3 text-right">{headerButton("days", "일수")}</th>
               <th className="p-3 text-right">{headerButton("staff", "사내")}</th>
               <th className="p-3 text-right">{headerButton("helper", "조공")}</th>
@@ -112,21 +127,28 @@ export function TripLogList({ docs, openProjectId }: { docs: TripProjectDoc[]; o
             </tr>
           </thead>
           <tbody>
-            {sorted.map(({ doc, totals }) => (
+            {sorted.map(({ doc, totals, latest }) => (
               <tr key={doc.projectId} className="border-b border-slate-100 last:border-0">
-                <td className="p-3 font-medium text-slate-900 max-md:max-w-[10rem] max-md:truncate" title={tripProjectLabel(doc)}>
+                <td
+                  className="p-3 font-medium text-slate-900 max-md:max-w-[10rem] max-md:truncate print:max-w-none print:overflow-visible print:whitespace-normal"
+                  title={tripProjectLabel(doc)}
+                >
                   {tripProjectLabel(doc)}
                 </td>
-                <td className="p-3 text-slate-700">{doc.siteName ?? "-"}</td>
-                <td className="p-3 text-slate-700">{doc.clientName ?? "-"}</td>
-                <td className="whitespace-nowrap p-3 tabular-nums text-slate-600">
-                  {totals.from === totals.to ? totals.from : `${totals.from} ~ ${totals.to}`}
+                <td className="p-3 text-slate-700">{doc.siteName ?? ""}</td>
+                <td className="p-3 text-slate-700">{doc.clientName ?? ""}</td>
+                <td className="whitespace-nowrap p-3 tabular-nums text-slate-600">{formatTripPeriod(totals)}</td>
+                <td
+                  className="max-w-[16rem] truncate p-3 text-slate-700 max-md:max-w-[10rem] print:max-w-none print:overflow-visible print:whitespace-normal"
+                  title={latest}
+                >
+                  {latest}
                 </td>
-                <td className="p-3 text-right tabular-nums text-slate-900">{totals.days}일</td>
-                <td className="p-3 text-right tabular-nums text-slate-700">{totals.staff}명</td>
-                <td className="p-3 text-right tabular-nums text-slate-700">{totals.helper}명</td>
-                <td className="p-3 text-right font-semibold tabular-nums text-slate-900">{totals.people}명</td>
-                <td className="p-3 text-right tabular-nums text-slate-700">{totals.equipmentDays ? `${totals.equipmentDays}일` : "-"}</td>
+                <td className="p-3 text-right tabular-nums text-slate-900">{countLabel(totals.days, "일")}</td>
+                <td className="p-3 text-right tabular-nums text-slate-700">{countLabel(totals.staff, "명")}</td>
+                <td className="p-3 text-right tabular-nums text-slate-700">{countLabel(totals.helper, "명")}</td>
+                <td className="p-3 text-right font-semibold tabular-nums text-slate-900">{countLabel(totals.people, "명")}</td>
+                <td className="p-3 text-right tabular-nums text-slate-700">{countLabel(totals.equipmentDays, "일")}</td>
                 <td className="p-3 text-right">
                   <Button type="button" variant="secondary" size="xs" onClick={() => setOpenId(doc.projectId)}>
                     보기
@@ -136,7 +158,7 @@ export function TripLogList({ docs, openProjectId }: { docs: TripProjectDoc[]; o
             ))}
             {docs.length === 0 && (
               <tr>
-                <td colSpan={10} className="p-8 text-center text-slate-400">
+                <td colSpan={11} className="p-8 text-center text-slate-400">
                   이 기간에 출장으로 체크한 작업일지가 없습니다.
                 </td>
               </tr>

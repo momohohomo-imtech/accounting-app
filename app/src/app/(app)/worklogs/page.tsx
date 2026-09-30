@@ -14,7 +14,7 @@ import { AutoPrint } from "@/components/AutoPrint";
 import { PageTabs } from "@/components/PageTabs";
 import { BusinessTripFilter } from "@/components/BusinessTripFilter";
 import { TripLogList } from "@/components/TripLogList";
-import { monthRange } from "@/lib/dateRange";
+import { monthRange, monthRangeLabel } from "@/lib/dateRange";
 import { cx } from "@/lib/cx";
 import { one } from "@/lib/relations";
 import type { WorkLog } from "@/lib/types";
@@ -139,6 +139,15 @@ async function BusinessTripSection({
     if (!list.includes(title)) list.push(title);
     contentsByKey.set(key, list);
   }
+  // 출장 업무 내역서의 내근 일수 — 조회 기간 안에 그 프로젝트가 작업일지에 있는 날짜(이 중 출장 아닌 날을 팝업에서 셈).
+  const workDatesByProject = new Map<string, Set<string>>();
+  for (const row of workRows) {
+    if (!row.project_id || row.log_date < start || row.log_date > end) continue;
+    const dates = workDatesByProject.get(row.project_id) ?? new Set<string>();
+    dates.add(row.log_date);
+    workDatesByProject.set(row.project_id, dates);
+  }
+  const periodLabel = monthRangeLabel(selectedYear, selectedMonth, currentMonth);
 
   const docs: TripProjectDoc[] = projectIds.map((projectId) => {
     const days = daysByProject.get(projectId) ?? [];
@@ -165,6 +174,8 @@ async function BusinessTripSection({
         note: d.note,
         contents: (contentsByKey.get(`${projectId}|${d.work_date}`) ?? []).join(" / "),
       })),
+      workDates: Array.from(workDatesByProject.get(projectId) ?? []).sort(),
+      periodLabel,
     };
   });
 
