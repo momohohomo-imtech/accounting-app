@@ -1,6 +1,6 @@
 "use client";
 
-import { WORK_TYPE_OPTIONS } from "@/lib/businessTrip";
+import { WORK_TYPE_OPTIONS } from "@/lib/tripLog";
 import { ModalPortal } from "@/components/ModalPortal";
 import { ModalPrintButton } from "@/components/ModalPrintButton";
 import { useEscapeKey } from "@/lib/useEscapeKey";

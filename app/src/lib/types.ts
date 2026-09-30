@@ -251,35 +251,3 @@ export type Backup = {
   storage_url: string;
   created_at: string;
 };
-
-// 근무일은 기본으로 그 프로젝트의 공사일을 따라가지만, 인원별로 다른 날짜로 수정할 수 있다.
-export type BusinessTripWorker = { work_date: string; name: string; overtime: boolean; note: string };
-export type BusinessTripEquipment = { name: string; location: string; hours: string; note: string };
-export type BusinessTripExpense = { vendor: string; amount: string; note: string };
-
-// 공사일은 프로젝트마다 따로 가진다 — 한 출장일지 안에 서로 다른 날짜의
-// 같거나 다른 프로젝트를 여러 줄로 기록할 수 있게 하기 위함.
-export type BusinessTripProject = {
-  work_date: string;
-  project_name: string;
-  workers: BusinessTripWorker[];
-  personnel_note: string;
-  total_manpower: string;
-  equipment: BusinessTripEquipment[];
-  expenses: BusinessTripExpense[];
-};
-
-export type BusinessTripLog = {
-  id: string;
-  // 프로젝트들 중 가장 이른 공사일 — 목록 정렬/기본 표시용으로 서버에서 자동 계산.
-  work_date: string;
-  created_date: string;
-  client_name: string | null;
-  site_name: string | null;
-  work_types: string[];
-  note: string | null;
-  // 자동 계산값(프로젝트별 공사일 중 서로 다른 날짜 수) 대신 직접 입력한 값 — null이면 자동 계산값을 씀.
-  day_count: number | null;
-  projects: BusinessTripProject[];
-  created_at: string;
-};

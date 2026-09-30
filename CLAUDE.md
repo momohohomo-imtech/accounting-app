@@ -15,7 +15,7 @@
   이미 대부분의 표(`EntityTable`, `TransactionTable`, `BankTransactionTable`,
   `PayrollTable`, `WorkLogSummaryTable`, `VendorAggregateTable`,
   `VendorDetailReport`, `DailyWorkerUsageTable`, `BackupsTable`,
-  `AccessListWorkerPicker`, `SiteAggregateTable`, `BusinessTripListClient`,
+  `AccessListWorkerPicker`, `SiteAggregateTable`,
   `CategoryAggregateTable`, `CategoryDetailReport`, `ToolChecklistHistoryTable`,
   `QuotesTable`, `PurchaseOrdersTable`, `UnassignedWorkLogTable`,
   `ClassificationPendingTable`, `RevenueVerificationTable`, `SiteProfitTable`,
@@ -62,7 +62,7 @@
     `EntityTable`의 `ProgressCell`). 레이아웃 본문의 `relative overflow-x-clip`이 최후 방어로
     잘라 주지만, 칸 안에서 막는 게 원칙.
   - 표가 아닌 목록 줄(고정 폭 `grid-cols-[…]`·`shrink-0` 칸이 많은 flex 줄)도 휴대폰에선 넘쳐서 금액·버튼이
-    잘림 — 휴대폰에서만 두 줄로 나눌 것(`CreditSettlementGroup`·`CreditHistoryToggle`·`BusinessTripLogForm` 예시).
+    잘림 — 휴대폰에서만 두 줄로 나눌 것(`CreditSettlementGroup`·`CreditHistoryToggle` 예시).
     글자 옆 버튼 묶음도 `max-md:flex-wrap`/`max-md:flex-col`(`AccessListCard`).
   - 선택칸 여러 개를 한 줄에 둘 땐 `inlineFieldClass`(폭 없음, 감싼 상자 폭은 안 넘게 `max-w-full`). `fieldClass`에 `w-auto`·`w-20` 등을
     덧붙이면 빌드 CSS에서 `w-full`이 이겨서 안 먹고, 한 줄의 칸들이 폭을 똑같이 나눠 "2026년"·긴 현장 이름이 잘림(휴대폰에선
@@ -88,6 +88,13 @@
   - **인쇄 주의:** A4 인쇄 폭(약 718px)도 `md`(768px) 미만이라 `max-md:` 등 휴대폰용
     클래스가 인쇄에도 적용됨 — 인쇄되는 칸에는 `print:max-w-none print:whitespace-normal
     print:overflow-visible`처럼 되돌리고, CSS로 쓸 때는 `@media screen and (...)`로 한정할 것.
+
+- **추가 버튼·화면 이름은 한 가지 방식으로.** 새 화면도 예외 없이 적용(사용자 요청 "정돈"):
+  - 추가 버튼은 오른쪽(화면 머리 줄 또는 그 칸의 머리 줄 오른쪽), 문구는 "+ 대상 동사" — 목록 항목은 "추가"(`CreatePanel`의
+    "+ 프로젝트 추가", "+ 메모 추가"), 돈 기록은 "등록"("+ 거래 등록", "+ 급여 지급 등록"), 문서는 "작성"("+ 견적서 작성").
+    `CreatePanel`은 닫혀 있을 때 버튼을 오른쪽으로 붙이고 펼치면 입력 카드가 한 줄을 다 씀.
+  - 메뉴 이름(`AppNav`)과 화면 제목(h1)은 같게, 두 가지를 묶은 이름은 "·"로("매입매출·외상", "직원·급여").
+  - 한 탭 안의 칸들은 같은 카드 모양으로(`CollapsibleSection` 기본 카드 — 카드 없는 `bare`와 섞지 말 것, 공구리스트 탭 참고).
 
 - **1000행을 넘을 수 있는 조회는 `fetchAllRows`로 끝까지 가져올 것.** Supabase(PostgREST)는
   한 번에 최대 1000행만 돌려줘서, 그냥 `select`하면 1000행 넘는 부분이 조용히 빠짐 —

@@ -1,6 +1,9 @@
 // 출장일지(새 방식, SQL 090) — 작업일지 팝업에서 "출장"을 체크한 날짜가 프로젝트별 출장일지 한 장에 모임.
 // 날짜 줄(trip_log_days) ↔ 입력칸 값 변환과 맨 위 합계(총 일수·총 투입 인원), 보고서의 출장 투입 인원·작업일수 나눔.
 
+/** 출장일지 머리의 작업구분 선택지(예전 출장일지에서 쓰던 것 그대로). */
+export const WORK_TYPE_OPTIONS = ["제작", "설치", "긴급", "기타"];
+
 export type TripDayRow = {
   id: string;
   project_id: string;

@@ -272,9 +272,11 @@ export async function ToolListSection({
   return (
     <div className="space-y-6">
       <div className={popupOpen ? "space-y-6 print:hidden" : "space-y-6"}>
-        <CollapsibleSection title="공구 마스터 목록" bare>
+        {/* 네 칸(공구 마스터·새 명세서·이력·메모)을 모두 같은 카드 모양으로 — 예전엔 카드 없는 접힘 제목 2개와 카드 2개가
+            섞여 있었음. 새 명세서 카드는 휴대폰에서 공구 칸 자리를 넓게 쓰도록 안쪽 여백을 줄임(명세서 폼 자체 카드는 없앰). */}
+        <CollapsibleSection title="공구 마스터 목록">
           <CreatePanel title="공구" fields={toolFields} createAction={createTool} />
-          <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mt-3">
             <ToolMasterGrid tools={toolMasterRows} />
           </div>
         </CollapsibleSection>
@@ -282,7 +284,7 @@ export async function ToolListSection({
         <CollapsibleSection
           title={editSource ? "공구명세서 수정" : "새 공구명세서 만들기"}
           defaultOpen={Boolean(editSource || copySource)}
-          bare
+          className="max-md:p-3"
           headerExtra={
             <Link
               href="/quality-construction?tab=tools&checklist=__blank__"

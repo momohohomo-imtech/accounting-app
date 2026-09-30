@@ -94,7 +94,7 @@ export async function QuotesSection({ suppliersOpen = false }: { suppliersOpen?:
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-900">견적서</h2>
-        <LinkButton href="/quotes/new">+ 새 견적서</LinkButton>
+        <LinkButton href="/quotes/new">+ 견적서 작성</LinkButton>
       </div>
       <CollapsibleSection
         title={`공급자 목록${profilesError ? "" : ` (${(profiles ?? []).length})`}`}

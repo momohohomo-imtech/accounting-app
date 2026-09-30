@@ -11,6 +11,7 @@ import { TransactionTable } from "@/components/TransactionTable";
 import { TransactionColumnToggles } from "@/components/TransactionColumnToggles";
 import { TransactionExportButtons } from "@/components/TransactionExportButtons";
 import { ProjectTreeFilter } from "@/components/ProjectTreeFilter";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { PaymentMethodFilter } from "@/components/PaymentMethodFilter";
 import { TransactionBulkImport } from "@/components/TransactionBulkImport";
 import { TransactionEditPopup } from "@/components/TransactionEditPopup";
@@ -268,6 +269,8 @@ async function TransactionListSection({
     return `/transactions?${p.toString()}`;
   }
 
+  const selectedProjectNode = project_id ? projectNodes.find((p) => p.id === project_id) : undefined;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
@@ -318,10 +321,20 @@ async function TransactionListSection({
         />
       </Card>
 
+      {/* 프로젝트 필터는 표 아래에 접어 둠(사용자 요청 — 자주 안 씀). 프로젝트로 거른 상태면 펼쳐서, 어떤 프로젝트로
+          걸렀는지 보이게 */}
       {projectNodes.length > 0 && (
-        <Card className="print:hidden">
+        <CollapsibleSection
+          title={
+            selectedProjectNode
+              ? `프로젝트 필터 — ${selectedProjectNode.name}`
+              : "프로젝트 필터"
+          }
+          defaultOpen={Boolean(selectedProjectNode)}
+          className="print:hidden"
+        >
           <ProjectTreeFilter basePath="/transactions" projects={projectNodes} selectedProjectId={project_id ?? ""} />
-        </Card>
+        </CollapsibleSection>
       )}
 
       <Card className="print:hidden">
