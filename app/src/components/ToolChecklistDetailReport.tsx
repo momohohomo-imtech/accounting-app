@@ -26,7 +26,7 @@ export function ToolChecklistDetailReport({
   groups,
   closeHref,
   copyHref,
-  editHref,
+  onEdit,
   hideEditActions = false,
 }: {
   title: string;
@@ -37,7 +37,8 @@ export function ToolChecklistDetailReport({
   groups: Group[];
   closeHref: string;
   copyHref: string;
-  editHref: string;
+  /** 같은 팝업을 수정 화면으로 바꿈(`ToolChecklistPopup`). 없으면 "수정"을 안 보여 줌. */
+  onEdit?: () => void;
   /** 실제로 저장된 명세서가 아닌 빈 양식 미리보기일 때 true — "수정"/"복사" 링크를
    *  숨기고, 인쇄 시 회색 톤 보조 글자까지 전부 검정으로 강제(실제 저장된
    *  명세서 인쇄는 기존 방식 그대로 둠). */
@@ -159,9 +160,11 @@ export function ToolChecklistDetailReport({
           </Button>
           {!hideEditActions && (
             <>
-              <Link href={editHref} className="text-sm text-slate-500 hover:text-slate-800">
-                수정
-              </Link>
+              {onEdit && (
+                <button type="button" onClick={onEdit} className="text-sm text-slate-500 hover:text-slate-800">
+                  수정
+                </button>
+              )}
               <Link href={copyHref} className="text-sm text-slate-500 hover:text-slate-800">
                 복사해서 새로 만들기
               </Link>

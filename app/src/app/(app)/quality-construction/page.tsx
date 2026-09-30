@@ -24,6 +24,7 @@ export default async function QualityConstructionPage({
     copyFrom?: string;
     editFrom?: string;
     checklist?: string;
+    edit?: string;
     historyYear?: string;
     historyMonth?: string;
     historySite?: string;
@@ -38,6 +39,7 @@ export default async function QualityConstructionPage({
     copyFrom,
     editFrom,
     checklist,
+    edit,
     historyYear,
     historyMonth,
     historySite,
@@ -65,6 +67,7 @@ export default async function QualityConstructionPage({
           copyFrom={copyFrom}
           editFrom={editFrom}
           checklist={checklist}
+          edit={edit}
           historyYear={historyYear}
           historyMonth={historyMonth}
           historySite={historySite}
