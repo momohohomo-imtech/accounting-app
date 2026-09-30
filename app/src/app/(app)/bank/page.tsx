@@ -148,7 +148,7 @@ export default async function BankPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h1 className="text-2xl font-bold text-slate-900">은행 계좌 / 거래내역</h1>
+          <h1 className="text-2xl font-bold text-slate-900">은행 거래내역</h1>
           <p className="text-sm text-slate-500">
             총 잔액 합계{" "}
             <span className={`tabular-nums text-base font-bold ${totalBalance < 0 ? "text-red-600" : "text-slate-900"}`}>

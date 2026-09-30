@@ -3,12 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { WORK_TYPE_OPTIONS } from "@/lib/businessTrip";
 import {
   inputToTripDayFields,
   tripDayToInput,
   tripProjectLabel,
   tripTotals,
+  WORK_TYPE_OPTIONS,
   type TripDayInput,
   type TripProjectDoc,
 } from "@/lib/tripLog";

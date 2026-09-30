@@ -47,7 +47,7 @@ export function ConstructionMemoList({
 
   return (
     <div className="space-y-4">
-      <div className="print:hidden">
+      <div className="flex justify-end print:hidden">
         <Button type="button" onClick={() => setPopup({ mode: "create" })} disabled={projects.length === 0}>
           + 메모 추가
         </Button>

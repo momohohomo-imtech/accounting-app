@@ -2,8 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { WORK_TYPE_OPTIONS } from "@/lib/businessTrip";
-import { inputToTripDayFields, type TripDayInput } from "@/lib/tripLog";
+import { inputToTripDayFields, WORK_TYPE_OPTIONS, type TripDayInput } from "@/lib/tripLog";
 
 // 출장일지(새 방식, 090) 수정 — 머리 정보(작업구분·비고)와 날짜 줄(인원·장비). 날짜 줄은 작업일지 팝업의 "출장"
 // 체크로만 생기고, 여기서 뺀 날짜는 작업일지의 출장 체크도 풀림(체크 여부 = trip_log_days에 줄이 있는지).

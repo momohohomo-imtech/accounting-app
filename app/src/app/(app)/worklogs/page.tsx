@@ -12,14 +12,12 @@ import { SiteAggregateTable } from "@/components/SiteAggregateTable";
 import { SiteColorLegend } from "@/components/SiteColorLegend";
 import { AutoPrint } from "@/components/AutoPrint";
 import { PageTabs } from "@/components/PageTabs";
-import { BusinessTripListClient } from "@/components/BusinessTripListClient";
 import { BusinessTripFilter } from "@/components/BusinessTripFilter";
 import { TripLogList } from "@/components/TripLogList";
-import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { monthRange } from "@/lib/dateRange";
 import { cx } from "@/lib/cx";
 import { one } from "@/lib/relations";
-import type { BusinessTripLog, WorkLog } from "@/lib/types";
+import type { WorkLog } from "@/lib/types";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import { nowKst } from "@/lib/kstDate";
 import { resolveWorkLogTitles, type WorkLogTitleRow } from "@/lib/workLogSummary";
@@ -104,22 +102,6 @@ async function BusinessTripSection({
     tripTableMissing = true;
   }
 
-  const [legacyLogs, legacyDates] = await Promise.all([
-    fetchAllRows<BusinessTripLog>((from, to) =>
-      supabase
-        .from("business_trip_logs")
-        .select("*")
-        .gte("work_date", start)
-        .lte("work_date", end)
-        .order("work_date", { ascending: false })
-        .order("id", { ascending: true })
-        .range(from, to)
-    ),
-    fetchAllRows<{ work_date: string }>((from, to) =>
-      supabase.from("business_trip_logs").select("work_date").order("work_date", { ascending: true }).order("id", { ascending: true }).range(from, to)
-    ),
-  ]);
-
   const siteOf = (d: TripDayWithProject) => one(one(d.projects)?.sites);
   const periodDays = yearDays.filter(
     (d) => d.work_date >= start && d.work_date <= end && (!site || siteOf(d)?.name === site)
@@ -186,11 +168,7 @@ async function BusinessTripSection({
     };
   });
 
-  const firstYear = Math.min(
-    ...legacyDates.map((l) => Number(l.work_date.slice(0, 4))).filter((y) => !Number.isNaN(y)),
-    TRIP_FLOOR_YEAR
-  );
-  const years = Array.from({ length: currentYear - firstYear + 1 }, (_, i) => currentYear - i);
+  const years = Array.from({ length: currentYear - TRIP_FLOOR_YEAR + 1 }, (_, i) => currentYear - i);
   if (!years.includes(selectedYear)) years.unshift(selectedYear);
   years.sort((a, b) => b - a);
 
@@ -219,15 +197,6 @@ async function BusinessTripSection({
         </p>
       ) : (
         <TripLogList docs={docs} openProjectId={open} />
-      )}
-      {legacyLogs.length > 0 && (
-        <CollapsibleSection title={`이전 출장일지 (예전 방식 · 보기만) ${legacyLogs.length}건`}>
-          <p className="mb-3 text-xs text-slate-500">
-            예전 방식으로 쓴 출장일지 — 새로 쓰거나 고칠 수는 없고 보기·인쇄·엑셀·삭제만 됩니다. 새 출장일지는 작업일지
-            팝업의 &lsquo;출장&rsquo; 체크로 만듭니다.
-          </p>
-          <BusinessTripListClient logs={legacyLogs} />
-        </CollapsibleSection>
       )}
     </div>
   );

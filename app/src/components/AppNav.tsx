@@ -31,7 +31,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: "인력",
     items: [
-      { href: "/employees", label: "직원관리" },
+      { href: "/employees", label: "직원·급여" },
       { href: "/daily-workers", label: "일용직 관리" },
     ],
   },

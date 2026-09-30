@@ -61,7 +61,7 @@ export async function PurchaseOrdersSection() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-900">발주서</h2>
-        <LinkButton href="/purchase-orders/new">+ 새 발주서</LinkButton>
+        <LinkButton href="/purchase-orders/new">+ 발주서 작성</LinkButton>
       </div>
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <PurchaseOrdersTable rows={rows} />

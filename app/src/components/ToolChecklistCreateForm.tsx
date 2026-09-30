@@ -179,7 +179,7 @@ export function ToolChecklistCreateForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm max-md:p-3 print:hidden"
+      className="space-y-4 print:hidden"
     >
       {isEdit && (
         <div className="flex justify-end">

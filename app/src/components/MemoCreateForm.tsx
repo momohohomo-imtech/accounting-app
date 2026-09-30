@@ -19,7 +19,11 @@ export function MemoCreateForm({
   const pending = useGlobalPending();
 
   if (!open) {
-    return <Button onClick={() => setOpen(true)}>+ 메모작성</Button>;
+    return (
+      <div className="flex justify-end">
+        <Button onClick={() => setOpen(true)}>+ 메모 추가</Button>
+      </div>
+    );
   }
 
   return (
