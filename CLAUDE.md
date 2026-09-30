@@ -104,7 +104,7 @@
 
 - **금액 계산을 바꾸면 `npm test`(app 폴더)로 자동 검사를 돌릴 것.** 부가세 분리(`vatBasis`),
   외상 잔액(`credit`), 종합소득세(`tax`), 견적 금액·한글 금액(`quoteCalc`·`numberToKorean`),
-  예상 미수액(`expectedReceivable`), 엑셀 거래 읽기(`transactionExcel`), 작업일지 집계(`workLogSummary`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
+  예상 미수액(`expectedReceivable`), 엑셀 거래 읽기(`transactionExcel`), 작업일지 집계(`workLogSummary`), 출장일지·투입 인원 합계(`tripLog`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
   (vitest는 npm 설치 오류로 못 씀 — 새 테스트 라이브러리를 넣지 말 것)
