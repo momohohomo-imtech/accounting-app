@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { fieldClass, labelClass } from "@/components/ui/field";
+import { fieldClass, inlineFieldClass, labelClass } from "@/components/ui/field";
 
 export type SiteOption = { id: string; name: string; client_name: string | null };
 export type ProjectOption = {
@@ -113,7 +113,8 @@ export function ProjectPicker({
         </select>
       ) : (
         <div className="flex flex-col gap-2 rounded-lg border border-dashed border-slate-300 p-2">
-          {/* 휴대폰: 연도·현장을 반씩 나누면 긴 현장 이름("(주)○○ · ○○ 현장")이 잘려서 위아래로 쌓음 */}
+          {/* 휴대폰: 연도·현장을 반씩 나누면 긴 현장 이름("(주)○○ · ○○ 현장")이 잘려서 위아래로 쌓음.
+              PC: 연도는 내용 폭만, 남는 폭은 현장 칸에(반반이면 거래 수정 팝업처럼 좁은 칸에서 현장 이름이 "(주)대…"로 잘림) */}
           <div className="flex gap-2 max-md:flex-col print:flex-row">
             <select
               value={year}
@@ -124,7 +125,7 @@ export function ProjectPicker({
                 // 이상 목록에 없을 수 있음 — 화면과 실제 값이 어긋나지 않도록 같이 비움.
                 onChange("");
               }}
-              className={fieldClass}
+              className={`${inlineFieldClass} shrink-0`}
             >
               <option value="">연도 선택</option>
               {years.map((y) => (
@@ -139,7 +140,7 @@ export function ProjectPicker({
                 setSiteId(e.target.value);
                 onChange("");
               }}
-              className={fieldClass}
+              className={`${fieldClass} min-w-0 flex-1`}
               disabled={!year}
             >
               <option value="">현장 선택</option>

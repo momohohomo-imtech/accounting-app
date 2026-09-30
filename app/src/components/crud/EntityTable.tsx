@@ -254,18 +254,52 @@ export function EntityTable({
     window.addEventListener("mouseup", onUp);
   }
 
+  // %로 준 칸 폭을 PC에선 실제 표 폭에 맞춰 px로 나눔 — 켜 둔 칸의 %를 더해도 100%가 안 되면(칸 몇 개를 꺼 둔
+  // 기본 상태) 남는 폭이 관리 칸으로 몰려서, 칸마다 "2026…"처럼 잘리고 머리글이 겹치는데 가운데는 텅 비던 문제.
+  // 관리 칸(고정 px)과 직접 드래그한 칸(px)을 빼고 남은 폭을 %칸끼리 원래 비율대로 나눈다.
+  const tableRef = useRef<HTMLTableElement | null>(null);
+  const [tableWidth, setTableWidth] = useState(0);
+  useEffect(() => {
+    const el = tableRef.current;
+    if (!hasWidths || !el) return;
+    const observer = new ResizeObserver(() => setTableWidth(el.getBoundingClientRect().width));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasWidths]);
+  const fitWidths = useMemo(() => {
+    const pctOf = (f: FieldConfig) => (f.width?.endsWith("%") ? parseFloat(f.width) : 0);
+    const pctFields = visibleFields.filter((f) => !colWidths[f.name] && pctOf(f) > 0);
+    const pctSum = pctFields.reduce((s, f) => s + pctOf(f), 0);
+    // 폭 지정이 없는 칸이 섞여 있으면 그 칸 몫으로 105px씩 남겨 둠(휴대폰 최소 폭과 같은 값).
+    const reserved =
+      actionsWidth +
+      visibleFields.reduce((s, f) => s + (colWidths[f.name] ?? (pctOf(f) > 0 ? 0 : 105)), 0);
+    const free = tableWidth - reserved;
+    if (!tableWidth || pctSum <= 0 || free <= 0) return {};
+    return Object.fromEntries(pctFields.map((f) => [f.name, Math.floor((free * pctOf(f)) / pctSum)]));
+  }, [tableWidth, visibleFields, colWidths, actionsWidth]);
+
   // 지정 폭(%, 드래그한 px)은 PC·인쇄에서만 — 휴대폰에서 %로 고정하면 칸이 좁아져 금액이
   // "5,000,…"처럼 잘림. 휴대폰은 내용 폭대로 늘어나고 표 전체를 옆으로 넘김.
+  function screenPx(f: FieldConfig): number | undefined {
+    return colWidths[f.name] ?? fitWidths[f.name];
+  }
   function colWidth(f: FieldConfig) {
-    const px = colWidths[f.name];
+    const px = screenPx(f);
     return px ? `${px}px` : f.width;
+  }
+  // 인쇄는 관리 칸이 없으니 화면에서 보이는 칸 폭 비율 그대로 A4 폭을 나눔(화면 폭 px를 그대로 쓰면 넘침).
+  function printWidth(f: FieldConfig) {
+    const px = screenPx(f);
+    const totalPx = visibleFields.reduce((s, g) => s + (screenPx(g) ?? 0), 0);
+    return px && totalPx ? `${((px / totalPx) * 100).toFixed(2)}%` : f.width;
   }
   function colStyle(f: FieldConfig) {
     const w = colWidth(f);
-    return w ? ({ "--col-w": w } as CSSProperties) : undefined;
+    return w ? ({ "--col-w": w, "--col-w-print": printWidth(f) } as CSSProperties) : undefined;
   }
   function colWidthClass(f: FieldConfig) {
-    return colWidth(f) ? "md:w-(--col-w) print:w-(--col-w)" : undefined;
+    return colWidth(f) ? "md:w-(--col-w) print:w-(--col-w-print)" : undefined;
   }
 
   function handleSort(name: string) {
@@ -346,6 +380,7 @@ export function EntityTable({
       </div>
     )}
     <Table
+      ref={tableRef}
       className={cx(
         "sticky-col-table min-w-(--entity-min-w) md:min-w-[700px]",
         hasWidths && "md:table-fixed print:table-fixed"
@@ -383,7 +418,7 @@ export function EntityTable({
             )}
           </th>
         ))}
-        <th className="whitespace-nowrap pb-2 text-right font-medium print:hidden" style={{ width: `${actionsWidth}px` }}>
+        <th className="sticky-actions whitespace-nowrap pb-2 text-right font-medium print:hidden" style={{ width: `${actionsWidth}px` }}>
           관리
         </th>
       </THead>
@@ -472,7 +507,7 @@ export function EntityTable({
                   )}
                 </Td>
               ))}
-              <Td className="whitespace-nowrap text-right print:hidden">
+              <Td className="sticky-actions whitespace-nowrap text-right print:hidden">
                 <div className="flex justify-end gap-2">
                   {extraActions?.[row.id]}
                   <Button variant="secondary" size="xs" onClick={() => setEditingId(row.id)}>

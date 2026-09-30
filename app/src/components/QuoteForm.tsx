@@ -458,14 +458,15 @@ export function QuoteForm({
         )}
 
         <div className="space-y-1.5 overflow-x-auto">
+          {/* 칸 폭: 규격("SS400 t6"·"M12×100")이 5ch라 "SS4"처럼 잘리고 수량·fee%는 남아서 10/7/6ch로 나눔(아래 입력칸과 같이) */}
           <div className="hidden items-center gap-1.5 whitespace-nowrap px-1 text-[11px] font-medium text-slate-500 sm:flex">
             <span className="w-4" />
             <span className="w-[3ch] text-center">No</span>
             <span className="w-[20ch]">품명</span>
-            <span className="w-[5ch]">규격</span>
+            <span className="w-[10ch]">규격</span>
             <span className="w-[6ch]">단위</span>
-            <span className="w-[10ch] text-center">fee%</span>
-            <span className="w-[10ch]">수량</span>
+            <span className="w-[6ch] text-center">fee%</span>
+            <span className="w-[7ch]">수량</span>
             <span className="w-[15ch]">단가</span>
             <span className="w-[20ch]">금액</span>
             <span className="w-[9ch] text-right">확정금액</span>
@@ -498,7 +499,7 @@ export function QuoteForm({
                   value={it.spec}
                   onChange={(e) => updateItem(i, { spec: e.target.value })}
                   placeholder="규격"
-                  className={`${compactInputClass} w-[5ch]`}
+                  className={`${compactInputClass} w-[10ch]`}
                 />
                 <input
                   value={it.unit}
@@ -512,14 +513,14 @@ export function QuoteForm({
                   onChange={(e) => updateItem(i, { handling_fee_pct: Number(e.target.value) || 0 })}
                   placeholder="0"
                   title="핸들링fee %"
-                  className={`${compactInputClass} w-[10ch]`}
+                  className={`${compactInputClass} w-[6ch]`}
                 />
                 <input
                   type="number"
                   value={it.quantity ?? ""}
                   onChange={(e) => handleQuantity(i, e.target.value)}
                   placeholder="수량"
-                  className={`${compactInputClass} w-[10ch]`}
+                  className={`${compactInputClass} w-[7ch]`}
                 />
                 <MoneyInput
                   allowDecimal

@@ -4,8 +4,3 @@ export function nowKst() {
   const d = new Date(Date.now() + 9 * 3600_000);
   return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
 }
-
-export function todayKstString() {
-  const { year, month, day } = nowKst();
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}

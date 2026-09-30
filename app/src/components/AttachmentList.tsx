@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { uploadAttachment, deleteAttachment } from "@/lib/actions/attachments";
 import { formatFileSize } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
-import { fieldClass } from "@/components/ui/field";
+import { inlineFieldClass } from "@/components/ui/field";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 export type AttachmentItem = {
@@ -132,7 +132,7 @@ export function AttachmentList({
         {projectId && <input type="hidden" name="project_id" value={projectId} />}
         {workDate && <input type="hidden" name="work_date" value={workDate} />}
         <input name="file" type="file" required className="text-xs" />
-        <input name="memo" placeholder="메모 (선택)" className={`${fieldClass} w-40`} />
+        <input name="memo" placeholder="메모 (선택)" className={`${inlineFieldClass} w-40`} />
         <Button type="submit" size="xs" disabled={pending}>
           {pending ? "업로드 중..." : "+ 업로드"}
         </Button>

@@ -234,7 +234,8 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
             ))}
           </div>
         </div>
-        <div className="flex items-center gap-2 print:hidden">
+        {/* flex-wrap: 휴대폰에서 버튼이 한 줄에 다 안 들어가 맨 끝 "닫기"가 화면 밖으로 잘리던 것 */}
+        <div className="flex flex-wrap items-center gap-2 print:hidden">
           <ProjectPurchaseChartButton
             data={categoryBreakdown}
             title={`${project.project_code ?? ""} ${project.name}`.trim()}

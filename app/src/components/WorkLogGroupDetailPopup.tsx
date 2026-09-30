@@ -61,7 +61,7 @@ function MemoRow({ entry }: { entry: WorkLogDetailEntry }) {
             onChange={(e) => setMemo(e.target.value)}
             rows={2}
             placeholder="메모 입력"
-            className={`${fieldClass} flex-1`}
+            className={`${fieldClass} min-w-0 flex-1`}
           />
           <div className="flex shrink-0 flex-col gap-1">
             <Button type="button" size="xs" disabled={saving} onClick={save}>

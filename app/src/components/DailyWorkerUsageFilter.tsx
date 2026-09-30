@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { fieldClass } from "@/components/ui/field";
+import { inlineFieldClass } from "@/components/ui/field";
 import { cx } from "@/lib/cx";
 
 const PRESETS = [
@@ -39,7 +39,7 @@ export function DailyWorkerUsageFilter({
       <select
         value={selectedYear}
         onChange={(e) => navigate(Number(e.target.value), monthInput, selectedClient)}
-        className={`${fieldClass} w-20 shrink-0`}
+        className={`${inlineFieldClass} shrink-0`}
       >
         {years.map((y) => (
           <option key={y} value={y}>
@@ -69,7 +69,7 @@ export function DailyWorkerUsageFilter({
         onChange={(e) => setMonthInput(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && navigate(selectedYear, monthInput, selectedClient)}
         placeholder="예: 1-12"
-        className={`${fieldClass} w-20 shrink-0`}
+        className={`${inlineFieldClass} w-24 shrink-0`}
       />
       <button
         type="button"
@@ -81,7 +81,7 @@ export function DailyWorkerUsageFilter({
       <select
         value={selectedClient}
         onChange={(e) => navigate(selectedYear, monthInput, e.target.value)}
-        className={`${fieldClass} w-36 shrink-0`}
+        className={`${inlineFieldClass} max-w-[12rem] shrink-0`}
       >
         <option value="">전체 거래처</option>
         {clientOptions.map((name) => (

@@ -33,14 +33,20 @@ export function GlobalPendingProvider({ children }: { children: ReactNode }) {
   return (
     <PendingContext.Provider value={{ run }}>
       {children}
-      {count > 0 && (
-        <div className="fixed inset-0 z-[200] flex justify-center pt-6 print:hidden" style={{ cursor: "wait" }}>
-          <div className="flex items-center gap-2 rounded-full bg-brand-ink/90 px-4 py-2 text-xs font-medium text-white shadow-lg">
-            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-            처리 중...
-          </div>
-        </div>
-      )}
+      {count > 0 && <PendingOverlay />}
     </PendingContext.Provider>
+  );
+}
+
+// 화면 전체를 막는 "처리 중..." 표시 — run()을 못 쓰는 서버 렌더링 폼(<form action={서버액션}>)의 제출 버튼은
+// useFormStatus의 pending일 때 이걸 직접 띄움(AccessListSubmitButton).
+export function PendingOverlay() {
+  return (
+    <div className="fixed inset-0 z-[200] flex justify-center pt-6 print:hidden" style={{ cursor: "wait" }}>
+      <div className="flex items-center gap-2 rounded-full bg-brand-ink/90 px-4 py-2 text-xs font-medium text-white shadow-lg">
+        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+        처리 중...
+      </div>
+    </div>
   );
 }

@@ -44,14 +44,24 @@ export async function AccessListsSection({ year, month }: { year?: string; month
     ]);
 
   const listIds = (lists ?? []).map((l) => l.id);
-  const { data: links } = listIds.length
-    ? await supabase
+  // 명단별 인원 — PostgREST는 한 번에 1000줄까지만 줘서 "전체(1년)"처럼 명단이 많으면 뒤쪽 명단 인원이 조용히
+  // 빠질 수 있음. 명단 5개씩 나눠서 가져옴(순서를 정할 키가 무작위 id뿐이라 페이지로 나누면 명단 안 인원 순서가
+  // 뒤섞여서, 예전처럼 DB가 주는 순서를 그대로 쓰는 쪽을 택함).
+  const LINK_CHUNK = 5;
+  const linkChunks = Array.from({ length: Math.ceil(listIds.length / LINK_CHUNK) }, (_, i) =>
+    listIds.slice(i * LINK_CHUNK, (i + 1) * LINK_CHUNK)
+  );
+  const linkResults = await Promise.all(
+    linkChunks.map((ids) =>
+      supabase
         .from("access_list_workers")
         .select(
           "id, access_list_id, daily_worker_id, employee_id, note, manual_name, manual_phone, manual_birth_date, manual_nationality, daily_workers(name, phone, nationality, birth_date, grade), employees(name, phone, nationality, birth_date)"
         )
-        .in("access_list_id", listIds)
-    : { data: [] };
+        .in("access_list_id", ids)
+    )
+  );
+  const links = linkResults.flatMap((r) => r.data ?? []);
 
   const employees = sortByEmployeeNo(employeesRaw ?? []);
   const maxDataYear = (allLists ?? []).reduce(

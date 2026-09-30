@@ -5,7 +5,8 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { formatWon } from "@/lib/format";
 import { formatThousands, parseNumericInput } from "@/lib/numberInput";
 
-const inputClass = "rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none";
+// w-full min-w-0: 칸이 여러 개인 줄에서 입력칸 기본 폭(약 180px) 때문에 카드 밖으로 넘치지 않게(PC 두 줄 배치).
+const inputClass = "w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none";
 
 
 

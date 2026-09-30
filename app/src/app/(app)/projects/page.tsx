@@ -231,7 +231,8 @@ async function ProjectListSection({
       label: "상태",
       type: "select",
       options: PROJECT_STATUS_OPTIONS,
-      width: "6%",
+      // 8%: "완료 수금대기"·"타 프로젝트 귀속"이 6%에선 "완료 수…"로 잘림
+      width: "8%",
     },
     {
       name: "rowColorKey",

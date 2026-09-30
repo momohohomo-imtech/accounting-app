@@ -101,6 +101,18 @@ body {
   }
 }
 
+/* PC(가로 1280 노트북 등)에서 표가 상자보다 넓으면 맨 오른쪽 관리(수정·삭제) 칸이 가려져 옆으로 밀어야 보였음 —
+   관리 칸을 오른쪽에 고정(표가 넘치지 않으면 보이는 변화 없음). 휴대폰은 화면이 좁아 왼쪽 고정 칸과 함께 두면
+   볼 자리가 없어서 제외. 배경은 행 색을 물려받음(.sticky-col과 같은 방식). */
+@media screen and (min-width: 768px) {
+  .sticky-actions {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    background-color: inherit;
+  }
+}
+
 /* 머리글도 고정된 표(stickyHeader)에서 왼쪽 위 모서리 칸이 행들 위에 오게 */
 .sticky-col-table thead .sticky-col {
   z-index: 20;

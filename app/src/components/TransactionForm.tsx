@@ -598,7 +598,7 @@ export function TransactionForm({
                     value={li.item_name}
                     onChange={(e) => updateLineItem(i, { item_name: e.target.value })}
                     placeholder="품목명"
-                    className={`${inputClass} flex-1`}
+                    className={`${inputClass} min-w-0 flex-1`}
                   />
                   {lineItems.length > 1 && (
                     <button

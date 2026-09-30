@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { swapToolPosition } from "@/lib/actions/tools";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { ToolEditPopup } from "@/components/ToolEditPopup";
 import { groupToolsBySortOrder, toolGroupLabel } from "@/lib/tools";
 import { cx } from "@/lib/cx";
@@ -21,6 +22,7 @@ type Tool = {
 
 export function ToolMasterGrid({ tools }: { tools: Tool[] }) {
   const router = useRouter();
+  const pending = useGlobalPending();
   const [editing, setEditing] = useState<Tool | null>(null);
   const groups = groupToolsBySortOrder(tools);
 
@@ -31,7 +33,7 @@ export function ToolMasterGrid({ tools }: { tools: Tool[] }) {
     const fd = new FormData();
     fd.append("id_a", groupTools[idx].id);
     fd.append("id_b", groupTools[swapIdx].id);
-    await swapToolPosition(fd);
+    await pending.run(() => swapToolPosition(fd));
     router.refresh();
   }
 

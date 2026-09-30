@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { fieldClass } from "@/components/ui/field";
+import { inlineFieldClass } from "@/components/ui/field";
 import { paymentMethodColorStyle } from "@/lib/paymentMethodColors";
 
 export function PaymentMethodFilter({
@@ -22,7 +22,7 @@ export function PaymentMethodFilter({
         else params.delete("payment_method_id");
         router.push(`/transactions?${params.toString()}`, { scroll: false });
       }}
-      className={`${fieldClass} w-36 print:hidden`}
+      className={`${inlineFieldClass} print:hidden`}
     >
       <option value="">결제방식 전체</option>
       {paymentMethods.map((pm) => (

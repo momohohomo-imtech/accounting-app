@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useTransition, type ReactNode } fr
 import { useRouter } from "next/navigation";
 import { updateProjectMemo } from "@/lib/actions/projects";
 import { useEscapeKey } from "@/lib/useEscapeKey";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 type MemoCtx = {
   memo: string;
@@ -36,13 +37,14 @@ export function ProjectMemoProvider({
   const router = useRouter();
   const [memo, setMemo] = useState(initialMemo);
   const [isPending, startTransition] = useTransition();
+  const globalPending = useGlobalPending();
   const dirty = memo !== initialMemo;
 
   const persist = async () => {
     const fd = new FormData();
     fd.set("id", projectId);
     fd.set("memo", memo);
-    await updateProjectMemo(fd);
+    await globalPending.run(() => updateProjectMemo(fd));
   };
 
   const save = () => {

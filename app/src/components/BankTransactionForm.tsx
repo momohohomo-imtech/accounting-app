@@ -145,7 +145,7 @@ export function BankTransactionForm({
                 onValueChange={(v) => updateRow(i, { amount: v })}
                 placeholder="금액"
                 required
-                className={`${inputClass} w-28 flex-1`}
+                className={`${inputClass} w-28 min-w-0 flex-1`}
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -153,7 +153,7 @@ export function BankTransactionForm({
                 value={r.description}
                 onChange={(e) => updateRow(i, { description: e.target.value })}
                 placeholder="내용"
-                className={`${inputClass} w-full flex-1`}
+                className={`${inputClass} w-full min-w-0 flex-1`}
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -162,12 +162,12 @@ export function BankTransactionForm({
                 onChange={(e) => updateRow(i, { matched_client_name_raw: e.target.value })}
                 list={CLIENT_NAMES_DATALIST_ID}
                 placeholder="거래처 수기 작성"
-                className={`${inputClass} w-32 flex-1`}
+                className={`${inputClass} w-32 min-w-0 flex-1`}
               />
               <select
                 value={r.matched_client_id}
                 onChange={(e) => updateRow(i, { matched_client_id: e.target.value })}
-                className={`${inputClass} w-32 flex-1`}
+                className={`${inputClass} w-32 min-w-0 flex-1`}
               >
                 <option value="">선택 안함</option>
                 {clients.map((c) => (

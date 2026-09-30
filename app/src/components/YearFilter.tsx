@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { fieldClass } from "@/components/ui/field";
+import { inlineFieldClass } from "@/components/ui/field";
 
 export function YearFilter({
   basePath,
@@ -36,7 +36,7 @@ export function YearFilter({
       <select
         value={selectedYear}
         onChange={(e) => navigate(e.target.value, selectedSiteId ?? "", statuses)}
-        className={fieldClass}
+        className={inlineFieldClass}
       >
         {years.map((y) => (
           <option key={y} value={y}>
@@ -48,7 +48,7 @@ export function YearFilter({
         <select
           value={selectedSiteId ?? ""}
           onChange={(e) => navigate(selectedYear, e.target.value, statuses)}
-          className={fieldClass}
+          className={inlineFieldClass}
         >
           <option value="">전체 현장</option>
           {siteOptions.map((s) => (

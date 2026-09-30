@@ -5,7 +5,7 @@ import { formatWon, formatDate } from "@/lib/format";
 import { projectStatusLabel, PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
 import { BarChart, buildChartData, type CategoryAmount } from "@/components/ProjectPurchaseChartButton";
 import { Badge } from "@/components/ui/Badge";
-import { fieldClass } from "@/components/ui/field";
+import { inlineFieldClass } from "@/components/ui/field";
 import { ProjectSummaryMemoEditor } from "@/components/ProjectSummaryMemoEditor";
 import { headcountParts, workDayParts, type Headcount, type WorkDaySplit } from "@/lib/tripLog";
 
@@ -100,7 +100,7 @@ export function ProjectSummaryReport({ rows }: { rows: ProjectSummaryRow[] }) {
             setSelectedSite(e.target.value);
             setSelectedProjectId("");
           }}
-          className={`${fieldClass} w-auto`}
+          className={inlineFieldClass}
         >
           <option value="">전체 현장</option>
           {siteOptions.map((s) => (
@@ -112,7 +112,7 @@ export function ProjectSummaryReport({ rows }: { rows: ProjectSummaryRow[] }) {
         <select
           value={selectedProjectId}
           onChange={(e) => setSelectedProjectId(e.target.value)}
-          className={`${fieldClass} w-auto`}
+          className={inlineFieldClass}
         >
           <option value="">전체 프로젝트</option>
           {projectOptionsForSite.map((p) => (
