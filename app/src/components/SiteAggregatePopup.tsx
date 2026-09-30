@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getSiteWorkLogDetail, type SiteWorkLogDetail } from "@/lib/actions/worklogs";
 import { parseMonthRange } from "@/lib/monthRange";
 import { downloadXlsx } from "@/lib/xlsxExport";
-import { fieldClass } from "@/components/ui/field";
+import { inlineFieldClass } from "@/components/ui/field";
 import { Button } from "@/components/ui/Button";
 import { ModalPrintButton } from "@/components/ModalPrintButton";
 import { ModalPortal } from "@/components/ModalPortal";
@@ -118,14 +118,14 @@ export function SiteAggregatePopup({
             type="number"
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
-            className={`${fieldClass} w-24`}
+            className={`${inlineFieldClass} w-24`}
           />
           <input
             value={monthInput}
             onChange={(e) => setMonthInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && load(year, monthInput)}
             placeholder="예: 3 또는 1-8"
-            className={`${fieldClass} w-24`}
+            className={`${inlineFieldClass} w-36`}
           />
           <Button type="button" size="sm" disabled={loading} onClick={() => load(year, monthInput)}>
             조회

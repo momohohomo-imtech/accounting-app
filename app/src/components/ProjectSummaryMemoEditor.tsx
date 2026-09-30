@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { updateProjectMemo } from "@/lib/actions/projects";
 import { Button } from "@/components/ui/Button";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 // 프로젝트 요약 카드 안에서 바로 메모를 쓰고 저장할 수 있게 — projects.memo를 그대로 씀
 // (프로젝트 수정 팝업의 메모와 같은 필드). 내용이 있을 때만 인쇄에도 나온다.
@@ -10,6 +11,7 @@ export function ProjectSummaryMemoEditor({ projectId, initialMemo }: { projectId
   const [memo, setMemo] = useState(initialMemo ?? "");
   const [savedMemo, setSavedMemo] = useState(initialMemo ?? "");
   const [isPending, startTransition] = useTransition();
+  const globalPending = useGlobalPending();
   const dirty = memo !== savedMemo;
   const hasMemo = memo.trim().length > 0;
 
@@ -19,7 +21,7 @@ export function ProjectSummaryMemoEditor({ projectId, initialMemo }: { projectId
     fd.set("id", projectId);
     fd.set("memo", memo);
     startTransition(async () => {
-      await updateProjectMemo(fd);
+      await globalPending.run(() => updateProjectMemo(fd));
       setSavedMemo(memo);
     });
   }

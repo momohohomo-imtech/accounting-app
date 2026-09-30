@@ -8,7 +8,7 @@ import { AccessListPrintPopup } from "@/components/AccessListPrintPopup";
 import { AccessApplicationPopup } from "@/components/AccessApplicationPopup";
 import { AccessListWorkerPicker } from "@/components/AccessListWorkerPicker";
 import { Button } from "@/components/ui/Button";
-import { fieldClass, labelClass } from "@/components/ui/field";
+import { fieldClass, labelClass, inlineFieldClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
@@ -194,7 +194,7 @@ export function AccessListCard({
                 onChange={(e) => setDraftNotes((prev) => ({ ...prev, [m.id]: e.target.value }))}
                 placeholder="비고"
                 autoComplete="off"
-                className={`${fieldClass} flex-1`}
+                className={`${fieldClass} min-w-0 flex-1`}
               />
             </div>
           ))}
@@ -221,7 +221,7 @@ export function AccessListCard({
                 value={manualDraft.name}
                 onChange={(e) => setManualDraft((prev) => ({ ...prev, name: e.target.value }))}
                 autoComplete="off"
-                className={`${fieldClass} w-32`}
+                className={`${inlineFieldClass} w-32`}
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -230,7 +230,7 @@ export function AccessListCard({
                 value={manualDraft.phone}
                 onChange={(e) => setManualDraft((prev) => ({ ...prev, phone: e.target.value }))}
                 autoComplete="off"
-                className={`${fieldClass} w-32`}
+                className={`${inlineFieldClass} w-32`}
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -240,7 +240,7 @@ export function AccessListCard({
                 onChange={(e) => setManualDraft((prev) => ({ ...prev, birthDate: e.target.value }))}
                 placeholder="YYYY-MM-DD"
                 autoComplete="off"
-                className={`${fieldClass} w-32`}
+                className={`${inlineFieldClass} w-32`}
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -249,7 +249,7 @@ export function AccessListCard({
                 value={manualDraft.nationality}
                 onChange={(e) => setManualDraft((prev) => ({ ...prev, nationality: e.target.value }))}
                 autoComplete="off"
-                className={`${fieldClass} w-24`}
+                className={`${inlineFieldClass} w-24`}
               />
             </div>
             <Button type="button" variant="secondary" size="sm" onClick={addManualEntry}>

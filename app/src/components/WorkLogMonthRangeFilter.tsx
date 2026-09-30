@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { fieldClass } from "@/components/ui/field";
+import { inlineFieldClass } from "@/components/ui/field";
 
 export function WorkLogMonthRangeFilter({ value }: { value: string }) {
   const router = useRouter();
@@ -22,7 +22,7 @@ export function WorkLogMonthRangeFilter({ value }: { value: string }) {
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && apply()}
         placeholder="예: 3 또는 1-12"
-        className={`${fieldClass} w-28`}
+        className={`${inlineFieldClass} w-36`}
       />
       <button
         type="button"

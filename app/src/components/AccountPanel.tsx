@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { fieldClass, labelClass } from "@/components/ui/field";
+import { fieldClass, labelClass, inlineFieldClass } from "@/components/ui/field";
 import {
   createAccount,
   updateAccount,
@@ -40,7 +40,7 @@ function RoleSelect({
       value={value}
       onChange={(e) => onChange(e.target.value as Role)}
       disabled={disabled}
-      className={`${fieldClass} w-28`}
+      className={`${inlineFieldClass} w-28`}
     >
       {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
         <option key={r} value={r}>
@@ -158,7 +158,7 @@ function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) 
         <div>
           {editingInfo ? (
             <div className="flex flex-wrap items-center gap-2">
-              <input value={name} onChange={(e) => setName(e.target.value)} className={`${fieldClass} w-40`} />
+              <input value={name} onChange={(e) => setName(e.target.value)} className={`${inlineFieldClass} w-40`} />
               <RoleSelect value={role} onChange={setRole} disabled={isProtected} />
             </div>
           ) : (
@@ -233,7 +233,7 @@ function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) 
                   onChange={(e) => setHours(e.target.value)}
                   placeholder="시간(선택)"
                   title="입력하면 그 시간 뒤에 자동으로 다시 비활성화됩니다. 비워두면 무기한 해제됩니다."
-                  className={`${fieldClass} w-24`}
+                  className={`${inlineFieldClass} w-28`}
                 />
               )}
               <Button

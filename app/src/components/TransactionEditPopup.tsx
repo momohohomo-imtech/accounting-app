@@ -35,7 +35,9 @@ export async function TransactionEditPopup({ editTx, redirectTo }: { editTx?: st
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-brand-ink/50 p-4 py-10 print:static print:bg-transparent print:p-0">
       <EscapeCloseLink href={redirectTo} />
-      <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
+      {/* max-w-5xl: 등록 화면(/transactions/new)과 비슷한 폭 — 좁으면(2xl) 3칸 배치의 프로젝트 선택칸이 "(주)대…"처럼 잘리고
+          "완료 프로젝트 보기"가 세 줄로 접혔음 */}
+      <div className="w-full max-w-5xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
         <h2 className="mb-4 text-lg font-semibold text-slate-900">거래 수정</h2>
         <TransactionForm
           clients={clients ?? []}

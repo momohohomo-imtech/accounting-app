@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { Button } from "@/components/ui/Button";
-import { fieldClass } from "@/components/ui/field";
+import { inlineFieldClass } from "@/components/ui/field";
 import { upsertHalfYearProfit } from "@/lib/actions/dashboard";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 
@@ -54,7 +54,7 @@ export function HalfYearSettlementInput({ year, initialAmount }: { year: number;
         value={value}
         onValueChange={setValue}
         placeholder="상반기 확정 이익"
-        className={`${fieldClass} w-40`}
+        className={`${inlineFieldClass} w-40`}
       />
       <Button type="submit" size="xs">
         저장

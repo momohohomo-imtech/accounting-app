@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { formatWon, formatDate } from "@/lib/format";
 import { LinkButton, Button } from "@/components/ui/Button";
 import { PayrollForm, type EmployeeOption, type PayrollInitial } from "@/components/PayrollForm";
@@ -38,6 +39,7 @@ export function PayrollTable({
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const pending = useGlobalPending();
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
@@ -134,7 +136,15 @@ export function PayrollTable({
                     수정
                   </Button>
                   {confirmDeleteId === p.id ? (
-                    <form action={deleteAction} className="flex items-center gap-1">
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        const fd = new FormData(e.currentTarget);
+                        await pending.run(() => Promise.resolve(deleteAction(fd)));
+                        setConfirmDeleteId(null);
+                      }}
+                      className="flex items-center gap-1"
+                    >
                       <input type="hidden" name="id" value={p.id} />
                       <span className="text-xs font-medium text-red-600">정말 삭제?</span>
                       <Button variant="danger" size="xs" type="submit">

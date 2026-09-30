@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 import { deleteBackupRecord } from "@/lib/actions/backups";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 export function DeleteBackupButton({ id, fileName }: { id: string; fileName: string }) {
   const [confirming, setConfirming] = useState(false);
+  const pending = useGlobalPending();
 
   if (confirming) {
     return (
       <form
         action={async (fd) => {
-          await deleteBackupRecord(fd);
+          await pending.run(() => deleteBackupRecord(fd));
         }}
         className="flex items-center gap-1"
       >

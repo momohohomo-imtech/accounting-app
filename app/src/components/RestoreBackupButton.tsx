@@ -5,6 +5,7 @@ import { restoreBackup } from "@/lib/actions/backups";
 import { Button } from "@/components/ui/Button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { useEscapeKey } from "@/lib/useEscapeKey";
+import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 export function RestoreBackupButton({ fileName }: { fileName: string }) {
   const [open, setOpen] = useState(false);
@@ -12,7 +13,9 @@ export function RestoreBackupButton({ fileName }: { fileName: string }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
-  useEscapeKey(open, close);
+  const globalPending = useGlobalPending();
+  // 복구 중에는 Esc로 창을 닫지 못하게(닫혀도 복구는 계속 돌아서 결과를 못 보게 됨).
+  useEscapeKey(open && !isPending, close);
 
   function handleRestore() {
     setError(null);
@@ -20,7 +23,7 @@ export function RestoreBackupButton({ fileName }: { fileName: string }) {
       const fd = new FormData();
       fd.set("fileName", fileName);
       fd.set("confirmText", confirmText);
-      const result = await restoreBackup(fd);
+      const result = await globalPending.run(() => restoreBackup(fd));
       if (result.error) setError(result.error);
       else setDone(true);
     });

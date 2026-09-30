@@ -145,7 +145,9 @@ export function PurchaseOrderForm({
     router.refresh();
   }
 
-  const inputClass = "rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none";
+  // w-full min-w-0: 품목 줄(grid)의 칸 폭에 맞춰 줄어들게 — 입력칸 기본 폭 때문에 줄이 밀려 머리글과 어긋나고
+  // 맨 오른쪽 "삭제"가 카드 밖으로 나가던 것.
+  const inputClass = "w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
@@ -228,7 +230,7 @@ export function PurchaseOrderForm({
         </div>
 
         <div className="space-y-2">
-          <div className="hidden grid-cols-[1fr_1fr_5rem_7rem_8rem_3rem] gap-2 px-1 text-xs font-medium text-slate-500 sm:grid">
+          <div className="hidden grid-cols-[minmax(0,1fr)_minmax(0,1fr)_5rem_7rem_8rem_3rem] gap-2 px-1 text-xs font-medium text-slate-500 sm:grid">
             <span>품목명</span>
             <span>규격</span>
             <span>수량</span>
@@ -237,7 +239,7 @@ export function PurchaseOrderForm({
             <span />
           </div>
           {items.map((it, i) => (
-            <div key={i} className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-2 sm:grid-cols-[1fr_1fr_5rem_7rem_8rem_3rem] sm:border-0 sm:p-0">
+            <div key={i} className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_5rem_7rem_8rem_3rem] sm:border-0 sm:p-0">
               <input value={it.item_name} onChange={(e) => updateItem(i, { item_name: e.target.value })} placeholder="품목명" className={inputClass} />
               <input value={it.spec} onChange={(e) => updateItem(i, { spec: e.target.value })} placeholder="규격" className={inputClass} />
               <input

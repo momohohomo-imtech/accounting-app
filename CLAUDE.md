@@ -38,7 +38,8 @@
   await pending.run(() => someAsyncServerActionCall(...));
   ```
   `app/src/components/crud/EntityTable.tsx`와
-  `app/src/components/crud/CreatePanel.tsx`가 정석 예시.
+  `app/src/components/crud/CreatePanel.tsx`가 정석 예시. 서버 렌더링 폼(`<form action={서버액션}>`)이라 `run()`을
+  못 쓰면 제출 버튼에서 `useFormStatus()`의 `pending`일 때 `PendingOverlay`를 띄울 것(`AccessListSubmitButton`).
 
 - **휴대폰에서도 표·숫자가 읽히게 만들 것.** 휴대폰으로 많이 쓰는 앱이라, 새 표나
   숫자 칸도 예외 없이 적용. 넓은 표가 칸을 우겨넣거나 박스를 넘어가서 "어느 행인지
@@ -63,8 +64,15 @@
   - 표가 아닌 목록 줄(고정 폭 `grid-cols-[…]`·`shrink-0` 칸이 많은 flex 줄)도 휴대폰에선 넘쳐서 금액·버튼이
     잘림 — 휴대폰에서만 두 줄로 나눌 것(`CreditSettlementGroup`·`CreditHistoryToggle`·`BusinessTripLogForm` 예시).
     글자 옆 버튼 묶음도 `max-md:flex-wrap`/`max-md:flex-col`(`AccessListCard`).
-  - 선택칸 여러 개를 한 줄에 둘 땐 `inlineFieldClass`(폭 없음). `fieldClass`에 `w-auto`·`w-20` 등을 덧붙이면 빌드 CSS에서
-    `w-full`이 이겨서 안 먹고, 한 줄의 칸들이 폭을 똑같이 나눠 "2026년"·긴 현장 이름이 잘림(휴대폰에선 `max-md:flex-col`로 쌓아도 됨).
+  - 선택칸 여러 개를 한 줄에 둘 땐 `inlineFieldClass`(폭 없음, 감싼 상자 폭은 안 넘게 `max-w-full`). `fieldClass`에 `w-auto`·`w-20` 등을
+    덧붙이면 빌드 CSS에서 `w-full`이 이겨서 안 먹고, 한 줄의 칸들이 폭을 똑같이 나눠 "2026년"·긴 현장 이름이 잘림(휴대폰에선
+    `max-md:flex-col`로 쌓아도 됨). 폭을 정하려면 `${inlineFieldClass} w-40`처럼(입력칸은 placeholder가 안 잘리는 폭으로).
+  - 입력칸을 `flex-1`로 늘릴 땐 `min-w-0`도(그리드 칸 안이면 `w-full min-w-0`) — 입력칸 기본 폭(약 180px) 때문에 줄이 넘쳐
+    옆 버튼("삭제")이 잘리거나 카드 밖으로 나감(계산기·발주서 품목 줄에서 실제로 발생). 그리드 칸은 `minmax(0,1fr)`.
+  - PC(가로 1280 노트북)에서도 표가 상자보다 넓을 수 있음: `EntityTable`은 관리 칸이 `sticky-actions`(PC에서만 오른쪽 고정)라
+    수정·삭제가 항상 보임. 맨 오른쪽 근처에 금액처럼 중요한 칸이 있으면 고정하면 그 칸을 가리므로 `xl:min-w-0`으로 1280부터
+    상자 폭에 맞춤(`TransactionTable`). `EntityTable`의 칸 폭(%)은 PC에서 실제 표 폭에 맞춰 관리 칸을 뺀 나머지를 비율대로 나눔
+    (켜 둔 칸의 %합이 100이 안 돼도 됨 — 전엔 남는 폭이 관리 칸으로 몰려 칸마다 "2026…"처럼 잘렸음).
   - 입력칸(`input`·`select`·`textarea`)의 배경색·글자색은 `globals.css`의 레이어 밖 규칙(흰 배경·검정 글자)이 이겨서
     `bg-*`·`text-*` 색 클래스가 안 먹음 — 입력칸 색을 바꿀 땐 `style`로 줄 것(`ToolChecklistCreateForm`의 이름·수량칸).
   - 큰 금액은 `whitespace-nowrap`("원"만 떨어지지 않게). 큰 숫자 여러 개를 나란히 둘 때는

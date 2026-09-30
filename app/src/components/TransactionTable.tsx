@@ -416,7 +416,9 @@ export function TransactionTable({
       )}
       {bulkError && <p className="text-sm text-red-600 print:hidden">{bulkError}</p>}
 
-      <Table stickyHeader className="sticky-col-table min-w-[1020px]">
+      {/* xl:min-w-0 — 휴대폰·좁은 화면은 칸을 안 우겨넣고 옆으로 넘기지만(1020px), 가로 1280 노트북에선 상자(약 930px)보다
+          조금 넓어서 맨 오른쪽 수정·삭제가 가려졌음 → 1280부터는 상자 폭에 맞춰 긴 글자를 줄바꿈 */}
+      <Table stickyHeader className="sticky-col-table min-w-[1020px] xl:min-w-0">
         <THead>
           <th className="w-8 pb-2 pr-2">
             <input

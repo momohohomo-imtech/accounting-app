@@ -58,13 +58,6 @@ export async function deleteBankAccountRecord(formData: FormData) {
   revalidatePath("/bank");
 }
 
-export async function createBankTransactionRecord(formData: FormData) {
-  const supabase = await createClient();
-  const { error } = await supabase.from("bank_transactions").insert(parseTransaction(formData));
-  if (error) return { error: error.message };
-  revalidatePath("/bank");
-}
-
 // 한 번에 여러 건 등록 — 전부 같은 날짜(trans_date)를 공유한다.
 export async function createBankTransactionsBulk(formData: FormData) {
   const supabase = await createClient();

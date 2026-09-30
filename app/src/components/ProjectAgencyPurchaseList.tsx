@@ -6,7 +6,7 @@ import { addAgencyPurchase, updateAgencyPurchase, deleteAgencyPurchase } from "@
 import { formatWon } from "@/lib/format";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import { Button } from "@/components/ui/Button";
-import { fieldClass } from "@/components/ui/field";
+import { fieldClass, inlineFieldClass } from "@/components/ui/field";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 
@@ -49,7 +49,7 @@ function CategorySelect({
   name?: string;
 }) {
   return (
-    <select name={name} value={value} onChange={(e) => onChange(e.target.value)} className={`${fieldClass} w-32`}>
+    <select name={name} value={value} onChange={(e) => onChange(e.target.value)} className={`${inlineFieldClass} w-32`}>
       <option value="">미분류</option>
       {categories.map((c) => (
         <option key={c.id} value={c.id} style={{ color: resolveCategoryColor(c) }}>
@@ -309,15 +309,15 @@ export function ProjectAgencyPurchaseList({
 
       <form action={handleAdd} className="flex flex-wrap items-end gap-2 print:hidden">
         <input type="hidden" name="project_id" value={projectId} />
-        <input list="agency-client-names-new" name="client_name" placeholder="매입처 (자유 입력)" className={`${fieldClass} w-32`} />
+        <input list="agency-client-names-new" name="client_name" placeholder="매입처 (자유 입력)" className={`${inlineFieldClass} w-36`} />
         <datalist id="agency-client-names-new">
           {clientNames.map((name) => (
             <option key={name} value={name} />
           ))}
         </datalist>
-        <input name="item_name" placeholder="품목명" className={`${fieldClass} w-40`} />
+        <input name="item_name" placeholder="품목명" className={`${inlineFieldClass} w-40`} />
         <CategorySelect name="category_id" value={newCategoryId} onChange={setNewCategoryId} categories={categories} />
-        <MoneyInput name="amount" placeholder="금액 (비워두면 0원)" className={`${fieldClass} w-32`} />
+        <MoneyInput name="amount" placeholder="금액 (비워두면 0원)" className={`${inlineFieldClass} w-36`} />
         <input name="memo" placeholder="메모 (무슨 물품/사항인지)" className={`${fieldClass} w-full min-w-[12rem] flex-1`} />
         <Button type="submit" size="xs" disabled={pending}>
           + 추가
