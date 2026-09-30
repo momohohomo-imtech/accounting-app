@@ -192,7 +192,7 @@ export function TripLogPopup({ doc, onClose }: { doc: TripProjectDoc; onClose: (
                 <thead>
                   <tr className="border-b border-t-2 border-slate-900 text-left text-slate-500">
                     <th className="py-1.5 pr-2">날짜</th>
-                    <th className="sticky-col py-1.5 pr-2">작업 내용</th>
+                    <th className="sticky-col min-w-[8rem] py-1.5 pr-2">작업 내용</th>
                     <th className="py-1.5 pr-2 text-right">사내</th>
                     <th className="py-1.5 pr-2 text-right">조공</th>
                     <th className="py-1.5 pr-2 text-right">계</th>
@@ -217,7 +217,7 @@ export function TripLogPopup({ doc, onClose }: { doc: TripProjectDoc; onClose: (
                             </Link>
                           )}
                         </td>
-                        <td className="sticky-col py-1.5 pr-2 max-md:max-w-[10rem] max-md:truncate print:max-w-none print:whitespace-normal" title={d.contents}>
+                        <td className="sticky-col min-w-[8rem] py-1.5 pr-2 max-md:max-w-[10rem] max-md:truncate print:min-w-0 print:max-w-none print:whitespace-normal" title={d.contents}>
                           {d.contents || "-"}
                         </td>
                         <td className="py-1.5 pr-2 text-right tabular-nums">
