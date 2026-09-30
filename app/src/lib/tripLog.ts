@@ -1,5 +1,5 @@
 // 출장일지(새 방식, SQL 090) — 작업일지 팝업에서 "출장"을 체크한 날짜가 프로젝트별 출장일지 한 장에 모임.
-// 날짜 줄(trip_log_days) ↔ 입력칸 값 변환과 맨 위 합계(총 일수·총 투입 인원).
+// 날짜 줄(trip_log_days) ↔ 입력칸 값 변환과 맨 위 합계(총 일수·총 투입 인원), 보고서의 출장 투입 인원·작업일수 나눔.
 
 export type TripDayRow = {
   id: string;
@@ -69,7 +69,7 @@ export type Headcount = {
   people: number;
 };
 
-/** 날짜 줄들의 사내·조공 인원 합(연인원). 출장일지 맨 위 합계와 보고서(프로젝트 요약·프로젝트 보고서)가 같이 씀. */
+/** 날짜 줄들의 사내·조공 인원 합(연인원). 출장일지 맨 위 합계와 보고서(프로젝트 요약·프로젝트 보고서)의 출장 투입 인원이 같이 씀. */
 export function sumHeadcount(days: Pick<TripDayRow, "staff_count" | "helper_count">[]): Headcount {
   const staff = days.reduce((s, d) => s + parseCount(d.staff_count), 0);
   const helper = days.reduce((s, d) => s + parseCount(d.helper_count), 0);
@@ -77,7 +77,7 @@ export function sumHeadcount(days: Pick<TripDayRow, "staff_count" | "helper_coun
 }
 
 /**
- * 보고서의 투입 인원 — 프로젝트(+귀속 하위 프로젝트) 묶음의 출장 날짜 줄을 합산. 인원을 적은 날(출장 체크한 날)이
+ * 보고서의 출장 투입 인원 — 프로젝트(+귀속 하위 프로젝트) 묶음의 출장 날짜 줄을 합산. 인원을 적은 날(출장 체크한 날)이
  * 하나도 없거나 출장일지 표(090)가 없어서 days가 null이면 null.
  */
 export function headcountForProjects(
@@ -98,6 +98,42 @@ export function headcountParts(h: Headcount): string[] {
 /** 보고서 표시용 — "사내 3명, 조공 2명, 총 5명". 인원을 적은 날이 없으면(null) "-". */
 export function formatHeadcount(h: Headcount | null): string {
   return h ? headcountParts(h).join(", ") : "-";
+}
+
+export type WorkDaySplit = {
+  /** 작업일지에만 있고 출장으로 체크하지 않은 날 */
+  inhouse: number;
+  /** 출장으로 체크한 날 */
+  trip: number;
+  /** 사내 + 출장(날짜는 한 번만) */
+  total: number;
+};
+
+/**
+ * 보고서의 작업일수 나눔 — 프로젝트(+귀속 하위 프로젝트) 묶음이 작업일지에 있는 날짜 중 출장으로 체크한 날은 출장,
+ * 나머지는 사내. 날짜는 한 번만 세서 사내 + 출장 = 총(같은 날 묶음 안의 한 프로젝트라도 출장이면 그날은 출장).
+ * 출장 날짜 줄만 있고 작업일지 줄이 없는 날도 출장으로 셈. 출장일지 표(090)가 없으면(tripDays null) 출장 0일.
+ */
+export function workDaySplitForProjects(
+  workLogs: { log_date: string; project_id: string | null }[],
+  tripDays: Pick<TripDayRow, "project_id" | "work_date">[] | null,
+  projectIds: Iterable<string>
+): WorkDaySplit {
+  const ids = new Set(projectIds);
+  const tripDates = new Set((tripDays ?? []).filter((d) => ids.has(d.project_id)).map((d) => d.work_date));
+  const allDates = new Set(workLogs.filter((r) => r.project_id && ids.has(r.project_id)).map((r) => r.log_date));
+  for (const d of tripDates) allDates.add(d);
+  return { inhouse: allDates.size - tripDates.size, trip: tripDates.size, total: allDates.size };
+}
+
+/** 보고서 표시용 조각 — ["사내 3일", "출장 2일", "총 5일"]. */
+export function workDayParts(w: WorkDaySplit): string[] {
+  return [`사내 ${w.inhouse}일`, `출장 ${w.trip}일`, `총 ${w.total}일`];
+}
+
+/** 보고서 표시용 — "사내 3일, 출장 2일, 총 5일". */
+export function formatWorkDays(w: WorkDaySplit): string {
+  return workDayParts(w).join(", ");
 }
 
 export type TripTotals = Headcount & {

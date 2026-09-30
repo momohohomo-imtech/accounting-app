@@ -31,7 +31,7 @@ import { WorkLogSiteFilter } from "@/components/WorkLogSiteFilter";
 import { UnassignedWorkLogTable } from "@/components/UnassignedWorkLogTable";
 import { UnassignedWorkLogMonthFilter } from "@/components/UnassignedWorkLogMonthFilter";
 import { buildWorkLogSummary } from "@/lib/workLogSummary";
-import { headcountForProjects, type TripDayRow } from "@/lib/tripLog";
+import { headcountForProjects, workDaySplitForProjects, type TripDayRow } from "@/lib/tripLog";
 import { parseMonthRange } from "@/lib/monthRange";
 import { ReportExcelButton } from "@/components/ReportExcelButton";
 import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
@@ -71,7 +71,7 @@ type Row = {
     | null;
 };
 
-type TripHeadcountRow = Pick<TripDayRow, "project_id" | "staff_count" | "helper_count">;
+type ProjectTripDayRow = Pick<TripDayRow, "project_id" | "work_date" | "staff_count" | "helper_count">;
 
 type AgencyPurchaseRow = {
   id: string;
@@ -208,9 +208,9 @@ export default async function ReportsPage({
 
   // 프로젝트 손익은 거래일 연도와 무관하게 그 프로젝트에 붙은 거래 전부로 계산 — 연도를 넘겨
   // 들어온 매입/매출(예: 작년 프로젝트의 올해 1월 매입)이 어느 해 보고서에서도 빠지지 않게.
-  // 프로젝트 목록·손익 팝업·대시보드 이익 예상과 같은 기준. 작업일수·투입 인원도 같은 이유로 기간 제한 없음.
-  // 투입 인원은 작업일지 팝업에서 "출장"을 체크하고 적은 사내·조공 인원(trip_log_days) — 090 SQL 전이라
-  // 표가 없으면 null(프로젝트 요약에 "-").
+  // 프로젝트 목록·손익 팝업·대시보드 이익 예상과 같은 기준. 작업일수·출장 투입 인원도 같은 이유로 기간 제한 없음.
+  // 출장 날짜 줄(trip_log_days, 작업일지 팝업에서 "출장"을 체크한 날) — 작업일수를 사내·출장으로 나누고, 그날 적은
+  // 사내·조공 인원을 출장 투입 인원으로 합산. 090 SQL 전이라 표가 없으면 null(출장 0일, 출장 투입 인원 "-").
   const projectIdList = (projects ?? []).map((p) => p.id);
   const [projectTxRaw, projectWorkLogRows, projectTripDays] = projectIdList.length
     ? await Promise.all([
@@ -230,16 +230,16 @@ export default async function ReportsPage({
             .order("id", { ascending: true })
             .range(from, to)
         ),
-        fetchAllRows<TripHeadcountRow>((from, to) =>
+        fetchAllRows<ProjectTripDayRow>((from, to) =>
           supabase
             .from("trip_log_days")
-            .select("project_id, staff_count, helper_count")
+            .select("project_id, work_date, staff_count, helper_count")
             .in("project_id", projectIdList)
             .order("id", { ascending: true })
             .range(from, to)
         ).catch(() => null),
       ])
-    : [[] as Row[], [] as { log_date: string; project_id: string | null }[], [] as TripHeadcountRow[]];
+    : [[] as Row[], [] as { log_date: string; project_id: string | null }[], [] as ProjectTripDayRow[]];
   const projectTx = projectTxRaw.filter((t) => isLedgerVisible(t, creditPayments));
 
   // 현재 자금 내역 — 선택 연도와 무관한 "현재" 스냅샷. 은행 총 잔액(마이너스 통장 있으면
@@ -374,9 +374,7 @@ export default async function ReportsPage({
       const purchaseTotal = purchaseSupply + purchaseVat;
       const profit = quoteAmount - purchaseCost - agencyAmount;
       const margin = quoteAmount > 0 ? (profit / quoteAmount) * 100 : null;
-      const workDayCount = new Set(
-        projectWorkLogRows.filter((r) => r.project_id && groupIds.has(r.project_id)).map((r) => r.log_date)
-      ).size;
+      const workDays = workDaySplitForProjects(projectWorkLogRows, projectTripDays, groupIds);
       const headcount = headcountForProjects(projectTripDays, groupIds);
       return {
         id: p.id,
@@ -388,7 +386,7 @@ export default async function ReportsPage({
         endDate: p.end_date ?? null,
         orderDate: p.order_date ?? null,
         memo: p.memo ?? null,
-        workDayCount,
+        workDays,
         headcount,
         childNames: group.length > 1 ? group.slice(1).map((g) => g.name) : [],
         quoteAmount,
@@ -409,7 +407,9 @@ export default async function ReportsPage({
     p.name,
     p.siteName ?? "-",
     projectStatusLabel(p.status),
-    p.workDayCount,
+    p.workDays.inhouse,
+    p.workDays.trip,
+    p.workDays.total,
     p.headcount?.staff ?? "-",
     p.headcount?.helper ?? "-",
     p.headcount?.people ?? "-",
@@ -1136,10 +1136,12 @@ export default async function ReportsPage({
               "프로젝트명",
               "현장",
               "상태",
-              "작업일수",
-              "사내 인원",
-              "조공 인원",
-              "총 투입 인원",
+              "작업일수(사내)",
+              "작업일수(출장)",
+              "작업일수(총)",
+              "출장 투입 인원(사내)",
+              "출장 투입 인원(조공)",
+              "출장 투입 인원(총)",
               "발주액",
               "대행구매액",
               "매입 공급가액",

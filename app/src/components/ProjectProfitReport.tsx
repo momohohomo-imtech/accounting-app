@@ -23,7 +23,7 @@ import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import { purchaseCostOf } from "@/lib/vatBasis";
 import { unsettledCreditPurchase } from "@/lib/projectProfit";
-import { formatHeadcount, headcountForProjects, type TripDayRow } from "@/lib/tripLog";
+import { formatHeadcount, formatWorkDays, headcountForProjects, workDaySplitForProjects, type TripDayRow } from "@/lib/tripLog";
 
 export async function ProjectProfitReport({ projectId, closeHref }: { projectId: string; closeHref: string }) {
   const supabase = await createClient();
@@ -42,11 +42,11 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
   // 작업일지(달력)에서 이 프로젝트(+귀속 하위 프로젝트)가 직접 선택된 날짜 수만 집계.
   // 작업일지 줄마다 현장뿐 아니라 프로젝트도 선택하게 바뀌기 전에 입력된 과거 항목은
   // project_id가 비어있어서 잡히지 않음 — 프로젝트를 선택하며 입력한 날부터 정확해짐.
-  // 투입 인원은 작업일지 팝업에서 "출장"을 체크하고 적은 사내·조공 인원(trip_log_days) 합 — 090 SQL 전이라
-  // 표가 없으면 null("-").
+  // 출장 날짜 줄(trip_log_days, 작업일지 팝업에서 "출장"을 체크한 날)로 근무일수를 사내·출장으로 나누고, 그날 적은
+  // 사내·조공 인원을 출장 투입 인원으로 합산 — 090 SQL 전이라 표가 없으면 null(출장 0일, 출장 투입 인원 "-").
   // 아래 조회들은 서로 기다릴 필요가 없어서 한꺼번에 보낸다.
   const [
-    { data: workLogDateRows },
+    workLogDateRows,
     tripDayRows,
     purchaseRowsRaw,
     { data: agencyRows },
@@ -54,11 +54,18 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
     { data: clientRows },
     { data: attachmentRows },
   ] = await Promise.all([
-    supabase.from("work_logs").select("log_date").in("project_id", groupIds),
-    fetchAllRows<Pick<TripDayRow, "project_id" | "staff_count" | "helper_count">>((from, to) =>
+    fetchAllRows<{ log_date: string; project_id: string | null }>((from, to) =>
+      supabase
+        .from("work_logs")
+        .select("log_date, project_id")
+        .in("project_id", groupIds)
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
+    fetchAllRows<Pick<TripDayRow, "project_id" | "work_date" | "staff_count" | "helper_count">>((from, to) =>
       supabase
         .from("trip_log_days")
-        .select("project_id, staff_count, helper_count")
+        .select("project_id, work_date, staff_count, helper_count")
         .in("project_id", groupIds)
         .order("id", { ascending: true })
         .range(from, to)
@@ -86,7 +93,7 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
       .in("project_id", groupIds)
       .order("created_at", { ascending: false }),
   ]);
-  const workDayCount = new Set((workLogDateRows ?? []).map((r) => r.log_date)).size;
+  const workDays = workDaySplitForProjects(workLogDateRows, tripDayRows, groupIds);
   const headcount = headcountForProjects(tripDayRows, groupIds);
   const clientNames = (clientRows ?? []).map((c) => c.name);
 
@@ -199,8 +206,9 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
 
   const infoLines = [
     `현장: ${siteName ?? "-"}    상태: ${projectStatusLabel(project.status)}`,
-    `기간: ${formatDate(project.start_date)} ~ ${formatDate(project.end_date)}    발주서일자: ${formatDate(project.order_date)}    근무일수: ${workDayCount}일`,
-    `투입 인원: ${formatHeadcount(headcount)}`,
+    `기간: ${formatDate(project.start_date)} ~ ${formatDate(project.end_date)}    발주서일자: ${formatDate(project.order_date)}`,
+    `근무일수: ${formatWorkDays(workDays)}`,
+    `출장 투입 인원: ${formatHeadcount(headcount)}`,
     ...(parentLabel ? [`귀속 프로젝트: ${parentLabel}`] : []),
   ];
 

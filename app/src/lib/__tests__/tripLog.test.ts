@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   EMPTY_TRIP_DAY_INPUT,
   formatHeadcount,
+  formatWorkDays,
   headcountForProjects,
   headcountParts,
   inputToTripDayFields,
@@ -10,6 +11,8 @@ import {
   sumHeadcount,
   tripDayToInput,
   tripTotals,
+  workDayParts,
+  workDaySplitForProjects,
 } from "@/lib/tripLog";
 
 test("인원 칸: 빈칸·글자·음수는 0, 소수는 버림", () => {
@@ -83,4 +86,34 @@ test("투입 인원 표시: \"사내 N명, 조공 N명, 총 N명\", 없으면 \"
   assert.equal(formatHeadcount({ staff: 0, helper: 0, people: 0 }), "사내 0명, 조공 0명, 총 0명");
   assert.equal(formatHeadcount(null), "-");
   assert.deepEqual(headcountParts({ staff: 3, helper: 0, people: 3 }), ["사내 3명", "조공 0명", "총 3명"]);
+});
+
+test("작업일수 나눔: 출장 체크한 날은 출장, 나머지 작업일지 날짜는 사내, 날짜는 한 번만(사내 + 출장 = 총)", () => {
+  const logs = [
+    { log_date: "2026-09-01", project_id: "p-parent" },
+    { log_date: "2026-09-01", project_id: "p-parent" }, // 같은 날 두 줄
+    { log_date: "2026-09-02", project_id: "p-parent" },
+    { log_date: "2026-09-03", project_id: "p-child" },
+    { log_date: "2026-09-04", project_id: "p-child" },
+    { log_date: "2026-09-05", project_id: "p-other" },
+    { log_date: "2026-09-06", project_id: null },
+  ];
+  const trips = [
+    { project_id: "p-parent", work_date: "2026-09-02" },
+    // 같은 날 하위 프로젝트만 출장이어도 그날은 출장(묶음 기준)
+    { project_id: "p-child", work_date: "2026-09-01" },
+    // 작업일지 줄 없이 출장 줄만 있는 날도 출장으로 셈
+    { project_id: "p-child", work_date: "2026-09-07" },
+    { project_id: "p-other", work_date: "2026-09-05" },
+  ];
+  assert.deepEqual(workDaySplitForProjects(logs, trips, ["p-parent", "p-child"]), { inhouse: 2, trip: 3, total: 5 });
+  assert.deepEqual(workDaySplitForProjects(logs, trips, new Set(["p-other"])), { inhouse: 0, trip: 1, total: 1 });
+  // 출장일지 표가 없으면 출장 0일, 전부 사내
+  assert.deepEqual(workDaySplitForProjects(logs, null, ["p-parent"]), { inhouse: 2, trip: 0, total: 2 });
+  assert.deepEqual(workDaySplitForProjects([], [], ["p-none"]), { inhouse: 0, trip: 0, total: 0 });
+});
+
+test("작업일수 표시: \"사내 N일, 출장 N일, 총 N일\"", () => {
+  assert.equal(formatWorkDays({ inhouse: 3, trip: 2, total: 5 }), "사내 3일, 출장 2일, 총 5일");
+  assert.deepEqual(workDayParts({ inhouse: 0, trip: 1, total: 1 }), ["사내 0일", "출장 1일", "총 1일"]);
 });
