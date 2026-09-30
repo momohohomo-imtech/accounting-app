@@ -8,7 +8,7 @@ import { ToolMasterGrid } from "@/components/ToolMasterGrid";
 import { ToolChecklistCreateForm } from "@/components/ToolChecklistCreateForm";
 import { ToolChecklistHistoryTable } from "@/components/ToolChecklistHistoryTable";
 import { ToolChecklistHistoryFilter } from "@/components/ToolChecklistHistoryFilter";
-import { ToolChecklistDetailReport } from "@/components/ToolChecklistDetailReport";
+import { ToolChecklistPopup } from "@/components/ToolChecklistPopup";
 import { KnowHowSection } from "@/components/KnowHowSection";
 import { createKnowHowNote, updateKnowHowNote, deleteKnowHowNote } from "@/lib/actions/knowHow";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
@@ -57,14 +57,18 @@ const HISTORY_RECENT_COUNT = 15;
 export async function ToolListSection({
   copyFrom,
   editFrom,
-  checklist,
+  checklist: checklistParam,
+  edit,
   historyYear,
   historyMonth,
   historySite,
 }: {
   copyFrom?: string;
+  /** 예전 주소(?editFrom=id) — 이제 수정은 팝업에서 하므로 그 명세서 팝업을 수정 화면으로 엶. */
   editFrom?: string;
   checklist?: string;
+  /** "1"이면 팝업을 처음부터 수정 화면으로(이력 표의 "수정"). */
+  edit?: string;
   historyYear?: string;
   historyMonth?: string;
   historySite?: string;
@@ -185,7 +189,9 @@ export async function ToolListSection({
   }));
 
   const copySource = copyFrom ? (checklists ?? []).find((c) => c.id === copyFrom) : null;
-  const editSource = editFrom ? (checklists ?? []).find((c) => c.id === editFrom) : null;
+  // 팝업으로 볼 명세서 — 예전 수정 주소(?editFrom=id)도 그 명세서 팝업을 수정 화면으로 엶.
+  const checklist = checklistParam ?? editFrom;
+  const startEditing = edit === "1" || Boolean(editFrom && !checklistParam);
 
   const {
     initialQuantities,
@@ -196,34 +202,25 @@ export async function ToolListSection({
     initialTripDate,
     initialHelperCount,
     initialMemo,
-  } = editSource
+  } = copySource
     ? {
-        ...buildInitialFormState(itemsByChecklist.get(editSource.id) ?? []),
-        initialTitle: editSource.title as string,
-        initialProjectId: (editSource.project_id as string | null) ?? "",
-        initialTripDate: (editSource.trip_date as string | null) ?? undefined,
-        initialHelperCount: editSource.helper_count != null ? String(editSource.helper_count) : "",
-        initialMemo: (editSource.memo as string | null) ?? "",
+        ...buildInitialFormState(itemsByChecklist.get(copySource.id) ?? []),
+        initialTitle: `${copySource.title} (복사)`,
+        initialProjectId: "",
+        initialTripDate: undefined as string | undefined,
+        initialHelperCount: copySource.helper_count != null ? String(copySource.helper_count) : "",
+        initialMemo: (copySource.memo as string | null) ?? "",
       }
-    : copySource
-      ? {
-          ...buildInitialFormState(itemsByChecklist.get(copySource.id) ?? []),
-          initialTitle: `${copySource.title} (복사)`,
-          initialProjectId: "",
-          initialTripDate: undefined as string | undefined,
-          initialHelperCount: copySource.helper_count != null ? String(copySource.helper_count) : "",
-          initialMemo: (copySource.memo as string | null) ?? "",
-        }
-      : {
-          initialQuantities: {},
-          initialToolNames: {},
-          initialAdhocItems: [],
-          initialTitle: "",
-          initialProjectId: "",
-          initialTripDate: undefined as string | undefined,
-          initialHelperCount: "",
-          initialMemo: "",
-        };
+    : {
+        initialQuantities: {},
+        initialToolNames: {},
+        initialAdhocItems: [],
+        initialTitle: "",
+        initialProjectId: "",
+        initialTripDate: undefined as string | undefined,
+        initialHelperCount: "",
+        initialMemo: "",
+      };
 
   // "__blank__"는 실제 저장된 명세서가 아니라, 마스터 공구 전체를 빈 칸으로 인쇄해볼
   // 수 있게 하는 특수 값(아래 "폼 인쇄" 링크에서 씀).
@@ -282,8 +279,8 @@ export async function ToolListSection({
         </CollapsibleSection>
 
         <CollapsibleSection
-          title={editSource ? "공구명세서 수정" : "새 공구명세서 만들기"}
-          defaultOpen={Boolean(editSource || copySource)}
+          title="새 공구명세서 만들기"
+          defaultOpen={Boolean(copySource)}
           className="max-md:p-3"
           headerExtra={
             <Link
@@ -295,11 +292,10 @@ export async function ToolListSection({
           }
         >
           <ToolChecklistCreateForm
-            key={editFrom ?? copyFrom ?? "new"}
+            key={copyFrom ?? "new"}
             tools={toolOptions}
             sites={siteOptions}
             projects={projects ?? []}
-            checklistId={editSource?.id as string | undefined}
             initialTitle={initialTitle}
             initialProjectId={initialProjectId}
             initialTripDate={initialTripDate}
@@ -308,7 +304,7 @@ export async function ToolListSection({
             initialQuantities={initialQuantities}
             initialToolNames={initialToolNames}
             initialAdhocItems={initialAdhocItems}
-            hasSource={Boolean(editSource || copySource)}
+            hasSource={Boolean(copySource)}
           />
         </CollapsibleSection>
 
@@ -346,22 +342,38 @@ export async function ToolListSection({
       </div>
 
       {(detailChecklist || isBlankForm) && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-brand-ink/50 p-4 py-10 print:static print:overflow-visible print:bg-transparent print:p-0">
-          <div className="w-full max-w-[210mm] rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:p-0 print:shadow-none">
-            <ToolChecklistDetailReport
-              title={detailChecklist ? detailChecklist.title : "공구명세서 양식"}
-              helperCount={detailChecklist ? (detailChecklist.helper_count ?? null) : null}
-              projectName={detailChecklist ? ((one(detailChecklist.projects) as { name: string } | null)?.name ?? null) : null}
-              tripDate={detailChecklist ? detailChecklist.trip_date : null}
-              memo={detailChecklist ? ((detailChecklist.memo as string | null) ?? null) : null}
-              groups={detailGroups}
-              closeHref="/quality-construction?tab=tools"
-              copyHref={detailChecklist ? `/quality-construction?tab=tools&copyFrom=${detailChecklist.id}` : "/quality-construction?tab=tools"}
-              editHref={detailChecklist ? `/quality-construction?tab=tools&editFrom=${detailChecklist.id}` : "/quality-construction?tab=tools"}
-              hideEditActions={isBlankForm}
-            />
-          </div>
-        </div>
+        <ToolChecklistPopup
+          key={checklist}
+          report={{
+            title: detailChecklist ? detailChecklist.title : "공구명세서 양식",
+            helperCount: detailChecklist ? (detailChecklist.helper_count ?? null) : null,
+            projectName: detailChecklist ? ((one(detailChecklist.projects) as { name: string } | null)?.name ?? null) : null,
+            tripDate: detailChecklist ? detailChecklist.trip_date : null,
+            memo: detailChecklist ? ((detailChecklist.memo as string | null) ?? null) : null,
+            groups: detailGroups,
+            closeHref: "/quality-construction?tab=tools",
+            copyHref: detailChecklist ? `/quality-construction?tab=tools&copyFrom=${detailChecklist.id}` : "/quality-construction?tab=tools",
+            hideEditActions: isBlankForm,
+          }}
+          form={
+            detailChecklist
+              ? {
+                  tools: toolOptions,
+                  sites: siteOptions,
+                  projects: projects ?? [],
+                  checklistId: detailChecklist.id,
+                  ...buildInitialFormState(itemsByChecklist.get(detailChecklist.id) ?? []),
+                  initialTitle: detailChecklist.title,
+                  initialProjectId: (detailChecklist.project_id as string | null) ?? "",
+                  // 출장일을 비워 둔 명세서는 빈칸 그대로(없으면 폼이 오늘 날짜를 채워서 저장 때 바뀌었음)
+                  initialTripDate: (detailChecklist.trip_date as string | null) ?? "",
+                  initialHelperCount: detailChecklist.helper_count != null ? String(detailChecklist.helper_count) : "",
+                  initialMemo: (detailChecklist.memo as string | null) ?? "",
+                }
+              : undefined
+          }
+          startEditing={startEditing}
+        />
       )}
     </div>
   );

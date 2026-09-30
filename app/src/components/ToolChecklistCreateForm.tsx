@@ -42,6 +42,8 @@ export function ToolChecklistCreateForm({
   initialToolNames = {},
   initialAdhocItems = [],
   hasSource = false,
+  onSaved,
+  onCancel,
 }: {
   tools: Tool[];
   sites: SiteOption[];
@@ -60,6 +62,9 @@ export function ToolChecklistCreateForm({
   /** 수정 또는 복사(기존 명세서를 원본으로 시작)인 경우 true — 원본에 실제로 담긴 품목이
       없더라도(예: 임의 추가만 있던 명세서) 공구별 기본 수량을 자동으로 채우지 않게 함. */
   hasSource?: boolean;
+  /** 팝업 안에서 수정할 때(`ToolChecklistPopup`) — 저장 뒤·취소 때 페이지를 옮기는 대신 불러서 팝업이 보기 화면으로 돌아감. */
+  onSaved?: () => void;
+  onCancel?: () => void;
 }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -163,7 +168,8 @@ export function ToolChecklistCreateForm({
       return;
     }
     if (isEdit) {
-      router.push("/quality-construction?tab=tools", { scroll: false });
+      if (onSaved) onSaved();
+      else router.push("/quality-construction?tab=tools", { scroll: false });
       return;
     }
     setTitle("");
@@ -181,7 +187,7 @@ export function ToolChecklistCreateForm({
       onSubmit={handleSubmit}
       className="space-y-4 print:hidden"
     >
-      {isEdit && (
+      {isEdit && !onCancel && (
         <div className="flex justify-end">
           <button
             type="button"
@@ -426,6 +432,11 @@ export function ToolChecklistCreateForm({
         <Button type="submit" disabled={pending || selectedCount === 0}>
           {isEdit ? "수정 저장" : "저장"}
         </Button>
+        {onCancel && (
+          <Button type="button" variant="secondary" onClick={onCancel}>
+            취소
+          </Button>
+        )}
         <span className="text-sm text-slate-500">{selectedCount}개 품목 선택됨</span>
       </div>
     </form>
