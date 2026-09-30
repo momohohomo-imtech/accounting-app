@@ -12,6 +12,7 @@ import { labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { MoneyInput } from "@/components/ui/MoneyInput";
+import type { CompanyProfileRow } from "@/lib/companyProfile";
 
 type ClientOption = { id: string; name: string };
 
@@ -41,10 +42,13 @@ export function QuoteForm({
   initial,
   initialItems,
   quoteId,
+  supplierProfiles = [],
 }: {
   clients: ClientOption[];
   sites: SiteOption[];
   projects: ProjectOption[];
+  /** 새 견적서 작성 때만 — 공급자 목록(기본 공급자가 맨 앞). 수정 화면은 아래 인쇄 영역에서 고름. */
+  supplierProfiles?: CompanyProfileRow[];
   initial?: {
     title: string;
     client_id: string | null;
@@ -72,6 +76,9 @@ export function QuoteForm({
     target_amount: initial?.target_amount != null ? String(initial.target_amount) : "",
   });
   const [items, setItems] = useState<QuoteItemInput[]>(initialItems?.length ? initialItems : [emptyItem()]);
+  const [supplierId, setSupplierId] = useState(
+    () => (supplierProfiles.find((p) => p.is_default) ?? supplierProfiles[0])?.id ?? ""
+  );
   const [pending, setPending] = useState(false);
   const [loadingFromProject, setLoadingFromProject] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -235,7 +242,7 @@ export function QuoteForm({
         return;
       }
     } else {
-      const result = await globalPending.run(() => createQuote(input));
+      const result = await globalPending.run(() => createQuote(input, supplierId || null));
       setPending(false);
       if (result?.error) {
         setError(result.error);
@@ -307,6 +314,27 @@ export function QuoteForm({
           label="연결 프로젝트 (선택)"
           emptyLabel="연결 프로젝트 없음"
         />
+        {!quoteId && supplierProfiles.length > 0 && (
+          <div className="flex flex-col gap-1">
+            <label htmlFor="quote-supplier" className={labelClass}>
+              공급자 (견적서에 찍히는 우리 회사)
+            </label>
+            <select
+              id="quote-supplier"
+              value={supplierId}
+              onChange={(e) => setSupplierId(e.target.value)}
+              className={inputClass}
+            >
+              {supplierProfiles.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.company_name}
+                  {p.biz_reg_no ? ` (${p.biz_reg_no})` : ""}
+                  {p.is_default ? " · 기본" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="flex flex-col gap-1 sm:col-span-2 lg:col-span-3">
           <label className={labelClass}>메모</label>
           <textarea value={values.memo} onChange={(e) => set("memo", e.target.value)} rows={2} className={inputClass} />

@@ -24,6 +24,9 @@ const TABLES = [
   "attachments",
   "quotes",
   "quote_items",
+  // 견적서 공급자 목록 — 백업 파일에만 담고 복구(restore.ts)는 건드리지 않음: 설정값이라 복구해도 지금 값을 그대로
+  // 두는 게 맞고, SQL 089 실행 전이나 이 표가 없던 예전 백업으로 복구할 때 표를 지우다 복구가 멈추는 일도 없음.
+  "company_profiles",
 ];
 
 export async function runBackup(supabase: SupabaseClient, backupType: "manual" | "auto") {

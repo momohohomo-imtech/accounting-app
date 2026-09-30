@@ -4,7 +4,7 @@ import { downloadXlsx } from "@/lib/xlsxExport";
 import { formatDate, formatWon } from "@/lib/format";
 import { numberToKoreanAmount } from "@/lib/numberToKorean";
 import { Button } from "@/components/ui/Button";
-import type { QuoteCompanyInfo } from "@/lib/actions/quotes";
+import type { QuoteCompanyInfo } from "@/lib/companyProfile";
 
 type Row = {
   id: string;

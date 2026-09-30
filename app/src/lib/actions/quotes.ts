@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { profileToCompanyInfo, type CompanyProfileRow, type QuoteCompanyInfo } from "@/lib/companyProfile";
 
 export type QuoteItemInput = {
   item_name: string;
@@ -57,11 +58,26 @@ async function saveItems(
   return {};
 }
 
-export async function createQuote(input: QuoteInput): Promise<{ error?: string; id?: string }> {
+// supplierProfileId: 새 견적서 작성 화면에서 고른 공급자(company_profiles) — 그 정보를 이 견적서의 공급자로
+// 저장해 둬서, 나중에 목록을 고치거나 기본 공급자를 바꿔도 이 견적서는 그대로.
+export async function createQuote(
+  input: QuoteInput,
+  supplierProfileId?: string | null
+): Promise<{ error?: string; id?: string }> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  let companyInfo: QuoteCompanyInfo | null = null;
+  if (supplierProfileId) {
+    const { data: profile } = await supabase
+      .from("company_profiles")
+      .select("*")
+      .eq("id", supplierProfileId)
+      .maybeSingle();
+    if (profile) companyInfo = profileToCompanyInfo(profile as CompanyProfileRow);
+  }
 
   const { data: quote, error } = await supabase
     .from("quotes")
@@ -74,6 +90,7 @@ export async function createQuote(input: QuoteInput): Promise<{ error?: string; 
       valid_until: input.valid_until,
       memo: input.memo,
       target_amount: input.target_amount,
+      company_info: companyInfo,
       created_by: user?.id ?? null,
     })
     .select()
@@ -114,18 +131,7 @@ export async function updateQuote(id: string, input: QuoteInput): Promise<{ erro
   return {};
 }
 
-export type QuoteCompanyInfo = {
-  companyName: string;
-  representativeName: string;
-  bizRegNo: string;
-  address: string;
-  bizType: string;
-  bizItem: string;
-  phone: string;
-  fax: string;
-};
-
-// 견적서 인쇄화면의 공급자 정보를 이 견적서에만 저장 — 다른/새 견적서의 기본값엔 영향 없음.
+// 견적서 인쇄화면의 공급자 정보(목록에서 고르거나 직접 고친 값)를 이 견적서에만 저장 — 공급자 목록·다른 견적서엔 영향 없음.
 export async function updateQuoteCompanyInfo(id: string, companyInfo: QuoteCompanyInfo): Promise<{ error?: string }> {
   const supabase = await createClient();
   const { error } = await supabase.from("quotes").update({ company_info: companyInfo }).eq("id", id);
