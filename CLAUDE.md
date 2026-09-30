@@ -104,10 +104,18 @@
 
 - **금액 계산을 바꾸면 `npm test`(app 폴더)로 자동 검사를 돌릴 것.** 부가세 분리(`vatBasis`),
   외상 잔액(`credit`), 종합소득세(`tax`), 견적 금액·한글 금액(`quoteCalc`·`numberToKorean`),
-  예상 미수액(`expectedReceivable`), 엑셀 거래 읽기(`transactionExcel`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
+  예상 미수액(`expectedReceivable`), 엑셀 거래 읽기(`transactionExcel`), 작업일지 집계(`workLogSummary`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
   (vitest는 npm 설치 오류로 못 씀 — 새 테스트 라이브러리를 넣지 말 것)
+
+- **작업일지의 "내용 이어받기"는 `lib/workLogSummary.ts`의 `resolveWorkLogTitles` 하나로만 정할 것.** 내용을 비운 줄은 같은
+  현장·같은 프로젝트의 앞 내용 → 없으면 프로젝트 이름 → 프로젝트도 없으면 그 현장의 앞 내용. 작업일지를 날짜·내용별로 세는
+  곳을 새로 만들 때도 이 함수를 쓰고, 그 해 1월 1일부터 넘겨서 정한 뒤 기간 안의 줄만 셀 것 — 곳마다 따로 이어받다가 다른
+  프로젝트 날짜까지 한 작업으로 합산되고 팝업·표 숫자가 서로 달랐던 적이 있음.
+
+- **앱에서 본 실제 데이터(거래처·금액·작업일지 내용·직원 정보 등)는 외부로 내보내지 말 것**(사용자 요청: 외부 반출 절대
+  불가). 커밋 메시지·코드 주석·PR 설명·`HANDOFF.md`·외부 서비스에 실제 값을 적지 말고, 점검·테스트·예시는 가짜 데이터로.
 
 - **외부 AI(제미나이)는 영수증·급여대장 인식에만 쓸 것**(`/api/ocr`·`/api/payroll-ocr`). 사용자 요청으로 보고서 AI 질문은
   없앴고, 엑셀 거래 일괄 등록은 머리글 이름으로 직접 읽음(`lib/transactionExcel.ts`). 거래처·금액 같은 회사 자료를 외부 AI로

@@ -157,12 +157,14 @@ async function WorkLogCalendarSection({
   const lastDay = new Date(selectedYear, selectedMonth, 0).getDate();
   const monthEnd = `${selectedYear}-${pad(selectedMonth)}-${pad(lastDay)}`;
 
-  const [logs, allDates, { data: sites }, tripLogs] = await Promise.all([
+  // 작업 집계는 내용이 빈 줄이 앞 줄 내용을 이어받아서, 그 해 1월 1일부터 가져와 정한 뒤 이 달 줄만 셈
+  // (lib/workLogSummary.ts resolveWorkLogTitles). 달력 등 나머지는 이 달 줄만 씀.
+  const [yearToMonthLogs, allDates, { data: sites }, tripLogs] = await Promise.all([
     fetchAllRows<WorkLog>((from, to) =>
       supabase
         .from("work_logs")
-        .select("*")
-        .gte("log_date", monthStart)
+        .select("*, projects(name)")
+        .gte("log_date", `${selectedYear}-01-01`)
         .lte("log_date", monthEnd)
         .order("log_date", { ascending: true })
         .order("sort_order", { ascending: true })
@@ -178,7 +180,7 @@ async function WorkLogCalendarSection({
     ),
   ]);
 
-  const rows = logs;
+  const rows = yearToMonthLogs.filter((l) => l.log_date >= monthStart);
   const logsByDate = new Map<string, WorkLog[]>();
   const holidayDates = new Set<string>();
   const unassignedDates = new Set<string>();
@@ -196,8 +198,9 @@ async function WorkLogCalendarSection({
 
   const siteNameById = new Map((sites ?? []).map((s) => [s.id, s.name]));
   const siteColorById = new Map((sites ?? []).map((s) => [s.id, s.color]));
-  const monthlySummary = buildWorkLogSummary(rows, sites ?? []);
-  const siteAggregate = buildSiteAggregate(rows, sites ?? []);
+  const monthRange = { from: monthStart, to: monthEnd };
+  const monthlySummary = buildWorkLogSummary(yearToMonthLogs, sites ?? [], monthRange);
+  const siteAggregate = buildSiteAggregate(yearToMonthLogs, sites ?? [], monthRange);
 
   const monthsByYear = new Map<number, Set<number>>();
   for (const { log_date } of allDates) {
