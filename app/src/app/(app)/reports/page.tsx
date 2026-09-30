@@ -588,11 +588,12 @@ export default async function ReportsPage({
     : `${selectedYear}-12-31`;
 
   const [wlRows, { data: wlSites }, unassignedLogRows, { data: wlChecks }] = await Promise.all([
+    // 내용이 빈 줄은 앞 줄 내용을 이어받아서 그 해 1월 1일부터 가져옴 — 세는 건 wlStart~wlEnd 안의 줄만.
     fetchAllRows<WorkLog>((from, to) =>
       supabase
         .from("work_logs")
-        .select("*")
-        .gte("log_date", wlStart)
+        .select("*, projects(name)")
+        .gte("log_date", `${selectedYear}-01-01`)
         .lte("log_date", wlEnd)
         .order("id", { ascending: true })
         .range(from, to)
@@ -614,10 +615,10 @@ export default async function ReportsPage({
   ]);
 
   const wlRowsFiltered = wlSite ? wlRows.filter((r) => r.site_id === wlSite) : wlRows;
-  const workLogSummaryRaw = buildWorkLogSummary(wlRowsFiltered, wlSites ?? []);
+  const workLogSummaryRaw = buildWorkLogSummary(wlRowsFiltered, wlSites ?? [], { from: wlStart, to: wlEnd });
   // 특정 현장으로 좁혀보면 현장에 안 묶이는 휴무/사내/기타 특수 항목은 그 현장 이야기가 아니라서 뺌.
   const workLogSummary = wlSite ? workLogSummaryRaw.filter((r) => !r.isSpecial) : workLogSummaryRaw;
-  const workLogTotalDays = new Set(wlRowsFiltered.map((r) => r.log_date)).size;
+  const workLogTotalDays = new Set(wlRowsFiltered.filter((r) => r.log_date >= wlStart).map((r) => r.log_date)).size;
 
   const siteNameById = new Map((wlSites ?? []).map((s) => [s.id, s.name]));
   const unassignedRows = unassignedLogRows.map((r) => ({
