@@ -14,11 +14,16 @@ import { AutoPrint } from "@/components/AutoPrint";
 import { PageTabs } from "@/components/PageTabs";
 import { BusinessTripListClient } from "@/components/BusinessTripListClient";
 import { BusinessTripFilter } from "@/components/BusinessTripFilter";
+import { TripLogList } from "@/components/TripLogList";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { monthRange } from "@/lib/dateRange";
 import { cx } from "@/lib/cx";
+import { one } from "@/lib/relations";
 import type { BusinessTripLog, WorkLog } from "@/lib/types";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import { nowKst } from "@/lib/kstDate";
+import { resolveWorkLogTitles, type WorkLogTitleRow } from "@/lib/workLogSummary";
+import type { TripDayRow, TripProjectDoc } from "@/lib/tripLog";
 
 const HOLIDAY_TITLE = "휴무";
 const TABS = [
@@ -38,9 +43,10 @@ export default async function WorkLogsPage({
     printSummary?: string;
     site?: string;
     project?: string;
+    open?: string;
   }>;
 }) {
-  const { tab, year, month, day, printSummary, site, project } = await searchParams;
+  const { tab, year, month, day, printSummary, site, open } = await searchParams;
   const activeTab = tab === "trip" ? "trip" : "calendar";
 
   return (
@@ -49,7 +55,7 @@ export default async function WorkLogsPage({
         <PageTabs basePath="/worklogs" tabs={TABS} active={activeTab} />
       </div>
       {activeTab === "trip" ? (
-        <BusinessTripSection year={year} month={month} site={site} project={project} />
+        <BusinessTripSection year={year} month={month} site={site} open={open} />
       ) : (
         <WorkLogCalendarSection year={year} month={month} day={day} printSummary={printSummary} />
       )}
@@ -57,16 +63,21 @@ export default async function WorkLogsPage({
   );
 }
 
+type TripSiteRel = { name: string; clients: { name: string } | { name: string }[] | null };
+type TripProjectRel = { name: string; project_code: string | null; sites: TripSiteRel | TripSiteRel[] | null };
+type TripDayWithProject = TripDayRow & { projects: TripProjectRel | TripProjectRel[] | null };
+
+// 출장일지(새 방식, 090) — 작업일지 팝업에서 "출장"을 체크한 날짜를 프로젝트별 한 장으로. 예전 방식 출장일지는 아래에 보기만.
 async function BusinessTripSection({
   year,
   month,
   site,
-  project,
+  open,
 }: {
   year?: string;
   month?: string;
   site?: string;
-  project?: string;
+  open?: string;
 }) {
   const supabase = await createClient();
   const { year: currentYear, month: currentMonth } = nowKst();
@@ -74,7 +85,26 @@ async function BusinessTripSection({
   const selectedMonth = month ?? "all";
   const { start, end } = monthRange(selectedYear, selectedMonth, currentMonth);
 
-  const [typedLogs, allTyped] = await Promise.all([
+  let yearDays: TripDayWithProject[] = [];
+  let tripTableMissing = false;
+  try {
+    yearDays = await fetchAllRows<TripDayWithProject>((from, to) =>
+      supabase
+        .from("trip_log_days")
+        .select(
+          "id, project_id, work_date, staff_count, helper_count, equipment_used, equipment_place, equipment_hours, note, projects(name, project_code, sites(name, clients(name)))"
+        )
+        .gte("work_date", `${selectedYear}-01-01`)
+        .lte("work_date", `${selectedYear}-12-31`)
+        .order("work_date", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to)
+    );
+  } catch {
+    tripTableMissing = true;
+  }
+
+  const [legacyLogs, legacyDates] = await Promise.all([
     fetchAllRows<BusinessTripLog>((from, to) =>
       supabase
         .from("business_trip_logs")
@@ -85,35 +115,87 @@ async function BusinessTripSection({
         .order("id", { ascending: true })
         .range(from, to)
     ),
-    fetchAllRows<Pick<BusinessTripLog, "work_date" | "site_name" | "projects">>((from, to) =>
-      supabase
-        .from("business_trip_logs")
-        .select("work_date, site_name, projects")
-        .order("work_date", { ascending: true })
-        .order("id", { ascending: true })
-        .range(from, to)
+    fetchAllRows<{ work_date: string }>((from, to) =>
+      supabase.from("business_trip_logs").select("work_date").order("work_date", { ascending: true }).order("id", { ascending: true }).range(from, to)
     ),
   ]);
 
-  const filteredLogs = typedLogs.filter((log) => {
-    if (site && log.site_name !== site) return false;
-    if (project && !log.projects.some((p) => p.project_name === project)) return false;
-    return true;
+  const siteOf = (d: TripDayWithProject) => one(one(d.projects)?.sites);
+  const periodDays = yearDays.filter(
+    (d) => d.work_date >= start && d.work_date <= end && (!site || siteOf(d)?.name === site)
+  );
+  const daysByProject = new Map<string, TripDayWithProject[]>();
+  for (const d of periodDays) daysByProject.set(d.project_id, [...(daysByProject.get(d.project_id) ?? []), d]);
+  const projectIds = Array.from(daysByProject.keys());
+
+  // 머리 정보(작업구분·비고)와 날짜별 작업 내용(작업일지 — 작업 집계와 같은 이어받기, 그 해 1월 1일부터).
+  const [{ data: headRows }, workRows] = await Promise.all([
+    projectIds.length
+      ? supabase.from("trip_logs").select("project_id, work_types, note").in("project_id", projectIds)
+      : Promise.resolve({ data: [] as { project_id: string; work_types: string[]; note: string | null }[] }),
+    projectIds.length
+      ? fetchAllRows<WorkLogTitleRow & { id: string }>((from, to) =>
+          supabase
+            .from("work_logs")
+            .select("id, log_date, site_id, project_id, title, sort_order, projects(name)")
+            .in("project_id", projectIds)
+            .gte("log_date", `${selectedYear}-01-01`)
+            .lte("log_date", end)
+            .order("log_date", { ascending: true })
+            .order("sort_order", { ascending: true })
+            .order("id", { ascending: true })
+            .range(from, to)
+        )
+      : Promise.resolve([] as (WorkLogTitleRow & { id: string })[]),
+  ]);
+  const headByProject = new Map((headRows ?? []).map((h) => [h.project_id, h]));
+  const contentsByKey = new Map<string, string[]>();
+  for (const { row, title } of resolveWorkLogTitles(workRows)) {
+    if (!title || !row.project_id) continue;
+    const key = `${row.project_id}|${row.log_date}`;
+    const list = contentsByKey.get(key) ?? [];
+    if (!list.includes(title)) list.push(title);
+    contentsByKey.set(key, list);
+  }
+
+  const docs: TripProjectDoc[] = projectIds.map((projectId) => {
+    const days = daysByProject.get(projectId) ?? [];
+    const project = one(days[0]?.projects);
+    const siteRel = one(project?.sites);
+    const head = headByProject.get(projectId);
+    return {
+      projectId,
+      projectName: project?.name ?? "(프로젝트 정보 없음)",
+      projectCode: project?.project_code ?? null,
+      siteName: siteRel?.name ?? null,
+      clientName: one(siteRel?.clients)?.name ?? null,
+      workTypes: head?.work_types ?? [],
+      note: head?.note ?? "",
+      days: days.map((d) => ({
+        id: d.id,
+        project_id: d.project_id,
+        work_date: d.work_date,
+        staff_count: d.staff_count,
+        helper_count: d.helper_count,
+        equipment_used: d.equipment_used,
+        equipment_place: d.equipment_place,
+        equipment_hours: d.equipment_hours,
+        note: d.note,
+        contents: (contentsByKey.get(`${projectId}|${d.work_date}`) ?? []).join(" / "),
+      })),
+    };
   });
 
   const firstYear = Math.min(
-    ...allTyped.map((l) => Number(l.work_date.slice(0, 4))).filter((y) => !Number.isNaN(y)),
+    ...legacyDates.map((l) => Number(l.work_date.slice(0, 4))).filter((y) => !Number.isNaN(y)),
     TRIP_FLOOR_YEAR
   );
   const years = Array.from({ length: currentYear - firstYear + 1 }, (_, i) => currentYear - i);
   if (!years.includes(selectedYear)) years.unshift(selectedYear);
   years.sort((a, b) => b - a);
 
-  const siteOptions = Array.from(new Set(allTyped.map((l) => l.site_name).filter((v): v is string => Boolean(v)))).sort(
-    (a, b) => a.localeCompare(b)
-  );
-  const projectOptions = Array.from(
-    new Set(allTyped.flatMap((l) => l.projects.map((p) => p.project_name)).filter((v): v is string => Boolean(v)))
+  const siteOptions = Array.from(
+    new Set(yearDays.map((d) => siteOf(d)?.name).filter((v): v is string => Boolean(v)))
   ).sort((a, b) => a.localeCompare(b));
 
   return (
@@ -126,11 +208,27 @@ async function BusinessTripSection({
           selectedMonth={selectedMonth}
           siteOptions={siteOptions}
           selectedSite={site ?? ""}
-          projectOptions={projectOptions}
-          selectedProject={project ?? ""}
+          projectOptions={[]}
+          selectedProject=""
         />
       </div>
-      <BusinessTripListClient logs={filteredLogs} />
+      {tripTableMissing ? (
+        <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          새 출장일지 표가 아직 없습니다 — Supabase SQL Editor에서 <code>090_trip_log_days.sql</code>을 실행하면, 작업일지
+          팝업에서 &lsquo;출장&rsquo;을 체크한 날짜가 프로젝트별로 여기에 모입니다.
+        </p>
+      ) : (
+        <TripLogList docs={docs} openProjectId={open} />
+      )}
+      {legacyLogs.length > 0 && (
+        <CollapsibleSection title={`이전 출장일지 (예전 방식 · 보기만) ${legacyLogs.length}건`}>
+          <p className="mb-3 text-xs text-slate-500">
+            예전 방식으로 쓴 출장일지 — 새로 쓰거나 고칠 수는 없고 보기·인쇄·엑셀·삭제만 됩니다. 새 출장일지는 작업일지
+            팝업의 &lsquo;출장&rsquo; 체크로 만듭니다.
+          </p>
+          <BusinessTripListClient logs={legacyLogs} />
+        </CollapsibleSection>
+      )}
     </div>
   );
 }
@@ -175,9 +273,8 @@ async function WorkLogCalendarSection({
       supabase.from("work_logs").select("log_date").order("log_date", { ascending: true }).range(from, to)
     ),
     supabase.from("sites").select("id, name, color").order("name"),
-    fetchAllRows<{ projects: unknown }>((from, to) =>
-      supabase.from("business_trip_logs").select("projects").order("id", { ascending: true }).range(from, to)
-    ),
+    // 새 출장일지(090)에서 출장으로 체크된 날짜 — 표가 없으면(090 실행 전) 비어 있음.
+    supabase.from("trip_log_days").select("work_date").gte("work_date", monthStart).lte("work_date", monthEnd),
   ]);
 
   const rows = yearToMonthLogs.filter((l) => l.log_date >= monthStart);
@@ -192,9 +289,7 @@ async function WorkLogCalendarSection({
     if (l.site_id && !l.project_id) unassignedDates.add(l.log_date);
   }
 
-  const tripDates = new Set(
-    tripLogs.flatMap((t) => (t.projects as { work_date?: string }[] | null ?? []).map((p) => p.work_date))
-  );
+  const tripDates = new Set((tripLogs.data ?? []).map((t) => t.work_date as string));
 
   const siteNameById = new Map((sites ?? []).map((s) => [s.id, s.name]));
   const siteColorById = new Map((sites ?? []).map((s) => [s.id, s.color]));

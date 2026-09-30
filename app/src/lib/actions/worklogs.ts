@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import { resolveWorkLogTitles, SPECIAL_TITLES, type WorkLogTitleRow } from "@/lib/workLogSummary";
+import { inputToTripDayFields } from "@/lib/tripLog";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 type SiteLogRow = WorkLogTitleRow & { id: string; content: string | null };
@@ -24,9 +25,49 @@ function fetchSiteLogs(supabase: Supabase, siteId: string, start: string, end: s
   );
 }
 
+// 작업일지 팝업의 "출장" 체크(프로젝트별 한 줄) — 클라이언트 값은 믿지 않고 여기서 다시 다듬음.
+function parseTrips(formData: FormData) {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(String(formData.get("trip_json") ?? "[]"));
+  } catch {
+    raw = [];
+  }
+  const seen = new Set<string>();
+  const trips: (ReturnType<typeof inputToTripDayFields> & { project_id: string })[] = [];
+  for (const t of Array.isArray(raw) ? (raw as Record<string, unknown>[]) : []) {
+    const projectId = typeof t?.project_id === "string" ? t.project_id : "";
+    if (!projectId || seen.has(projectId)) continue;
+    seen.add(projectId);
+    trips.push({
+      project_id: projectId,
+      ...inputToTripDayFields({
+        staff: String(t.staff_count ?? ""),
+        helper: String(t.helper_count ?? ""),
+        equipmentUsed: t.equipment_used === true,
+        place: String(t.equipment_place ?? ""),
+        hours: String(t.equipment_hours ?? ""),
+        note: String(t.note ?? ""),
+      }),
+    });
+  }
+  return trips;
+}
+
 export async function saveDayWorkLogs(formData: FormData): Promise<{ redirectTo: string | null; error: string | null }> {
   const supabase = await createClient();
   const logDate = String(formData.get("log_date"));
+  const trips = parseTrips(formData);
+
+  // 출장일지 표(090)를 먼저 확인 — 표가 없는데 출장을 체크했으면 작업일지를 건드리기 전에 알려 줌.
+  const existingTrips = await supabase.from("trip_log_days").select("id, project_id").eq("work_date", logDate);
+  const tripTableReady = !existingTrips.error;
+  if (!tripTableReady && trips.length > 0) {
+    return {
+      redirectTo: null,
+      error: "출장일지 표가 아직 없습니다 — Supabase SQL Editor에서 090_trip_log_days.sql을 먼저 실행해 주세요.",
+    };
+  }
 
   const del = await supabase.from("work_logs").delete().eq("log_date", logDate);
   if (del.error) return { redirectTo: null, error: del.error.message };
@@ -44,6 +85,24 @@ export async function saveDayWorkLogs(formData: FormData): Promise<{ redirectTo:
   if (rows.length) {
     const ins = await supabase.from("work_logs").insert(rows);
     if (ins.error) return { redirectTo: null, error: ins.error.message };
+  }
+
+  // 출장일지 맞추기: 저장된 줄에 남은 프로젝트만 이 날짜 출장으로(인원·장비는 덮어씀), 체크를 뺀 프로젝트는 이 날짜에서 뺌.
+  if (tripTableReady) {
+    const savedProjects = new Set(rows.map((r) => r.project_id).filter((id): id is string => Boolean(id)));
+    const tripRows = trips
+      .filter((t) => savedProjects.has(t.project_id))
+      .map((t) => ({ ...t, work_date: logDate, updated_at: new Date().toISOString() }));
+    if (tripRows.length) {
+      const up = await supabase.from("trip_log_days").upsert(tripRows, { onConflict: "project_id,work_date" });
+      if (up.error) return { redirectTo: null, error: up.error.message };
+    }
+    const keep = new Set(tripRows.map((t) => t.project_id));
+    const staleIds = (existingTrips.data ?? []).filter((t) => !keep.has(t.project_id)).map((t) => t.id);
+    if (staleIds.length) {
+      const rm = await supabase.from("trip_log_days").delete().in("id", staleIds);
+      if (rm.error) return { redirectTo: null, error: rm.error.message };
+    }
   }
 
   const [year, month] = logDate.split("-");
@@ -143,47 +202,6 @@ export async function renameWorkLogTitle(formData: FormData) {
 
   revalidatePath("/worklogs");
   revalidatePath("/reports");
-}
-
-export type WorkLogDateEntry = { site_id: string; site_name: string | null; title: string };
-
-/**
- * 출장일지 작성 화면에서 "달력에서 선택"을 누르면, 그 공사일에 실제로 활성화된
- * 현장·내용 조합을 뽑아준다 — 내용이 빈 줄은 작업 집계와 같은 규칙(resolveWorkLogTitles)으로
- * 이어받은 내용이나 프로젝트 이름.
- */
-export async function getWorkLogsForDate(dateKey: string): Promise<WorkLogDateEntry[]> {
-  const supabase = await createClient();
-  const year = Number(dateKey.slice(0, 4));
-
-  const data = await fetchAllRows<
-    WorkLogTitleRow & { id: string; sites: { name: string } | { name: string }[] | null }
-  >((from, to) =>
-    supabase
-      .from("work_logs")
-      .select("id, log_date, site_id, project_id, title, sort_order, sites(name), projects(name)")
-      .gte("log_date", `${year}-01-01`)
-      .lte("log_date", dateKey)
-      .order("log_date", { ascending: true })
-      .order("sort_order", { ascending: true })
-      .order("id", { ascending: true })
-      .range(from, to)
-  );
-
-  const result: WorkLogDateEntry[] = [];
-  for (const { row, title } of resolveWorkLogTitles(data)) {
-    if (row.log_date !== dateKey || !row.site_id || !title) continue;
-    const siteName = Array.isArray(row.sites) ? (row.sites[0]?.name ?? null) : (row.sites?.name ?? null);
-    result.push({ site_id: row.site_id, site_name: siteName, title });
-  }
-
-  const seen = new Set<string>();
-  return result.filter((e) => {
-    const key = `${e.site_id}::${e.title}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
 }
 
 export type SiteWorkLogEntry = { log_date: string; title: string };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { fieldClass } from "@/components/ui/field";
+import { inlineFieldClass } from "@/components/ui/field";
 
 const MONTH_OPTIONS = [
   { value: "all", label: "전체" },
@@ -41,7 +41,7 @@ export function BusinessTripFilter({
       <select
         value={selectedYear}
         onChange={(e) => navigate(Number(e.target.value), selectedMonth, selectedSite, selectedProject)}
-        className={fieldClass}
+        className={`${inlineFieldClass} max-w-full`}
       >
         {years.map((y) => (
           <option key={y} value={y}>
@@ -52,7 +52,7 @@ export function BusinessTripFilter({
       <select
         value={selectedMonth}
         onChange={(e) => navigate(selectedYear, e.target.value, selectedSite, selectedProject)}
-        className={fieldClass}
+        className={`${inlineFieldClass} max-w-full`}
       >
         {MONTH_OPTIONS.map((m) => (
           <option key={m.value} value={m.value}>
@@ -63,7 +63,7 @@ export function BusinessTripFilter({
       <select
         value={selectedSite}
         onChange={(e) => navigate(selectedYear, selectedMonth, e.target.value, selectedProject)}
-        className={fieldClass}
+        className={`${inlineFieldClass} max-w-full`}
       >
         <option value="">전체 현장</option>
         {siteOptions.map((s) => (
@@ -72,18 +72,20 @@ export function BusinessTripFilter({
           </option>
         ))}
       </select>
-      <select
-        value={selectedProject}
-        onChange={(e) => navigate(selectedYear, selectedMonth, selectedSite, e.target.value)}
-        className={fieldClass}
-      >
-        <option value="">전체 프로젝트</option>
-        {projectOptions.map((p) => (
-          <option key={p} value={p}>
-            {p}
-          </option>
-        ))}
-      </select>
+      {projectOptions.length > 0 && (
+        <select
+          value={selectedProject}
+          onChange={(e) => navigate(selectedYear, selectedMonth, selectedSite, e.target.value)}
+          className={`${inlineFieldClass} max-w-full`}
+        >
+          <option value="">전체 프로젝트</option>
+          {projectOptions.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
+      )}
     </div>
   );
 }

@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { WorkLogForm } from "@/components/WorkLogForm";
-import { WorkLogDayTripLinks } from "@/components/WorkLogDayTripLinks";
 import { AttachmentList } from "@/components/AttachmentList";
 import { EscapeCloseLink } from "@/components/EscapeCloseLink";
-import type { BusinessTripLog } from "@/lib/types";
+import { tripDayToInput, type TripDayRow } from "@/lib/tripLog";
 
 export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string; closeHref: string }) {
   const supabase = await createClient();
@@ -14,13 +13,18 @@ export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string
   const lastDay = new Date(year, month, 0).getDate();
   const monthEnd = `${year}-${pad(month)}-${pad(lastDay)}`;
 
-  const [{ data: logs }, { data: sites }, { data: projects }, { data: monthLogs }, { data: tripLogs }, { data: attachmentRows }] =
+  const [{ data: logs }, { data: sites }, { data: projects }, { data: monthLogs }, { data: tripDays }, { data: attachmentRows }] =
     await Promise.all([
       supabase.from("work_logs").select("*").eq("log_date", dateKey).order("sort_order", { ascending: true }),
       supabase.from("sites").select("id, name, color").order("name"),
       supabase.from("projects").select("id, name, site_id, year, project_code, status").order("year", { ascending: false }),
       supabase.from("work_logs").select("title").gte("log_date", monthStart).lte("log_date", monthEnd),
-      supabase.from("business_trip_logs").select("*"),
+      // 이 날짜에 출장으로 체크된 프로젝트(090 실행 전이면 비어 있음).
+      supabase
+        .from("trip_log_days")
+        .select("id, project_id, work_date, staff_count, helper_count, equipment_used, equipment_place, equipment_hours, note")
+        .eq("work_date", dateKey)
+        .overrideTypes<TripDayRow[], { merge: false }>(),
       supabase
         .from("attachments")
         .select("id, file_name, mime_type, file_size, memo, storage_path")
@@ -42,9 +46,8 @@ export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string
     })
   );
 
-  const dayTripLogs = ((tripLogs ?? []) as BusinessTripLog[]).filter((t) =>
-    t.projects.some((p) => p.work_date === dateKey)
-  );
+  const initialTrips = Object.fromEntries((tripDays ?? []).map((d) => [d.project_id, tripDayToInput(d)]));
+  const projectById = new Map((projects ?? []).map((p) => [p.id, p]));
 
   const rows = Array.from({ length: 5 }, (_, i) => logs?.[i] ?? null);
   const contentSuggestions = Array.from(
@@ -61,9 +64,31 @@ export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string
         </Link>
       </div>
 
-      <WorkLogDayTripLinks logs={dayTripLogs} />
+      {(tripDays ?? []).length > 0 && (
+        <div className="space-y-1">
+          {(tripDays ?? []).map((d) => {
+            const project = projectById.get(d.project_id);
+            return (
+              <Link
+                key={d.id}
+                href={`/worklogs?tab=trip&year=${year}&open=${d.project_id}`}
+                className="block rounded-lg bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+              >
+                *출장일지* — {project ? `${project.project_code ? `${project.project_code} ` : ""}${project.name}` : "프로젝트"}
+              </Link>
+            );
+          })}
+        </div>
+      )}
 
-      <WorkLogForm dateKey={dateKey} rows={rows} sites={sites ?? []} projects={projects ?? []} contentSuggestions={contentSuggestions} />
+      <WorkLogForm
+        dateKey={dateKey}
+        rows={rows}
+        sites={sites ?? []}
+        projects={projects ?? []}
+        contentSuggestions={contentSuggestions}
+        initialTrips={initialTrips}
+      />
 
       <AttachmentList workDate={dateKey} items={attachments} title="현장사진·메모 첨부" />
     </div>
