@@ -7,7 +7,7 @@ import { BarChart, buildChartData, type CategoryAmount } from "@/components/Proj
 import { Badge } from "@/components/ui/Badge";
 import { fieldClass } from "@/components/ui/field";
 import { ProjectSummaryMemoEditor } from "@/components/ProjectSummaryMemoEditor";
-import { headcountParts, type Headcount } from "@/lib/tripLog";
+import { headcountParts, workDayParts, type Headcount, type WorkDaySplit } from "@/lib/tripLog";
 
 export type ProjectSummaryRow = {
   id: string;
@@ -19,9 +19,9 @@ export type ProjectSummaryRow = {
   endDate: string | null;
   orderDate: string | null;
   memo: string | null;
-  /** 작업일지 기준 실제 작업한 날짜 수(귀속 하위 프로젝트 포함, 중복 날짜는 한 번만). */
-  workDayCount: number;
-  /** 작업일지 팝업에서 "출장"을 체크하고 적은 사내·조공 인원 합(귀속 하위 포함). 적은 날이 없으면 null("-"). */
+  /** 작업일지 기준 실제 작업한 날짜 수를 사내·출장으로 나눈 것(귀속 하위 프로젝트 포함, 중복 날짜는 한 번만). */
+  workDays: WorkDaySplit;
+  /** 출장 투입 인원 — 작업일지 팝업에서 "출장"을 체크하고 적은 사내·조공 인원 합(귀속 하위 포함). 적은 날이 없으면 null("-"). */
   headcount: Headcount | null;
   /** 이 프로젝트에 귀속(합산)된 하위 프로젝트 이름들 — 있으면 재무제표에 이미 합산돼 있음을 표시. */
   childNames: string[];
@@ -35,6 +35,24 @@ export type ProjectSummaryRow = {
   margin: number | null;
   categoryBreakdown: (CategoryAmount & { color?: string })[];
 };
+
+// 카드 제목 줄의 "이름표: 조각, 조각, 조각" — 휴대폰에서 줄이 넘어가도 "출장 / 투입 인원", "사내 / 7명"처럼 끊기지 않게
+// 이름표와 조각마다 묶고 쉼표 뒤에서만 줄바꿈. 조각이 없으면(null) "-".
+function HeadingStat({ label, parts }: { label: string; parts: string[] | null }) {
+  return (
+    <span className="font-normal text-slate-500">
+      <span className="whitespace-nowrap">{label}:</span>{" "}
+      {parts
+        ? parts.map((part, k) => (
+            <Fragment key={k}>
+              {k > 0 && ", "}
+              <span className="whitespace-nowrap">{part}</span>
+            </Fragment>
+          ))
+        : "-"}
+    </span>
+  );
+}
 
 // 공사완료·완료 수금대기·수금완료 프로젝트를 A4 한 장짜리 재무제표 형태로 나열 —
 // 매입 품목 전체 내역이 아니라 카테고리별 합산 금액만 보여주는 요약본. 귀속(하위)
@@ -124,22 +142,11 @@ export function ProjectSummaryReport({ rows }: { rows: ProjectSummaryRow[] }) {
                     </Badge>
                   )}
                 </div>
-                {/* 휴대폰에서 줄이 넘어가면 이름·작업일수·투입 인원이 칸째로 다음 줄로 가고, 그 안에서도 "작업일수: / 1일",
-                    "투입 / 인원", "사내 / 7명"처럼 끊기지 않게 조각마다 묶어 쉼표 뒤에서만 줄바꿈 */}
-                <h3 className="flex flex-wrap items-baseline gap-x-2 text-lg font-semibold text-slate-900 print:text-base">
+                {/* 휴대폰에서 줄이 넘어가면 이름·작업일수·출장 투입 인원이 칸째로 다음 줄로 감(HeadingStat 참고) */}
+                <h3 className="flex flex-wrap items-baseline gap-x-4 text-lg font-semibold text-slate-900 print:text-base">
                   <span>{p.name}</span>
-                  <span className="whitespace-nowrap font-normal text-slate-500">작업일수: {p.workDayCount}일</span>
-                  <span className="font-normal text-slate-500">
-                    <span className="whitespace-nowrap">투입 인원:</span>{" "}
-                    {p.headcount
-                      ? headcountParts(p.headcount).map((part, k) => (
-                          <Fragment key={k}>
-                            {k > 0 && ", "}
-                            <span className="whitespace-nowrap">{part}</span>
-                          </Fragment>
-                        ))
-                      : "-"}
-                  </span>
+                  <HeadingStat label="작업일수" parts={workDayParts(p.workDays)} />
+                  <HeadingStat label="출장 투입 인원" parts={p.headcount ? headcountParts(p.headcount) : null} />
                   {p.childNames.length > 0 && (
                     <span className="text-xs font-normal text-slate-400 print:text-[9px]">
                       (귀속 합산: {p.childNames.join(", ")})
