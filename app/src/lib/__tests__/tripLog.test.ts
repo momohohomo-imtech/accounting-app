@@ -17,6 +17,7 @@ import {
   workDayParts,
   workDaySplit,
   workDaySplitForProjects,
+  workLogContentsByProjectDate,
 } from "@/lib/tripLog";
 import { monthRangeLabel } from "@/lib/dateRange";
 
@@ -166,4 +167,29 @@ test("내근 일수 기준 기간 이름: 연도·반기·월", () => {
   assert.equal(monthRangeLabel(2026, "9", 3), "2026년 9월");
   assert.equal(monthRangeLabel(2026, "current", 3), "2026년 3월");
   assert.equal(monthRangeLabel(2026, "x", 3), "2026년");
+});
+
+test("날짜별 작업 내용: 작업 집계와 같은 이어받기, 해마다 1월 1일부터(연도를 넘겨 이어받지 않음), 같은 날 여러 줄은 \" / \"", () => {
+  const row = (log_date: string, project_id: string | null, title: string, sort_order = 0) => ({
+    log_date,
+    site_id: "s1",
+    project_id,
+    title,
+    sort_order,
+    projects: project_id ? { name: `가짜 프로젝트 ${project_id}` } : null,
+  });
+  const map = workLogContentsByProjectDate([
+    row("2025-12-30", "p1", "가짜 제작"),
+    row("2025-12-31", "p1", ""), // 같은 해 앞 내용 이어받음
+    row("2026-01-02", "p1", ""), // 해가 바뀌면 이어받지 않고 프로젝트 이름
+    row("2026-01-05", "p1", "배관", 0),
+    row("2026-01-05", "p1", "전기", 1),
+    row("2026-01-06", "p1", ""),
+    row("2026-01-06", "p2", "가짜 점검"),
+  ]);
+  assert.equal(map.get("p1|2025-12-31"), "가짜 제작");
+  assert.equal(map.get("p1|2026-01-02"), "가짜 프로젝트 p1");
+  assert.equal(map.get("p1|2026-01-05"), "배관 / 전기");
+  assert.equal(map.get("p1|2026-01-06"), "전기");
+  assert.equal(map.get("p2|2026-01-06"), "가짜 점검");
 });

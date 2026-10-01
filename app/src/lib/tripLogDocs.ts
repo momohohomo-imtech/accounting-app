@@ -1,8 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import { one } from "@/lib/relations";
-import { resolveWorkLogTitles, type WorkLogTitleRow } from "@/lib/workLogSummary";
-import type { TripDayRow, TripProjectDoc } from "@/lib/tripLog";
+import type { WorkLogTitleRow } from "@/lib/workLogSummary";
+import { workLogContentsByProjectDate, type TripDayRow, type TripProjectDoc } from "@/lib/tripLog";
 
 type TripSiteRel = { name: string; clients: { name: string } | { name: string }[] | null };
 type TripProjectRel = { name: string; project_code: string | null; sites: TripSiteRel | TripSiteRel[] | null };
@@ -69,14 +69,7 @@ export async function loadTripProjectDocs(
   const headByProject = new Map(
     ((headRows ?? []) as { project_id: string; work_types: string[] | null; note: string | null }[]).map((h) => [h.project_id, h])
   );
-  const contentsByKey = new Map<string, string[]>();
-  for (const { row, title } of resolveWorkLogTitles(workRows)) {
-    if (!title || !row.project_id) continue;
-    const key = `${row.project_id}|${row.log_date}`;
-    const list = contentsByKey.get(key) ?? [];
-    if (!list.includes(title)) list.push(title);
-    contentsByKey.set(key, list);
-  }
+  const contentsByKey = workLogContentsByProjectDate(workRows);
   // 출장 업무 내역서의 내근 일수 — 조회 기간 안에 그 프로젝트가 작업일지에 있는 날짜(이 중 출장 아닌 날을 셈).
   const workDatesByProject = new Map<string, Set<string>>();
   for (const row of workRows) {
@@ -109,7 +102,7 @@ export async function loadTripProjectDocs(
         equipment_place: d.equipment_place,
         equipment_hours: d.equipment_hours,
         note: d.note,
-        contents: (contentsByKey.get(`${projectId}|${d.work_date}`) ?? []).join(" / "),
+        contents: contentsByKey.get(`${projectId}|${d.work_date}`) ?? "",
       })),
       workDates: Array.from(workDatesByProject.get(projectId) ?? []).sort(),
       periodLabel,

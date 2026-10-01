@@ -1,5 +1,6 @@
 // 출장일지(새 방식, SQL 090) — 작업일지 팝업에서 "출장"을 체크한 날짜가 프로젝트별 출장일지 한 장에 모임.
 // 날짜 줄(trip_log_days) ↔ 입력칸 값 변환과 맨 위 합계(총 일수·총 투입 인원), 보고서의 출장 투입 인원·작업일수 나눔.
+import { resolveWorkLogTitles, type WorkLogTitleRow } from "@/lib/workLogSummary";
 
 /** 출장일지 머리의 작업구분 선택지(예전 출장일지에서 쓰던 것 그대로). */
 export const WORK_TYPE_OPTIONS = ["제작", "설치", "긴급", "기타"];
@@ -214,4 +215,28 @@ export function latestTripContents(days: Pick<TripProjectDoc["days"][number], "w
     if (contents && (!latest || d.work_date > latest.date)) latest = { date: d.work_date, contents };
   }
   return latest?.contents ?? "";
+}
+
+/**
+ * 프로젝트·날짜별 작업 내용(출장 날짜 줄 옆에 보여줄 것) — 작업 집계와 같은 이어받기(resolveWorkLogTitles)를 해마다 그 해
+ * 1월 1일부터 정함(연도를 넘겨 이어받지 않음 — 출장일지 탭·보고서·프로젝트 보고서가 같은 글자). 같은 날 같은 프로젝트 줄이
+ * 여럿이면 " / "로 이어 붙임. 키는 `${project_id}|${log_date}`.
+ */
+export function workLogContentsByProjectDate(rows: WorkLogTitleRow[]): Map<string, string> {
+  const byYear = new Map<string, WorkLogTitleRow[]>();
+  for (const r of rows) {
+    const year = r.log_date.slice(0, 4);
+    byYear.set(year, [...(byYear.get(year) ?? []), r]);
+  }
+  const lists = new Map<string, string[]>();
+  for (const yearRows of byYear.values()) {
+    for (const { row, title } of resolveWorkLogTitles(yearRows)) {
+      if (!title || !row.project_id) continue;
+      const key = `${row.project_id}|${row.log_date}`;
+      const list = lists.get(key) ?? [];
+      if (!list.includes(title)) list.push(title);
+      lists.set(key, list);
+    }
+  }
+  return new Map(Array.from(lists, ([key, list]) => [key, list.join(" / ")]));
 }
