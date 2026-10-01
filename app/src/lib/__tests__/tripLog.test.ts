@@ -1,19 +1,24 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  countLabel,
   EMPTY_TRIP_DAY_INPUT,
   formatHeadcount,
+  formatTripPeriod,
   formatWorkDays,
   headcountForProjects,
   headcountParts,
   inputToTripDayFields,
+  latestTripContents,
   parseCount,
   sumHeadcount,
   tripDayToInput,
   tripTotals,
   workDayParts,
+  workDaySplit,
   workDaySplitForProjects,
 } from "@/lib/tripLog";
+import { monthRangeLabel } from "@/lib/dateRange";
 
 test("인원 칸: 빈칸·글자·음수는 0, 소수는 버림", () => {
   assert.equal(parseCount("3"), 3);
@@ -116,4 +121,49 @@ test("작업일수 나눔: 출장 체크한 날은 출장, 나머지 작업일�
 test("작업일수 표시: \"사내 N일, 출장 N일, 총 N일\"", () => {
   assert.equal(formatWorkDays({ inhouse: 3, trip: 2, total: 5 }), "사내 3일, 출장 2일, 총 5일");
   assert.deepEqual(workDayParts({ inhouse: 0, trip: 1, total: 1 }), ["사내 0일", "출장 1일", "총 1일"]);
+});
+
+test("출장일지 숫자 칸: 0(안 적음)은 공란, 나머지는 단위 붙여서", () => {
+  assert.equal(countLabel(0, "명"), "");
+  assert.equal(countLabel(3, "명"), "3명");
+  assert.equal(countLabel(2), "2");
+  assert.equal(countLabel(0), "");
+});
+
+test("출장일지 기간: 하루면 그 날짜만, 날짜가 없으면 공란", () => {
+  assert.equal(formatTripPeriod({ from: "2026-09-01", to: "2026-09-14" }), "2026-09-01 ~ 2026-09-14");
+  assert.equal(formatTripPeriod({ from: "2026-09-03", to: "2026-09-03" }), "2026-09-03");
+  assert.equal(formatTripPeriod({ from: null, to: null }), "");
+});
+
+test("내근 일수: 작업일지 날짜 중 출장 아닌 날(날짜는 한 번만), 출장 줄만 있는 날은 출장", () => {
+  const work = ["2026-09-01", "2026-09-02", "2026-09-02", "2026-09-03", "2026-09-05"];
+  assert.deepEqual(workDaySplit(work, ["2026-09-02", "2026-09-05"]), { inhouse: 2, trip: 2, total: 4 });
+  // 출장 날짜를 빼면(수정 중 "빼기") 그날은 내근으로
+  assert.deepEqual(workDaySplit(work, ["2026-09-02"]), { inhouse: 3, trip: 1, total: 4 });
+  // 작업일지 줄 없이 출장 줄만 있는 날
+  assert.deepEqual(workDaySplit([], ["2026-09-07"]), { inhouse: 0, trip: 1, total: 1 });
+  assert.deepEqual(workDaySplit([], []), { inhouse: 0, trip: 0, total: 0 });
+});
+
+test("최근 작업 내용: 내용이 있는 가장 늦은 출장 날짜의 내용(날짜 순서와 무관)", () => {
+  assert.equal(
+    latestTripContents([
+      { work_date: "2026-09-14", contents: "배관 연결" },
+      { work_date: "2026-09-01", contents: "자재 반입" },
+      { work_date: "2026-09-16", contents: "  " },
+    ]),
+    "배관 연결"
+  );
+  assert.equal(latestTripContents([{ work_date: "2026-09-01", contents: "" }]), "");
+  assert.equal(latestTripContents([]), "");
+});
+
+test("내근 일수 기준 기간 이름: 연도·반기·월", () => {
+  assert.equal(monthRangeLabel(2026, "all", 9), "2026년");
+  assert.equal(monthRangeLabel(2026, "h1", 9), "2026년 상반기");
+  assert.equal(monthRangeLabel(2026, "h2", 9), "2026년 하반기");
+  assert.equal(monthRangeLabel(2026, "9", 3), "2026년 9월");
+  assert.equal(monthRangeLabel(2026, "current", 3), "2026년 3월");
+  assert.equal(monthRangeLabel(2026, "x", 3), "2026년");
 });

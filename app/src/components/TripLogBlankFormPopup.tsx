@@ -54,7 +54,7 @@ export function TripLogBlankFormPopup({ onClose }: { onClose: () => void }) {
                     </td>
                   </tr>
                   <tr>
-                    <td className={`${cell} bg-slate-50 font-medium`}>총 일수</td>
+                    <td className={`${cell} bg-slate-50 font-medium`}>출장 일수</td>
                     <td className={cell}>일</td>
                     <td className={`${cell} bg-slate-50 font-medium`}>총 투입 인원</td>
                     <td className={cell}>명 (사내 &nbsp;&nbsp;&nbsp; 명 · 조공 &nbsp;&nbsp;&nbsp; 명)</td>

@@ -8,3 +8,11 @@ export function monthRange(selectedYear: number, monthParam: string, currentMont
   const lastDay = new Date(selectedYear, m, 0).getDate();
   return { start: `${selectedYear}-${mm}-01`, end: `${selectedYear}-${mm}-${String(lastDay).padStart(2, "0")}` };
 }
+
+/** monthRange와 같은 월 파라미터의 이름 — "2026년", "2026년 상반기", "2026년 9월". */
+export function monthRangeLabel(selectedYear: number, monthParam: string, currentMonth: number) {
+  if (monthParam === "h1") return `${selectedYear}년 상반기`;
+  if (monthParam === "h2") return `${selectedYear}년 하반기`;
+  const m = monthParam === "current" ? currentMonth : Number(monthParam);
+  return monthParam === "all" || !Number.isInteger(m) ? `${selectedYear}년` : `${selectedYear}년 ${m}월`;
+}

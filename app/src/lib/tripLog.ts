@@ -113,6 +113,17 @@ export type WorkDaySplit = {
 };
 
 /**
+ * 작업일수 나눔 — 작업일지 날짜 중 출장 날짜는 출장, 나머지는 사내(출장일지 팝업에선 "내근"). 날짜는 한 번만 세서
+ * 사내 + 출장 = 총. 작업일지 줄 없이 출장 날짜만 있는 날도 출장으로 셈.
+ */
+export function workDaySplit(workDates: Iterable<string>, tripDates: Iterable<string>): WorkDaySplit {
+  const trip = new Set(tripDates);
+  const all = new Set(workDates);
+  for (const d of trip) all.add(d);
+  return { inhouse: all.size - trip.size, trip: trip.size, total: all.size };
+}
+
+/**
  * 보고서의 작업일수 나눔 — 프로젝트(+귀속 하위 프로젝트) 묶음이 작업일지에 있는 날짜 중 출장으로 체크한 날은 출장,
  * 나머지는 사내. 날짜는 한 번만 세서 사내 + 출장 = 총(같은 날 묶음 안의 한 프로젝트라도 출장이면 그날은 출장).
  * 출장 날짜 줄만 있고 작업일지 줄이 없는 날도 출장으로 셈. 출장일지 표(090)가 없으면(tripDays null) 출장 0일.
@@ -123,10 +134,10 @@ export function workDaySplitForProjects(
   projectIds: Iterable<string>
 ): WorkDaySplit {
   const ids = new Set(projectIds);
-  const tripDates = new Set((tripDays ?? []).filter((d) => ids.has(d.project_id)).map((d) => d.work_date));
-  const allDates = new Set(workLogs.filter((r) => r.project_id && ids.has(r.project_id)).map((r) => r.log_date));
-  for (const d of tripDates) allDates.add(d);
-  return { inhouse: allDates.size - tripDates.size, trip: tripDates.size, total: allDates.size };
+  return workDaySplit(
+    workLogs.filter((r) => r.project_id && ids.has(r.project_id)).map((r) => r.log_date),
+    (tripDays ?? []).filter((d) => ids.has(d.project_id)).map((d) => d.work_date)
+  );
 }
 
 /** 보고서 표시용 조각 — ["사내 3일", "출장 2일", "총 5일"]. */
@@ -163,6 +174,17 @@ export function tripTotals(
   };
 }
 
+/** 출장일지 기간 — "2026-09-01 ~ 2026-09-14"(하루면 그 날짜만), 날짜가 없으면 공란. */
+export function formatTripPeriod(t: Pick<TripTotals, "from" | "to">): string {
+  if (!t.from) return "";
+  return !t.to || t.from === t.to ? t.from : `${t.from} ~ ${t.to}`;
+}
+
+/** 출장일지 숫자 칸 — 0(인원을 안 적은 날·장비 없음 등)은 "0명"·"-" 대신 공란(사용자 요청). */
+export function countLabel(n: number, unit = ""): string {
+  return n > 0 ? `${n}${unit}` : "";
+}
+
 /** 출장일지 한 장(프로젝트 하나) — 원청사·현장은 프로젝트에서, 작업구분·비고는 trip_logs에서. */
 export type TripProjectDoc = {
   projectId: string;
@@ -174,8 +196,22 @@ export type TripProjectDoc = {
   note: string;
   /** 날짜순. contents = 그날 그 프로젝트 작업일지 내용(작업 집계와 같은 이어받기 규칙). */
   days: (TripDayRow & { contents: string })[];
+  /** 목록 조회 기간(연·월 필터) 안에 이 프로젝트가 작업일지에 있는 날짜(중복 없이) — 내근 일수 = 이 중 출장 아닌 날. */
+  workDates: string[];
+  /** 목록 조회 기간 이름("2026년", "2026년 9월") — 내근 일수가 어느 기간 기준인지 표시. */
+  periodLabel: string;
 };
 
 export function tripProjectLabel(doc: Pick<TripProjectDoc, "projectCode" | "projectName">) {
   return doc.projectCode ? `${doc.projectCode} ${doc.projectName}` : doc.projectName;
+}
+
+/** 목록의 "최근 작업 내용" — 내용이 있는 가장 늦은 출장 날짜의 작업 내용. 없으면 공란. */
+export function latestTripContents(days: Pick<TripProjectDoc["days"][number], "work_date" | "contents">[]): string {
+  let latest: { date: string; contents: string } | null = null;
+  for (const d of days) {
+    const contents = d.contents.trim();
+    if (contents && (!latest || d.work_date > latest.date)) latest = { date: d.work_date, contents };
+  }
+  return latest?.contents ?? "";
 }

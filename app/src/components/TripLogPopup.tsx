@@ -4,10 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  countLabel,
+  formatTripPeriod,
   inputToTripDayFields,
   tripDayToInput,
   tripProjectLabel,
   tripTotals,
+  workDaySplit,
   WORK_TYPE_OPTIONS,
   type TripDayInput,
   type TripProjectDoc,
@@ -24,11 +27,12 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { todayString } from "@/lib/format";
 import { cx } from "@/lib/cx";
 
-function SummaryBox({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function SummaryBox({ label, value, sub, className }: { label: string; value: string; sub?: string; className?: string }) {
   return (
-    <div className="rounded-lg border border-slate-300 px-3 py-2 print:py-1.5">
+    <div className={cx("rounded-lg border border-slate-300 px-3 py-2 print:py-1.5", className)}>
       <p className="text-xs text-slate-500">{label}</p>
-      <p className="whitespace-nowrap text-lg font-bold tabular-nums text-slate-900 print:text-base">{value}</p>
+      {/* 0(안 적음)은 공란 — 칸 높이는 그대로 */}
+      <p className="whitespace-nowrap text-lg font-bold tabular-nums text-slate-900 print:text-base">{value || "\u00a0"}</p>
       {sub && <p className="text-[11px] text-slate-500">{sub}</p>}
     </div>
   );
@@ -58,13 +62,21 @@ export function TripLogPopup({ doc, onClose }: { doc: TripProjectDoc; onClose: (
     setError(null);
     setEditing(true);
   }
-  useEscapeKey(true, () => (editing ? setEditing(false) : onClose()));
+  // 취소하면 "빼기"한 날짜도 되돌림(예전엔 취소해도 뺀 날짜가 팝업을 다시 열 때까지 안 보였음).
+  function cancelEdit() {
+    setRemoved(new Set());
+    setError(null);
+    setEditing(false);
+  }
+  useEscapeKey(true, () => (editing ? cancelEdit() : onClose()));
 
   const days = doc.days.filter((d) => !removed.has(d.id));
   // 수정 중에는 입력한 값으로 합계를 바로 다시 셈.
   const shown = days.map((d) => (editing && inputs[d.id] ? { ...d, ...inputToTripDayFields(inputs[d.id]) } : d));
   const totals = tripTotals(shown);
-  const period = totals.from ? (totals.from === totals.to ? totals.from : `${totals.from} ~ ${totals.to}`) : "-";
+  const period = formatTripPeriod(totals);
+  // 내근 일수 — 목록 조회 기간에 이 프로젝트가 작업일지에 있는 날 중 출장 아닌 날(수정 중 "빼기"한 날짜는 바로 내근으로 셈).
+  const workDays = workDaySplit(doc.workDates, shown.map((d) => d.work_date));
 
   function setInput(id: string, patch: Partial<TripDayInput>) {
     setInputs((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
@@ -108,7 +120,7 @@ export function TripLogPopup({ doc, onClose }: { doc: TripProjectDoc; onClose: (
                   <Button type="button" size="xs" onClick={save}>
                     저장
                   </Button>
-                  <Button type="button" variant="secondary" size="xs" onClick={() => setEditing(false)}>
+                  <Button type="button" variant="secondary" size="xs" onClick={cancelEdit}>
                     취소
                   </Button>
                 </>
@@ -139,11 +151,11 @@ export function TripLogPopup({ doc, onClose }: { doc: TripProjectDoc; onClose: (
               </p>
               <p>
                 <span className="text-slate-500">현장 </span>
-                {doc.siteName ?? "-"}
+                {doc.siteName ?? ""}
               </p>
               <p>
                 <span className="text-slate-500">원청사 </span>
-                {doc.clientName ?? "-"}
+                {doc.clientName ?? ""}
               </p>
               <p>
                 <span className="text-slate-500">기간 </span>
@@ -175,16 +187,33 @@ export function TripLogPopup({ doc, onClose }: { doc: TripProjectDoc; onClose: (
                     </label>
                   ))
                 ) : (
-                  <span>{doc.workTypes.join(", ") || "-"}</span>
+                  <span>{doc.workTypes.join(", ")}</span>
                 )}
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4 print:grid-cols-4">
-              <SummaryBox label="총 일수" value={`${totals.days}일`} sub={totals.equipmentDays ? `장비 투입 ${totals.equipmentDays}일` : undefined} />
-              <SummaryBox label="총 투입 인원" value={`${totals.people}명`} sub="날짜별 사내 + 조공 합" />
-              <SummaryBox label="사내" value={`${totals.staff}명`} />
-              <SummaryBox label="조공" value={`${totals.helper}명`} />
+            {/* 휴대폰·태블릿: 일수 2칸 + 인원 3칸 두 줄, PC·인쇄: 5칸 한 줄 */}
+            <div className="mt-3 grid grid-cols-6 gap-2 lg:grid-cols-5 print:grid-cols-5">
+              <SummaryBox
+                label="출장 일수"
+                value={countLabel(totals.days, "일")}
+                sub={totals.equipmentDays ? `장비 투입 ${totals.equipmentDays}일` : undefined}
+                className="col-span-3 lg:col-span-1 print:col-span-1"
+              />
+              <SummaryBox
+                label="내근 일수"
+                value={countLabel(workDays.inhouse, "일")}
+                sub={`${doc.periodLabel} 작업일지 기준`}
+                className="col-span-3 lg:col-span-1 print:col-span-1"
+              />
+              <SummaryBox
+                label="총 투입 인원"
+                value={countLabel(totals.people, "명")}
+                sub="날짜별 사내 + 조공 합"
+                className="col-span-2 lg:col-span-1 print:col-span-1"
+              />
+              <SummaryBox label="사내" value={countLabel(totals.staff, "명")} className="col-span-2 lg:col-span-1 print:col-span-1" />
+              <SummaryBox label="조공" value={countLabel(totals.helper, "명")} className="col-span-2 lg:col-span-1 print:col-span-1" />
             </div>
 
             <div className="mt-3 overflow-x-auto print:overflow-visible">
@@ -218,7 +247,7 @@ export function TripLogPopup({ doc, onClose }: { doc: TripProjectDoc; onClose: (
                           )}
                         </td>
                         <td className="sticky-col min-w-[8rem] py-1.5 pr-2 max-md:max-w-[10rem] max-md:truncate print:min-w-0 print:max-w-none print:whitespace-normal" title={d.contents}>
-                          {d.contents || "-"}
+                          {d.contents}
                         </td>
                         <td className="py-1.5 pr-2 text-right tabular-nums">
                           {editing ? (
@@ -231,7 +260,7 @@ export function TripLogPopup({ doc, onClose }: { doc: TripProjectDoc; onClose: (
                               className={numberInput}
                             />
                           ) : (
-                            d.staff_count
+                            countLabel(d.staff_count)
                           )}
                         </td>
                         <td className="py-1.5 pr-2 text-right tabular-nums">
@@ -245,10 +274,10 @@ export function TripLogPopup({ doc, onClose }: { doc: TripProjectDoc; onClose: (
                               className={numberInput}
                             />
                           ) : (
-                            d.helper_count
+                            countLabel(d.helper_count)
                           )}
                         </td>
-                        <td className="py-1.5 pr-2 text-right font-semibold tabular-nums">{d.staff_count + d.helper_count}</td>
+                        <td className="py-1.5 pr-2 text-right font-semibold tabular-nums">{countLabel(d.staff_count + d.helper_count)}</td>
                         <td className="py-1.5 pr-2 text-center">
                           {editing ? (
                             <input
@@ -327,11 +356,11 @@ export function TripLogPopup({ doc, onClose }: { doc: TripProjectDoc; onClose: (
                 <tfoot>
                   <tr className="border-t-2 border-slate-300 font-semibold">
                     <td className="py-1.5 pr-2">합계</td>
-                    <td className="sticky-col py-1.5 pr-2 tabular-nums">{totals.days}일</td>
-                    <td className="py-1.5 pr-2 text-right tabular-nums">{totals.staff}</td>
-                    <td className="py-1.5 pr-2 text-right tabular-nums">{totals.helper}</td>
-                    <td className="py-1.5 pr-2 text-right tabular-nums">{totals.people}</td>
-                    <td className="py-1.5 pr-2 text-center tabular-nums">{totals.equipmentDays ? `${totals.equipmentDays}일` : ""}</td>
+                    <td className="sticky-col py-1.5 pr-2 tabular-nums">{countLabel(totals.days, "일")}</td>
+                    <td className="py-1.5 pr-2 text-right tabular-nums">{countLabel(totals.staff)}</td>
+                    <td className="py-1.5 pr-2 text-right tabular-nums">{countLabel(totals.helper)}</td>
+                    <td className="py-1.5 pr-2 text-right tabular-nums">{countLabel(totals.people)}</td>
+                    <td className="py-1.5 pr-2 text-center tabular-nums">{countLabel(totals.equipmentDays, "일")}</td>
                     <td colSpan={editing ? 4 : 3} />
                   </tr>
                 </tfoot>
