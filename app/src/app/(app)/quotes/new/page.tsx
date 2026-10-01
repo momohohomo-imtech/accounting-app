@@ -19,9 +19,12 @@ export default async function NewQuotePage() {
   }));
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-900">견적서 작성</h1>
-      <QuoteForm clients={clients ?? []} sites={siteOptions} projects={projects ?? []} supplierProfiles={profiles ?? []} />
-    </div>
+    <QuoteForm
+      heading="견적서 작성"
+      clients={clients ?? []}
+      sites={siteOptions}
+      projects={projects ?? []}
+      supplierProfiles={profiles ?? []}
+    />
   );
 }

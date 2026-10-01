@@ -36,14 +36,13 @@ export default async function EditQuotePage({ params }: { params: Promise<{ id: 
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between print:hidden">
-        <h1 className="text-2xl font-bold text-slate-900">
-          견적서 수정 <span className="tabular-nums text-base font-normal text-slate-400">{quote.quote_number}</span>
-        </h1>
-      </div>
-
       <div className="print:hidden">
         <QuoteForm
+          heading={
+            <>
+              견적서 수정 <span className="tabular-nums text-base font-normal text-slate-400">{quote.quote_number}</span>
+            </>
+          }
           clients={clients ?? []}
           sites={siteOptions}
           projects={projects ?? []}
