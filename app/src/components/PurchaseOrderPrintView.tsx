@@ -137,21 +137,12 @@ export function PurchaseOrderPrintView({
             className="hidden rounded-2xl border border-slate-200 bg-white p-6 text-[13px] print:block print:rounded-none print:border-0 print:p-0"
             style={{ breakAfter: isLast ? "auto" : "page" }}
           >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-2">
-                <Image src="/logo-lockup.png" alt="" width={26} height={20} priority className="h-5 w-auto" />
-                <span className="tabular-nums text-[10px] tracking-widest text-slate-400">
-                  PURCHASE ORDER{pages.length > 1 ? ` · ${pageIndex + 1}/${pages.length}` : ""}
-                </span>
-              </div>
-              <div className="flex text-center text-[10px]">
-                {["담당", "검토", "승인"].map((label) => (
-                  <div key={label} className="-ml-px flex h-6 w-11 flex-col border border-slate-300 first:ml-0">
-                    <div className="border-b border-slate-300 bg-brand-soft py-px font-semibold text-slate-600">{label}</div>
-                    <div className="flex-1" />
-                  </div>
-                ))}
-              </div>
+            {/* 오른쪽 위 담당·검토·승인 결재 칸은 사용자 요청으로 뺌 — 견적서처럼 로고 왼쪽, 문서 이름(쪽 번호) 오른쪽 */}
+            <div className="flex items-center gap-2">
+              <Image src="/logo-lockup.png" alt="" width={26} height={20} priority className="h-5 w-auto" />
+              <span className="ml-auto tabular-nums text-[10px] tracking-widest text-slate-400">
+                PURCHASE ORDER{pages.length > 1 ? ` · ${pageIndex + 1}/${pages.length}` : ""}
+              </span>
             </div>
 
             <div className="mt-1.5 flex flex-col">
