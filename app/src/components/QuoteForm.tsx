@@ -209,13 +209,32 @@ export function QuoteForm({
     else router.push(LIST_HREF, { scroll: false });
   }
 
-  function removeItem(i: number) {
-    setItems((prev) => prev.filter((_, idx) => idx !== i));
-    setSelected((prev) => {
-      const next = new Set(prev);
-      next.delete(i);
-      return next;
-    });
+  // 품목 삭제 — 내용이 있는 줄은 먼저 물어봄(사용자 요청 — 잘못 눌러도 바로 지워지던 것). 묶음 대표 줄을 지우면 묶여 있던
+  // 품목은 묶음을 풀어 다시 따로 보이게(안 풀면 대표 줄 없이 숨은 채로 남아 인쇄·합계에서 빠짐). 체크 표시는 남은 품목을 따라감.
+  async function removeItem(i: number) {
+    const it = items[i];
+    if (!it) return;
+    const hasContent = Boolean(it.item_name || it.spec || it.unit || it.note || it.amount || it.quantity || it.unit_price);
+    const groupLabel = it.is_group_summary ? it.group_label : null;
+    const members = groupLabel ? items.filter((x) => x.group_label === groupLabel && !x.is_group_summary).length : 0;
+    const label = `${i + 1}번 품목${it.item_name ? `(${it.item_name})` : ""}`;
+    if (
+      hasContent &&
+      !(await confirm(
+        members > 0
+          ? `${label}을 삭제하시겠습니까? 묶여 있던 품목 ${members}개는 묶음이 풀려 다시 따로 보입니다.`
+          : `${label}을 삭제하시겠습니까?`,
+        { danger: true, confirmLabel: "삭제" }
+      ))
+    ) {
+      return;
+    }
+    setItems((prev) =>
+      prev
+        .filter((_, idx) => idx !== i)
+        .map((x) => (groupLabel && x.group_label === groupLabel ? { ...x, group_label: null } : x))
+    );
+    setSelected((prev) => new Set(Array.from(prev).filter((idx) => idx !== i).map((idx) => (idx > i ? idx - 1 : idx))));
   }
 
   function toggleSelect(i: number) {
