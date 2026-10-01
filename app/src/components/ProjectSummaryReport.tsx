@@ -55,7 +55,7 @@ function HeadingStat({ label, parts }: { label: string; parts: string[] | null }
 }
 
 // 작업일수 사내·출장 비율 막대 — 카드를 훑어 내리기만 해도 출장이 많은 프로젝트가 보이게(사용자 요청). 막대 길이는 카드마다
-// 같고(그 프로젝트 총 작업일수 = 막대 전체) 출장만 남색으로 강조, 사내는 회색. 숫자는 바로 위 제목 줄에 있음.
+// 같고(그 프로젝트 총 작업일수 = 막대 전체) 출장만 녹색으로 강조(출장 현황 그래프와 같은 색), 사내는 회색. 숫자는 바로 위 제목 줄에 있음.
 function WorkDayRatioBar({ workDays }: { workDays: WorkDaySplit }) {
   if (workDays.total === 0) return null;
   return (
@@ -66,7 +66,7 @@ function WorkDayRatioBar({ workDays }: { workDays: WorkDaySplit }) {
         className="flex h-2 w-48 gap-[2px] overflow-hidden rounded sm:w-64"
       >
         {workDays.inhouse > 0 && <span className="h-full bg-slate-300" style={{ flexGrow: workDays.inhouse }} />}
-        {workDays.trip > 0 && <span className="h-full bg-indigo-500" style={{ flexGrow: workDays.trip }} />}
+        {workDays.trip > 0 && <span className="h-full bg-emerald-500" style={{ flexGrow: workDays.trip }} />}
       </div>
       <span className="flex items-center gap-2 text-[11px] text-slate-500 print:text-[9px]">
         <span className="flex items-center gap-1">
@@ -74,7 +74,7 @@ function WorkDayRatioBar({ workDays }: { workDays: WorkDaySplit }) {
           사내
         </span>
         <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-sm bg-indigo-500" />
+          <span className="h-2 w-2 rounded-sm bg-emerald-500" />
           출장
         </span>
       </span>

@@ -24,8 +24,9 @@ const VIEWS: { key: View; label: string }[] = [
   { key: "client", label: "원청사별" },
   { key: "site", label: "현장별" },
 ];
-// 달력 진하기 — 한 색(남색)을 밝은 → 진한 순으로. 0 = 출장 없음, 1 = 출장했지만 인원 안 적음, 2~4 = 인원 많을수록 진하게.
-const LEVEL_CLASS = ["bg-slate-100", "bg-indigo-100", "bg-indigo-300", "bg-indigo-500", "bg-indigo-700"] as const;
+// 달력 진하기 — 한 색(녹색, 사용자 요청 — 앱의 brand-green과 같은 계열)을 밝은 → 진한 순으로. 0 = 출장 없음, 1 = 출장했지만
+// 인원 안 적음, 2~4 = 인원 많을수록 진하게. 1단계도 빈 칸(회색)과 구분되게 200부터.
+const LEVEL_CLASS = ["bg-slate-100", "bg-emerald-200", "bg-emerald-400", "bg-emerald-600", "bg-emerald-800"] as const;
 const DAY_LABELS = new Set([1, 10, 20, 30]);
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -325,7 +326,7 @@ export function TripOverviewReport({ docs, year }: { docs: TripProjectDoc[]; yea
                     className={cx(
                       "flex w-full items-center gap-2 rounded-md px-1 py-1 text-left",
                       m.tripDays > 0 && "hover:bg-slate-50",
-                      active && "bg-indigo-50"
+                      active && "bg-emerald-50"
                     )}
                   >
                     <span className={cx("w-8 shrink-0 text-xs tabular-nums", active ? "font-semibold text-slate-900" : "text-slate-500")}>
@@ -334,7 +335,7 @@ export function TripOverviewReport({ docs, year }: { docs: TripProjectDoc[]; yea
                     <span className="flex min-w-0 flex-1 items-center gap-2">
                       {m.tripDays > 0 && (
                         <span
-                          className={cx("h-3.5 shrink-0 rounded-r", month && !active ? "bg-indigo-200" : "bg-indigo-500")}
+                          className={cx("h-3.5 shrink-0 rounded-r", month && !active ? "bg-emerald-200" : "bg-emerald-500")}
                           style={{ width: `max(0.25rem, calc((100% - 6rem) * ${ratio}))` }}
                         />
                       )}
