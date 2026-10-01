@@ -31,7 +31,16 @@ import { WorkLogSiteFilter } from "@/components/WorkLogSiteFilter";
 import { UnassignedWorkLogTable } from "@/components/UnassignedWorkLogTable";
 import { UnassignedWorkLogMonthFilter } from "@/components/UnassignedWorkLogMonthFilter";
 import { buildWorkLogSummary } from "@/lib/workLogSummary";
-import { headcountForProjects, workDaySplitForProjects, type TripDayRow } from "@/lib/tripLog";
+import {
+  formatTripPeriod,
+  headcountForProjects,
+  tripProjectLabel,
+  workDaySplitForProjects,
+  type TripDayRow,
+} from "@/lib/tripLog";
+import { loadTripProjectDocs } from "@/lib/tripLogDocs";
+import { tripProjectRows } from "@/lib/tripOverview";
+import { TripOverviewReport } from "@/components/TripOverviewReport";
 import { parseMonthRange } from "@/lib/monthRange";
 import { ReportExcelButton } from "@/components/ReportExcelButton";
 import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
@@ -605,7 +614,7 @@ export default async function ReportsPage({
     ? `${selectedYear}-${pad(unassignedMonthNum)}-${pad(uEndDay)}`
     : `${selectedYear}-12-31`;
 
-  const [wlRows, { data: wlSites }, unassignedLogRows, { data: wlChecks }] = await Promise.all([
+  const [wlRows, { data: wlSites }, unassignedLogRows, { data: wlChecks }, tripOverview] = await Promise.all([
     // 내용이 빈 줄은 앞 줄 내용을 이어받아서 그 해 1월 1일부터 가져옴 — 세는 건 wlStart~wlEnd 안의 줄만.
     fetchAllRows<WorkLog>((from, to) =>
       supabase
@@ -630,6 +639,13 @@ export default async function ReportsPage({
         .range(from, to)
     ),
     supabase.from("work_log_summary_checks").select("group_key").eq("year", selectedYear),
+    // 출장 현황 — 출장일지 탭과 같은 불러오기(그 해 전체). 090 표가 없으면 tableMissing.
+    loadTripProjectDocs(supabase, {
+      year: selectedYear,
+      start: `${selectedYear}-01-01`,
+      end: `${selectedYear}-12-31`,
+      periodLabel: `${selectedYear}년`,
+    }),
   ]);
 
   const wlRowsFiltered = wlSite ? wlRows.filter((r) => r.site_id === wlSite) : wlRows;
@@ -905,6 +921,21 @@ export default async function ReportsPage({
   const workLogExportRows = workLogSummary.map((r) => [r.siteName, r.title, r.days, r.dates.join(", ")]);
 
   const unassignedExportRows = unassignedRows.map((r) => [formatDate(r.date), r.siteName, r.title]);
+
+  // 출장 현황 엑셀 — 화면의 프로젝트별 표(한 해 전체)와 같은 칸. 0은 공란(출장일지와 같게).
+  const blankZero = (n: number) => (n > 0 ? n : "");
+  const tripExportRows = tripProjectRows(tripOverview.docs).map((r) => [
+    tripProjectLabel(r.doc),
+    r.doc.siteName ?? "",
+    r.doc.clientName ?? "",
+    formatTripPeriod(r.totals),
+    blankZero(r.totals.days),
+    blankZero(r.inhouse),
+    blankZero(r.totals.staff),
+    blankZero(r.totals.helper),
+    blankZero(r.totals.people),
+    blankZero(r.totals.equipmentDays),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -1243,11 +1274,31 @@ export default async function ReportsPage({
       </CollapsibleSection>
 
       <CollapsibleSection
-        title={groupTitle("작업일지")}
+        title={groupTitle("작업일지·출장")}
         bare
-        defaultOpen={groupDefaultOpen(["worklog", "unassigned"])}
+        defaultOpen={groupDefaultOpen(["trips", "worklog", "unassigned"])}
       >
        <div className="space-y-6 mt-3">
+
+        <CollapsibleSection
+          className={hiddenClass("trips")}
+          title={`출장 현황 — ${selectedYear}년 출장 일수·투입 인원을 월별·프로젝트별로`}
+          defaultOpen={printSection === "trips"}
+          headerExtra={sectionControls("trips", {
+            filename: `출장_현황_${selectedYear}.xlsx`,
+            headers: ["프로젝트", "현장", "원청사", "기간", "출장 일수", "내근 일수", "사내", "조공", "총 투입 인원", "장비 투입 일수"],
+            rows: tripExportRows,
+          })}
+        >
+          {tripOverview.tableMissing ? (
+            <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              출장일지 표가 아직 없습니다 — Supabase SQL Editor에서 <code>090_trip_log_days.sql</code>을 실행하면 작업일지
+              팝업에서 &lsquo;출장&rsquo;을 체크한 날이 여기에 모입니다.
+            </p>
+          ) : (
+            <TripOverviewReport docs={tripOverview.docs} year={selectedYear} />
+          )}
+        </CollapsibleSection>
 
         <CollapsibleSection
         className={hiddenClass("worklog")}

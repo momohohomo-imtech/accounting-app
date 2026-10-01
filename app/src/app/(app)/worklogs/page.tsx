@@ -16,12 +16,10 @@ import { BusinessTripFilter } from "@/components/BusinessTripFilter";
 import { TripLogList } from "@/components/TripLogList";
 import { monthRange, monthRangeLabel } from "@/lib/dateRange";
 import { cx } from "@/lib/cx";
-import { one } from "@/lib/relations";
 import type { WorkLog } from "@/lib/types";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import { nowKst } from "@/lib/kstDate";
-import { resolveWorkLogTitles, type WorkLogTitleRow } from "@/lib/workLogSummary";
-import type { TripDayRow, TripProjectDoc } from "@/lib/tripLog";
+import { loadTripProjectDocs } from "@/lib/tripLogDocs";
 
 const HOLIDAY_TITLE = "휴무";
 const TABS = [
@@ -61,11 +59,7 @@ export default async function WorkLogsPage({
   );
 }
 
-type TripSiteRel = { name: string; clients: { name: string } | { name: string }[] | null };
-type TripProjectRel = { name: string; project_code: string | null; sites: TripSiteRel | TripSiteRel[] | null };
-type TripDayWithProject = TripDayRow & { projects: TripProjectRel | TripProjectRel[] | null };
-
-// 출장일지(새 방식, 090) — 작업일지 팝업에서 "출장"을 체크한 날짜를 프로젝트별 한 장으로. 예전 방식 출장일지는 아래에 보기만.
+// 출장일지(새 방식, 090) — 작업일지 팝업에서 "출장"을 체크한 날짜를 프로젝트별 한 장으로(불러오기는 보고서 "출장 현황"과 같이 씀).
 async function BusinessTripSection({
   year,
   month,
@@ -82,110 +76,17 @@ async function BusinessTripSection({
   const selectedYear = year ? Number(year) : currentYear;
   const selectedMonth = month ?? "all";
   const { start, end } = monthRange(selectedYear, selectedMonth, currentMonth);
-
-  let yearDays: TripDayWithProject[] = [];
-  let tripTableMissing = false;
-  try {
-    yearDays = await fetchAllRows<TripDayWithProject>((from, to) =>
-      supabase
-        .from("trip_log_days")
-        .select(
-          "id, project_id, work_date, staff_count, helper_count, equipment_used, equipment_place, equipment_hours, note, projects(name, project_code, sites(name, clients(name)))"
-        )
-        .gte("work_date", `${selectedYear}-01-01`)
-        .lte("work_date", `${selectedYear}-12-31`)
-        .order("work_date", { ascending: true })
-        .order("id", { ascending: true })
-        .range(from, to)
-    );
-  } catch {
-    tripTableMissing = true;
-  }
-
-  const siteOf = (d: TripDayWithProject) => one(one(d.projects)?.sites);
-  const periodDays = yearDays.filter(
-    (d) => d.work_date >= start && d.work_date <= end && (!site || siteOf(d)?.name === site)
-  );
-  const daysByProject = new Map<string, TripDayWithProject[]>();
-  for (const d of periodDays) daysByProject.set(d.project_id, [...(daysByProject.get(d.project_id) ?? []), d]);
-  const projectIds = Array.from(daysByProject.keys());
-
-  // 머리 정보(작업구분·비고)와 날짜별 작업 내용(작업일지 — 작업 집계와 같은 이어받기, 그 해 1월 1일부터).
-  const [{ data: headRows }, workRows] = await Promise.all([
-    projectIds.length
-      ? supabase.from("trip_logs").select("project_id, work_types, note").in("project_id", projectIds)
-      : Promise.resolve({ data: [] as { project_id: string; work_types: string[]; note: string | null }[] }),
-    projectIds.length
-      ? fetchAllRows<WorkLogTitleRow & { id: string }>((from, to) =>
-          supabase
-            .from("work_logs")
-            .select("id, log_date, site_id, project_id, title, sort_order, projects(name)")
-            .in("project_id", projectIds)
-            .gte("log_date", `${selectedYear}-01-01`)
-            .lte("log_date", end)
-            .order("log_date", { ascending: true })
-            .order("sort_order", { ascending: true })
-            .order("id", { ascending: true })
-            .range(from, to)
-        )
-      : Promise.resolve([] as (WorkLogTitleRow & { id: string })[]),
-  ]);
-  const headByProject = new Map((headRows ?? []).map((h) => [h.project_id, h]));
-  const contentsByKey = new Map<string, string[]>();
-  for (const { row, title } of resolveWorkLogTitles(workRows)) {
-    if (!title || !row.project_id) continue;
-    const key = `${row.project_id}|${row.log_date}`;
-    const list = contentsByKey.get(key) ?? [];
-    if (!list.includes(title)) list.push(title);
-    contentsByKey.set(key, list);
-  }
-  // 출장 업무 내역서의 내근 일수 — 조회 기간 안에 그 프로젝트가 작업일지에 있는 날짜(이 중 출장 아닌 날을 팝업에서 셈).
-  const workDatesByProject = new Map<string, Set<string>>();
-  for (const row of workRows) {
-    if (!row.project_id || row.log_date < start || row.log_date > end) continue;
-    const dates = workDatesByProject.get(row.project_id) ?? new Set<string>();
-    dates.add(row.log_date);
-    workDatesByProject.set(row.project_id, dates);
-  }
-  const periodLabel = monthRangeLabel(selectedYear, selectedMonth, currentMonth);
-
-  const docs: TripProjectDoc[] = projectIds.map((projectId) => {
-    const days = daysByProject.get(projectId) ?? [];
-    const project = one(days[0]?.projects);
-    const siteRel = one(project?.sites);
-    const head = headByProject.get(projectId);
-    return {
-      projectId,
-      projectName: project?.name ?? "(프로젝트 정보 없음)",
-      projectCode: project?.project_code ?? null,
-      siteName: siteRel?.name ?? null,
-      clientName: one(siteRel?.clients)?.name ?? null,
-      workTypes: head?.work_types ?? [],
-      note: head?.note ?? "",
-      days: days.map((d) => ({
-        id: d.id,
-        project_id: d.project_id,
-        work_date: d.work_date,
-        staff_count: d.staff_count,
-        helper_count: d.helper_count,
-        equipment_used: d.equipment_used,
-        equipment_place: d.equipment_place,
-        equipment_hours: d.equipment_hours,
-        note: d.note,
-        contents: (contentsByKey.get(`${projectId}|${d.work_date}`) ?? []).join(" / "),
-      })),
-      workDates: Array.from(workDatesByProject.get(projectId) ?? []).sort(),
-      periodLabel,
-    };
+  const { docs, siteOptions, tableMissing: tripTableMissing } = await loadTripProjectDocs(supabase, {
+    year: selectedYear,
+    start,
+    end,
+    site,
+    periodLabel: monthRangeLabel(selectedYear, selectedMonth, currentMonth),
   });
 
   const years = Array.from({ length: currentYear - TRIP_FLOOR_YEAR + 1 }, (_, i) => currentYear - i);
   if (!years.includes(selectedYear)) years.unshift(selectedYear);
   years.sort((a, b) => b - a);
-
-  const siteOptions = Array.from(
-    new Set(yearDays.map((d) => siteOf(d)?.name).filter((v): v is string => Boolean(v)))
-  ).sort((a, b) => a.localeCompare(b));
 
   return (
     <div className="space-y-4">

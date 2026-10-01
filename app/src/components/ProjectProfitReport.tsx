@@ -23,7 +23,17 @@ import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import { purchaseCostOf } from "@/lib/vatBasis";
 import { unsettledCreditPurchase } from "@/lib/projectProfit";
-import { formatHeadcount, formatWorkDays, headcountForProjects, workDaySplitForProjects, type TripDayRow } from "@/lib/tripLog";
+import {
+  formatHeadcount,
+  formatWorkDays,
+  headcountForProjects,
+  tripTotals,
+  workDaySplitForProjects,
+  workLogContentsByProjectDate,
+  type TripDayRow,
+} from "@/lib/tripLog";
+import type { WorkLogTitleRow } from "@/lib/workLogSummary";
+import { ProjectTripDetailTable } from "@/components/ProjectTripDetailTable";
 
 export async function ProjectProfitReport({ projectId, closeHref }: { projectId: string; closeHref: string }) {
   const supabase = await createClient();
@@ -54,18 +64,19 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
     { data: clientRows },
     { data: attachmentRows },
   ] = await Promise.all([
-    fetchAllRows<{ log_date: string; project_id: string | null }>((from, to) =>
+    // 내용(title 등)은 아래 "출장 내역"의 날짜별 작업 내용용 — 작업 집계와 같은 이어받기로 정함.
+    fetchAllRows<WorkLogTitleRow>((from, to) =>
       supabase
         .from("work_logs")
-        .select("log_date, project_id")
+        .select("log_date, site_id, project_id, title, sort_order, projects(name)")
         .in("project_id", groupIds)
         .order("id", { ascending: true })
         .range(from, to)
     ),
-    fetchAllRows<Pick<TripDayRow, "project_id" | "work_date" | "staff_count" | "helper_count">>((from, to) =>
+    fetchAllRows<TripDayRow>((from, to) =>
       supabase
         .from("trip_log_days")
-        .select("project_id, work_date, staff_count, helper_count")
+        .select("id, project_id, work_date, staff_count, helper_count, equipment_used, equipment_place, equipment_hours, note")
         .in("project_id", groupIds)
         .order("id", { ascending: true })
         .range(from, to)
@@ -95,6 +106,19 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
   ]);
   const workDays = workDaySplitForProjects(workLogDateRows, tripDayRows, groupIds);
   const headcount = headcountForProjects(tripDayRows, groupIds);
+
+  // 출장 내역(출장 업무 내역서와 같은 날짜 줄) — 귀속 하위까지 묶은 보고서면 어느 프로젝트 출장인지도 같이.
+  const projectLabelById = new Map(group.map((p) => [p.id, p.project_code ? `${p.project_code} ${p.name}` : p.name]));
+  const contentsByKey = workLogContentsByProjectDate(workLogDateRows);
+  const tripDetailRows = (tripDayRows ?? [])
+    .map((d) => ({
+      ...d,
+      contents: contentsByKey.get(`${d.project_id}|${d.work_date}`) ?? "",
+      projectLabel: projectLabelById.get(d.project_id) ?? "",
+    }))
+    .sort((a, b) => a.work_date.localeCompare(b.work_date) || a.projectLabel.localeCompare(b.projectLabel));
+  const tripDetailTotals = tripTotals(tripDetailRows);
+  const tripDetailMultiProject = new Set(tripDetailRows.map((d) => d.project_id)).size > 1;
   const clientNames = (clientRows ?? []).map((c) => c.name);
 
   // 외상(미완납)은 완납 전까지 장부에서 제외 — 대시보드·보고서와 동일한 기준.
@@ -422,6 +446,17 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
       <div className="order-7 print:order-6 print:break-inside-avoid">
         <ReportPrintChart data={categoryBreakdown} quoteTotal={quoteTotal} />
       </div>
+
+      {tripDetailRows.length > 0 && (
+        // 기본은 접힘 — 펼친 채로 인쇄하면 손익 보고서에 같이 나옴(늘 넣으면 출장이 많은 프로젝트는 인쇄가 길어짐).
+        <CollapsibleSection
+          title={`출장 내역 (${tripDetailTotals.days}일${tripDetailTotals.people ? ` · 연인원 ${tripDetailTotals.people}명` : ""})`}
+          bare
+          className="order-3 print:order-4"
+        >
+          <ProjectTripDetailTable rows={tripDetailRows} showProject={tripDetailMultiProject} />
+        </CollapsibleSection>
+      )}
 
       <CollapsibleSection title="첨부파일 (사양서·도면·사진 등)" defaultOpen printAlways bare className="order-4 print:order-7">
         <AttachmentList projectId={project.id} items={attachments} title="" />

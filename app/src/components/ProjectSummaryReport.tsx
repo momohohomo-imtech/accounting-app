@@ -54,6 +54,34 @@ function HeadingStat({ label, parts }: { label: string; parts: string[] | null }
   );
 }
 
+// 작업일수 사내·출장 비율 막대 — 카드를 훑어 내리기만 해도 출장이 많은 프로젝트가 보이게(사용자 요청). 막대 길이는 카드마다
+// 같고(그 프로젝트 총 작업일수 = 막대 전체) 출장만 남색으로 강조, 사내는 회색. 숫자는 바로 위 제목 줄에 있음.
+function WorkDayRatioBar({ workDays }: { workDays: WorkDaySplit }) {
+  if (workDays.total === 0) return null;
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+      <div
+        role="img"
+        aria-label={`작업일수 사내 ${workDays.inhouse}일, 출장 ${workDays.trip}일`}
+        className="flex h-2 w-48 gap-[2px] overflow-hidden rounded sm:w-64"
+      >
+        {workDays.inhouse > 0 && <span className="h-full bg-slate-300" style={{ flexGrow: workDays.inhouse }} />}
+        {workDays.trip > 0 && <span className="h-full bg-indigo-500" style={{ flexGrow: workDays.trip }} />}
+      </div>
+      <span className="flex items-center gap-2 text-[11px] text-slate-500 print:text-[9px]">
+        <span className="flex items-center gap-1">
+          <span className="h-2 w-2 rounded-sm bg-slate-300" />
+          사내
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-2 w-2 rounded-sm bg-indigo-500" />
+          출장
+        </span>
+      </span>
+    </div>
+  );
+}
+
 // 공사완료·완료 수금대기·수금완료 프로젝트를 A4 한 장짜리 재무제표 형태로 나열 —
 // 매입 품목 전체 내역이 아니라 카테고리별 합산 금액만 보여주는 요약본. 귀속(하위)
 // 프로젝트는 이미 어미 프로젝트 카드에 합산돼 있으므로 여기 목록에는 따로 나오지
@@ -153,6 +181,7 @@ export function ProjectSummaryReport({ rows }: { rows: ProjectSummaryRow[] }) {
                     </span>
                   )}
                 </h3>
+                <WorkDayRatioBar workDays={p.workDays} />
                 <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500 print:text-[10px]">
                   <span>현장: {p.siteName ?? "-"}</span>
                   <span>상태: {projectStatusLabel(p.status)}</span>
