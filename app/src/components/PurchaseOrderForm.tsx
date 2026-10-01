@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components/ProjectPicker";
 import {
@@ -19,6 +19,8 @@ import { MoneyInput } from "@/components/ui/MoneyInput";
 
 type ClientOption = { id: string; name: string };
 
+const LIST_HREF = "/projects?tab=purchase_orders";
+
 function emptyItem(): PurchaseOrderItemInput {
   return { item_name: "", spec: "", quantity: null, unit_price: null, amount: 0 };
 }
@@ -30,7 +32,10 @@ export function PurchaseOrderForm({
   initial,
   initialItems,
   purchaseOrderId,
+  heading,
 }: {
+  /** 화면 제목(h1) — 오른쪽에 "목록으로" 버튼이 같이 붙음. */
+  heading: ReactNode;
   clients: ClientOption[];
   sites: SiteOption[];
   projects: ProjectOption[];
@@ -49,7 +54,7 @@ export function PurchaseOrderForm({
   const router = useRouter();
   const confirm = useConfirm();
   const globalPending = useGlobalPending();
-  const [values, setValues] = useState({
+  const startValues = {
     title: initial?.title ?? "",
     client_id: initial?.client_id ?? "",
     client_name_raw: initial?.client_name_raw ?? "",
@@ -57,8 +62,18 @@ export function PurchaseOrderForm({
     status: initial?.status ?? "draft",
     expected_date: initial?.expected_date ?? "",
     memo: initial?.memo ?? "",
-  });
-  const [items, setItems] = useState<PurchaseOrderItemInput[]>(initialItems?.length ? initialItems : [emptyItem()]);
+  };
+  const startItems = initialItems?.length ? initialItems : [emptyItem()];
+  const [values, setValues] = useState(startValues);
+  const [items, setItems] = useState<PurchaseOrderItemInput[]>(startItems);
+  // "목록으로"를 누를 때 저장 안 한 내용이 있는지 보려고 마지막으로 저장한(또는 처음) 상태를 기억 — 견적서(QuoteForm)와 같음.
+  const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify([startValues, startItems]));
+  const [savedNotice, setSavedNotice] = useState(false);
+  useEffect(() => {
+    if (!savedNotice) return;
+    const t = setTimeout(() => setSavedNotice(false), 4000);
+    return () => clearTimeout(t);
+  }, [savedNotice]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -98,8 +113,34 @@ export function PurchaseOrderForm({
     setItems((prev) => [...prev, emptyItem()]);
   }
 
-  function removeItem(i: number) {
+  // 품목 삭제 — 내용이 있는 줄은 먼저 물어봄(견적서와 같게, 사용자 요청). 빈 줄은 바로.
+  async function removeItem(i: number) {
+    const it = items[i];
+    if (!it) return;
+    const hasContent = Boolean(it.item_name || it.spec || it.quantity || it.unit_price || it.amount);
+    if (
+      hasContent &&
+      !(await confirm(`${i + 1}번 품목${it.item_name ? `(${it.item_name})` : ""}을 삭제하시겠습니까?`, {
+        danger: true,
+        confirmLabel: "삭제",
+      }))
+    ) {
+      return;
+    }
     setItems((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  // 들어오기 전 화면(발주서 목록)으로 — 브라우저 뒤로 가기와 같게. 이 화면을 주소로 바로 연 경우만 목록을 새로 엶.
+  // 저장 안 한 내용이 있으면 먼저 물어봄.
+  async function goBack() {
+    if (
+      JSON.stringify([values, items]) !== savedSnapshot &&
+      !(await confirm("저장하지 않은 내용이 있습니다. 저장하지 않고 나가시겠습니까?"))
+    ) {
+      return;
+    }
+    if (window.history.length > 1) router.back();
+    else router.push(LIST_HREF, { scroll: false });
   }
 
   const total = items.reduce((s, it) => s + (it.amount || 0), 0);
@@ -124,7 +165,6 @@ export function PurchaseOrderForm({
       memo: values.memo || null,
       items,
     };
-    let targetId = purchaseOrderId;
     if (purchaseOrderId) {
       const result = await globalPending.run(() => updatePurchaseOrder(purchaseOrderId, input));
       setPending(false);
@@ -132,17 +172,21 @@ export function PurchaseOrderForm({
         setError(result.error);
         return;
       }
-    } else {
-      const result = await globalPending.run(() => createPurchaseOrder(input));
-      setPending(false);
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
-      targetId = result?.id;
+      // 같은 화면에 그대로 있으면서 아래 인쇄 미리보기만 새로 고침 — 같은 주소로 다시 이동하면 방문 기록이 쌓여서 뒤로 가기가
+      // 같은 화면만 보여줬음(견적서와 같은 문제).
+      setSavedSnapshot(JSON.stringify([values, items]));
+      setSavedNotice(true);
+      router.refresh();
+      return;
     }
-    router.push(targetId ? `/purchase-orders/${targetId}/edit` : "/projects?tab=purchase_orders", { scroll: false });
-    router.refresh();
+    const result = await globalPending.run(() => createPurchaseOrder(input));
+    setPending(false);
+    if (result?.error) {
+      setError(result.error);
+      return;
+    }
+    // 작성 화면을 수정 화면으로 "바꿔치기" — 뒤로 가기를 누르면 빈 작성 화면이 아니라 목록으로 돌아감.
+    router.replace(result?.id ? `/purchase-orders/${result.id}/edit` : LIST_HREF);
   }
 
   // w-full min-w-0: 품목 줄(grid)의 칸 폭에 맞춰 줄어들게 — 입력칸 기본 폭 때문에 줄이 밀려 머리글과 어긋나고
@@ -151,6 +195,12 @@ export function PurchaseOrderForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl font-bold text-slate-900">{heading}</h1>
+        <Button type="button" variant="secondary" size="sm" onClick={goBack}>
+          ← 목록으로
+        </Button>
+      </div>
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
       <div className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-2 lg:grid-cols-3">
@@ -277,13 +327,18 @@ export function PurchaseOrderForm({
         </p>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" disabled={pending}>
           {purchaseOrderId ? "수정 저장" : "발주서 등록"}
         </Button>
-        <Button type="button" variant="secondary" onClick={() => router.push("/projects?tab=purchase_orders", { scroll: false })}>
-          취소
+        <Button type="button" variant="secondary" onClick={goBack}>
+          {purchaseOrderId ? "목록으로" : "취소"}
         </Button>
+        {savedNotice && (
+          <span role="status" className="text-sm text-emerald-700">
+            저장했습니다.
+          </span>
+        )}
       </div>
     </form>
   );

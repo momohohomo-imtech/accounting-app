@@ -17,9 +17,6 @@ export default async function NewPurchaseOrderPage() {
   }));
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-900">발주서 작성</h1>
-      <PurchaseOrderForm clients={clients ?? []} sites={siteOptions} projects={projects ?? []} />
-    </div>
+    <PurchaseOrderForm heading="발주서 작성" clients={clients ?? []} sites={siteOptions} projects={projects ?? []} />
   );
 }
