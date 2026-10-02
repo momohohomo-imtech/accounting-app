@@ -26,6 +26,8 @@ import { cx } from "@/lib/cx";
 
 const MIN_PRINT_ROWS = 8;
 
+const PAGE_NUMBER_CSS = `@page { @bottom-center { content: counter(page) " / " counter(pages); font-size: 8pt; color: #64748b; } }`;
+
 // 공급자 입력칸 — 인쇄 문서·엑셀에 찍히는 공급자 정보는 모두 이 칸들의 지금 값.
 const COMPANY_FIELDS: { key: keyof QuoteCompanyInfo; label: string; placeholder?: string; wide?: boolean }[] = [
   { key: "companyName", label: "상호" },
@@ -212,8 +214,13 @@ export function QuotePrintView({
         <PrintButton />
       </div>
 
-      {/* print-page-quote: 인쇄할 때 아래 가운데 쪽 번호("1 / 2") — globals.css의 @page quote */}
-      <div className="print-page-quote hidden rounded-2xl border border-slate-200 bg-white p-6 print:flex print:min-h-[277mm] print:flex-col print:rounded-none print:border-0 print:p-0">
+      {/* 인쇄 쪽 번호(아래 가운데 "1 / 2") — 이 화면에 있을 때만 쓰는 @page 규칙. 이름 붙인 페이지(@page quote + page: quote)로
+          했더니 크롬이 페이지 이름이 바뀌는 곳마다 장을 끊어서 한 장짜리가 여러 장으로 나옴(사용자 제보 "한장짜리가 4장으로") —
+          이름 없는 @page라 장이 끊기지 않음. 크롬 131부터 되는 페이지 여백 상자라 옛 브라우저·사파리는 번호 없이 인쇄됨. */}
+      <style>{PAGE_NUMBER_CSS}</style>
+      {/* 인쇄 때 문서 높이 270mm 고정 — 회사명을 종이 아래쪽에 두되, 인쇄 칸(277mm)을 꽉 채우면 1px만 넘쳐도 회사명 한 줄이
+          둘째 장으로 넘어가서 조금 남겨 둠. */}
+      <div className="hidden rounded-2xl border border-slate-200 bg-white p-6 print:flex print:min-h-[270mm] print:flex-col print:rounded-none print:border-0 print:p-0">
         <div className="flex items-center gap-2.5">
           <Image src="/logo-lockup.png" alt="" width={30} height={24} className="h-6 w-auto" />
           <span className="ml-auto tabular-nums text-[11px] tracking-widest text-slate-400">QUOTATION</span>
@@ -297,48 +304,48 @@ export function QuotePrintView({
 
         <p className="mt-5 text-sm text-slate-700">아래와 같이 견적합니다.</p>
 
-        {/* 공급자 표·품목 표가 종이 폭(190mm)을 넘으면 크롬이 페이지 전체를 줄여 인쇄해서 오른쪽 여백만 커짐(사용자 제보
-            "발주서처럼 좌우 공백을 같게") — 띄어쓰기 없는 긴 글자는 품명·비고 칸 안에서 줄바꿈(표 전체에 걸면 규격·단위 칸까지
-            좁아져 "SS40/0"처럼 끊김), 숫자 칸은 한 줄로. */}
+        {/* 품목 줄 위아래 여백은 py-1(사용자 요청 "품목 간 간격 줄여 주세요"). 숫자 칸은 한 줄로("원"만 떨어지지 않게).
+            품명·비고 칸은 띄어쓰기에서만 줄바꿈 — 아무 데서나 끊기게([overflow-wrap:anywhere]) 했더니 칸 폭 나눔이 바뀌어 품명이
+            한 줄 더 꺾였고, 한 장에 꽉 차던 견적서가 둘째 장으로 넘어감(공급자 표 줄바꿈은 좌우 여백 때문에 그대로). */}
         <table className="mt-2 w-full text-sm">
           <thead>
             <tr className="border-b border-t-2 border-slate-900 text-left text-slate-500">
-              <th className="w-10 py-2 pr-2 text-center">No</th>
-              <th className="py-2 pr-2">품명</th>
-              <th className="py-2 pr-2">규격</th>
-              <th className="py-2 pr-2">단위</th>
-              <th className="py-2 pr-2 text-right">수량</th>
-              <th className="py-2 pr-2 text-right">단가</th>
-              <th className="py-2 pr-2 text-right">금액</th>
-              <th className="py-2">비고</th>
+              <th className="w-10 py-1.5 pr-2 text-center">No</th>
+              <th className="py-1.5 pr-2">품명</th>
+              <th className="py-1.5 pr-2">규격</th>
+              <th className="py-1.5 pr-2">단위</th>
+              <th className="py-1.5 pr-2 text-right">수량</th>
+              <th className="py-1.5 pr-2 text-right">단가</th>
+              <th className="py-1.5 pr-2 text-right">금액</th>
+              <th className="py-1.5">비고</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((it, i) => (
               <tr key={it.id} className="border-b border-slate-100">
-                <td className="py-2 pr-2 text-center text-slate-500">{i + 1}</td>
-                <td className="py-2 pr-2 [overflow-wrap:anywhere]">{it.item_name ?? "-"}</td>
-                <td className="py-2 pr-2 text-slate-500">{it.spec ?? "-"}</td>
-                <td className="py-2 pr-2 text-slate-500">{it.unit ?? "-"}</td>
-                <td className="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{it.quantity ?? "-"}</td>
-                <td className="whitespace-nowrap py-2 pr-2 text-right tabular-nums">
+                <td className="py-1 pr-2 text-center text-slate-500">{i + 1}</td>
+                <td className="py-1 pr-2">{it.item_name ?? "-"}</td>
+                <td className="py-1 pr-2 text-slate-500">{it.spec ?? "-"}</td>
+                <td className="py-1 pr-2 text-slate-500">{it.unit ?? "-"}</td>
+                <td className="whitespace-nowrap py-1 pr-2 text-right tabular-nums">{it.quantity ?? "-"}</td>
+                <td className="whitespace-nowrap py-1 pr-2 text-right tabular-nums">
                   {it.adjustedUnitPrice != null ? formatWon(it.adjustedUnitPrice) : "-"}
                 </td>
-                <td className="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{it.confirmed === 0 ? "-" : formatWon(it.confirmed)}</td>
-                <td className="py-2 text-slate-500 [overflow-wrap:anywhere]">{it.note ?? "-"}</td>
+                <td className="whitespace-nowrap py-1 pr-2 text-right tabular-nums">{it.confirmed === 0 ? "-" : formatWon(it.confirmed)}</td>
+                <td className="py-1 text-slate-500">{it.note ?? "-"}</td>
               </tr>
             ))}
             {/* 내역이 몇 줄이든 인쇄 서식은 항상 9줄 — 빈 줄은 No 표기 없이 공란으로 채움. */}
             {Array.from({ length: Math.max(0, MIN_PRINT_ROWS - rows.length) }).map((_, i) => (
               <tr key={`blank-${i}`} className="border-b border-slate-100">
-                <td className="py-2 pr-2">&nbsp;</td>
-                <td className="py-2 pr-2">&nbsp;</td>
-                <td className="py-2 pr-2">&nbsp;</td>
-                <td className="py-2 pr-2">&nbsp;</td>
-                <td className="py-2 pr-2">&nbsp;</td>
-                <td className="py-2 pr-2">&nbsp;</td>
-                <td className="py-2 pr-2">&nbsp;</td>
-                <td className="py-2">&nbsp;</td>
+                <td className="py-1 pr-2">&nbsp;</td>
+                <td className="py-1 pr-2">&nbsp;</td>
+                <td className="py-1 pr-2">&nbsp;</td>
+                <td className="py-1 pr-2">&nbsp;</td>
+                <td className="py-1 pr-2">&nbsp;</td>
+                <td className="py-1 pr-2">&nbsp;</td>
+                <td className="py-1 pr-2">&nbsp;</td>
+                <td className="py-1">&nbsp;</td>
               </tr>
             ))}
           </tbody>
@@ -346,10 +353,10 @@ export function QuotePrintView({
               소계처럼 보임). 머리글(thead)은 장마다 반복되는 게 맞아서 그대로. */}
           <tbody>
             <tr className="border-t-2 border-slate-300">
-              <td colSpan={6} className="py-2 pr-3 text-right font-semibold text-slate-900">
+              <td colSpan={6} className="py-1.5 pr-3 text-right font-semibold text-slate-900">
                 합계
               </td>
-              <td className="whitespace-nowrap py-2 pr-2 text-right tabular-nums font-bold text-slate-900">{formatWon(total)}</td>
+              <td className="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums font-bold text-slate-900">{formatWon(total)}</td>
               <td />
             </tr>
           </tbody>

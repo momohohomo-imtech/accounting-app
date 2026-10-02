@@ -136,21 +136,9 @@ textarea {
   margin: 10mm;
 }
 
-/* 견적서 인쇄 쪽 번호(사용자 요청) — 아래 여백 가운데 "1 / 2". 크롬의 페이지 여백 상자(@page margin box, 크롬 131부터)라
-   그보다 옛 브라우저·사파리는 번호 없이 그대로 인쇄됨. 견적서 문서(.print-page-quote)만 이름 붙인 페이지로 — 크기·여백은
-   위 @page 그대로(방향을 바꾸지 않아서 아래 동희 반입반출증 때 같은 빈 페이지 문제 없음). 발주서는 머리에 "1/2"가 이미 있음. */
-@page quote {
-  @bottom-center {
-    content: counter(page) " / " counter(pages);
-    font-size: 8pt;
-    color: #64748b;
-  }
-}
-@media print {
-  .print-page-quote {
-    page: quote;
-  }
-}
+/* 견적서 인쇄 쪽 번호("1 / 2")는 QuotePrintView 안의 <style>(그 화면에 있을 때만 쓰는 이름 없는 @page). 이름 붙인
+   페이지(@page quote + page: quote)는 크기·여백이 같아도 크롬이 페이지 이름이 바뀌는 곳마다 장을 끊어서 한 장짜리 견적서가
+   여러 장으로 나왔음 — 아래 동희 반입반출증과 같은 이유로 이름 붙인 페이지는 쓰지 말 것. */
 
 /* 동희 반입반출증(A5 양식 2장을 A4 한 장에 좌우로 배치)은 예전엔 이름 붙은
    `@page donghee-landscape { size: A4 landscape }`로 이 부분만 자동으로 용지를
