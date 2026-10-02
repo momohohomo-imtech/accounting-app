@@ -36,6 +36,7 @@ export async function QuotesSection({ suppliersOpen = false }: { suppliersOpen?:
     title: string;
     status: string;
     created_at: string;
+    memo: string | null;
     client_id: string | null;
     client_name_raw: string | null;
     clients: { name: string } | { name: string }[] | null;
@@ -54,7 +55,7 @@ export async function QuotesSection({ suppliersOpen = false }: { suppliersOpen?:
     fetchAllRows<QuoteRow>((from, to) =>
       supabase
         .from("quotes")
-        .select("id, quote_number, title, status, created_at, client_id, client_name_raw, clients(name), projects(name, project_code)")
+        .select("id, quote_number, title, status, created_at, memo, client_id, client_name_raw, clients(name), projects(name, project_code)")
         .order("created_at", { ascending: false })
         .order("id", { ascending: true })
         .range(from, to)
@@ -87,6 +88,7 @@ export async function QuotesSection({ suppliersOpen = false }: { suppliersOpen?:
       status: q.status,
       total: totalByQuote.get(q.id) ?? 0,
       created_at: q.created_at,
+      memo: q.memo,
     };
   });
 

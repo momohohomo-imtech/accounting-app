@@ -212,7 +212,8 @@ export function QuotePrintView({
         <PrintButton />
       </div>
 
-      <div className="hidden rounded-2xl border border-slate-200 bg-white p-6 print:flex print:min-h-[277mm] print:flex-col print:rounded-none print:border-0 print:p-0">
+      {/* print-page-quote: 인쇄할 때 아래 가운데 쪽 번호("1 / 2") — globals.css의 @page quote */}
+      <div className="print-page-quote hidden rounded-2xl border border-slate-200 bg-white p-6 print:flex print:min-h-[277mm] print:flex-col print:rounded-none print:border-0 print:p-0">
         <div className="flex items-center gap-2.5">
           <Image src="/logo-lockup.png" alt="" width={30} height={24} className="h-6 w-auto" />
           <span className="ml-auto tabular-nums text-[11px] tracking-widest text-slate-400">QUOTATION</span>
@@ -258,27 +259,27 @@ export function QuotePrintView({
               <tbody>
                 <tr className="border-b border-slate-200">
                   <td className="w-20 whitespace-nowrap px-3 py-1.5 text-slate-500">등록번호</td>
-                  <td className="whitespace-nowrap px-3 py-1.5 text-slate-900">{bizRegNo || "-"}</td>
+                  <td className="px-3 py-1.5 text-slate-900 [overflow-wrap:anywhere]">{bizRegNo || "-"}</td>
                 </tr>
                 <tr className="border-b border-slate-200">
                   <td className="w-20 whitespace-nowrap px-3 py-1.5 text-slate-500">상호</td>
-                  <td className="whitespace-nowrap px-3 py-1.5 text-slate-900">
+                  <td className="px-3 py-1.5 text-slate-900 [overflow-wrap:anywhere]">
                     {companyName || "-"} {representativeName && <span>(대표 {representativeName})</span>}
                   </td>
                 </tr>
                 <tr className="border-b border-slate-200">
                   <td className="w-20 whitespace-nowrap px-3 py-1.5 text-slate-500">주소</td>
-                  <td className="whitespace-nowrap px-3 py-1.5 text-slate-900">{address || "-"}</td>
+                  <td className="px-3 py-1.5 text-slate-900 [overflow-wrap:anywhere]">{address || "-"}</td>
                 </tr>
                 <tr className="border-b border-slate-200">
                   <td className="w-20 whitespace-nowrap px-3 py-1.5 text-slate-500">업태/종목</td>
-                  <td className="whitespace-nowrap px-3 py-1.5 text-slate-900">
+                  <td className="px-3 py-1.5 text-slate-900 [overflow-wrap:anywhere]">
                     {bizType || "-"} / {bizItem || "-"}
                   </td>
                 </tr>
                 <tr>
                   <td className="w-20 whitespace-nowrap px-3 py-1.5 text-slate-500">전화/팩스</td>
-                  <td className="whitespace-nowrap px-3 py-1.5 text-slate-900">
+                  <td className="px-3 py-1.5 text-slate-900 [overflow-wrap:anywhere]">
                     {phone || "-"} / {fax || "-"}
                   </td>
                 </tr>
@@ -296,6 +297,9 @@ export function QuotePrintView({
 
         <p className="mt-5 text-sm text-slate-700">아래와 같이 견적합니다.</p>
 
+        {/* 공급자 표·품목 표가 종이 폭(190mm)을 넘으면 크롬이 페이지 전체를 줄여 인쇄해서 오른쪽 여백만 커짐(사용자 제보
+            "발주서처럼 좌우 공백을 같게") — 띄어쓰기 없는 긴 글자는 품명·비고 칸 안에서 줄바꿈(표 전체에 걸면 규격·단위 칸까지
+            좁아져 "SS40/0"처럼 끊김), 숫자 칸은 한 줄로. */}
         <table className="mt-2 w-full text-sm">
           <thead>
             <tr className="border-b border-t-2 border-slate-900 text-left text-slate-500">
@@ -313,15 +317,15 @@ export function QuotePrintView({
             {rows.map((it, i) => (
               <tr key={it.id} className="border-b border-slate-100">
                 <td className="py-2 pr-2 text-center text-slate-500">{i + 1}</td>
-                <td className="py-2 pr-2">{it.item_name ?? "-"}</td>
+                <td className="py-2 pr-2 [overflow-wrap:anywhere]">{it.item_name ?? "-"}</td>
                 <td className="py-2 pr-2 text-slate-500">{it.spec ?? "-"}</td>
                 <td className="py-2 pr-2 text-slate-500">{it.unit ?? "-"}</td>
-                <td className="py-2 pr-2 text-right tabular-nums">{it.quantity ?? "-"}</td>
-                <td className="py-2 pr-2 text-right tabular-nums">
+                <td className="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{it.quantity ?? "-"}</td>
+                <td className="whitespace-nowrap py-2 pr-2 text-right tabular-nums">
                   {it.adjustedUnitPrice != null ? formatWon(it.adjustedUnitPrice) : "-"}
                 </td>
-                <td className="py-2 pr-2 text-right tabular-nums">{it.confirmed === 0 ? "-" : formatWon(it.confirmed)}</td>
-                <td className="py-2 text-slate-500">{it.note ?? "-"}</td>
+                <td className="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{it.confirmed === 0 ? "-" : formatWon(it.confirmed)}</td>
+                <td className="py-2 text-slate-500 [overflow-wrap:anywhere]">{it.note ?? "-"}</td>
               </tr>
             ))}
             {/* 내역이 몇 줄이든 인쇄 서식은 항상 9줄 — 빈 줄은 No 표기 없이 공란으로 채움. */}
@@ -338,15 +342,17 @@ export function QuotePrintView({
               </tr>
             ))}
           </tbody>
-          <tfoot>
+          {/* 합계는 표 끝에 한 번만 — tfoot이면 크롬이 장마다 표 아래에 반복해서 첫 장 끝에도 전체 합계가 찍혔음(그 장의
+              소계처럼 보임). 머리글(thead)은 장마다 반복되는 게 맞아서 그대로. */}
+          <tbody>
             <tr className="border-t-2 border-slate-300">
-              <td colSpan={6} className="py-2 text-right font-semibold text-slate-900">
+              <td colSpan={6} className="py-2 pr-3 text-right font-semibold text-slate-900">
                 합계
               </td>
-              <td className="py-2 text-right tabular-nums font-bold text-slate-900">{formatWon(total)}</td>
+              <td className="whitespace-nowrap py-2 pr-2 text-right tabular-nums font-bold text-slate-900">{formatWon(total)}</td>
               <td />
             </tr>
-          </tfoot>
+          </tbody>
         </table>
 
         <div className="mt-6 min-h-[70px] rounded-lg border border-slate-200 p-3 text-sm">
