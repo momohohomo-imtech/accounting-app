@@ -19,7 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <ConfirmProvider>
     <GlobalPendingProvider>
-    <div className="app-backdrop flex min-h-screen bg-slate-50">
+    <div className="app-backdrop flex min-h-screen bg-slate-50 print:bg-white">
       <IdleLogout />
       <aside className="brand-sidebar hidden w-60 shrink-0 bg-brand-navy md:sticky md:top-0 md:flex md:h-screen md:flex-col print:hidden">
         <div className="flex items-center gap-3 px-6 pb-2 pt-7">
