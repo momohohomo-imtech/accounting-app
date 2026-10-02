@@ -136,6 +136,22 @@ textarea {
   margin: 10mm;
 }
 
+/* 견적서 인쇄 쪽 번호(사용자 요청) — 아래 여백 가운데 "1 / 2". 크롬의 페이지 여백 상자(@page margin box, 크롬 131부터)라
+   그보다 옛 브라우저·사파리는 번호 없이 그대로 인쇄됨. 견적서 문서(.print-page-quote)만 이름 붙인 페이지로 — 크기·여백은
+   위 @page 그대로(방향을 바꾸지 않아서 아래 동희 반입반출증 때 같은 빈 페이지 문제 없음). 발주서는 머리에 "1/2"가 이미 있음. */
+@page quote {
+  @bottom-center {
+    content: counter(page) " / " counter(pages);
+    font-size: 8pt;
+    color: #64748b;
+  }
+}
+@media print {
+  .print-page-quote {
+    page: quote;
+  }
+}
+
 /* 동희 반입반출증(A5 양식 2장을 A4 한 장에 좌우로 배치)은 예전엔 이름 붙은
    `@page donghee-landscape { size: A4 landscape }`로 이 부분만 자동으로 용지를
    가로로 돌렸었는데, 크롬이 기본(세로) 페이지에서 이 가로 페이지로 들어가고

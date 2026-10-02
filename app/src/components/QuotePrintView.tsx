@@ -212,7 +212,8 @@ export function QuotePrintView({
         <PrintButton />
       </div>
 
-      <div className="hidden rounded-2xl border border-slate-200 bg-white p-6 print:flex print:min-h-[277mm] print:flex-col print:rounded-none print:border-0 print:p-0">
+      {/* print-page-quote: 인쇄할 때 아래 가운데 쪽 번호("1 / 2") — globals.css의 @page quote */}
+      <div className="print-page-quote hidden rounded-2xl border border-slate-200 bg-white p-6 print:flex print:min-h-[277mm] print:flex-col print:rounded-none print:border-0 print:p-0">
         <div className="flex items-center gap-2.5">
           <Image src="/logo-lockup.png" alt="" width={30} height={24} className="h-6 w-auto" />
           <span className="ml-auto tabular-nums text-[11px] tracking-widest text-slate-400">QUOTATION</span>
@@ -341,7 +342,9 @@ export function QuotePrintView({
               </tr>
             ))}
           </tbody>
-          <tfoot>
+          {/* 합계는 표 끝에 한 번만 — tfoot이면 크롬이 장마다 표 아래에 반복해서 첫 장 끝에도 전체 합계가 찍혔음(그 장의
+              소계처럼 보임). 머리글(thead)은 장마다 반복되는 게 맞아서 그대로. */}
+          <tbody>
             <tr className="border-t-2 border-slate-300">
               <td colSpan={6} className="py-2 pr-3 text-right font-semibold text-slate-900">
                 합계
@@ -349,7 +352,7 @@ export function QuotePrintView({
               <td className="whitespace-nowrap py-2 pr-2 text-right tabular-nums font-bold text-slate-900">{formatWon(total)}</td>
               <td />
             </tr>
-          </tfoot>
+          </tbody>
         </table>
 
         <div className="mt-6 min-h-[70px] rounded-lg border border-slate-200 p-3 text-sm">

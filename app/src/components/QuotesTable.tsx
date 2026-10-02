@@ -17,9 +17,10 @@ export type QuoteRow = {
   status: string;
   total: number;
   created_at: string;
+  memo: string | null;
 };
 
-type SortKey = "quote_number" | "title" | "clientName" | "status" | "total" | "created_at";
+type SortKey = "quote_number" | "title" | "clientName" | "status" | "total" | "created_at" | "memo";
 
 function sortValue(r: QuoteRow, key: SortKey): string | number {
   switch (key) {
@@ -35,6 +36,8 @@ function sortValue(r: QuoteRow, key: SortKey): string | number {
       return r.total;
     case "created_at":
       return r.created_at;
+    case "memo":
+      return r.memo ?? "";
   }
 }
 
@@ -76,7 +79,7 @@ export function QuotesTable({ rows }: { rows: QuoteRow[] }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[750px] text-sm">
+      <table className="w-full min-w-[900px] text-sm">
         <thead>
           <tr className="border-b border-slate-200 text-left text-slate-500">
             <th className="pb-2 pr-4">{headerButton("quote_number", "견적번호")}</th>
@@ -86,13 +89,15 @@ export function QuotesTable({ rows }: { rows: QuoteRow[] }) {
             <th className="pb-2 pr-4">{headerButton("status", "상태")}</th>
             <th className="pb-2 pr-4 text-right">{headerButton("total", "합계")}</th>
             <th className="pb-2 pr-4">{headerButton("created_at", "작성일")}</th>
+            <th className="pb-2 pr-4">{headerButton("memo", "메모")}</th>
             <th className="pb-2 text-right">관리</th>
           </tr>
         </thead>
         <tbody>
           {sorted.map((q) => (
             <tr key={q.id} className="border-b border-slate-100 last:border-0">
-              <td className="py-2 pr-4 tabular-nums text-slate-500">
+              {/* 견적번호·상태·합계·작성일은 짧은 값이라 한 줄로 — 메모 칸이 생기면서 "Q2026-/009"처럼 쪼개지던 것 */}
+              <td className="whitespace-nowrap py-2 pr-4 tabular-nums text-slate-500">
                 <Link href={`/quotes/${q.id}/edit`} className="underline decoration-slate-300 underline-offset-2 hover:text-slate-900">
                   {q.quote_number ?? "-"}
                 </Link>
@@ -100,9 +105,17 @@ export function QuotesTable({ rows }: { rows: QuoteRow[] }) {
               <td className="py-2 pr-4 text-slate-700">{q.title}</td>
               <td className="py-2 pr-4 text-slate-700">{q.clientName ?? "-"}</td>
               <td className="py-2 pr-4 text-slate-500">{q.projectLabel ?? "-"}</td>
-              <td className="py-2 pr-4 text-slate-700">{quoteStatusLabel(q.status)}</td>
-              <td className="py-2 pr-4 text-right tabular-nums text-slate-900">{formatWon(q.total)}</td>
-              <td className="py-2 pr-4 text-slate-500">{formatDate(q.created_at)}</td>
+              <td className="whitespace-nowrap py-2 pr-4 text-slate-700">{quoteStatusLabel(q.status)}</td>
+              <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums text-slate-900">{formatWon(q.total)}</td>
+              <td className="whitespace-nowrap py-2 pr-4 tabular-nums text-slate-500">{formatDate(q.created_at)}</td>
+              {/* 메모(사용자 요청) — PC는 두 줄까지(줄바꿈 그대로), 휴대폰은 한 줄 말줄임. 전체는 마우스를 올리면 보임. */}
+              <td className="py-2 pr-4 text-slate-600" title={q.memo ?? undefined}>
+                {q.memo && (
+                  <div className="line-clamp-2 max-w-[14rem] whitespace-pre-line [overflow-wrap:anywhere] max-md:block max-md:max-w-[10rem] max-md:truncate">
+                    {q.memo}
+                  </div>
+                )}
+              </td>
               <td className="py-2 text-right">
                 <div className="flex justify-end gap-1.5">
                   <LinkButton href={`/quotes/${q.id}/edit`} variant="secondary" size="xs">
@@ -154,7 +167,7 @@ export function QuotesTable({ rows }: { rows: QuoteRow[] }) {
           ))}
           {sorted.length === 0 && (
             <tr>
-              <td colSpan={8} className="py-8 text-center text-slate-400">
+              <td colSpan={9} className="py-8 text-center text-slate-400">
                 작성된 견적서가 없습니다.
               </td>
             </tr>

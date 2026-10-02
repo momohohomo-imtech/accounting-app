@@ -250,7 +250,8 @@ export function PurchaseOrderPrintView({
               <tbody>
                 {pageItems.map((it, i) => (
                   <tr key={it.id} className="border-b border-slate-100">
-                    <td className="py-[6px] pr-2 text-center text-slate-500">{i + 1}</td>
+                    {/* 번호는 장을 넘어 이어서(둘째 장은 14번부터) — 예전엔 장마다 1번부터 다시 시작했음 */}
+                    <td className="py-[6px] pr-2 text-center text-slate-500">{pageIndex * ROWS_PER_PAGE + i + 1}</td>
                     <td className="truncate py-[6px] pr-2">{it.item_name ?? "-"}</td>
                     <td className="truncate py-[6px] pr-2 text-slate-500">{it.spec ?? "-"}</td>
                     <td className="py-[6px] pr-2 text-right tabular-nums">{it.quantity ?? "-"}</td>
@@ -260,7 +261,7 @@ export function PurchaseOrderPrintView({
                 ))}
                 {Array.from({ length: blankRows }).map((_, i) => (
                   <tr key={`blank-${i}`} className="border-b border-slate-100">
-                    <td className="py-[6px] pr-2 text-center text-slate-400">{pageItems.length + i + 1}</td>
+                    <td className="py-[6px] pr-2 text-center text-slate-400">{pageIndex * ROWS_PER_PAGE + pageItems.length + i + 1}</td>
                     <td className="py-[6px] pr-2">&nbsp;</td>
                     <td className="py-[6px] pr-2">&nbsp;</td>
                     <td className="py-[6px] pr-2">&nbsp;</td>
