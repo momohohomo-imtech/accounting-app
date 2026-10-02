@@ -125,7 +125,9 @@ export function AccessApplicationPopup({
   return (
     <ModalPortal>
       <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-brand-ink/50 p-4 py-10 print:static print:block print:h-auto print:overflow-visible print:bg-white print:p-0">
-        <div className="w-full max-w-4xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
+        {/* print:p-0 — usePrintFitToPage는 양식(printRef)만 270mm에 맞추므로, 인쇄에 카드 안쪽 여백(위아래 24px)이 남으면
+            그만큼 인쇄 칸(277mm)을 넘어 아래 KIA 로고 줄이 둘째 장으로 넘어갔음(사용자 제보 "출입신청서 한 장이 넘어가요"). */}
+        <div className="w-full max-w-4xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:p-0 print:shadow-none">
           <div className="mb-4 flex items-start justify-between gap-3 print:hidden">
             <h2 className="text-lg font-semibold text-slate-900">공사 출입자 출입 신청서</h2>
             <div className="flex shrink-0 items-center gap-2">
