@@ -35,6 +35,11 @@ export function taxEstimate(profit: number) {
   return { taxBase, incomeTax, localTax, totalTax: incomeTax + localTax, ratePct: Math.round(bracket.rate * 100) };
 }
 
+// 화면 표시용 세율 구간 — 이익이 기본공제 이하라 과세표준이 0이면 "6% 구간" 대신 과세표준 없음.
+export function taxRateLabel(t: { taxBase: number; ratePct: number }) {
+  return t.taxBase > 0 ? `적용 세율 ${t.ratePct}% 구간` : "과세표준 없음";
+}
+
 // 종합소득세 분납: 납부할 소득세가 1천만원을 넘으면 일부를 2개월 안(7월 말)에 나눠 낼 수 있음 —
 // 2천만원 이하면 1천만원 넘는 부분, 2천만원 넘으면 절반까지.
 export function incomeTaxInstallment(incomeTax: number) {

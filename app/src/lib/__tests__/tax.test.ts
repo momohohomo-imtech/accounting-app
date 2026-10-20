@@ -62,3 +62,11 @@ test("부가세 예정고지는 직전 반기 납부세액의 절반, 50만원 �
   assert.equal(vatPrepaymentNotice(999_999), 0);
   assert.equal(vatPrepaymentNotice(-2_000_000), 0);
 });
+
+test("세율 구간 표시: 과세표준이 0이면 6% 구간 대신 과세표준 없음", async () => {
+  const { taxEstimate, taxRateLabel } = await import("@/lib/tax");
+  assert.equal(taxRateLabel(taxEstimate(0)), "과세표준 없음");
+  assert.equal(taxRateLabel(taxEstimate(1_500_000)), "과세표준 없음");
+  assert.equal(taxRateLabel(taxEstimate(-3_000_000)), "과세표준 없음");
+  assert.equal(taxRateLabel(taxEstimate(30_000_000)), "적용 세율 15% 구간");
+});

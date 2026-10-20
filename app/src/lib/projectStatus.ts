@@ -12,6 +12,8 @@ export const PROJECT_STATUS_OPTIONS = [
 export const PROJECT_STATUS_COLLECTED = "collected";
 // 완료 수금대기 상태는 목록에서 옅은 파랑 배경으로 별도 강조하는 데 씀.
 export const PROJECT_STATUS_AWAITING_PAYMENT = "done_awaiting_payment";
+// 검토중(아직 수주 전) — 발주액은 예상 매출·예상 이익 같은 합계 계산에 넣지 않음(사용자 요청, lib/projectProfit.ts).
+export const PROJECT_STATUS_REVIEW = "review";
 
 export function projectStatusLabel(status: string | null | undefined) {
   return PROJECT_STATUS_OPTIONS.find((o) => o.value === status)?.label ?? status ?? "-";

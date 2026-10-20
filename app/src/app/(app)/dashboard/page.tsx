@@ -5,7 +5,7 @@ import { formatWon, formatDate, moneyClass } from "@/lib/format";
 import { remainingBalance, isLedgerVisible } from "@/lib/credit";
 import type { ExpenseCategory, Transaction } from "@/lib/types";
 import { vatOf, salesSupplyOf, purchaseCostOf } from "@/lib/vatBasis";
-import { taxEstimate, incomeTaxInstallment, interimPrepayment, vatPrepaymentNotice } from "@/lib/tax";
+import { taxEstimate, taxRateLabel, incomeTaxInstallment, interimPrepayment, vatPrepaymentNotice } from "@/lib/tax";
 import {
   estimateOwnerInsurance,
   ownerHealthSettlement,
@@ -164,7 +164,7 @@ export default async function DashboardPage({
     ),
     supabase.from("transactions").select("trans_date").order("trans_date", { ascending: true }).limit(1),
     // 선택 연도 프로젝트 — 예상 미수액·총 예상 매출·이익 예상(loadProfitOutlook)이 같이 쓴다.
-    supabase.from("projects").select("id, name, status, quote_amount").eq("year", selectedYear),
+    supabase.from("projects").select("id, name, status, quote_amount, parent_project_id").eq("year", selectedYear),
     // select("*") — 불공제·비과세 칸(082·083 마이그레이션) 실행 전에도 조회가 깨지지 않게.
     supabase.from("expense_categories").select("*"),
     // 대표자 건강보험·국민연금(사업 첫해) = 최고 급여 직원 기준 — 직원 공제액(본인 절반)의 2배. 조회 전용 계정은
@@ -181,8 +181,8 @@ export default async function DashboardPage({
   const receivableProjects = yearProjects.filter((p) => receivableStatuses.has(p.status ?? ""));
   const receivableProjectIds = receivableProjects.map((p) => p.id);
   const [o, receivableAgencyRows, receivableSalesRows] = await Promise.all([
+    // 이익 예상은 세금계산서 기준 — 외상 미정산도 포함한 그 해 거래 전부를 넘긴다.
     loadProfitOutlook(selectedYear, {
-      payments,
       yearProjects,
       yearTx: yearTxRaw.map((t) => ({ ...t, expense_categories: categoryRel(t.category_id) })),
     }),
@@ -268,9 +268,9 @@ export default async function DashboardPage({
 
   // 부가세는 세금계산서(거래일) 기준이라 외상 미정산 건도 포함한다. 금액은 총액(부가세 포함)에서
   // 계산(lib/vatBasis.ts)하고, 매입세액 불공제 카테고리(승용차 등)는 공제 대상에서 빼서 따로 표시.
-  // 참고: 장부 매출−매입(부가세 제외, 불공제 부가세는 비용) 기준 연간 예상 세금 — 위에서 받은
-  // 연간 거래(외상 미정산 제외)로 바로 계산해서 같은 거래를 다시 조회하지 않는다.
-  const ledgerProfit = yearTx.reduce((s, t) => {
+  // 참고: 매출−매입(부가세 제외, 불공제 부가세는 비용)만으로 본 연간 예상 세금 — 이익 예상과 같은 세금계산서 기준
+  // (외상 미정산 포함), 위에서 받은 연간 거래로 바로 계산해서 같은 거래를 다시 조회하지 않는다.
+  const ledgerProfit = yearTxRaw.reduce((s, t) => {
     const row = { ...t, expense_categories: categoryRel(t.category_id) };
     return s + salesSupplyOf(row) - purchaseCostOf(row);
   }, 0);
@@ -312,6 +312,9 @@ export default async function DashboardPage({
 
   const insuranceBaseProfit = o.combinedProfit ?? o.profitEstimate;
   const ownerInsurance = estimateOwnerInsurance(insuranceBaseProfit, businessMonths);
+  // 이익이 0 이하이면 이익 기준 보험료가 0원으로 계산되지만 실제로는 공단 최저 보험료가 붙음 — 0원 대신 안내만 표시.
+  const hasOwnerIncome = insuranceBaseProfit > 0;
+  const NO_INCOME_NOTE = "이익 없음 — 공단 최저 보험료 적용";
   const ofProfit = (yearly: number) =>
     insuranceBaseProfit > 0 ? ` · 이익 대비 ${((yearly / insuranceBaseProfit) * 100).toFixed(1)}%` : "";
 
@@ -334,7 +337,7 @@ export default async function DashboardPage({
     mayTax: nextYearTax.totalTax,
     installment: incomeTaxInstallment(nextYearTax.incomeTax),
     healthSettlement:
-      ownerHealthPaidMonthly != null
+      ownerHealthPaidMonthly != null && hasOwnerIncome
         ? ownerHealthSettlement(insuranceBaseProfit, businessMonths, ownerHealthPaidMonthly)
         : null,
     interim: interimPrepayment(nextYearTax.incomeTax),
@@ -413,7 +416,7 @@ export default async function DashboardPage({
             label="예상 종합소득세"
             emphasis
             className="lg:col-span-2 xl:col-span-1"
-            sub={headlineTax ? `지방소득세 포함 · 적용 세율 ${headlineTax.ratePct}% 구간` : undefined}
+            sub={headlineTax ? `지방소득세 포함 · ${taxRateLabel(headlineTax)}` : undefined}
           >
             {headlineTax ? <Money value={headlineTax.totalTax} /> : "-"}
           </Stat>
@@ -447,9 +450,11 @@ export default async function DashboardPage({
               ) : (
                 `상반기 확정 이익 ${formatWon(o.half1Profit)}`
               )}
-              {` · ${selectedYear + 1}년 대표자 사회보험료 월 ${formatWon(
-                ownerInsurance.pensionMonthly + ownerInsurance.healthMonthly
-              )}`}
+              {hasOwnerIncome
+                ? ` · ${selectedYear + 1}년 대표자 사회보험료 월 ${formatWon(
+                    ownerInsurance.pensionMonthly + ownerInsurance.healthMonthly
+                  )}`
+                : ` · ${selectedYear + 1}년 대표자 사회보험료 공단 최저액 적용(이익 없음)`}
             </>
           }
         >
@@ -475,7 +480,7 @@ export default async function DashboardPage({
             </Stat>
             <Stat
               label="연간 예상 종합소득세"
-              sub={o.combinedTax ? `지방소득세 포함 · 적용 세율 ${o.combinedTax.ratePct}% 구간` : "상반기 확정치 입력 필요"}
+              sub={o.combinedTax ? `지방소득세 포함 · ${taxRateLabel(o.combinedTax)}` : "상반기 확정치 입력 필요"}
             >
               {o.combinedTax ? <Money value={o.combinedTax.totalTax} /> : "-"}
             </Stat>
@@ -484,39 +489,51 @@ export default async function DashboardPage({
                 <Stat label="프로젝트 기준 예상 이익 (진행 중 포함)">
                   <Money value={o.profitEstimate} />
                 </Stat>
-                <Stat label="프로젝트 기준 예상 종합소득세" sub={`지방소득세 포함 · 적용 세율 ${o.profitTax.ratePct}% 구간`}>
+                <Stat label="프로젝트 기준 예상 종합소득세" sub={`지방소득세 포함 · ${taxRateLabel(o.profitTax)}`}>
                   <Money value={o.profitTax.totalTax} />
                 </Stat>
               </>
             )}
             <Stat
               label={`${selectedYear + 1}년 대표자 국민연금 (월)`}
-              sub={`연 ${formatWon(ownerInsurance.pensionYearly)}${ofProfit(ownerInsurance.pensionYearly)}`}
+              sub={
+                hasOwnerIncome
+                  ? `연 ${formatWon(ownerInsurance.pensionYearly)}${ofProfit(ownerInsurance.pensionYearly)}`
+                  : NO_INCOME_NOTE
+              }
             >
-              <Money value={ownerInsurance.pensionMonthly} />
+              {hasOwnerIncome ? <Money value={ownerInsurance.pensionMonthly} /> : "-"}
             </Stat>
             <Stat
               label={`${selectedYear + 1}년 대표자 건강보험료 (월)`}
-              sub={`연 ${formatWon(ownerInsurance.healthYearly)}${ofProfit(ownerInsurance.healthYearly)} · 장기요양보험료 포함`}
+              sub={
+                hasOwnerIncome
+                  ? `연 ${formatWon(ownerInsurance.healthYearly)}${ofProfit(ownerInsurance.healthYearly)} · 장기요양보험료 포함`
+                  : NO_INCOME_NOTE
+              }
             >
-              <Money value={ownerInsurance.healthMonthly} />
+              {hasOwnerIncome ? <Money value={ownerInsurance.healthMonthly} /> : "-"}
             </Stat>
           </div>
           <Footnote>
             <DetailToggle label="산정 기준">
               <p>
-                하반기 예상 이익 = 장부상 손익 + 세금계산서 미발행분 예상 이익 − 인건비 · 연간 예상 이익 = 상반기 확정 이익 +
+                하반기 예상 이익 = 하반기 매출−매입 + 세금계산서 미발행분 예상 이익 − 인건비 · 연간 예상 이익 = 상반기 확정 이익 +
                 하반기 예상 이익
                 {o.hasProjectsWithProfit &&
-                  " · 프로젝트 기준 예상 이익 = 프로젝트 총이익(발주액 미등록 프로젝트 비용 포함) − 일반경비 − 직원급여·상여·4대보험 (추가 지출 발생 시 즉시 반영)"}
+                  " · 프로젝트 기준 예상 이익 = 프로젝트 총이익(발주액 기준, 발주액이 없으면 실제 매출 · 매입은 전부 반영) − 일반경비 − 직원급여·상여·4대보험 (추가 지출 발생 시 즉시 반영)"}
+              </p>
+              <p>
+                매출·매입은 세금계산서(거래일) 기준으로 외상 미정산분 포함 · 검토중 프로젝트의 발주액은 미반영 · 귀속 연도가 해당
+                연도인 프로젝트 기준 — 다음 해에 세금계산서를 발행할 프로젝트는 귀속 연도를 다음 해로 변경
               </p>
               <p>
                 예상 종합소득세 = 이익에서 본인 기본공제 150만원을 차감한 과세표준에 종합소득세율 적용 + 지방소득세 10% · 그 밖의
                 공제와 매입장 외 경비는 세무사 신고 시 반영되므로 실제 세액과 차이 발생 가능
               </p>
               <p>
-                참고: 장부상 매출−매입(공급가액 기준)만 반영 시 이익 {formatWon(ledgerProfit)}, 기본공제 차감 후 과세표준{" "}
-                {formatWon(ledgerTax.taxBase)}, 적용 세율 {ledgerTax.ratePct}%, 예상 세액 약 {formatWon(ledgerTax.totalTax)}
+                참고: 매출−매입(공급가액, 세금계산서 기준)만 반영 시 이익 {formatWon(ledgerProfit)}, 기본공제 차감 후 과세표준{" "}
+                {formatWon(ledgerTax.taxBase)}, {taxRateLabel(ledgerTax)}, 예상 세액 약 {formatWon(ledgerTax.totalTax)}
               </p>
               <p>
                 {selectedYear + 1}년 국민연금·건강보험료 = {o.combinedProfit != null ? "연간" : "프로젝트 기준"} 예상 이익으로 추정한
@@ -565,9 +582,11 @@ export default async function DashboardPage({
               <Stat
                 label="7월부터 · 대표자 건강보험료 정산"
                 sub={
-                  ownerHealthPaidMonthly != null
-                    ? `기납부액(월 ${formatWon(ownerHealthPaidMonthly)}) 차감 · 분할납부 가능`
-                    : "급여 정보 조회 권한이 있는 계정에서 산출"
+                  !hasOwnerIncome
+                    ? NO_INCOME_NOTE
+                    : ownerHealthPaidMonthly != null
+                      ? `기납부액(월 ${formatWon(ownerHealthPaidMonthly)}) 차감 · 분할납부 가능`
+                      : "급여 정보 조회 권한이 있는 계정에서 산출"
                 }
               >
                 {cashOut.healthSettlement != null ? <Money value={cashOut.healthSettlement} /> : "-"}
@@ -581,14 +600,16 @@ export default async function DashboardPage({
               <Stat
                 label="7월부터 · 대표자 국민연금 조정 (월)"
                 sub={
-                  ownerPensionPaidMonthly != null
-                    ? `현재 월 ${formatWon(ownerPensionPaidMonthly)} 대비 ${formatWon(
-                        Math.max(ownerInsurance.pensionMonthly - ownerPensionPaidMonthly, 0)
-                      )} 인상 · 소급 정산 없음`
-                    : "현재 납부액은 급여 정보 조회 권한이 있는 계정에서 표시 · 소급 정산 없음"
+                  !hasOwnerIncome
+                    ? `${NO_INCOME_NOTE} · 소급 정산 없음`
+                    : ownerPensionPaidMonthly != null
+                      ? `현재 월 ${formatWon(ownerPensionPaidMonthly)} 대비 ${formatWon(
+                          Math.max(ownerInsurance.pensionMonthly - ownerPensionPaidMonthly, 0)
+                        )} 인상 · 소급 정산 없음`
+                      : "현재 납부액은 급여 정보 조회 권한이 있는 계정에서 표시 · 소급 정산 없음"
                 }
               >
-                <Money value={ownerInsurance.pensionMonthly} />
+                {hasOwnerIncome ? <Money value={ownerInsurance.pensionMonthly} /> : "-"}
               </Stat>
             </div>
             <Footnote>

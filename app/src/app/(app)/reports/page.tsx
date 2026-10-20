@@ -10,7 +10,7 @@ import { ReportProjectPicker } from "@/components/ReportProjectPicker";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { AnnualSettlementSummary } from "@/components/AnnualSettlementSummary";
 import { ProjectSummaryReport, type ProjectSummaryRow } from "@/components/ProjectSummaryReport";
-import { projectStatusLabel } from "@/lib/projectStatus";
+import { projectStatusLabel, PROJECT_STATUS_REVIEW } from "@/lib/projectStatus";
 import { AutoPrint } from "@/components/AutoPrint";
 import { isLedgerVisible, remainingBalance } from "@/lib/credit";
 import { resolveCategoryColor } from "@/lib/categoryColor";
@@ -45,9 +45,9 @@ import { parseMonthRange } from "@/lib/monthRange";
 import { ReportExcelButton } from "@/components/ReportExcelButton";
 import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
 import { purchaseCostOf, salesSupplyOf, supplyOf, vatOf } from "@/lib/vatBasis";
-import { PAYROLL_CATEGORY_NAME } from "@/lib/vatExempt";
 import type { WorkLog } from "@/lib/types";
 import { nowKst } from "@/lib/kstDate";
+import { projectBasedProfit } from "@/lib/projectProfit";
 
 const MONTH_LABELS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
 
@@ -448,33 +448,26 @@ export default async function ReportsPage({
       ledgerSales: p.sales,
     }));
 
-  const projectSummaryQuoteAmount = byProject.reduce((s, p) => s + p.quoteAmount, 0);
-  const projectSummaryProfit = byProject.reduce((s, p) => s + p.profit, 0);
+  // 합계는 검토중(아직 수주 전) 프로젝트를 뺀다(사용자 요청) — 표에는 검토중 행도 그대로 보임.
+  const summaryProjects = byProject.filter((p) => p.status !== PROJECT_STATUS_REVIEW);
+  const projectSummaryQuoteAmount = summaryProjects.reduce((s, p) => s + p.quoteAmount, 0);
+  const projectSummaryProfit = summaryProjects.reduce((s, p) => s + p.profit, 0);
   const projectSummary = {
-    count: byProject.length,
-    sales: byProject.reduce((s, p) => s + p.sales, 0),
-    purchase: byProject.reduce((s, p) => s + p.purchase, 0),
+    count: summaryProjects.length,
+    reviewExcluded: byProject.length - summaryProjects.length,
+    sales: summaryProjects.reduce((s, p) => s + p.sales, 0),
+    purchase: summaryProjects.reduce((s, p) => s + p.purchase, 0),
     quoteAmount: projectSummaryQuoteAmount,
     profit: projectSummaryProfit,
     profitRate: projectSummaryQuoteAmount > 0 ? (projectSummaryProfit / projectSummaryQuoteAmount) * 100 : null,
   };
 
-  // 상단 박스의 "예상 순이익율" — 대시보드 "이익 예상"과 동일한 기준(연도 전체, site 필터와 무관)으로
-  // 계산. 대시보드 이익 예상(components/sections/ProfitOutlook.tsx)과 같은 방식(발주액 기준 프로젝트
-  // 손익 − 프로젝트 미배정 일반경비 − 직원급여/상여/4대보험)을 그대로 따름.
-  // 발주액 없는 프로젝트(귀속 하위·미정리 등)는 profit이 −(매입+대행구매)라 그 비용까지 빠짐없이 반영됨.
-  // 비율은 프로젝트 이익율과 같은 발주액 대비. 수주액(수기 입력)은 입력 확인용이라 계산에 안 씀.
-  const totalQuoteAmount = byProjectAll.reduce((s, p) => s + p.quoteAmount, 0);
-  const yearProfitSum = byProjectAll.reduce((s, p) => s + p.profit, 0);
-  const nullProjectPurchaseTx = transactions.filter((t) => !t.project_id && t.type === "매입");
-  const generalExpense = nullProjectPurchaseTx
-    .filter((t) => one(t.expense_categories)?.name !== PAYROLL_CATEGORY_NAME)
-    .reduce((s, t) => s + purchaseCostOf(t), 0);
-  const payrollCost = nullProjectPurchaseTx
-    .filter((t) => one(t.expense_categories)?.name === PAYROLL_CATEGORY_NAME)
-    .reduce((s, t) => s + purchaseCostOf(t), 0);
-  const yearProfitEstimate = yearProfitSum - generalExpense - payrollCost;
-  const yearProfitEstimateRate = totalQuoteAmount > 0 ? (yearProfitEstimate / totalQuoteAmount) * 100 : null;
+  // 상단 박스의 "예상 순이익율" — 대시보드 "프로젝트 기준 예상 이익"과 같은 계산(lib/projectProfit.ts의
+  // projectBasedProfit: 연도 전체, site 필터와 무관, 세금계산서 기준이라 외상 미정산 포함, 검토중 발주액 제외,
+  // 발주액 없는 프로젝트는 실제 매출) ÷ 발주액 합계(검토중 제외). 수주액(수기 입력)은 입력 확인용이라 계산에 안 씀.
+  const yearEstimate = projectBasedProfit(projects ?? [], projectTxRaw, rawTx, agencyByProject);
+  const yearProfitEstimateRate =
+    yearEstimate.quoteTotal > 0 ? (yearEstimate.profit / yearEstimate.quoteTotal) * 100 : null;
 
   // 현장별 손익 (프로젝트 없는 일반경비는 별도 묶음)
   const siteMap = new Map<string, { name: string; sales: number; purchase: number }>();
@@ -969,7 +962,7 @@ export default async function ReportsPage({
                 {yearProfitEstimateRate === null ? "-" : `${yearProfitEstimateRate.toFixed(2)}%`}
               </p>
               <p className="mt-1 text-[11px] leading-tight text-slate-400">
-                {selectedYear}년 이익 예상 ÷ 발주액 합계 — site 필터와 무관한 연간 전체 기준
+                {selectedYear}년 이익 예상 ÷ 발주액 합계(검토중 제외) — site 필터와 무관한 연간 전체 기준
               </p>
             </div>
           </div>
@@ -1097,7 +1090,7 @@ export default async function ReportsPage({
             },
             <>
               <span className="text-xs text-slate-500">
-                {selectedYear}년 총 {projectSummary.count}건 · 매출(VAT제외) {formatWon(projectSummary.sales)} · 매입(VAT제외){" "}
+                {selectedYear}년 총 {projectSummary.count}건{projectSummary.reviewExcluded > 0 && ` (검토중 ${projectSummary.reviewExcluded}건 제외)`} · 매출(VAT제외) {formatWon(projectSummary.sales)} · 매입(VAT제외){" "}
                 {formatWon(projectSummary.purchase)} · 이익금 {formatWon(projectSummary.profit)} · 이익율{" "}
                 {projectSummary.profitRate === null ? "-" : `${projectSummary.profitRate.toFixed(2)}%`}
               </span>
@@ -1120,7 +1113,7 @@ export default async function ReportsPage({
           )}
         >
           <p className="mb-3 hidden text-xs text-slate-500 print:block">
-            {selectedYear}년 총 {projectSummary.count}건 · 매출(VAT제외) {formatWon(projectSummary.sales)} · 매입(VAT제외){" "}
+            {selectedYear}년 총 {projectSummary.count}건{projectSummary.reviewExcluded > 0 && ` (검토중 ${projectSummary.reviewExcluded}건 제외)`} · 매출(VAT제외) {formatWon(projectSummary.sales)} · 매입(VAT제외){" "}
             {formatWon(projectSummary.purchase)} · 이익금 {formatWon(projectSummary.profit)} · 이익율{" "}
             {projectSummary.profitRate === null ? "-" : `${projectSummary.profitRate.toFixed(2)}%`}
           </p>
