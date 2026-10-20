@@ -328,12 +328,13 @@ export default async function DashboardPage({
     activeEmployees.length ? 2 * Math.max(...activeEmployees.map(pick)) : null;
   const ownerHealthPaidMonthly = ownerPaidMonthly((e) => Number(e.health_insurance) + Number(e.long_term_care_insurance));
   const ownerPensionPaidMonthly = ownerPaidMonthly((e) => Number(e.national_pension));
-  // 1월 부가세 2기 확정 = 7~12월 부가세 − 10월 예정고지(1~6월 납부세액의 1/2, 50만원 미만이면 고지 없음).
+  // 1월 부가세 2기 확정 = 7~12월 부가세 − 10월 예정고지(1~6월 납부세액의 1/2, 50만원 미만이면 고지 없음)
+  // + 미발행 계산서 예상분(그 해 귀속 미발행 프로젝트의 남은 발주액 부가세, 12월까지 끊는다고 봄 — 사용자 결정).
   // 실제 예정고지는 세무사가 매입장 외 공제까지 반영해 신고한 1기 세액 기준이라 이 장부 기준 추정과 다를 수 있음.
   const vat1 = vatQuarters[0].net + vatQuarters[1].net;
   const vatOctoberNotice = vatPrepaymentNotice(vat1);
   const cashOut = {
-    vat2: vatQuarters[2].net + vatQuarters[3].net - vatOctoberNotice,
+    vat2: vatQuarters[2].net + vatQuarters[3].net - vatOctoberNotice + o.unbilledVat.vat,
     mayTax: nextYearTax.totalTax,
     installment: incomeTaxInstallment(nextYearTax.incomeTax),
     healthSettlement:
@@ -562,10 +563,12 @@ export default async function DashboardPage({
               <Stat
                 label="1월 · 부가가치세 제2기 확정신고 (7~12월)"
                 sub={[
+                  o.unbilledVat.vat > 0 &&
+                    `미발행 계산서 ${o.unbilledVat.count}건 예상분 약 ${formatWon(o.unbilledVat.vat)} 포함`,
                   vatOctoberNotice > 0 && `10월 예정고지액 약 ${formatWon(vatOctoberNotice)} 차감`,
                   vatOctoberNotice === 0 && vat1 > 0 && "10월 예정고지 없음(50만원 미만)",
                   cashOut.vat2 < 0 && "환급 예상",
-                  "4분기 실적에 따라 증가 가능",
+                  o.unbilledVat.vat > 0 ? "추가 매입 시 감소 가능" : "4분기 실적에 따라 증가 가능",
                 ]
                   .filter(Boolean)
                   .join(" · ")}
@@ -618,6 +621,13 @@ export default async function DashboardPage({
                 기납부액(최고 급여 직원 기준, 직원 공제액의 2배) · 국민연금은 연간 정산 없이 7월부터 월 보험료만 조정(소득총액신고
                 누락 시 11월에 7월분부터 소급 부과) · 모든 금액은 세무사 확인 전 추정치
               </p>
+              {o.unbilledVat.vat > 0 && (
+                <p>
+                  미발행 계산서 예상분 = {selectedYear}년 귀속 진행중·공사 완료·완료 수금대기 프로젝트의 남은 발주액(발주액 −
+                  대행구매액 − 발행 매출, 공급가액 {formatWon(o.unbilledVat.supply)})의 10% · 12월까지 발행 가정 · 해당 프로젝트의 추가
+                  매입 세금계산서 부가가치세만큼 감소
+                </p>
+              )}
               <p>
                 10월 부가가치세 예정고지(제1기 납부세액의 1/2)·11월 중간예납(소득세의 1/2)은 50만원 미만 시 고지 없음 · 실제
                 고지액은 세무사가 매입장 외 공제까지 반영해 신고한 세액 기준으로, 장부 기준 추정액과 차이 발생 가능
@@ -703,6 +713,12 @@ export default async function DashboardPage({
               반기(1~6월, 7~12월) 단위 · 4월·10월에 직전 반기 납부세액의 1/2을 예정고지로 선납(50만원 미만 시 고지 없음)하고
               7월·1월 확정신고 시 차감 · 매입장 외 공제는 세무사 신고 시 반영되어 실제 납부액과 차이 발생 가능
             </p>
+            {o.unbilledVat.vat > 0 && (
+              <p>
+                세금계산서 미발행 프로젝트 {o.unbilledVat.count}건의 남은 발주액 부가가치세 예상 약 {formatWon(o.unbilledVat.vat)}은
+                표에 미포함(12월까지 발행 시 제2기 납부세액에 추가)
+              </p>
+            )}
           </Footnote>
         </FoldRow>
 

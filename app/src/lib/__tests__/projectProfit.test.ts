@@ -8,6 +8,7 @@ import {
   secondHalfOutlook,
   expectedRevenueOf,
   countedQuote,
+  unbilledInvoiceVat,
   type OutlookProject,
   type OutlookTx,
 } from "@/lib/projectProfit";
@@ -185,4 +186,23 @@ test("프로젝트 기준: 외상 미정산 매입도 비용으로(세금계산�
   const est = projectBasedProfit(ps, ofProjects(txs, ps), inYear(txs), AG);
   // (9,000만 − 5,000만 − 500만) + (8,000만 − 1,000만) − 7,000만 − 800만 = 2,700만
   assert.equal(est.profit, 27_000_000);
+});
+
+test("1월 부가세 미발행 예상분: 남은 발주액(대행구매·이미 끊은 매출 차감)의 10%", () => {
+  const awaiting: OutlookProject = { id: "PD", name: "수금대기 D", status: "done_awaiting_payment", quote_amount: 30_000_000 };
+  const billed: OutlookProject = { id: "PE", name: "다 끊은 E", status: "done", quote_amount: 10_000_000 };
+  const over: OutlookProject = { id: "PF", name: "더 끊은 F", status: "done", quote_amount: 10_000_000 };
+  const review: OutlookProject = { id: "PR", name: "검토중 G", status: "review", quote_amount: 20_000_000 };
+  const zero: OutlookProject = { id: "PZ", name: "발주액 0원 H", status: "ongoing", quote_amount: 0 };
+  const ps = [PA, PB, awaiting, billed, over, review, zero];
+  const txs = [
+    ...baseTx(),
+    sale("2026-10-01", 22_000_000, "PD", "credit"), // 입금 전 외상도 끊은 계산서 — 공급가 2,000만 차감
+    sale("2026-05-01", 11_000_000, "PE"), // 상반기에 다 끊음
+    sale("2026-09-01", 11_550_000, "PF"), // 발주액보다 더 끊음(추가 공사 등) — 0 아래로 안 내려감
+  ];
+  // A: 9,000만 − 대행구매 500만 = 8,500만 → 850만 / D: 3,000만 − 2,000만 = 1,000만 → 100만
+  // E·F: 남은 것 없음 / 수금완료 B·검토중·발주액 0원: 대상 아님
+  assert.deepEqual(unbilledInvoiceVat(ps, ofProjects(txs, ps), AG), { count: 2, supply: 95_000_000, vat: 9_500_000 });
+  assert.deepEqual(unbilledInvoiceVat([PB], ofProjects(txs, [PB]), AG), { count: 0, supply: 0, vat: 0 });
 });

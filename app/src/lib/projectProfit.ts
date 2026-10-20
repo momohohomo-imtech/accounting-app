@@ -55,6 +55,14 @@ export function countedQuote(p: Pick<OutlookProject, "status" | "quote_amount">)
   return p.status === PROJECT_STATUS_REVIEW ? 0 : p.quote_amount ?? 0;
 }
 
+// 세금계산서를 아직 다 안 끊었을 수 있는 "미발행" 프로젝트 — 진행중·공사 완료·완료 수금대기이고 발주액이 있는(0원·검토중
+// 제외) 것. 하반기 예상 이익과 1월 부가세 미발행 예상분이 같은 대상을 쓴다.
+function isUnbilledProject(p: OutlookProject) {
+  return (
+    (p.status === "ongoing" || p.status === "done" || p.status === PROJECT_STATUS_AWAITING_PAYMENT) && countedQuote(p) > 0
+  );
+}
+
 // 프로젝트 기준 예상 이익 = Σ 프로젝트(어미 + 귀속 하위 묶음) 이익 − 프로젝트 없는 일반경비 − 직원급여/상여/4대보험.
 // 묶음 이익 = 매출 − 매입(공급가) − 대행구매. 매출은 발주액(검토중 제외)이 있으면 발주액, 없으면(발주액 빈칸·0원·검토중)
 // 그 묶음에 실제로 끊은 매출 — 발주액이 없다고 실제 매출까지 빠지면 안 됨. 매입·대행구매는 발주액과 상관없이 실제로 나간
@@ -108,10 +116,7 @@ export function secondHalfOutlook(
 ) {
   const h2Start = `${year}-07-01`;
   const yearEnd = `${year}-12-31`;
-  const unbilled = projects.filter(
-    (p) =>
-      (p.status === "ongoing" || p.status === "done" || p.status === PROJECT_STATUS_AWAITING_PAYMENT) && countedQuote(p) > 0
-  );
+  const unbilled = projects.filter(isUnbilledProject);
   const unbilledIds = new Set(unbilled.map((p) => p.id));
   const inUnbilled = (t: OutlookTx) => Boolean(t.project_id && unbilledIds.has(t.project_id));
 
@@ -150,6 +155,32 @@ export function secondHalfOutlook(
     h2PayrollCost,
     h2EstimatedProfit: h2Profit + unbilledPendingProfit - h2PayrollCost,
   };
+}
+
+// 1월 부가세(제2기 확정) 추정에 따로 더하는 "미발행 계산서 예상분"(사용자 결정). 미발행 프로젝트마다 남은 계산서 공급가액
+// = 발주액 − 대행구매액 − 이미 끊은 매출(날짜·외상 정산 무관, 0 아래로는 안 내려감 — 수금 예정액과 같은 기준)을 12월까지
+// 끊는다고 보고 그 10%. 그 프로젝트에 앞으로 받을 매입 계산서의 부가세는 알 수 없어 빼지 않음(실제로는 그만큼 줄어듦).
+export function unbilledInvoiceVat(
+  projects: OutlookProject[],
+  projectTx: OutlookTx[],
+  agencyByProject: Map<string, number>
+) {
+  const billedBy = new Map<string, number>();
+  for (const t of projectTx) {
+    if (t.type !== "매출" || !t.project_id) continue;
+    billedBy.set(t.project_id, (billedBy.get(t.project_id) ?? 0) + salesSupplyOf(t));
+  }
+  let count = 0;
+  let supply = 0;
+  let vat = 0;
+  for (const p of projects.filter(isUnbilledProject)) {
+    const remaining = Math.max(0, countedQuote(p) - (agencyByProject.get(p.id) ?? 0) - (billedBy.get(p.id) ?? 0));
+    if (remaining === 0) continue;
+    count += 1;
+    supply += remaining;
+    vat += Math.round(remaining * 0.1);
+  }
+  return { count, supply, vat };
 }
 
 // 그 해 예상 매출액 = 발주액 − 대행구매(프로젝트 목록 수주예상액 합계와 같은 기준), 검토중은 뺌.

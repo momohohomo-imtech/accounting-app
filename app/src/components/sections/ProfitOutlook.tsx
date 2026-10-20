@@ -7,6 +7,7 @@ import {
   projectBasedProfit,
   secondHalfOutlook,
   countedQuote,
+  unbilledInvoiceVat,
   type OutlookProject,
   type OutlookTx,
 } from "@/lib/projectProfit";
@@ -78,6 +79,8 @@ export async function loadProfitOutlook(
     ...h2,
     combinedProfit,
     combinedTax,
+    // 1월 부가세(제2기 확정) 추정에 따로 더하는 미발행 계산서 예상분.
+    unbilledVat: unbilledInvoiceVat(yearProjects, projectTx, agencyByProject),
   };
 }
 
