@@ -1,6 +1,9 @@
 import type { CreditPayment } from "@/lib/types";
 import { isLedgerVisible } from "@/lib/credit";
-import { purchaseCostOf } from "@/lib/vatBasis";
+import { purchaseCostOf, salesSupplyOf, type VatBasisRow } from "@/lib/vatBasis";
+import { one } from "@/lib/relations";
+import { PAYROLL_CATEGORY_NAME } from "@/lib/vatExempt";
+import { PROJECT_STATUS_AWAITING_PAYMENT, PROJECT_STATUS_REVIEW } from "@/lib/projectStatus";
 
 type ProjectAmountRow = { id: string; quote_amount: number | null };
 
@@ -26,17 +29,134 @@ export function unbilledH2Profit(quote: number, h1BilledSales: number, h2Purchas
   return quote - h1BilledSales - h2Purchase - agency;
 }
 
-// 여러 프로젝트의 이익 총합 — 발주액이 없는 프로젝트(귀속 하위·미정리·검토중 등)의 매입·대행구매도
-// 실제로 나간 돈이라 빠짐없이 뺀다.
-export function totalProjectProfit(
-  projects: ProjectAmountRow[],
-  purchaseByProject: Map<string, number>,
+// ── 대시보드 "프로젝트 기준 예상 이익"·"연간 예상 이익(확정+예상)", 보고서 "예상 순이익율" 공통 계산 ──
+// 거래는 세금계산서(거래일) 기준 — 외상 미정산도 포함한다. 종합소득세는 계산서 기준이라, 받은 계산서인데 아직 안 갚은
+// 매입은 비용, 끊었는데 아직 못 받은 매출은 매출(부가세 분기표와 같은 기준). 예전엔 정산 전 외상이 빠져 이익이 틀어졌음.
+
+type OutlookCategory = { name: string; vat_exempt?: boolean | null; vat_non_deductible?: boolean | null };
+export type OutlookProject = {
+  id: string;
+  name?: string;
+  status: string | null;
+  quote_amount: number | null;
+  parent_project_id?: string | null;
+};
+export type OutlookTx = VatBasisRow & {
+  type: string;
+  project_id: string | null;
+  trans_date: string;
+  expense_categories?: OutlookCategory | OutlookCategory[] | null;
+};
+
+const isPayroll = (t: OutlookTx) => one(t.expense_categories)?.name === PAYROLL_CATEGORY_NAME;
+
+// 합계 계산에 넣는 발주액 — 검토중(아직 수주 전)은 0(사용자 요청: 검토중은 계산에 넣지 않음).
+export function countedQuote(p: Pick<OutlookProject, "status" | "quote_amount">) {
+  return p.status === PROJECT_STATUS_REVIEW ? 0 : p.quote_amount ?? 0;
+}
+
+// 프로젝트 기준 예상 이익 = Σ 프로젝트(어미 + 귀속 하위 묶음) 이익 − 프로젝트 없는 일반경비 − 직원급여/상여/4대보험.
+// 묶음 이익 = 매출 − 매입(공급가) − 대행구매. 매출은 발주액(검토중 제외)이 있으면 발주액, 없으면(발주액 빈칸·0원·검토중)
+// 그 묶음에 실제로 끊은 매출 — 발주액이 없다고 실제 매출까지 빠지면 안 됨. 매입·대행구매는 발주액과 상관없이 실제로 나간
+// 돈이라 빠짐없이 뺀다. projectTx = 이 프로젝트들에 붙은 거래 전부(기간 무관), yearTx = 그 해 거래 전부.
+export function projectBasedProfit(
+  projects: OutlookProject[],
+  projectTx: OutlookTx[],
+  yearTx: OutlookTx[],
   agencyByProject: Map<string, number>
 ) {
-  return projects.reduce(
-    (s, p) => s + (p.quote_amount ?? 0) - (purchaseByProject.get(p.id) ?? 0) - (agencyByProject.get(p.id) ?? 0),
+  const ids = new Set(projects.map((p) => p.id));
+  const rootOf = (p: OutlookProject) => (p.parent_project_id && ids.has(p.parent_project_id) ? p.parent_project_id : p.id);
+  const salesBy = new Map<string, number>();
+  const purchaseBy = new Map<string, number>();
+  for (const t of projectTx) {
+    if (!t.project_id || !ids.has(t.project_id)) continue;
+    salesBy.set(t.project_id, (salesBy.get(t.project_id) ?? 0) + salesSupplyOf(t));
+    purchaseBy.set(t.project_id, (purchaseBy.get(t.project_id) ?? 0) + purchaseCostOf(t));
+  }
+  const groups = new Map<string, OutlookProject[]>();
+  for (const p of projects) groups.set(rootOf(p), [...(groups.get(rootOf(p)) ?? []), p]);
+
+  let projectProfit = 0;
+  let quoteTotal = 0;
+  for (const group of groups.values()) {
+    const quote = group.reduce((s, p) => s + countedQuote(p), 0);
+    const actualSales = group.reduce((s, p) => s + (salesBy.get(p.id) ?? 0), 0);
+    const cost = group.reduce((s, p) => s + (purchaseBy.get(p.id) ?? 0) + (agencyByProject.get(p.id) ?? 0), 0);
+    projectProfit += (quote > 0 ? quote : actualSales) - cost;
+    quoteTotal += quote;
+  }
+
+  const nullProjectPurchases = yearTx.filter((t) => t.type === "매입" && !t.project_id);
+  const payrollCost = nullProjectPurchases.filter(isPayroll).reduce((s, t) => s + purchaseCostOf(t), 0);
+  const generalExpense = nullProjectPurchases.filter((t) => !isPayroll(t)).reduce((s, t) => s + purchaseCostOf(t), 0);
+  return { projectProfit, generalExpense, payrollCost, profit: projectProfit - generalExpense - payrollCost, quoteTotal };
+}
+
+// 연간 예상 이익(상반기 확정 + 하반기 예상)의 하반기 부분.
+// - 하반기 매출−매입: 7~12월 거래(세금계산서 기준), 단 아래 "미발행" 프로젝트의 거래와 인건비 카테고리는 뺌.
+// - 미발행 예상 이익: 진행중·공사 완료·완료 수금대기이고 발주액이 있는(0원·검토중 제외) 그 해 귀속 프로젝트는 남은 발주액을
+//   그 해 매출로 봄(발주액 − 상반기에 끊은 매출 − 7~12월 매입 − 대행구매). 다음 해에 계산서를 끊을 프로젝트는 사용자가 귀속
+//   연도를 다음 해로 바꿈(사용자 운영 방식). 매입은 그 해 12월 31일까지만 — 다음 해 매입은 다음 해 비용.
+// - 하반기 인건비: 7~12월 직원급여/상여/4대보험 — 프로젝트를 지정한 것도 포함(미발행 프로젝트에 붙은 건 위에서 이미 뺌).
+export function secondHalfOutlook(
+  year: number,
+  projects: OutlookProject[],
+  projectTx: OutlookTx[],
+  yearTx: OutlookTx[],
+  agencyByProject: Map<string, number>
+) {
+  const h2Start = `${year}-07-01`;
+  const yearEnd = `${year}-12-31`;
+  const unbilled = projects.filter(
+    (p) =>
+      (p.status === "ongoing" || p.status === "done" || p.status === PROJECT_STATUS_AWAITING_PAYMENT) && countedQuote(p) > 0
+  );
+  const unbilledIds = new Set(unbilled.map((p) => p.id));
+  const inUnbilled = (t: OutlookTx) => Boolean(t.project_id && unbilledIds.has(t.project_id));
+
+  const h2PurchaseBy = new Map<string, number>();
+  for (const t of projectTx) {
+    if (t.type !== "매입" || !inUnbilled(t) || t.trans_date < h2Start || t.trans_date > yearEnd) continue;
+    h2PurchaseBy.set(t.project_id!, (h2PurchaseBy.get(t.project_id!) ?? 0) + purchaseCostOf(t));
+  }
+  // 상반기에 이미 끊은 기성금 — 상반기 확정 이익(세무사 결산)에 들어가 있어 발주액에서 뺀다.
+  const h1BilledBy = new Map<string, number>();
+  for (const t of yearTx) {
+    if (t.type !== "매출" || !inUnbilled(t) || t.trans_date >= h2Start) continue;
+    h1BilledBy.set(t.project_id!, (h1BilledBy.get(t.project_id!) ?? 0) + salesSupplyOf(t));
+  }
+  const unbilledPendingProfit = unbilled.reduce(
+    (s, p) =>
+      s +
+      unbilledH2Profit(countedQuote(p), h1BilledBy.get(p.id) ?? 0, h2PurchaseBy.get(p.id) ?? 0, agencyByProject.get(p.id) ?? 0),
     0
   );
+  const h1BilledSales = Array.from(h1BilledBy.values()).reduce((s, v) => s + v, 0);
+
+  const h2Tx = yearTx.filter((t) => t.trans_date >= h2Start && t.trans_date <= yearEnd);
+  const h2LedgerTx = h2Tx.filter((t) => !inUnbilled(t) && !isPayroll(t));
+  const h2Sales = h2LedgerTx.reduce((s, t) => s + salesSupplyOf(t), 0);
+  const h2Purchase = h2LedgerTx.reduce((s, t) => s + purchaseCostOf(t), 0);
+  const h2PayrollCost = h2Tx.filter((t) => isPayroll(t) && !inUnbilled(t)).reduce((s, t) => s + purchaseCostOf(t), 0);
+  const h2Profit = h2Sales - h2Purchase;
+  return {
+    h2Sales,
+    h2Purchase,
+    h2Profit,
+    unbilledPendingProfit,
+    h1BilledSales,
+    unbilledProjectNames: unbilled.map((p) => p.name ?? ""),
+    h2PayrollCost,
+    h2EstimatedProfit: h2Profit + unbilledPendingProfit - h2PayrollCost,
+  };
+}
+
+// 그 해 예상 매출액 = 발주액 − 대행구매(프로젝트 목록 수주예상액 합계와 같은 기준), 검토중은 뺌.
+export function expectedRevenueOf(projects: OutlookProject[], agencyByProject: Map<string, number>) {
+  return projects
+    .filter((p) => p.status !== PROJECT_STATUS_REVIEW)
+    .reduce((s, p) => s + (p.quote_amount ?? 0) - (agencyByProject.get(p.id) ?? 0), 0);
 }
 
 // 외상 미정산(완납 전) 매입 — 손익보고서의 매입 합계·이익금에는 빠져 있어서 따로 합산한다. 이익금과 같은

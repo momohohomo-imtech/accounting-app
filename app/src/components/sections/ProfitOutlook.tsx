@@ -1,80 +1,27 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatWon, moneyClass } from "@/lib/format";
-import { PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
 import { taxEstimate } from "@/lib/tax";
-import { isLedgerVisible } from "@/lib/credit";
-import type { CreditPayment, ExpenseCategory } from "@/lib/types";
-import { one } from "@/lib/relations";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
-import { PAYROLL_CATEGORY_NAME } from "@/lib/vatExempt";
-import { purchaseCostOf, salesSupplyOf } from "@/lib/vatBasis";
-import { totalProjectProfit, unbilledH2Profit } from "@/lib/projectProfit";
+import {
+  expectedRevenueOf,
+  projectBasedProfit,
+  secondHalfOutlook,
+  countedQuote,
+  type OutlookProject,
+  type OutlookTx,
+} from "@/lib/projectProfit";
 
-type YearTxRow = {
-  id: string;
-  type: string;
-  payment_type: string;
-  trans_date: string;
-  project_id: string | null;
-  sales_amount: number;
-  sales_vat: number;
-  purchase_amount: number;
-  purchase_vat: number;
-  expense_categories: ExpenseCategory | null;
-};
-type YearProjectRow = { id: string; name: string; quote_amount: number | null; status: string | null };
-
-// 대시보드의 이익·세금 추정치를 한 번에 계산 — 계산식은 기존 대시보드 박스와 동일하고,
-// 화면 배치만 대시보드 쪽에서 나눠서 보여준다. 선택 연도의 거래·프로젝트·외상 정산 이력은
-// 대시보드가 이미 받아온 것을 그대로 넘겨받아 같은 데이터를 다시 조회하지 않는다.
+// 대시보드의 이익·세금 추정치를 한 번에 계산 — 계산식은 lib/projectProfit.ts(자동 검사 있음), 여기서는 조회만.
+// 선택 연도의 거래·프로젝트는 대시보드가 이미 받아온 것을 그대로 넘겨받아 같은 데이터를 다시 조회하지 않는다.
+// 거래는 세금계산서 기준(외상 미정산 포함) — yearTx도 정산 여부로 거르지 않은 그 해 거래 전부를 넘길 것.
 export async function loadProfitOutlook(
   year: number,
-  {
-    payments,
-    yearProjects,
-    yearTx,
-  }: { payments: CreditPayment[]; yearProjects: YearProjectRow[]; yearTx: YearTxRow[] }
+  { yearProjects, yearTx }: { yearProjects: OutlookProject[]; yearTx: OutlookTx[] }
 ) {
   const supabase = await createClient();
+  const projectIds = yearProjects.map((p) => p.id);
 
-  // 프로젝트에 귀속되지 않은(project_id가 없는) 매입 거래 전체(연간) — 카테고리별로
-  // "일반경비"(직원급여 제외)와 "직원급여/상여/4대보험"(payroll 관리 화면이 아니라
-  // 매입매출장의 이 카테고리 기준으로 집계, employees/payroll 입력 누락과 무관하게 실측)로 나눠 씀.
-  const nullProjectTxRaw = yearTx.filter((t) => t.type === "매입" && !t.project_id);
-  // 하반기 집계 이익금: 대시보드 "장부 기준 세금"과 같은 부가세 제외 매출-매입(원장 기준)으로 계산
-  const h2TxRaw = yearTx.filter((t) => t.trans_date >= `${year}-07-01`);
-
-  // 외상(미완납)은 대시보드의 다른 항목들과 동일하게 완납 전까지 장부에서 제외한다.
-  const nullProjectTx = nullProjectTxRaw.filter((t) => isLedgerVisible(t, payments));
-  const h2Tx = h2TxRaw.filter((t) => isLedgerVisible(t, payments));
-
-  const payrollTx = nullProjectTx.filter((t) => one(t.expense_categories)?.name === PAYROLL_CATEGORY_NAME);
-  const generalTx = nullProjectTx.filter((t) => one(t.expense_categories)?.name !== PAYROLL_CATEGORY_NAME);
-
-  // 세금계산서 미발행 예상 이익금 대상: 완료 수금대기 + 공사 완료(둘 다 매출/세금계산서가
-  // 아직 없는 경우가 많음 — 프로젝트 페이지의 hasIncompleteProjects 판단과 동일한 범위),
-  // 마찬가지로 필터 연도로 한정.
-  const unbilledRows = yearProjects.filter((p) => p.status === PROJECT_STATUS_AWAITING_PAYMENT || p.status === "done");
-  const yearRows = yearProjects;
-
-  // 완료 수금대기/공사 완료 프로젝트는 매입(원가)은 이미 원장에 찍혔지만 매출/세금계산서가
-  // 아직 없는 경우가 많음 — 이 프로젝트들의 예상 이익도 같은 매입/대행구매 조회에 포함해서 구함.
-  const yearProjectIds = yearRows.map((p) => p.id);
-  const unbilledProjectIds = unbilledRows.map((p) => p.id);
-  const allProjectIds = Array.from(new Set([...yearProjectIds, ...unbilledProjectIds]));
-  type ProjectPurchaseTxRow = {
-    id: string;
-    type: string;
-    payment_type: string;
-    sales_amount: number;
-    sales_vat: number;
-    project_id: string | null;
-    purchase_amount: number;
-    purchase_vat: number;
-    trans_date: string;
-    expense_categories: { name: string } | { name: string }[] | null;
-  };
-  // 아래 프로젝트 매입 조회와 동시에 보내려고 먼저 시작(.then으로 바로 요청이 나가게).
+  // 상반기 확정 이익 — 아래 프로젝트 거래 조회와 동시에 보내려고 먼저 시작(.then으로 바로 요청이 나가게).
   const halfYearPromise = supabase
     .from("half_year_settlements")
     .select("profit_amount")
@@ -82,14 +29,14 @@ export async function loadProfitOutlook(
     .eq("half", 1)
     .maybeSingle()
     .then((r) => r);
-  const [purchaseTxRaw, { data: agencyTx }] = allProjectIds.length
+  // 그 해 귀속 프로젝트에 붙은 거래 전부(기간 무관, 매출·매입) + 대행구매.
+  const [projectTx, agencyRows] = projectIds.length
     ? await Promise.all([
-        fetchAllRows<ProjectPurchaseTxRow>((from, to) =>
+        fetchAllRows<OutlookTx>((from, to) =>
           supabase
             .from("transactions")
             .select("id, type, payment_type, sales_amount, sales_vat, project_id, purchase_amount, purchase_vat, trans_date, expense_categories(*)")
-            .eq("type", "매입")
-            .in("project_id", allProjectIds)
+            .in("project_id", projectIds)
             .order("id", { ascending: true })
             .range(from, to)
         ),
@@ -97,110 +44,38 @@ export async function loadProfitOutlook(
           supabase
             .from("project_agency_purchases")
             .select("project_id, amount")
-            .in("project_id", allProjectIds)
+            .in("project_id", projectIds)
             .order("id", { ascending: true })
             .range(from, to)
-        ).then((data) => ({ data })),
+        ),
       ])
-    : [[] as ProjectPurchaseTxRow[], { data: [] as { project_id: string; amount: number }[] }];
+    : [[] as OutlookTx[], [] as { project_id: string; amount: number }[]];
   const { data: halfYearRow } = await halfYearPromise;
-  // 외상(미완납)은 완납 전까지 장부에서 제외 — 다른 대시보드 항목들과 동일한 기준.
-  const purchaseTx = purchaseTxRaw.filter((t) => isLedgerVisible(t, payments));
 
-
-  // --- {year}년 이익 예상: 프로젝트 총이익금 - 카테고리 일반경비 - 직원급여/상여/4대보험 ---
-  const purchaseByProject = new Map<string, number>();
-  for (const t of purchaseTx) {
-    if (!t.project_id) continue;
-    purchaseByProject.set(t.project_id, (purchaseByProject.get(t.project_id) ?? 0) + purchaseCostOf(t));
-  }
   const agencyByProject = new Map<string, number>();
-  for (const a of agencyTx ?? []) {
-    agencyByProject.set(a.project_id, (agencyByProject.get(a.project_id) ?? 0) + a.amount);
+  for (const a of agencyRows) {
+    agencyByProject.set(a.project_id, (agencyByProject.get(a.project_id) ?? 0) + Number(a.amount));
   }
-  const yearProjectsWithProfit = yearRows.filter((p) => p.quote_amount != null);
-  // 발주액이 없는 프로젝트(귀속 하위·미정리·검토중 등)에 들어간 매입도 실제 지출이라 같이 뺀다.
-  const yearProfitSum = totalProjectProfit(yearRows, purchaseByProject, agencyByProject);
-  // 추가 매입/매출이 더 생길 수 있는 건 아직 공사 중이거나 검토 중인 프로젝트뿐 — 수금 완료·귀속·기타는 제외.
-  const hasIncompleteProjects = yearRows.some((p) => p.status === "ongoing" || p.status === "review");
 
-  // 발주액·대행구매액이 부가세 제외라 매입·경비도 공급가(부가세 제외) 기준 — lib/vatBasis.ts.
-  const generalExpense = generalTx.reduce((s, t) => s + purchaseCostOf(t), 0);
-  const payrollCost = payrollTx.reduce((s, t) => s + purchaseCostOf(t), 0);
-  const profitEstimate = yearProfitSum - generalExpense - payrollCost;
-  const profitTax = taxEstimate(profitEstimate);
+  // 프로젝트 기준 예상 이익(진행 중 포함) — 귀속 연도 프로젝트의 발주액(검토중 제외) 기준.
+  const estimate = projectBasedProfit(yearProjects, projectTx, yearTx, agencyByProject);
+  const profitTax = taxEstimate(estimate.profit);
 
-  // --- 하반기(7~12월) 집계 이익금 + 상반기 확정 이익금(세무사 결산) 합산 예상 세액 ---
-  // 세금계산서 아직 안 끊은 이익금: 완료 수금대기·공사 완료 프로젝트는 매입은 원장에
-  // 반영돼 있어도 매출이 아직 없어서 하반기 매출-매입만으로는 그 프로젝트의 예상 이익이
-  // 누락됨 — 여기서 보충. 진행중 프로젝트도 발주액(이익금)이 잡혀 있는 건 같은 이유로 포함.
-  // 상반기분 매입은 이미 상반기 확정 이익금(세무사 결산) 안에서 세무 처리가 끝났다고 보고,
-  // 여기서는 하반기(7~12월)분 매입만 뺀다.
-  const purchaseByProjectH2 = new Map<string, number>();
-  for (const t of purchaseTx) {
-    if (!t.project_id || t.trans_date < `${year}-07-01`) continue;
-    purchaseByProjectH2.set(t.project_id, (purchaseByProjectH2.get(t.project_id) ?? 0) + purchaseCostOf(t));
-  }
-  const ongoingYearProjectsWithProfit = yearRows.filter((p) => p.status === "ongoing" && p.quote_amount != null);
-  const unbilledProjectsWithProfit = [
-    ...unbilledRows.filter((p) => p.quote_amount != null),
-    ...ongoingYearProjectsWithProfit,
-  ];
-  const unbilledProjectIdSet = new Set(unbilledProjectsWithProfit.map((p) => p.id));
-  // 상반기에 이미 끊은 기성금 — 세무사 결산은 계산서 기준이라 외상 미정산 건도 포함(장부 표시 여부와 무관).
-  const h1BilledByProject = new Map<string, number>();
-  for (const t of yearTx) {
-    if (t.type !== "매출" || !t.project_id || !unbilledProjectIdSet.has(t.project_id)) continue;
-    if (t.trans_date >= `${year}-07-01`) continue;
-    h1BilledByProject.set(t.project_id, (h1BilledByProject.get(t.project_id) ?? 0) + salesSupplyOf(t));
-  }
-  const h1BilledSales = Array.from(h1BilledByProject.values()).reduce((s, v) => s + v, 0);
-  const unbilledPendingProfit = unbilledProjectsWithProfit.reduce(
-    (s, p) =>
-      s +
-      unbilledH2Profit(
-        p.quote_amount!,
-        h1BilledByProject.get(p.id) ?? 0,
-        purchaseByProjectH2.get(p.id) ?? 0,
-        agencyByProject.get(p.id) ?? 0
-      ),
-    0
-  );
-  // 미발행 예상 이익금에 이미 하반기 매입이 반영된 프로젝트들과, 직원급여 카테고리(아래
-  // h2PayrollCost에서 따로 뺌)는 하반기 매출-매입 집계에서 빼서 이중으로 차감되지 않게 한다.
-  const h2LedgerTx = h2Tx
-    .filter((t) => !t.project_id || !unbilledProjectIdSet.has(t.project_id))
-    .filter((t) => one(t.expense_categories)?.name !== PAYROLL_CATEGORY_NAME);
-  const h2Sales = h2LedgerTx.reduce((s, t) => s + salesSupplyOf(t), 0);
-  const h2Purchase = h2LedgerTx.reduce((s, t) => s + purchaseCostOf(t), 0);
-  const h2Profit = h2Sales - h2Purchase;
-  const h2PayrollCost = payrollTx
-    .filter((t) => t.trans_date >= `${year}-07-01`)
-    .reduce((s, t) => s + purchaseCostOf(t), 0);
+  // 연간 예상 이익 = 상반기 확정 이익(세무사 결산) + 하반기 예상 이익.
+  const h2 = secondHalfOutlook(year, yearProjects, projectTx, yearTx, agencyByProject);
   const half1Profit = halfYearRow?.profit_amount ?? null;
-  const combinedProfit =
-    half1Profit != null ? half1Profit + h2Profit + unbilledPendingProfit - h2PayrollCost : null;
+  const combinedProfit = half1Profit != null ? Number(half1Profit) + h2.h2EstimatedProfit : null;
   const combinedTax = combinedProfit != null ? taxEstimate(combinedProfit) : null;
 
-  // 선택 연도 총 예상 매출 = 발주액 − 대행구매(현대기계 마진 포함) — 프로젝트 목록 하단 "수주예상액" 합계와 같음.
-  // 수주액(수기 입력)은 입력 확인용이라 쓰지 않는다.
-  const expectedRevenue = yearRows.reduce((s, p) => s + (p.quote_amount ?? 0) - (agencyByProject.get(p.id) ?? 0), 0);
-
   return {
-    expectedRevenue,
-    hasProjectsWithProfit: yearProjectsWithProfit.length > 0,
-    profitEstimate,
+    expectedRevenue: expectedRevenueOf(yearProjects, agencyByProject),
+    hasProjectsWithProfit: yearProjects.some((p) => countedQuote(p) > 0),
+    profitEstimate: estimate.profit,
     profitTax,
-    hasIncompleteProjects,
-    half1Profit,
-    h2Sales,
-    h2Purchase,
-    h2Profit,
-    unbilledPendingProfit,
-    h1BilledSales,
-    unbilledProjectNames: unbilledProjectsWithProfit.map((p) => p.name),
-    h2PayrollCost,
-    h2EstimatedProfit: h2Profit + unbilledPendingProfit - h2PayrollCost,
+    // 추가 매출·매입이 더 생길 수 있는 건 아직 공사 중인 프로젝트뿐(검토중은 계산에 안 넣음).
+    hasIncompleteProjects: yearProjects.some((p) => p.status === "ongoing"),
+    half1Profit: half1Profit != null ? Number(half1Profit) : null,
+    ...h2,
     combinedProfit,
     combinedTax,
   };
@@ -219,7 +94,7 @@ export function ProfitCalculationDetail({ year, o }: { year: number; o: ProfitOu
         <span className="tabular-nums font-semibold">{formatWon(o.h2Purchase)}</span>
         {" = "}
         <span className={`tabular-nums font-semibold ${moneyClass(o.h2Profit)}`}>{formatWon(o.h2Profit)}</span>
-        {" (7~12월 원장 기준, 공급가액, 일반경비 포함)"}
+        {" (7~12월 세금계산서 기준·외상 미정산 포함, 공급가액, 일반경비 포함)"}
       </p>
       <p>
         <span className="font-semibold">{year}년 세금계산서 미발행분 예상 이익</span>
@@ -260,6 +135,9 @@ export function ProfitCalculationDetail({ year, o }: { year: number; o: ProfitOu
           <br />
           (나) 수금 대기·공사 완료·진행중(발주액 등록) 프로젝트 — 자재비·인건비 등 매입은 이미 원장에
           반영되었으나, 세금계산서(매출)는 아직 발행 전이어서 매출이 누락되어 있습니다.
+          <br />
+          검토중 프로젝트의 발주액은 반영하지 않음(이미 지출한 매입은 반영) · 귀속 연도가 그 해인 프로젝트만 대상(다음
+          해에 세금계산서를 발행할 프로젝트는 귀속 연도를 다음 해로 변경) · 외상 미정산 거래도 세금계산서 기준으로 반영
         </p>
         <p>
           (나)를 원장 그대로 &quot;하반기 매출-매입&quot;에 합산하면 매입만 반영되고 매출은 누락된 불완전한
