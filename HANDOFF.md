@@ -2128,8 +2128,9 @@ admin/staff/tax_agent 전체 계정을 관리하는 `AccountPanel`/`lib/actions/
 프로젝트 금액을 쓰는 곳 40곳 넘게 고쳐야 해서 안 함.)
 - `supabase/092_transaction_payment_group.sql`: `transactions.payment_group_id uuid`(빈 칸으로 추가, 기존 데이터 그대로) + 인덱스.
   **사용자가 Supabase에서 실행해야 함.** 실행 전에는 묶기 체크·버튼이 안 보이고 예전처럼 동작(등록 시 칸을 아예 안 보냄).
-- 등록(`TransactionForm`): 품목 2줄 이상이면 "한 결제로 묶기" 체크(기본 켜짐, 사진 여러 장 OCR은 영수증이 따로라 꺼짐). 기존 단독
-  거래 수정 중 줄을 더하면 그 거래와 같은 묶음(`bulkImportTransactions`의 `joinGroupOf`).
+- 등록(`TransactionForm`): 품목 2줄 이상이면 "한 결제로 묶기" 체크(기본 켜짐, 사진 여러 장 OCR은 영수증이 따로라 꺼짐). 한 줄일 땐
+  체크 대신 "+ 물품 종류 추가로 줄을 더하면 나와요" 안내(한 줄짜리 수정 화면에서 기능을 못 찾았다는 문의). 기존 단독 거래 수정 중
+  줄을 더하면 그 거래와 같은 묶음(`bulkImportTransactions`의 `joinGroupOf`).
 - 수정: 묶음 줄 어디서 "수정"을 눌러도 묶음 전체가 열림(`loadPaymentGroupForEdit`) — 줄 수정·추가·삭제를 한 번에
   (`saveTransactionGroup`, 수정 → 추가 → 삭제 순서, 삭제는 그 묶음 번호인 줄만). 공통 칸(날짜·거래처·카테고리·결제·VAT·메모 등)이
   줄마다 다르면 한 값으로 덮어쓰지 않게 그 줄만 수정(안내 문구).

@@ -724,6 +724,11 @@ export function TransactionForm({
                 <span className="block text-xs text-slate-400">매입장에 한 줄로 표시 · 프로젝트별 금액은 줄마다 따로 저장</span>
               </span>
             </label>
+          ) : groupingReady ? (
+            // 한 줄일 때는 묶을 게 없어서 체크 대신 안내만 — 체크가 안 보여 기능을 못 찾았음(사용자 문의).
+            <p className="text-xs text-slate-400">
+              한 결제를 여러 프로젝트로 나눌 땐 &quot;+ 물품 종류 추가&quot;로 줄을 더하면 &quot;한 결제로 묶기&quot;가 나와요.
+            </p>
           ) : (
             <span />
           )}
