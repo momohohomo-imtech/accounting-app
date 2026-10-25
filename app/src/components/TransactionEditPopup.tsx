@@ -4,6 +4,7 @@ import { one } from "@/lib/relations";
 import { TransactionForm } from "@/components/TransactionForm";
 import { updateTransactionRecord } from "@/lib/actions/transactions";
 import { EscapeCloseLink } from "@/components/EscapeCloseLink";
+import { loadPaymentGroupForEdit } from "@/lib/paymentGroup";
 
 // 거래 수정 팝업 — 매입매출 목록, 외상 관리, 보고서(매입처별 집계) 어디서 열든 공통으로 씀.
 export async function TransactionEditPopup({ editTx, redirectTo }: { editTx?: string; redirectTo: string }) {
@@ -22,6 +23,9 @@ export async function TransactionEditPopup({ editTx, redirectTo }: { editTx?: st
     ]);
 
   if (!tx) return null;
+  // 한 결제로 묶인 거래면 묶음 줄을 같이 열어 한꺼번에 수정(092 SQL 실행 전엔 칸이 없어 묶기 기능을 숨김).
+  const groupingReady = "payment_group_id" in tx;
+  const { group, partOfGroup } = await loadPaymentGroupForEdit(supabase, tx);
 
   const siteOptions = (sites ?? []).map((s) => ({
     id: s.id,
@@ -38,8 +42,9 @@ export async function TransactionEditPopup({ editTx, redirectTo }: { editTx?: st
       {/* max-w-5xl: 등록 화면(/transactions/new)과 비슷한 폭 — 좁으면(2xl) 3칸 배치의 프로젝트 선택칸이 "(주)대…"처럼 잘리고
           "완료 프로젝트 보기"가 세 줄로 접혔음 */}
       <div className="w-full max-w-5xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">거래 수정</h2>
+        <h2 className="mb-4 text-lg font-semibold text-slate-900">{group ? `거래 수정 (한 결제 ${group.length}줄)` : "거래 수정"}</h2>
         <TransactionForm
+          key={tx.id}
           clients={clients ?? []}
           rawClientNames={rawClientNames}
           sites={siteOptions}
@@ -47,6 +52,9 @@ export async function TransactionEditPopup({ editTx, redirectTo }: { editTx?: st
           paymentMethods={paymentMethods ?? []}
           expenseCategories={expenseCategories ?? []}
           initial={tx}
+          initialGroup={group}
+          partOfGroup={partOfGroup}
+          groupingReady={groupingReady}
           action={updateTransactionRecord}
           redirectTo={redirectTo}
         />

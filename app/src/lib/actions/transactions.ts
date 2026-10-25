@@ -124,13 +124,38 @@ export type BulkTransactionInput = {
   note2: string | null;
 };
 
-export async function bulkImportTransactions(rows: BulkTransactionInput[]) {
+// 한 결제로 묶기(092 SQL) — group: 새로 등록하는 이 줄들을 한 결제로 묶음. joinGroupOf: 수정 중인 거래에 줄을 더할 때
+// 그 거래와 같은 묶음으로(그 거래에 묶음 번호가 없으면 새로 만들어 그 거래에도 붙임). 둘 다 없으면 예전처럼 따로 등록.
+export async function bulkImportTransactions(
+  rows: BulkTransactionInput[],
+  options: { group?: boolean; joinGroupOf?: string } = {}
+) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (rows.length === 0) return { error: "등록할 행이 없습니다." };
+
+  let paymentGroupId: string | null = null;
+  if (options.joinGroupOf) {
+    const { data: base, error } = await supabase
+      .from("transactions")
+      .select("payment_group_id")
+      .eq("id", options.joinGroupOf)
+      .single();
+    if (error) return { error: error.message };
+    paymentGroupId = base.payment_group_id ?? crypto.randomUUID();
+    if (!base.payment_group_id) {
+      const { error: baseError } = await supabase
+        .from("transactions")
+        .update({ payment_group_id: paymentGroupId })
+        .eq("id", options.joinGroupOf);
+      if (baseError) return { error: baseError.message };
+    }
+  } else if (options.group && rows.length > 1) {
+    paymentGroupId = crypto.randomUUID();
+  }
 
   const inserts = rows.map((r) => ({
     trans_date: r.trans_date,
@@ -152,11 +177,110 @@ export async function bulkImportTransactions(rows: BulkTransactionInput[]) {
     note1: r.note1,
     note2: r.note2,
     created_by: user?.id ?? null,
+    // 묶지 않을 때는 칸을 아예 안 보냄 — 092 SQL 실행 전에도 등록이 깨지지 않게.
+    ...(paymentGroupId ? { payment_group_id: paymentGroupId } : {}),
   }));
 
   const { error } = await supabase.from("transactions").insert(inserts);
   if (error) return { error: error.message };
 
+  revalidateLedgerPages();
+}
+
+export type GroupLineInput = BulkTransactionInput & { id?: string };
+
+// 묶음 전체 수정 — 줄 수정·추가·삭제를 한 번에. keepGroup이 꺼져 있거나 한 줄만 남으면 묶음을 푼다.
+// 중간에 실패해도 데이터가 덜 사라지게 수정 → 추가 → 삭제 순서, 삭제는 이 묶음의 줄만(묶음 번호로 한 번 더 거름).
+export async function saveTransactionGroup(input: {
+  groupId: string;
+  lines: GroupLineInput[];
+  removedIds: string[];
+  keepGroup: boolean;
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (input.lines.length === 0) return { error: "저장할 줄이 없습니다." };
+  const paymentGroupId = input.keepGroup && input.lines.length > 1 ? input.groupId : null;
+
+  const fieldsOf = (r: BulkTransactionInput) => ({
+    trans_date: r.trans_date,
+    type: r.type,
+    client_id: r.client_id,
+    client_name_raw: r.client_name_raw,
+    project_id: r.project_id,
+    item_name: r.item_name,
+    category_id: r.category_id,
+    quantity: r.quantity,
+    unit_price: r.unit_price,
+    payment_method_id: r.payment_method_id,
+    tax_invoice_issued: r.tax_invoice_issued,
+    vat_included: r.vat_included,
+    ...computeAmounts(r.type, r.amount, r.vat_included),
+    payment_type: r.payment_type,
+    needs_classification: r.needs_classification,
+    note1: r.note1,
+    note2: r.note2,
+    payment_group_id: paymentGroupId,
+  });
+
+  const updates = await Promise.all(
+    input.lines
+      .filter((l) => l.id)
+      .map((l) => supabase.from("transactions").update(fieldsOf(l)).eq("id", l.id!))
+  );
+  const updateError = updates.find((r) => r.error)?.error;
+  if (updateError) return { error: updateError.message };
+
+  const inserts = input.lines
+    .filter((l) => !l.id)
+    .map((l) => ({ ...fieldsOf(l), is_verified_ai: true, created_by: user?.id ?? null }));
+  if (inserts.length > 0) {
+    const { error } = await supabase.from("transactions").insert(inserts);
+    if (error) return { error: error.message };
+  }
+
+  if (input.removedIds.length > 0) {
+    const { error } = await supabase
+      .from("transactions")
+      .delete()
+      .in("id", input.removedIds)
+      .eq("payment_group_id", input.groupId);
+    if (error) return { error: error.message };
+  }
+
+  revalidateLedgerPages();
+}
+
+// 매입장에서 고른 거래들을 한 결제로 묶음 — 같은 날짜·같은 구분끼리만(묶음이 다른 달이나 매입/매출로 갈라지지 않게).
+export async function groupTransactions(formData: FormData) {
+  const supabase = await createClient();
+  const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
+  if (ids.length < 2) return { error: "묶을 거래를 2건 이상 선택해주세요." };
+
+  const { data: rows, error } = await supabase.from("transactions").select("id, trans_date, type").in("id", ids);
+  if (error) return { error: error.message };
+  if (new Set((rows ?? []).map((r) => r.type)).size > 1) return { error: "매입과 매출은 함께 묶을 수 없습니다." };
+  if (new Set((rows ?? []).map((r) => r.trans_date)).size > 1) return { error: "날짜가 같은 거래끼리만 묶을 수 있습니다." };
+
+  const { error: updateError } = await supabase
+    .from("transactions")
+    .update({ payment_group_id: crypto.randomUUID() })
+    .in("id", ids);
+  if (updateError) return { error: updateError.message };
+  revalidateLedgerPages();
+}
+
+// 묶음 풀기 — 고른 거래만 묶음에서 빼서 매입장에 따로 보이게(금액·프로젝트는 그대로).
+export async function ungroupTransactions(formData: FormData) {
+  const supabase = await createClient();
+  const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
+  if (ids.length === 0) return { error: "선택된 거래가 없습니다." };
+
+  const { error } = await supabase.from("transactions").update({ payment_group_id: null }).in("id", ids);
+  if (error) return { error: error.message };
   revalidateLedgerPages();
 }
 
@@ -228,6 +352,16 @@ export async function deleteTransactionRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
   const { error } = await supabase.from("transactions").delete().eq("id", id);
+  if (error) return { error: error.message };
+  revalidateLedgerPages();
+}
+
+// 묶음 삭제 — 한 결제로 묶인 줄 전부.
+export async function deleteTransactionRecords(formData: FormData) {
+  const supabase = await createClient();
+  const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
+  if (ids.length === 0) return { error: "삭제할 거래가 없습니다." };
+  const { error } = await supabase.from("transactions").delete().in("id", ids);
   if (error) return { error: error.message };
   revalidateLedgerPages();
 }

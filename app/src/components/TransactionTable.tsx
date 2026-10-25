@@ -1,16 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import {
   deleteTransactionRecord,
+  deleteTransactionRecords,
   bulkUpdateProjectId,
   bulkUpdateClientId,
   bulkUpdateCategoryId,
   bulkUpdatePaymentMethodId,
   bulkUpdateItemName,
+  groupTransactions,
+  ungroupTransactions,
 } from "@/lib/actions/transactions";
 import { formatWon, formatDate } from "@/lib/format";
 import { transactionTotal } from "@/lib/credit";
+import { groupLedgerRows, sortGroupLines, summaryLabel } from "@/lib/paymentGroup";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import { paymentMethodColorStyle } from "@/lib/paymentMethodColors";
 import { Badge } from "@/components/ui/Badge";
@@ -73,6 +77,36 @@ function sortValue(t: Transaction, key: SortKey): string | number {
 
 type BulkField = "project" | "client" | "category" | "payment_method" | "item_name";
 
+// 한 결제로 묶인 거래(092)의 매입장 한 줄 — 금액은 합계, 이름은 "A 외 1곳"처럼(같은 이름은 한 번만), 나머지는 첫 줄
+// (한 결제라 날짜·구분·결제방식이 같음).
+function groupHead(lines: Transaction[]): Transaction {
+  const first = lines[0];
+  const total = (key: "sales_amount" | "sales_vat" | "purchase_amount" | "purchase_vat") =>
+    lines.reduce((s, l) => s + Number(l[key]), 0);
+  const firstCategory = lines.find((l) => l.expense_categories)?.expense_categories;
+  return {
+    ...first,
+    sales_amount: total("sales_amount"),
+    sales_vat: total("sales_vat"),
+    purchase_amount: total("purchase_amount"),
+    purchase_vat: total("purchase_vat"),
+    tax_invoice_issued: lines.some((l) => l.tax_invoice_issued),
+    needs_classification: lines.every((l) => l.needs_classification),
+    item_name: summaryLabel(lines.map((l) => l.item_name ?? "-"), "건"),
+    clients: {
+      ...first.clients,
+      name: summaryLabel(lines.map((l) => l.clients?.name ?? l.client_name_raw ?? "-"), "곳"),
+    } as Transaction["clients"],
+    projects: lines.some((l) => l.projects)
+      ? ({ name: summaryLabel(lines.map((l) => l.projects?.name ?? "일반경비"), "곳") } as Transaction["projects"])
+      : undefined,
+    expense_categories: firstCategory && {
+      ...firstCategory,
+      name: summaryLabel(lines.map((l) => l.expense_categories?.name ?? "-"), "개"),
+    },
+  };
+}
+
 export function TransactionTable({
   transactions,
   projectNodes,
@@ -83,6 +117,7 @@ export function TransactionTable({
   showProject = true,
   showCategory = true,
   showItem = true,
+  groupingReady = false,
 }: {
   transactions: Transaction[];
   projectNodes: ProjectTreeNode[];
@@ -93,6 +128,8 @@ export function TransactionTable({
   showProject?: boolean;
   showCategory?: boolean;
   showItem?: boolean;
+  // 092 SQL 실행 후에만 "한 결제로 묶기·묶음 풀기" 버튼을 보여 줌.
+  groupingReady?: boolean;
 }) {
   const COLUMNS = ALL_COLUMNS.filter(
     (c) =>
@@ -114,6 +151,9 @@ export function TransactionTable({
   const [sortKey, setSortKey] = useState<SortKey>("trans_date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // 펼친 묶음(payment_group_id).
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // 삭제 확인 중인 줄 — 거래 id, 묶음 전체면 "group:묶음 번호".
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const pending = useGlobalPending();
@@ -198,16 +238,27 @@ export function TransactionTable({
     }
   }
 
+  // 한 결제로 묶인 거래는 한 줄로(정렬은 묶음 합계·대표값 기준), 펼치면 줄마다.
+  const items = useMemo(
+    () =>
+      groupLedgerRows(transactions).map((it) => {
+        if (!it.groupId) return { ...it, head: it.lines[0] };
+        const lines = sortGroupLines(it.lines);
+        return { ...it, lines, head: groupHead(lines) };
+      }),
+    [transactions]
+  );
+
   const sorted = useMemo(() => {
-    const copy = [...transactions];
+    const copy = [...items];
     copy.sort((a, b) => {
-      const va = sortValue(a, sortKey);
-      const vb = sortValue(b, sortKey);
+      const va = sortValue(a.head, sortKey);
+      const vb = sortValue(b.head, sortKey);
       const cmp = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb));
       return sortDir === "asc" ? cmp : -cmp;
     });
     return copy;
-  }, [transactions, sortKey, sortDir]);
+  }, [items, sortKey, sortDir]);
 
   const bulkYears = useMemo(
     () => Array.from(new Set(projectNodes.map((p) => p.year))).sort((a, b) => b - a),
@@ -230,17 +281,217 @@ export function TransactionTable({
     [projectNodes, bulkYear, bulkSiteId]
   );
 
-  function toggle(id: string) {
+  // 거래 여러 건을 한 번에 선택/해제 — 묶음 한 줄의 체크는 묶음의 모든 줄.
+  function toggleLines(ids: string[]) {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      const allOn = ids.every((id) => next.has(id));
+      for (const id of ids) {
+        if (allOn) next.delete(id);
+        else next.add(id);
+      }
       return next;
     });
   }
 
   function toggleAll() {
-    setSelected((prev) => (prev.size === sorted.length ? new Set() : new Set(sorted.map((t) => t.id))));
+    setSelected((prev) => (prev.size === transactions.length ? new Set() : new Set(transactions.map((t) => t.id))));
+  }
+
+  function toggleExpand(groupId: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }
+
+  const selectedHasGroup = transactions.some((t) => selected.has(t.id) && t.payment_group_id);
+
+  async function runGroupAction(groupAction: (fd: FormData) => Promise<BulkResult>) {
+    const fd = new FormData();
+    selected.forEach((id) => fd.append("transaction_ids", id));
+    setBulkError(null);
+    const result = await pending.run(() => groupAction(fd));
+    if (result?.error) {
+      setBulkError(result.error);
+      return;
+    }
+    setSelected(new Set());
+    resetBulkFields();
+  }
+
+  function deleteFormData(ids: string[]) {
+    const fd = new FormData();
+    if (ids.length === 1) fd.append("id", ids[0]);
+    else ids.forEach((id) => fd.append("transaction_ids", id));
+    return fd;
+  }
+
+  function checkboxCell(ids: string[]) {
+    return (
+      <Td className="pr-2">
+        <input
+          type="checkbox"
+          checked={ids.every((id) => selected.has(id))}
+          onChange={() => toggleLines(ids)}
+          className="h-4 w-4 accent-slate-900"
+        />
+      </Td>
+    );
+  }
+
+  // 수정·삭제 칸 — 묶음 줄(묶음 전체·펼친 줄)의 수정은 묶음 전체 수정 화면이 열림. ids가 여러 개면 묶음 전체 삭제.
+  function actionsCell(editId: string, confirmKey: string, ids: string[]) {
+    return (
+      <Td className="text-right">
+        <div className="flex justify-end gap-2">
+          <LinkButton href={editHrefFor(editId)} variant="secondary" size="xs">
+            수정
+          </LinkButton>
+          {confirmDeleteId === confirmKey ? (
+            <div className="flex items-center gap-1">
+              <span className="whitespace-nowrap text-xs font-medium text-red-600">
+                {ids.length > 1 ? `${ids.length}건 모두 삭제?` : "정말 삭제?"}
+              </span>
+              <Button
+                variant="danger"
+                size="xs"
+                type="button"
+                onClick={async () => {
+                  const fd = deleteFormData(ids);
+                  const result = await pending.run(() =>
+                    ids.length > 1 ? deleteTransactionRecords(fd) : deleteTransactionRecord(fd)
+                  );
+                  if (result?.error) {
+                    setDeleteError(result.error);
+                    return;
+                  }
+                  setDeleteError(null);
+                  setConfirmDeleteId(null);
+                }}
+              >
+                확인
+              </Button>
+              <Button
+                variant="secondary"
+                size="xs"
+                type="button"
+                onClick={() => {
+                  setConfirmDeleteId(null);
+                  setDeleteError(null);
+                }}
+              >
+                취소
+              </Button>
+            </div>
+          ) : (
+            <Button variant="danger" size="xs" type="button" onClick={() => setConfirmDeleteId(confirmKey)}>
+              삭제
+            </Button>
+          )}
+        </div>
+        {confirmDeleteId === confirmKey && deleteError && (
+          <p className="mt-1 text-right text-xs text-red-600">{deleteError}</p>
+        )}
+      </Td>
+    );
+  }
+
+  function projectCell(t: Transaction) {
+    return (
+      <Td className="pr-4 max-md:max-w-[10rem] max-md:truncate print:max-w-none print:overflow-visible print:whitespace-normal" title={t.projects?.name ?? undefined}>
+        {t.needs_classification ? (
+          <Badge variant="green">분류 대기 중</Badge>
+        ) : (
+          (t.projects?.name ?? <span className="font-medium text-red-600">일반경비</span>)
+        )}
+      </Td>
+    );
+  }
+
+  function categoryCell(t: Transaction) {
+    return (
+      <Td className="whitespace-nowrap pr-4">
+        <span
+          className={t.expense_categories?.project_only ? "font-medium" : undefined}
+          style={{ color: resolveCategoryColor(t.expense_categories) }}
+        >
+          {t.expense_categories?.name ?? "-"}
+        </span>
+      </Td>
+    );
+  }
+
+  function itemCell(t: Transaction) {
+    return (
+      <Td className="pr-4 max-md:max-w-[10rem] max-md:truncate print:max-w-none print:overflow-visible print:whitespace-normal" title={t.item_name ?? undefined}>
+        {t.item_name ?? "-"}
+      </Td>
+    );
+  }
+
+  // 거래 한 줄(묶음 한 줄 포함)의 날짜~금액 칸. lead: 날짜 앞에 붙는 묶음 펼치기 버튼.
+  function mainCells(t: Transaction, lead?: React.ReactNode, typeExtra?: React.ReactNode) {
+    return (
+      <>
+        <Td className="whitespace-nowrap pr-4" title={formatDate(t.trans_date)}>
+          {lead}
+          {/* 화면은 연도 필터로 이미 한 해만 보이므로 월-일만, 인쇄는 전체 날짜 */}
+          <span className="print:hidden">{formatDate(t.trans_date).slice(5)}</span>
+          <span className="hidden print:inline">{formatDate(t.trans_date)}</span>
+        </Td>
+        <Td className="whitespace-nowrap pr-4">
+          <Badge variant={t.type === "매출" ? "blue" : "orange"}>{t.type}</Badge>
+          {typeExtra}
+        </Td>
+        <Td
+          className="sticky-col pr-4 max-md:max-w-[8.5rem] max-md:truncate print:max-w-none print:overflow-visible print:whitespace-normal"
+          title={t.clients?.name ?? t.client_name_raw ?? undefined}
+        >
+          {t.clients?.name ?? t.client_name_raw ?? "-"}
+        </Td>
+        {showProject && projectCell(t)}
+        {showCategory && categoryCell(t)}
+        {showItem && itemCell(t)}
+        <Td className="whitespace-nowrap pr-4">
+          {t.payment_methods ? (
+            <span
+              className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+              style={paymentMethodColorStyle(t.payment_methods)}
+            >
+              {t.payment_methods.name}
+            </span>
+          ) : (
+            "-"
+          )}
+        </Td>
+        <Td className="whitespace-nowrap pr-4">
+          {t.tax_invoice_issued ? <Badge variant="emerald">발행</Badge> : <span className="text-slate-300">-</span>}
+        </Td>
+        <Td className="whitespace-nowrap pr-4 text-right font-medium text-slate-900">{formatWon(transactionTotal(t))}</Td>
+      </>
+    );
+  }
+
+  // 묶음을 펼친 줄 — 프로젝트·카테고리·품목·금액만(날짜·거래처·결제방식은 묶음 줄과 같음).
+  function lineRow(t: Transaction) {
+    return (
+      <Tr key={t.id} className={selected.has(t.id) ? "bg-brand-soft" : "bg-slate-50/70"}>
+        {checkboxCell([t.id])}
+        <Td className="whitespace-nowrap pr-4 pl-3 text-slate-300">└</Td>
+        <Td className="pr-4" />
+        <Td className="sticky-col pr-4" />
+        {showProject && projectCell(t)}
+        {showCategory && categoryCell(t)}
+        {showItem && itemCell(t)}
+        <Td className="pr-4" />
+        <Td className="pr-4" />
+        <Td className="whitespace-nowrap pr-4 text-right text-slate-700">{formatWon(transactionTotal(t))}</Td>
+        {actionsCell(t.id, t.id, [t.id])}
+      </Tr>
+    );
   }
 
   return (
@@ -412,6 +663,20 @@ export function TransactionTable({
               선택 해제
             </Button>
           </form>
+          {groupingReady && (selected.size > 1 || selectedHasGroup) && (
+            <div className="flex flex-wrap items-center gap-2 border-slate-300 sm:border-l sm:pl-2">
+              {selected.size > 1 && (
+                <Button type="button" variant="secondary" size="sm" onClick={() => runGroupAction(groupTransactions)}>
+                  한 결제로 묶기
+                </Button>
+              )}
+              {selectedHasGroup && (
+                <Button type="button" variant="secondary" size="sm" onClick={() => runGroupAction(ungroupTransactions)}>
+                  묶음 풀기
+                </Button>
+              )}
+            </div>
+          )}
         </Card>
       )}
       {bulkError && <p className="text-sm text-red-600 print:hidden">{bulkError}</p>}
@@ -423,7 +688,7 @@ export function TransactionTable({
           <th className="w-8 pb-2 pr-2">
             <input
               type="checkbox"
-              checked={selected.size > 0 && selected.size === sorted.length}
+              checked={selected.size > 0 && selected.size === transactions.length}
               onChange={toggleAll}
               className="h-4 w-4 accent-slate-900"
             />
@@ -450,123 +715,43 @@ export function TransactionTable({
           <th className="pb-2 text-right font-medium">관리</th>
         </THead>
         <tbody>
-          {sorted.map((t) => (
-            <Tr
-              key={t.id}
-              className={selected.has(t.id) ? "bg-brand-soft" : undefined}
-            >
-              <Td className="pr-2">
-                <input
-                  type="checkbox"
-                  checked={selected.has(t.id)}
-                  onChange={() => toggle(t.id)}
-                  className="h-4 w-4 accent-slate-900"
-                />
-              </Td>
-              <Td className="whitespace-nowrap pr-4" title={formatDate(t.trans_date)}>
-                {/* 화면은 연도 필터로 이미 한 해만 보이므로 월-일만, 인쇄는 전체 날짜 */}
-                <span className="print:hidden">{formatDate(t.trans_date).slice(5)}</span>
-                <span className="hidden print:inline">{formatDate(t.trans_date)}</span>
-              </Td>
-              <Td className="whitespace-nowrap pr-4">
-                <Badge variant={t.type === "매출" ? "blue" : "orange"}>{t.type}</Badge>
-              </Td>
-              <Td
-                className="sticky-col pr-4 max-md:max-w-[8.5rem] max-md:truncate print:max-w-none print:overflow-visible print:whitespace-normal"
-                title={t.clients?.name ?? t.client_name_raw ?? undefined}
-              >
-                {t.clients?.name ?? t.client_name_raw ?? "-"}
-              </Td>
-              {showProject && (
-                <Td className="pr-4 max-md:max-w-[10rem] max-md:truncate print:max-w-none print:overflow-visible print:whitespace-normal" title={t.projects?.name ?? undefined}>
-                  {t.needs_classification ? (
-                    <Badge variant="green">분류 대기 중</Badge>
-                  ) : (
-                    (t.projects?.name ?? <span className="font-medium text-red-600">일반경비</span>)
+          {sorted.map((item) => {
+            const t = item.head;
+            if (!item.groupId) {
+              return (
+                <Tr key={item.key} className={selected.has(t.id) ? "bg-brand-soft" : undefined}>
+                  {checkboxCell([t.id])}
+                  {mainCells(t)}
+                  {actionsCell(t.id, t.id, [t.id])}
+                </Tr>
+              );
+            }
+            const groupId = item.groupId;
+            const ids = item.lines.map((l) => l.id);
+            const open = expanded.has(groupId);
+            return (
+              <Fragment key={item.key}>
+                <Tr className={ids.every((id) => selected.has(id)) ? "bg-brand-soft" : undefined}>
+                  {checkboxCell(ids)}
+                  {mainCells(
+                    t,
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand(groupId)}
+                      aria-expanded={open}
+                      aria-label={open ? "묶음 접기" : "묶음 펼치기"}
+                      className="mr-1 inline-flex h-5 w-5 items-center justify-center rounded text-[10px] text-slate-500 hover:bg-slate-200 print:hidden"
+                    >
+                      {open ? "▼" : "▶"}
+                    </button>,
+                    <span className="ml-1 text-[11px] text-slate-500">{item.lines.length}건 묶음</span>
                   )}
-                </Td>
-              )}
-              {showCategory && (
-                <Td className="whitespace-nowrap pr-4">
-                  <span
-                    className={t.expense_categories?.project_only ? "font-medium" : undefined}
-                    style={{ color: resolveCategoryColor(t.expense_categories) }}
-                  >
-                    {t.expense_categories?.name ?? "-"}
-                  </span>
-                </Td>
-              )}
-              {showItem && (
-                <Td className="pr-4 max-md:max-w-[10rem] max-md:truncate print:max-w-none print:overflow-visible print:whitespace-normal" title={t.item_name ?? undefined}>
-                  {t.item_name ?? "-"}
-                </Td>
-              )}
-              <Td className="whitespace-nowrap pr-4">
-                {t.payment_methods ? (
-                  <span
-                    className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
-                    style={paymentMethodColorStyle(t.payment_methods)}
-                  >
-                    {t.payment_methods.name}
-                  </span>
-                ) : (
-                  "-"
-                )}
-              </Td>
-              <Td className="whitespace-nowrap pr-4">
-                {t.tax_invoice_issued ? <Badge variant="emerald">발행</Badge> : <span className="text-slate-300">-</span>}
-              </Td>
-              <Td className="whitespace-nowrap pr-4 text-right font-medium text-slate-900">{formatWon(transactionTotal(t))}</Td>
-              <Td className="text-right">
-                <div className="flex justify-end gap-2">
-                  <LinkButton href={editHrefFor(t.id)} variant="secondary" size="xs">
-                    수정
-                  </LinkButton>
-                  {confirmDeleteId === t.id ? (
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs font-medium text-red-600">정말 삭제?</span>
-                      <Button
-                        variant="danger"
-                        size="xs"
-                        type="button"
-                        onClick={async () => {
-                          const fd = new FormData();
-                          fd.append("id", t.id);
-                          const result = await pending.run(() => deleteTransactionRecord(fd));
-                          if (result?.error) {
-                            setDeleteError(result.error);
-                            return;
-                          }
-                          setDeleteError(null);
-                          setConfirmDeleteId(null);
-                        }}
-                      >
-                        확인
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="xs"
-                        type="button"
-                        onClick={() => {
-                          setConfirmDeleteId(null);
-                          setDeleteError(null);
-                        }}
-                      >
-                        취소
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button variant="danger" size="xs" type="button" onClick={() => setConfirmDeleteId(t.id)}>
-                      삭제
-                    </Button>
-                  )}
-                </div>
-                {confirmDeleteId === t.id && deleteError && (
-                  <p className="mt-1 text-right text-xs text-red-600">{deleteError}</p>
-                )}
-              </Td>
-            </Tr>
-          ))}
+                  {actionsCell(item.lines[0].id, `group:${groupId}`, ids)}
+                </Tr>
+                {open && item.lines.map((l) => lineRow(l))}
+              </Fragment>
+            );
+          })}
           {sorted.length === 0 && <EmptyRow colSpan={COLUMNS.length + 2}>거래 내역이 없습니다.</EmptyRow>}
         </tbody>
       </Table>

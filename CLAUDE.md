@@ -124,7 +124,7 @@
 
 - **금액 계산을 바꾸면 `npm test`(app 폴더)로 자동 검사를 돌릴 것.** 부가세 분리(`vatBasis`),
   외상 잔액(`credit`), 종합소득세(`tax`), 견적 금액·한글 금액(`quoteCalc`·`numberToKorean`),
-  예상 미수액(`expectedReceivable`), 이익 예상(`projectProfit` — 대시보드·보고서 공통), 엑셀 거래 읽기(`transactionExcel`), 작업일지 집계(`workLogSummary`), 출장일지 합계·보고서 작업일수 나눔·출장 투입 인원(`tripLog`), 보고서 출장 현황(`tripOverview`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
+  예상 미수액(`expectedReceivable`), 이익 예상(`projectProfit` — 대시보드·보고서 공통), 엑셀 거래 읽기(`transactionExcel`), 작업일지 집계(`workLogSummary`), 출장일지 합계·보고서 작업일수 나눔·출장 투입 인원(`tripLog`), 보고서 출장 현황(`tripOverview`), 매입장 한 결제 묶기(`paymentGroup`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
   (vitest는 npm 설치 오류로 못 씀 — 새 테스트 라이브러리를 넣지 말 것)
@@ -134,6 +134,11 @@
   기준(사용자 결정): 세금계산서(거래일) 기준이라 외상 미정산도 포함 · 검토중 프로젝트의 발주액은 어떤 합계에도 안 넣음(이미 쓴
   매입은 비용) · 연도는 프로젝트 귀속 연도(연말까지 계산서를 못 끊은 프로젝트는 사용자가 귀속 연도를 다음 해로 바꿈) · 발주액
   0원은 빈칸과 같게 · "미발행" 프로젝트(하반기 예상 이익·1월 부가세 예상분 대상)는 `isUnbilledProject` 하나로 판단. 화면마다 따로 계산하다가 대시보드와 보고서 숫자가 어긋난 적이 있음.
+
+- **"한 결제로 묶기"(`transactions.payment_group_id`, 092 SQL)는 매입장 표시용.** 카드 결제 한 번을 프로젝트별로 나눈 거래들은
+  같은 묶음 번호를 가짐 — 저장·계산(프로젝트 손익·보고서·부가세·외상)은 거래(줄)마다 그대로, 매입장 표·엑셀만 `lib/paymentGroup.ts`의
+  `groupLedgerRows`로 한 줄. 묶음 수정은 `saveTransactionGroup` 하나로(줄 수정·추가·삭제). 거래 1건에 프로젝트 배분표를 다는 방식은
+  프로젝트 금액을 쓰는 곳을 전부 고쳐야 해서 쓰지 않기로 사용자와 정함.
 
 - **작업일지의 "내용 이어받기"는 `lib/workLogSummary.ts`의 `resolveWorkLogTitles` 하나로만 정할 것.** 내용을 비운 줄은 같은
   현장·같은 프로젝트의 앞 내용 → 없으면 프로젝트 이름 → 프로젝트도 없으면 그 현장의 앞 내용. 작업일지를 날짜·내용별로 세는

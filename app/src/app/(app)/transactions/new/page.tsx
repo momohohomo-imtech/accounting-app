@@ -3,10 +3,19 @@ import { fetchAllRawClientNames } from "@/lib/supabaseFetchAll";
 import { one } from "@/lib/relations";
 import { TransactionForm } from "@/components/TransactionForm";
 import { createTransactionRecord } from "@/lib/actions/transactions";
+import { paymentGroupReady } from "@/lib/paymentGroup";
 
 export default async function NewTransactionPage() {
   const supabase = await createClient();
-  const [{ data: clients }, { data: sites }, { data: projects }, { data: paymentMethods }, { data: expenseCategories }, { data: rawClientRows }] =
+  const [
+    { data: clients },
+    { data: sites },
+    { data: projects },
+    { data: paymentMethods },
+    { data: expenseCategories },
+    { data: rawClientRows },
+    groupingReady,
+  ] =
     await Promise.all([
       supabase.from("clients").select("id, name, default_item_name, default_category_id").order("name"),
       supabase.from("sites").select("id, name, clients(name)").order("name"),
@@ -14,6 +23,7 @@ export default async function NewTransactionPage() {
       supabase.from("payment_methods").select("*").order("sort_order"),
       supabase.from("expense_categories").select("*").order("sort_order"),
       fetchAllRawClientNames(supabase),
+      paymentGroupReady(supabase),
     ]);
 
   const siteOptions = (sites ?? []).map((s) => ({
@@ -35,6 +45,7 @@ export default async function NewTransactionPage() {
         projects={projects ?? []}
         paymentMethods={paymentMethods ?? []}
         expenseCategories={expenseCategories ?? []}
+        groupingReady={groupingReady}
         action={createTransactionRecord}
       />
     </div>

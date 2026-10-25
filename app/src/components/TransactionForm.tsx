@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ExpenseCategory, PaymentMethod, Transaction } from "@/lib/types";
 import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components/ProjectPicker";
-import { bulkImportTransactions, type BulkTransactionInput } from "@/lib/actions/transactions";
+import { bulkImportTransactions, saveTransactionGroup, type BulkTransactionInput } from "@/lib/actions/transactions";
 import { formatWon, todayString } from "@/lib/format";
 import { isVatExemptCategory } from "@/lib/vatBasis";
 import { resolveCategoryColor } from "@/lib/categoryColor";
@@ -16,7 +16,8 @@ import { formatThousands, parseNumericInput } from "@/lib/numberInput";
 
 type Option = { id: string; name: string };
 type ClientOption = Option & { default_item_name?: string | null; default_category_id?: string | null };
-type LineItem = { item_name: string; quantity: string; unit_price: string; subtotal: string; project_id: string };
+// id: 묶음 전체 수정 때 원래 거래(줄) — 없으면 저장할 때 새 거래로 추가.
+type LineItem = { item_name: string; quantity: string; unit_price: string; subtotal: string; project_id: string; id?: string };
 
 function emptyLineItem(): LineItem {
   return { item_name: "", quantity: "", unit_price: "", subtotal: "", project_id: "" };
@@ -47,6 +48,9 @@ export function TransactionForm({
   paymentMethods,
   expenseCategories,
   initial,
+  initialGroup,
+  partOfGroup = false,
+  groupingReady = false,
   action,
   redirectTo = "/transactions",
 }: {
@@ -57,9 +61,16 @@ export function TransactionForm({
   paymentMethods: PaymentMethod[];
   expenseCategories: ExpenseCategory[];
   initial?: Transaction;
+  // 한 결제로 묶인 거래를 수정할 때 묶음의 모든 줄(공통 칸이 같을 때만 — 수정 팝업이 확인해서 넘김).
+  initialGroup?: Transaction[];
+  // 묶음에 속하지만 줄마다 공통 칸이 달라서 이 줄만 수정하는 경우.
+  partOfGroup?: boolean;
+  // 092 SQL 실행 후에만 "한 결제로 묶기"를 보여 줌.
+  groupingReady?: boolean;
   action: (formData: FormData) => Promise<{ error?: string } | void>;
   redirectTo?: string;
 }) {
+  const isGroupEdit = Boolean(initial && initialGroup && initialGroup.length > 1);
   const router = useRouter();
   const confirm = useConfirm();
   const pending = useGlobalPending();
@@ -72,7 +83,8 @@ export function TransactionForm({
     type: initial?.type ?? "매입",
     client_id: initial?.client_id ?? "",
     client_name_raw: initial?.client_name_raw ?? "",
-    project_id: initial?.project_id ?? "",
+    // 묶음 수정은 줄마다 자기 프로젝트를 들고 있어서 공통 프로젝트는 비워 둠.
+    project_id: isGroupEdit ? "" : initial?.project_id ?? "",
     category_id: initial?.category_id ?? "",
     payment_method_id: initial?.payment_method_id ?? "",
     tax_invoice_issued: initial?.tax_invoice_issued ?? false,
@@ -83,8 +95,14 @@ export function TransactionForm({
     note2: initial?.note2 ?? "",
   });
   const [lineItems, setLineItems] = useState<LineItem[]>(
-    initial ? [lineItemFromInitial(initial)] : [emptyLineItem()]
+    isGroupEdit
+      ? initialGroup!.map((t) => ({ ...lineItemFromInitial(t), project_id: t.project_id ?? "", id: t.id }))
+      : initial
+        ? [lineItemFromInitial(initial)]
+        : [emptyLineItem()]
   );
+  // 한 결제로 묶기 — 품목이 2줄 이상일 때. 사진을 여러 장 올리면 영수증이 따로라서 끔.
+  const [groupPayment, setGroupPayment] = useState(true);
   const [ocrExtracted, setOcrExtracted] = useState<Record<string, unknown> | null>(
     (initial?.ocr_extracted_raw as Record<string, unknown>) ?? null
   );
@@ -179,6 +197,7 @@ export function TransactionForm({
   }
 
   async function handleImageOrPdfFiles(files: File[]) {
+    if (files.length > 1) setGroupPayment(false);
     const firstImage = files.find((f) => f.type.startsWith("image/"));
     setPreview(firstImage ? URL.createObjectURL(firstImage) : null);
     setOcrLoading(true);
@@ -317,7 +336,17 @@ export function TransactionForm({
       return;
     }
 
-    if (!(await confirm(initial ? "수정 내용을 저장하시겠습니까?" : `이 거래를 등록하시겠습니까? (${validItems.length}건)`))) return;
+    // 묶음 수정에서 지운 줄(금액을 비운 줄 포함)은 저장할 때 그 거래를 삭제.
+    const removedIds = isGroupEdit
+      ? initialGroup!.map((t) => t.id).filter((id) => !validItems.some((li) => li.id === id))
+      : [];
+    const willGroup = groupingReady && groupPayment && validItems.length > 1;
+    const confirmMessage = isGroupEdit
+      ? `수정 내용을 저장하시겠습니까?${removedIds.length > 0 ? ` (줄 ${removedIds.length}개 삭제)` : ""}`
+      : initial
+        ? "수정 내용을 저장하시겠습니까?"
+        : `이 거래를 등록하시겠습니까? (${validItems.length}건${willGroup ? " · 한 결제로 묶음" : ""})`;
+    if (!(await confirm(confirmMessage))) return;
     setError(null);
 
     // 종류구분이 비과세면 체크박스 state가(예전 데이터 등으로) true로 남아있어도 무조건 무시 —
@@ -370,15 +399,29 @@ export function TransactionForm({
       return pending.run(() => action(fd));
     }
 
-    if (validItems.length === 1) {
+    if (isGroupEdit) {
+      // 한 결제로 묶인 줄 전체 수정 — 원래 줄은 수정, 새 줄은 같은 묶음으로 추가, 지운 줄은 삭제.
+      const result = await pending.run(() =>
+        saveTransactionGroup({
+          groupId: initial!.payment_group_id!,
+          lines: validItems.map((li) => ({ ...buildRow(li), id: li.id })),
+          removedIds,
+          keepGroup: groupPayment,
+        })
+      );
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+    } else if (validItems.length === 1) {
       const result = await saveSingle(validItems[0], initial?.id);
       if (result?.error) {
         setError(result.error);
         return;
       }
     } else if (!initial) {
-      // 신규 등록, 여러 줄 → 전부 새 거래로 일괄 등록.
-      const result = await pending.run(() => bulkImportTransactions(validItems.map(buildRow)));
+      // 신규 등록, 여러 줄 → 전부 새 거래로 일괄 등록(한 결제로 묶기를 켜면 같은 묶음 번호).
+      const result = await pending.run(() => bulkImportTransactions(validItems.map(buildRow), { group: willGroup }));
       if (result?.error) {
         setError(result.error);
         return;
@@ -393,7 +436,9 @@ export function TransactionForm({
         return;
       }
       if (rest.length > 0) {
-        const bulkResult = await pending.run(() => bulkImportTransactions(rest.map(buildRow)));
+        const bulkResult = await pending.run(() =>
+          bulkImportTransactions(rest.map(buildRow), willGroup ? { joinGroupOf: initial.id } : {})
+        );
         if (bulkResult?.error) {
           setError(bulkResult.error);
           return;
@@ -578,11 +623,18 @@ export function TransactionForm({
             + 물품 종류 추가
           </button>
         </div>
-        {initial && (
+        {isGroupEdit ? (
           <p className="mb-2 text-xs text-slate-400">
-            줄을 추가하면 저장 시 첫 줄은 이 거래를 수정하고, 나머지 줄은 새 거래로 분리돼요 (계산서 1건이 여러
-            프로젝트에 걸칠 때).
+            한 결제로 묶인 {initialGroup!.length}줄을 함께 수정해요. 줄을 지우거나 소계를 비우면 저장할 때 그 거래가 삭제돼요.
           </p>
+        ) : (
+          initial && (
+            <p className="mb-2 text-xs text-slate-400">
+              줄을 추가하면 저장 시 첫 줄은 이 거래를 수정하고, 나머지 줄은 새 거래로 분리돼요 (계산서 1건이 여러
+              프로젝트에 걸칠 때).
+              {partOfGroup && " 이 거래는 한 결제로 묶여 있지만 줄마다 날짜·카테고리 등이 달라 이 줄만 수정해요."}
+            </p>
+          )
         )}
 
         <div className="space-y-3">
@@ -658,10 +710,33 @@ export function TransactionForm({
           })}
         </div>
 
-        <p className="mt-3 text-right text-sm font-semibold text-slate-900">
-          합계{vatAppliesNow && <span className="ml-1 text-xs font-normal text-slate-400">(VAT 포함)</span>}
-          <span className="ml-1 tabular-nums text-base">{formatWon(grandTotal)}</span>
-        </p>
+        <div className="mt-3 flex flex-wrap items-start justify-between gap-2">
+          {groupingReady && (lineItems.length > 1 || isGroupEdit) ? (
+            <label className="flex items-start gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={groupPayment}
+                onChange={(e) => setGroupPayment(e.target.checked)}
+                className="mt-0.5 h-4 w-4"
+              />
+              <span>
+                한 결제로 묶기
+                <span className="block text-xs text-slate-400">매입장에 한 줄로 표시 · 프로젝트별 금액은 줄마다 따로 저장</span>
+              </span>
+            </label>
+          ) : groupingReady ? (
+            // 한 줄일 때는 묶을 게 없어서 체크 대신 안내만 — 체크가 안 보여 기능을 못 찾았음(사용자 문의).
+            <p className="text-xs text-slate-400">
+              한 결제를 여러 프로젝트로 나눌 땐 &quot;+ 물품 종류 추가&quot;로 줄을 더하면 &quot;한 결제로 묶기&quot;가 나와요.
+            </p>
+          ) : (
+            <span />
+          )}
+          <p className="ml-auto whitespace-nowrap text-right text-sm font-semibold text-slate-900">
+            합계{vatAppliesNow && <span className="ml-1 text-xs font-normal text-slate-400">(VAT 포함)</span>}
+            <span className="ml-1 tabular-nums text-base">{formatWon(grandTotal)}</span>
+          </p>
+        </div>
       </div>
 
       {projectPopupIndex !== null && (
