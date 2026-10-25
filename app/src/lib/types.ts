@@ -99,6 +99,8 @@ export type Transaction = {
   note2: string | null;
   created_by: string | null;
   created_at: string;
+  // 한 결제로 묶은 거래들의 공통 번호(092 SQL) — 실행 전에는 칸 자체가 없어서 undefined.
+  payment_group_id?: string | null;
   clients?: Client;
   projects?: Project;
   payment_methods?: PaymentMethod;
