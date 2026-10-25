@@ -40,6 +40,17 @@ export function sortGroupLines<T extends { item_name: string | null; projects?: 
   );
 }
 
+// 묶음 줄의 날짜 — 외상 정산 묶음은 계산서 날짜가 달라서 처음~마지막(같으면 둘이 같음). 매입장 정렬은 마지막 날짜로.
+export function dateSpan(lines: { trans_date: string }[]) {
+  const dates = lines.map((l) => l.trans_date).sort();
+  return { first: dates[0], last: dates[dates.length - 1] };
+}
+
+// 묶음 줄 구분 — 모두 외상이면 한 번에 정산한 것("외상 정산 N건"), 아니면 "N건 묶음".
+export function groupKindLabel(lines: { payment_type: string }[]) {
+  return lines.every((l) => l.payment_type === "credit") ? `외상 정산 ${lines.length}건` : `${lines.length}건 묶음`;
+}
+
 // 묶음 한 줄에 보일 이름 — 하나뿐이면 그 이름, 여럿이면 "A 외 1곳"(같은 이름은 한 번만 셈). "외 1곳"은 줄이 바뀌어도
 // 떨어지지 않게 붙는 공백으로.
 export function summaryLabel(names: string[], unit: string) {

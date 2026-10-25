@@ -26,6 +26,8 @@ export async function CreditSection() {
   ]);
 
   const methods = (paymentMethods ?? []) as PaymentMethod[];
+  // 092 SQL 실행 전에는 거래에 묶음 번호 칸이 없음 → 정산할 때 묶기 체크를 숨김.
+  const groupingReady = txs.length > 0 && "payment_group_id" in txs[0];
 
   // remaining > 0이면 당연히 미정산. remaining이 0이어도 정산 이력이 아예 없으면
   // (금액을 0원으로 입력한 외상 건 등) 계속 목록에 보여줘야 수정/삭제할 수 있음 —
@@ -140,7 +142,13 @@ export async function CreditSection() {
 
       <div className="space-y-4">
         {groupList.map((g) => (
-          <CreditSettlementGroup key={g.key} label={g.label} items={g.items} paymentMethods={methods} />
+          <CreditSettlementGroup
+            key={g.key}
+            label={g.label}
+            items={g.items}
+            paymentMethods={methods}
+            groupingReady={groupingReady}
+          />
         ))}
         {groupList.length === 0 && <p className="py-8 text-center text-sm text-slate-400">미정산 외상 거래가 없습니다.</p>}
       </div>

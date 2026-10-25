@@ -18,10 +18,13 @@ export function CreditSettlementGroup({
   label,
   items,
   paymentMethods,
+  groupingReady = false,
 }: {
   label: string;
   items: OutstandingItem[];
   paymentMethods: PaymentMethod[];
+  // 092 SQL 실행 후에만 "한 결제로 묶기"를 보여 줌.
+  groupingReady?: boolean;
 }) {
   const pending = useGlobalPending();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -171,6 +174,14 @@ export function CreditSettlementGroup({
               ))}
             </select>
           </div>
+          {/* 여러 건을 한 번에 갚으면 한 결제 — 매입매출 목록에 한 줄로(계산서 날짜 범위·정산일 표시). */}
+          {groupingReady && selected.size > 1 && (
+            <label className="flex items-center gap-2 self-center text-sm text-slate-700">
+              <input type="checkbox" name="group_payment" defaultChecked className="h-4 w-4" />
+              한 결제로 묶기
+              <span className="text-xs text-slate-400">(매입매출 목록에 한 줄로)</span>
+            </label>
+          )}
           <Button type="submit">
             정산 등록 ({selected.size}건 · {formatWon(selectedTotal)})
           </Button>
