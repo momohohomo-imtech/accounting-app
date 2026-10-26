@@ -23,6 +23,17 @@ function emptyLineItem(): LineItem {
   return { item_name: "", quantity: "", unit_price: "", subtotal: "", project_id: "" };
 }
 
+// 품목이 2줄 이상이면 프로젝트는 줄마다 정하고 위쪽 공통 칸은 숨김 — 줄을 추가한 뒤 위쪽 칸을 바꾸면 "(공통)" 줄까지 같이
+// 바뀌어 원래 프로젝트에서 거래가 빠졌음(사용자 문의). 2줄 이상이 되면 공통값을 줄마다 옮겨 적고(그때부터 줄의 빈 값은
+// 일반경비), 1줄로 돌아오면 그 줄 값을 다시 공통 칸으로.
+function splitLineProjects(lines: LineItem[], common: string): { lines: LineItem[]; common: string } {
+  if (lines.length > 1) return { lines: lines.map((li) => ({ ...li, project_id: li.project_id || common })), common: "" };
+  if (lines.length === 1 && lines[0].project_id) {
+    return { lines: [{ ...lines[0], project_id: "" }], common: lines[0].project_id };
+  }
+  return { lines, common };
+}
+
 function lineItemFromInitial(t: Transaction): LineItem {
   // 소계는 "VAT 얹기 전 원래 입력 금액"을 나타내는 값이라, 여기서도 purchase_vat/sales_vat를
   // 더한 최종 합계가 아니라 base 금액만 보여줘야 함 — 안 그러면 체크된 채로 다시 저장할 때마다
@@ -167,12 +178,21 @@ export function TransactionForm({
     );
   }
 
+  // 줄 수가 바뀌는 곳(추가·삭제·OCR·엑셀)은 모두 이걸로 — 줄마다 프로젝트/공통 프로젝트를 splitLineProjects 규칙대로.
+  function applyLines(next: LineItem[]) {
+    const r = splitLineProjects(next, values.project_id);
+    setLineItems(r.lines);
+    if (r.common !== values.project_id) set("project_id", r.common);
+  }
+
   function addLineItem() {
-    setLineItems((prev) => [...prev, emptyLineItem()]);
+    // 새 줄은 바로 윗줄 프로젝트로 시작 — 묶음 수정에서 새 줄이 일반경비로 들어가던 것.
+    const last = lineItems[lineItems.length - 1];
+    applyLines([...lineItems, { ...emptyLineItem(), project_id: last ? last.project_id || values.project_id : "" }]);
   }
 
   function removeLineItem(i: number) {
-    setLineItems((prev) => prev.filter((_, idx) => idx !== i));
+    applyLines(lineItems.filter((_, idx) => idx !== i));
   }
 
   function handleClientSelect(clientId: string) {
@@ -210,20 +230,18 @@ export function TransactionForm({
         return;
       }
       setOcrExtracted(valid[0]);
-      setLineItems((prev) => {
-        const updated = [...prev];
-        valid.forEach((ex, idx) => {
-          const patch = {
-            item_name: (ex.item_name as string) ?? "",
-            quantity: ex.quantity != null ? String(ex.quantity) : "",
-            unit_price: ex.unit_price != null ? String(ex.unit_price) : "",
-            subtotal: ex.amount != null ? String(ex.amount) : "",
-          };
-          if (idx < updated.length) updated[idx] = { ...updated[idx], ...patch };
-          else updated.push({ ...emptyLineItem(), ...patch });
-        });
-        return updated;
+      const updated = [...lineItems];
+      valid.forEach((ex, idx) => {
+        const patch = {
+          item_name: (ex.item_name as string) ?? "",
+          quantity: ex.quantity != null ? String(ex.quantity) : "",
+          unit_price: ex.unit_price != null ? String(ex.unit_price) : "",
+          subtotal: ex.amount != null ? String(ex.amount) : "",
+        };
+        if (idx < updated.length) updated[idx] = { ...updated[idx], ...patch };
+        else updated.push({ ...emptyLineItem(), ...patch });
       });
+      applyLines(updated);
       const ex = valid[0];
       const matchedCategory = expenseCategories.find((c) => c.name === ex.category);
       const ocrExempt = isVatExemptCategory(matchedCategory);
@@ -278,7 +296,7 @@ export function TransactionForm({
         return;
       }
 
-      setLineItems(
+      applyLines(
         rows.map((r) => ({
           item_name: r.item_name ?? "",
           quantity: r.quantity != null ? String(r.quantity) : "",
@@ -515,12 +533,21 @@ export function TransactionForm({
           </datalist>
         </Field>
         <div className="flex flex-col gap-1">
-          <ProjectPicker
-            sites={sites}
-            projects={projects}
-            value={values.project_id}
-            onChange={(v) => set("project_id", v)}
-          />
+          {lineItems.length > 1 ? (
+            <>
+              <span className="text-xs font-medium text-slate-500">프로젝트</span>
+              <p className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-500">
+                품목이 여러 줄이라 아래 품목 줄마다 선택해요.
+              </p>
+            </>
+          ) : (
+            <ProjectPicker
+              sites={sites}
+              projects={projects}
+              value={values.project_id}
+              onChange={(v) => set("project_id", v)}
+            />
+          )}
           {values.type === "매출" && (
             <p className="text-xs text-slate-400">
               기성금·잔금 매출은 프로젝트를 꼭 선택하세요 — 받은 만큼 대시보드 예상 미수액에서 빠져요.
@@ -671,7 +698,7 @@ export function TransactionForm({
                       className={`${inputClass} truncate text-left`}
                     >
                       {resolvedProject ? resolvedProject.name : "일반경비"}
-                      {!isOverride && <span className="text-slate-400"> (공통)</span>}
+                      {!isOverride && lineItems.length === 1 && <span className="text-slate-400"> (공통)</span>}
                     </button>
                   </div>
                   <div className="flex flex-col gap-1">
@@ -764,7 +791,7 @@ export function TransactionForm({
               projects={projects}
               value={lineItems[projectPopupIndex].project_id}
               onChange={(v) => updateLineItem(projectPopupIndex, { project_id: v })}
-              label="프로젝트 (비워두면 상단 공통값 사용)"
+              label={lineItems.length > 1 ? "프로젝트 (비워두면 일반경비)" : "프로젝트 (비워두면 상단 공통값 사용)"}
             />
           </div>
         </div>
