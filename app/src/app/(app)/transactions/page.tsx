@@ -154,7 +154,14 @@ const loadLedgerTransactions = cache(
             .range(from, to)
         )
       : [];
-    return rawTransactions.filter((t) => isLedgerVisible(t, relevantPayments));
+    // 외상 정산일(거래마다 마지막 정산 이력) — 매입장의 외상 정산 묶음 줄에 "MM-DD 정산"으로 보여 줌.
+    const paidDateById: Record<string, string> = {};
+    for (const p of relevantPayments) {
+      if (!paidDateById[p.transaction_id] || p.paid_date > paidDateById[p.transaction_id]) {
+        paidDateById[p.transaction_id] = p.paid_date;
+      }
+    }
+    return { rows: rawTransactions.filter((t) => isLedgerVisible(t, relevantPayments)), paidDateById };
   }
 );
 
@@ -175,7 +182,7 @@ async function fetchTransactionTotals({
   const selectedYear = year ? Number(year) : currentYear;
   const selectedMonth = month ?? "current";
   const { start, end } = monthRange(selectedYear, selectedMonth, currentMonth);
-  const visible = await loadLedgerTransactions(start, end, type ?? "", project_id ?? "", payment_method_id ?? "");
+  const { rows: visible } = await loadLedgerTransactions(start, end, type ?? "", project_id ?? "", payment_method_id ?? "");
 
   return {
     purchase: visible.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0),
@@ -215,7 +222,7 @@ async function TransactionListSection({
   const { start, end } = monthRange(selectedYear, selectedMonth, currentMonth);
 
   const [
-    transactions,
+    { rows: transactions, paidDateById },
     { data: projectTree },
     { data: latestTx },
     { data: importClients },
@@ -321,6 +328,7 @@ async function TransactionListSection({
           paymentMethods={importPaymentMethods ?? []}
           listParams={{ year: selectedYear, month: selectedMonth, type: type ?? "", project_id: project_id ?? "" }}
           groupingReady={groupingReady}
+          paidDateById={paidDateById}
           {...columnVisibility}
         />
       </Card>

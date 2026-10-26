@@ -254,16 +254,23 @@ export async function saveTransactionGroup(input: {
   revalidateLedgerPages();
 }
 
-// 매입장에서 고른 거래들을 한 결제로 묶음 — 같은 날짜·같은 구분끼리만(묶음이 다른 달이나 매입/매출로 갈라지지 않게).
+// 매입장에서 고른 거래들을 한 결제로 묶음 — 같은 구분끼리만, 날짜도 같아야 함(묶음이 다른 달로 갈라지지 않게). 단 외상
+// 정산분은 여러 날의 계산서를 한 번에 갚는 것이라 날짜가 달라도 됨(매입장에서는 계산서 날짜 범위로 표시).
 export async function groupTransactions(formData: FormData) {
   const supabase = await createClient();
   const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
   if (ids.length < 2) return { error: "묶을 거래를 2건 이상 선택해주세요." };
 
-  const { data: rows, error } = await supabase.from("transactions").select("id, trans_date, type").in("id", ids);
+  const { data: rows, error } = await supabase
+    .from("transactions")
+    .select("id, trans_date, type, payment_type")
+    .in("id", ids);
   if (error) return { error: error.message };
   if (new Set((rows ?? []).map((r) => r.type)).size > 1) return { error: "매입과 매출은 함께 묶을 수 없습니다." };
-  if (new Set((rows ?? []).map((r) => r.trans_date)).size > 1) return { error: "날짜가 같은 거래끼리만 묶을 수 있습니다." };
+  const allCredit = (rows ?? []).every((r) => r.payment_type === "credit");
+  if (!allCredit && new Set((rows ?? []).map((r) => r.trans_date)).size > 1) {
+    return { error: "날짜가 같은 거래끼리만 묶을 수 있습니다(외상 정산분끼리는 날짜가 달라도 됩니다)." };
+  }
 
   const { error: updateError } = await supabase
     .from("transactions")
@@ -417,6 +424,8 @@ export async function settleCreditTransactions(formData: FormData) {
   if (insertError) return { error: insertError.message };
 
   const settleNote = `정산일: ${paidDate}${paymentMethod?.name ? ` · ${paymentMethod.name}` : ""}`;
+  // 한 번에 정산한 여러 건은 한 결제로 묶음(092) — 매입장에 한 줄로. 묶지 않을 땐 칸을 아예 안 보냄(092 실행 전 대비).
+  const paymentGroupId = formData.get("group_payment") === "on" && targetTxs.length > 1 ? crypto.randomUUID() : null;
   const updateResults = await Promise.all(
     targetTxs.map((tx) =>
       supabase
@@ -424,6 +433,7 @@ export async function settleCreditTransactions(formData: FormData) {
         .update({
           payment_method_id: paymentMethodId,
           note2: tx.note2 ? `${tx.note2} / ${settleNote}` : settleNote,
+          ...(paymentGroupId ? { payment_group_id: paymentGroupId } : {}),
         })
         .eq("id", tx.id)
     )

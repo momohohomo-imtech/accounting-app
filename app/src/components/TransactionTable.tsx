@@ -14,7 +14,7 @@ import {
 } from "@/lib/actions/transactions";
 import { formatWon, formatDate } from "@/lib/format";
 import { transactionTotal } from "@/lib/credit";
-import { groupLedgerRows, sortGroupLines, summaryLabel } from "@/lib/paymentGroup";
+import { dateSpan, groupKindLabel, groupLedgerRows, sortGroupLines, summaryLabel } from "@/lib/paymentGroup";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import { paymentMethodColorStyle } from "@/lib/paymentMethodColors";
 import { Badge } from "@/components/ui/Badge";
@@ -77,8 +77,8 @@ function sortValue(t: Transaction, key: SortKey): string | number {
 
 type BulkField = "project" | "client" | "category" | "payment_method" | "item_name";
 
-// 한 결제로 묶인 거래(092)의 매입장 한 줄 — 금액은 합계, 이름은 "A 외 1곳"처럼(같은 이름은 한 번만), 나머지는 첫 줄
-// (한 결제라 날짜·구분·결제방식이 같음).
+// 한 결제로 묶인 거래(092)의 매입장 한 줄 — 금액은 합계, 이름은 "A 외 1곳"처럼(같은 이름은 한 번만), 날짜는 마지막 계산서
+// 날짜(외상 정산 묶음은 날짜가 여럿 — 정렬용, 화면엔 범위로), 나머지는 첫 줄(한 결제라 구분·결제방식이 같음).
 function groupHead(lines: Transaction[]): Transaction {
   const first = lines[0];
   const total = (key: "sales_amount" | "sales_vat" | "purchase_amount" | "purchase_vat") =>
@@ -86,6 +86,7 @@ function groupHead(lines: Transaction[]): Transaction {
   const firstCategory = lines.find((l) => l.expense_categories)?.expense_categories;
   return {
     ...first,
+    trans_date: dateSpan(lines).last,
     sales_amount: total("sales_amount"),
     sales_vat: total("sales_vat"),
     purchase_amount: total("purchase_amount"),
@@ -118,6 +119,7 @@ export function TransactionTable({
   showCategory = true,
   showItem = true,
   groupingReady = false,
+  paidDateById = {},
 }: {
   transactions: Transaction[];
   projectNodes: ProjectTreeNode[];
@@ -130,6 +132,8 @@ export function TransactionTable({
   showItem?: boolean;
   // 092 SQL 실행 후에만 "한 결제로 묶기·묶음 풀기" 버튼을 보여 줌.
   groupingReady?: boolean;
+  // 외상 거래의 정산일(마지막 정산 이력) — 외상 정산 묶음 줄에 "MM-DD 정산"으로.
+  paidDateById?: Record<string, string>;
 }) {
   const COLUMNS = ALL_COLUMNS.filter(
     (c) =>
@@ -432,15 +436,34 @@ export function TransactionTable({
     );
   }
 
-  // 거래 한 줄(묶음 한 줄 포함)의 날짜~금액 칸. lead: 날짜 앞에 붙는 묶음 펼치기 버튼.
-  function mainCells(t: Transaction, lead?: React.ReactNode, typeExtra?: React.ReactNode) {
+  // 거래 한 줄(묶음 한 줄 포함)의 날짜~금액 칸. 묶음 줄은 lead(펼치기 버튼)·firstDate(날짜가 여럿이면 처음 날짜 — "처음~마지막"
+  // 으로 표시)·typeExtra("N건 묶음")·methodExtra("MM-DD 정산")를 넘김.
+  function mainCells(
+    t: Transaction,
+    {
+      lead,
+      firstDate,
+      typeExtra,
+      methodExtra,
+    }: { lead?: React.ReactNode; firstDate?: string; typeExtra?: React.ReactNode; methodExtra?: React.ReactNode } = {}
+  ) {
+    const range = firstDate && firstDate !== t.trans_date;
     return (
       <>
-        <Td className="whitespace-nowrap pr-4" title={formatDate(t.trans_date)}>
+        <Td
+          className="whitespace-nowrap pr-4"
+          title={range ? `${formatDate(firstDate)} ~ ${formatDate(t.trans_date)}` : formatDate(t.trans_date)}
+        >
           {lead}
           {/* 화면은 연도 필터로 이미 한 해만 보이므로 월-일만, 인쇄는 전체 날짜 */}
-          <span className="print:hidden">{formatDate(t.trans_date).slice(5)}</span>
-          <span className="hidden print:inline">{formatDate(t.trans_date)}</span>
+          <span className="print:hidden">
+            {range && `${formatDate(firstDate).slice(5)}~`}
+            {formatDate(t.trans_date).slice(5)}
+          </span>
+          <span className="hidden print:inline">
+            {range && `${formatDate(firstDate)}~`}
+            {formatDate(t.trans_date)}
+          </span>
         </Td>
         <Td className="whitespace-nowrap pr-4">
           <Badge variant={t.type === "매출" ? "blue" : "orange"}>{t.type}</Badge>
@@ -466,6 +489,7 @@ export function TransactionTable({
           ) : (
             "-"
           )}
+          {methodExtra}
         </Td>
         <Td className="whitespace-nowrap pr-4">
           {t.tax_invoice_issued ? <Badge variant="emerald">발행</Badge> : <span className="text-slate-300">-</span>}
@@ -480,7 +504,10 @@ export function TransactionTable({
     return (
       <Tr key={t.id} className={selected.has(t.id) ? "bg-brand-soft" : "bg-slate-50/70"}>
         {checkboxCell([t.id])}
-        <Td className="whitespace-nowrap pr-4 pl-3 text-slate-300">└</Td>
+        <Td className="whitespace-nowrap pr-4 pl-3 text-xs text-slate-400">
+          └ <span className="print:hidden">{formatDate(t.trans_date).slice(5)}</span>
+          <span className="hidden print:inline">{formatDate(t.trans_date)}</span>
+        </Td>
         <Td className="pr-4" />
         <Td className="sticky-col pr-4" />
         {showProject && projectCell(t)}
@@ -729,23 +756,31 @@ export function TransactionTable({
             const groupId = item.groupId;
             const ids = item.lines.map((l) => l.id);
             const open = expanded.has(groupId);
+            // 외상 정산 묶음 — 정산일(줄마다 같음, 다르면 마지막 날).
+            const paidDate = item.lines.map((l) => paidDateById[l.id] ?? "").sort().at(-1);
             return (
               <Fragment key={item.key}>
                 <Tr className={ids.every((id) => selected.has(id)) ? "bg-brand-soft" : undefined}>
                   {checkboxCell(ids)}
-                  {mainCells(
-                    t,
-                    <button
-                      type="button"
-                      onClick={() => toggleExpand(groupId)}
-                      aria-expanded={open}
-                      aria-label={open ? "묶음 접기" : "묶음 펼치기"}
-                      className="mr-1 inline-flex h-5 w-5 items-center justify-center rounded text-[10px] text-slate-500 hover:bg-slate-200 print:hidden"
-                    >
-                      {open ? "▼" : "▶"}
-                    </button>,
-                    <span className="ml-1 text-[11px] text-slate-500">{item.lines.length}건 묶음</span>
-                  )}
+                  {mainCells(t, {
+                    lead: (
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(groupId)}
+                        aria-expanded={open}
+                        aria-label={open ? "묶음 접기" : "묶음 펼치기"}
+                        className="mr-1 inline-flex h-5 w-5 items-center justify-center rounded text-[10px] text-slate-500 hover:bg-slate-200 print:hidden"
+                      >
+                        {open ? "▼" : "▶"}
+                      </button>
+                    ),
+                    firstDate: dateSpan(item.lines).first,
+                    // 배지 아래 줄에 — 옆에 붙이면 칸이 넓어져 PC(1280)에서 프로젝트·품목 칸이 좁아지고 글자가 여러 줄로 꺾였음.
+                    typeExtra: <span className="mt-0.5 block text-[11px] text-slate-500">{groupKindLabel(item.lines)}</span>,
+                    methodExtra: paidDate ? (
+                      <span className="mt-0.5 block text-[11px] text-slate-500">{formatDate(paidDate).slice(5)} 정산</span>
+                    ) : undefined,
+                  })}
                   {actionsCell(item.lines[0].id, `group:${groupId}`, ids)}
                 </Tr>
                 {open && item.lines.map((l) => lineRow(l))}

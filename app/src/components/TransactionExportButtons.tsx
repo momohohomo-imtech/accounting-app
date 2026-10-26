@@ -5,18 +5,20 @@ import { transactionTotal } from "@/lib/credit";
 import { todayString, formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { PrintButton } from "@/components/PrintButton";
-import { groupLedgerRows, sortGroupLines } from "@/lib/paymentGroup";
+import { dateSpan, groupLedgerRows, sortGroupLines } from "@/lib/paymentGroup";
 import type { Transaction } from "@/lib/types";
 
 export function TransactionExportButtons({ transactions }: { transactions: Transaction[] }) {
   async function handleExport() {
-    // 한 결제로 묶인 거래(092)는 화면처럼 한 줄로 — 거래처·프로젝트·품목은 이름을 모두 적고 금액은 합계.
+    // 한 결제로 묶인 거래(092)는 화면처럼 한 줄로 — 거래처·프로젝트·품목은 이름을 모두 적고 금액은 합계, 날짜가 여럿이면
+    // (외상 정산 묶음) 처음~마지막.
     const rows = groupLedgerRows(transactions).map((item) => {
       const lines = sortGroupLines(item.lines);
       const t = lines[0];
       const names = (pick: (l: Transaction) => string) => Array.from(new Set(lines.map(pick))).join(", ");
+      const { first, last } = dateSpan(lines);
       return [
-        formatDate(t.trans_date),
+        first === last ? formatDate(last) : `${formatDate(first)}~${formatDate(last)}`,
         t.type,
         names((l) => l.clients?.name ?? l.client_name_raw ?? "-"),
         names((l) => l.projects?.name ?? "일반경비"),

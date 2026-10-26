@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { groupLedgerRows, summaryLabel, sameCommonFields, sortGroupLines } from "@/lib/paymentGroup";
+import { groupLedgerRows, summaryLabel, sameCommonFields, sortGroupLines, dateSpan, groupKindLabel } from "@/lib/paymentGroup";
 
 // 가짜 거래 — 같은 payment_group_id는 한 결제를 프로젝트별로 나눈 줄
 const row = (id: string, payment_group_id: string | null = null) => ({ id, payment_group_id });
@@ -38,6 +38,23 @@ test("묶음 안 줄 순서: 프로젝트 이름 → 품목 이름, 일반경비
     sorted.map((l) => `${l.projects?.name ?? "일반경비"}/${l.item_name}`),
     ["가 현장/볼트", "가 현장/앵글", "나 현장/철판", "일반경비/볼트"]
   );
+});
+
+test("묶음 날짜: 외상 정산 묶음은 계산서 날짜 처음~마지막, 같은 날이면 하나", () => {
+  assert.deepEqual(dateSpan([{ trans_date: "2026-09-28" }, { trans_date: "2026-09-03" }, { trans_date: "2026-09-15" }]), {
+    first: "2026-09-03",
+    last: "2026-09-28",
+  });
+  assert.deepEqual(dateSpan([{ trans_date: "2026-10-10" }, { trans_date: "2026-10-10" }]), {
+    first: "2026-10-10",
+    last: "2026-10-10",
+  });
+});
+
+test("묶음 구분: 모두 외상이면 '외상 정산 N건', 하나라도 즉시결제면 'N건 묶음'", () => {
+  assert.equal(groupKindLabel([{ payment_type: "credit" }, { payment_type: "credit" }, { payment_type: "credit" }]), "외상 정산 3건");
+  assert.equal(groupKindLabel([{ payment_type: "immediate" }, { payment_type: "immediate" }]), "2건 묶음");
+  assert.equal(groupKindLabel([{ payment_type: "credit" }, { payment_type: "immediate" }]), "2건 묶음");
 });
 
 test("묶음 한 줄 이름: 하나면 그 이름, 여럿이면 'A 외 N곳'(같은 이름은 한 번만)", () => {
