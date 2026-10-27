@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { cx } from "@/lib/cx";
 import type { FieldConfig, RowBgColor } from "./types";
 import { EntityForm } from "./EntityForm";
@@ -135,6 +135,8 @@ export function EntityTable({
   extraActions,
   editPopup,
   groupByField,
+  groupSummaries,
+  groupActions,
 }: {
   fields: FieldConfig[];
   rows: Row[];
@@ -150,6 +152,13 @@ export function EntityTable({
    * never splits a group apart.
    */
   groupByField?: string;
+  /**
+   * groupByField로 묶인 어미+하위를 한 줄(요약 행)로 접어 보여 줄 때 그 요약 행 — 어미 id → 요약 행(합계 등은 부르는 쪽에서
+   * 계산). 있으면 그 묶음은 기본 접힘, ▶로 펼치면 어미·하위가 원래 줄로(수정·삭제·extraActions 그대로). 정렬도 요약 행 값으로.
+   */
+  groupSummaries?: Record<string, Row>;
+  /** 요약 행의 관리 칸(요약 행은 실제 항목이 아니라 수정·삭제 없음) — 어미 id → 버튼. */
+  groupActions?: Record<string, ReactNode>;
 }) {
   const confirm = useConfirm();
   const pending = useGlobalPending();
@@ -159,6 +168,17 @@ export function EntityTable({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  // 펼친 묶음(어미 id) — groupSummaries가 있는 묶음만 접고 펼침.
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  function toggleGroup(anchorId: string) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(anchorId)) next.delete(anchorId);
+      else next.add(anchorId);
+      return next;
+    });
+  }
 
   // 체크박스로 켜고 끌 수 있는(toggleable) 열 — 켜짐/꺼짐 상태는 표 구성별로 로컬에
   // 저장해서 다음 방문에도 유지됨.
@@ -311,10 +331,10 @@ export function EntityTable({
     }
   }
 
-  const sortedRows = useMemo(() => {
+  const blocks = useMemo(() => {
     // groupByField가 있으면 그 필드로 다른 행을 가리키는 행(자식)을 항상 그 행(부모) 바로
-    // 아래에 묶어두고, 정렬은 그룹(부모+자식들)을 통째로 부모 기준값으로 재배치한다 — 자식이
-    // 그룹에서 떨어져 나가 다른 곳에 꽂히는 일이 없게.
+    // 아래에 묶어두고, 정렬은 그룹(부모+자식들)을 통째로 부모 기준값(요약 행이 있으면 요약 행 값)으로
+    // 재배치한다 — 자식이 그룹에서 떨어져 나가 다른 곳에 꽂히는 일이 없게.
     const rowById = new Map(rows.map((r) => [r.id, r]));
     const childrenByParentId = new Map<string, Row[]>();
     const childIds = new Set<string>();
@@ -343,19 +363,191 @@ export function EntityTable({
       return sortDir === "asc" ? cmp : -cmp;
     }
 
-    const blocks = rows
+    const list = rows
       .filter((r) => !childIds.has(r.id))
-      .map((anchor) => ({
-        anchor,
-        children: [...(childrenByParentId.get(anchor.id) ?? [])].sort(compare),
-      }));
-    if (sortField) blocks.sort((a, b) => compare(a.anchor, b.anchor));
-
-    return blocks.flatMap((b) => [b.anchor, ...b.children]);
-  }, [rows, sortField, sortDir, groupByField]);
+      .map((anchor) => {
+        const children = [...(childrenByParentId.get(anchor.id) ?? [])].sort(compare);
+        return { anchor, children, summary: children.length > 0 ? groupSummaries?.[anchor.id] : undefined };
+      });
+    if (sortField) list.sort((a, b) => compare(a.summary ?? a.anchor, b.summary ?? b.anchor));
+    return list;
+  }, [rows, sortField, sortDir, groupByField, groupSummaries]);
+  const sortedRows = useMemo(() => blocks.flatMap((b) => [b.anchor, ...b.children]), [blocks]);
 
   const editingRow = editPopup ? sortedRows.find((r) => r.id === editingId) : undefined;
   useEscapeKey(Boolean(editingRow), () => setEditingId(null));
+
+  // 표 한 줄 — lead·trail: 고정 칸(프로젝트명 등) 앞·뒤에 붙는 것(묶음 펼치기 버튼·펼친 줄의 └, 요약 행의 "외 N건").
+  // summaryOf: 요약 행이면 어미 id(관리 칸에 groupActions만).
+  function renderRow(row: Row, lead?: ReactNode, summaryOf?: string, trail?: ReactNode) {
+    return (
+      editingId === row.id && !editPopup ? (
+        <Tr key={row.id} className="bg-slate-50">
+          <td colSpan={visibleFields.length + 1} className="py-3 pr-4">
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const form = e.currentTarget;
+                if (!(await confirm("수정 내용을 저장하시겠습니까?"))) return;
+                try {
+                  const result = await pending.run(() => Promise.resolve(updateAction(new FormData(form))));
+                  if (result && typeof result === "object" && "error" in result && result.error) {
+                    setFormError(String(result.error));
+                    return;
+                  }
+                  setFormError(null);
+                  setEditingId(null);
+                } catch (err) {
+                  setFormError(err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.");
+                }
+              }}
+              className="space-y-3"
+            >
+              <input type="hidden" name="id" value={row.id} />
+              <EntityForm fields={fields} defaultValues={row} />
+              {formError && <p className="text-sm text-red-600">{formError}</p>}
+              <div className="flex gap-2">
+                <Button type="submit" size="sm">
+                  저장
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setFormError(null);
+                    setEditingId(null);
+                  }}
+                >
+                  취소
+                </Button>
+              </div>
+            </form>
+          </td>
+        </Tr>
+      ) : (
+        <Tr key={row.id} className={rowBgClass(row, fields)}>
+          {visibleFields.map((f) => (
+            <Td
+              key={f.name}
+              style={colStyle(f)}
+              title={f.display === "progress" ? undefined : displayValue(row, f)}
+              className={cx(
+                "max-w-[220px] truncate pr-4 print:whitespace-normal print:overflow-visible",
+                colWidthClass(f),
+                // w-[1%]: 표의 남는 폭이 고정 칸으로 몰려 화면을 덮지 않게(globals.css와 같은 방식)
+                f.name === stickyFieldName && "sticky-col max-md:w-[1%]"
+              )}
+            >
+              {f.display === "progress" ? (
+                <ProgressCell value={Number(row[f.name]) || 0} />
+              ) : (
+                (() => {
+                  const value = (
+                    <>
+                      {cellColorClass(row, f) ? (
+                        <span className={cellColorClass(row, f)}>{displayValue(row, f)}</span>
+                      ) : (
+                        displayValue(row, f)
+                      )}
+                      {dotColorClass(row, f) && (
+                        <span
+                          className={`ml-1.5 inline-block h-2 w-2 rounded-full align-middle ${dotColorClass(row, f)}`}
+                        />
+                      )}
+                    </>
+                  );
+                  // 묶음 줄: 앞(▶·└)·뒤("외 N건")는 그대로 두고 이름만 말줄임 — 칸이 좁으면 "외 N건"이 잘려 안 보였음.
+                  if (f.name === stickyFieldName && (lead || trail)) {
+                    return (
+                      <span className="flex min-w-0 items-center max-md:max-w-[9rem] print:max-w-none">
+                        {lead}
+                        <span className="min-w-0 truncate print:overflow-visible print:whitespace-normal">{value}</span>
+                        {trail}
+                      </span>
+                    );
+                  }
+                  // 휴대폰에서 고정 칸(프로젝트명 등)은 화면을 너무 덮지 않게 폭 제한 + 말줄임
+                  // (칸 자체의 max-width는 자동 폭 표에서 무시돼서 안쪽 상자로 제한).
+                  return (
+                    <span
+                      className={cx(
+                        f.name === stickyFieldName &&
+                          "max-md:block max-md:max-w-[9rem] max-md:truncate print:max-w-none print:whitespace-normal print:overflow-visible"
+                      )}
+                    >
+                      {value}
+                    </span>
+                  );
+                })()
+              )}
+            </Td>
+          ))}
+          <Td className="sticky-actions whitespace-nowrap text-right print:hidden">
+            {summaryOf ? (
+              <div className="flex justify-end gap-2">{groupActions?.[summaryOf]}</div>
+            ) : (
+            <div className="flex justify-end gap-2">
+              {extraActions?.[row.id]}
+              <Button variant="secondary" size="xs" onClick={() => setEditingId(row.id)}>
+                수정
+              </Button>
+              {confirmDeleteId === row.id ? (
+                <div className="flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-medium text-red-600">정말 삭제?</span>
+                    <Button
+                      variant="danger"
+                      size="xs"
+                      type="button"
+                      onClick={async () => {
+                        const fd = new FormData();
+                        fd.append("id", row.id);
+                        const result = await pending.run(() => Promise.resolve(deleteAction(fd)));
+                        if (result && typeof result === "object" && "error" in result && result.error) {
+                          setDeleteError(String(result.error));
+                          return;
+                        }
+                        setDeleteError(null);
+                        setConfirmDeleteId(null);
+                      }}
+                    >
+                      확인
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="xs"
+                      type="button"
+                      onClick={() => {
+                        setConfirmDeleteId(null);
+                        setDeleteError(null);
+                      }}
+                    >
+                      취소
+                    </Button>
+                  </div>
+                  {deleteError && <span className="max-w-[200px] text-right text-xs text-red-600">{deleteError}</span>}
+                </div>
+              ) : (
+                <Button
+                  variant="danger"
+                  size="xs"
+                  type="button"
+                  onClick={() => {
+                    setConfirmDeleteId(row.id);
+                    setDeleteError(null);
+                  }}
+                >
+                  삭제
+                </Button>
+              )}
+            </div>
+            )}
+          </Td>
+        </Tr>
+      )
+    );
+  }
 
   if (rows.length === 0) {
     return <p className="py-8 text-center text-sm text-slate-400">등록된 항목이 없습니다.</p>;
@@ -423,150 +615,33 @@ export function EntityTable({
         </th>
       </THead>
       <tbody>
-        {sortedRows.map((row) =>
-          editingId === row.id && !editPopup ? (
-            <Tr key={row.id} className="bg-slate-50">
-              <td colSpan={visibleFields.length + 1} className="py-3 pr-4">
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    const form = e.currentTarget;
-                    if (!(await confirm("수정 내용을 저장하시겠습니까?"))) return;
-                    try {
-                      const result = await pending.run(() => Promise.resolve(updateAction(new FormData(form))));
-                      if (result && typeof result === "object" && "error" in result && result.error) {
-                        setFormError(String(result.error));
-                        return;
-                      }
-                      setFormError(null);
-                      setEditingId(null);
-                    } catch (err) {
-                      setFormError(err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.");
-                    }
-                  }}
-                  className="space-y-3"
+        {blocks.map((b) => {
+          if (!b.summary) return [b.anchor, ...b.children].map((row) => renderRow(row));
+          const anchorId = b.anchor.id;
+          const open = expandedGroups.has(anchorId);
+          return (
+            <Fragment key={`group:${anchorId}`}>
+              {renderRow(
+                b.summary,
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(anchorId)}
+                  aria-expanded={open}
+                  aria-label={open ? "묶음 접기" : "묶음 펼치기"}
+                  className="mr-1 inline-flex h-5 w-5 items-center justify-center rounded align-middle text-[10px] text-slate-500 hover:bg-slate-200 print:hidden"
                 >
-                  <input type="hidden" name="id" value={row.id} />
-                  <EntityForm fields={fields} defaultValues={row} />
-                  {formError && <p className="text-sm text-red-600">{formError}</p>}
-                  <div className="flex gap-2">
-                    <Button type="submit" size="sm">
-                      저장
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => {
-                        setFormError(null);
-                        setEditingId(null);
-                      }}
-                    >
-                      취소
-                    </Button>
-                  </div>
-                </form>
-              </td>
-            </Tr>
-          ) : (
-            <Tr key={row.id} className={rowBgClass(row, fields)}>
-              {visibleFields.map((f) => (
-                <Td
-                  key={f.name}
-                  style={colStyle(f)}
-                  title={f.display === "progress" ? undefined : displayValue(row, f)}
-                  className={cx(
-                    "max-w-[220px] truncate pr-4 print:whitespace-normal print:overflow-visible",
-                    colWidthClass(f),
-                    // w-[1%]: 표의 남는 폭이 고정 칸으로 몰려 화면을 덮지 않게(globals.css와 같은 방식)
-                    f.name === stickyFieldName && "sticky-col max-md:w-[1%]"
-                  )}
-                >
-                  {f.display === "progress" ? (
-                    <ProgressCell value={Number(row[f.name]) || 0} />
-                  ) : (
-                    // 휴대폰에서 고정 칸(프로젝트명 등)은 화면을 너무 덮지 않게 폭 제한 + 말줄임
-                    // (칸 자체의 max-width는 자동 폭 표에서 무시돼서 안쪽 상자로 제한).
-                    <span
-                      className={cx(
-                        f.name === stickyFieldName &&
-                          "max-md:block max-md:max-w-[9rem] max-md:truncate print:max-w-none print:whitespace-normal print:overflow-visible"
-                      )}
-                    >
-                      {cellColorClass(row, f) ? (
-                        <span className={cellColorClass(row, f)}>{displayValue(row, f)}</span>
-                      ) : (
-                        displayValue(row, f)
-                      )}
-                      {dotColorClass(row, f) && (
-                        <span
-                          className={`ml-1.5 inline-block h-2 w-2 rounded-full align-middle ${dotColorClass(row, f)}`}
-                        />
-                      )}
-                    </span>
-                  )}
-                </Td>
-              ))}
-              <Td className="sticky-actions whitespace-nowrap text-right print:hidden">
-                <div className="flex justify-end gap-2">
-                  {extraActions?.[row.id]}
-                  <Button variant="secondary" size="xs" onClick={() => setEditingId(row.id)}>
-                    수정
-                  </Button>
-                  {confirmDeleteId === row.id ? (
-                    <div className="flex flex-col items-end gap-1">
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs font-medium text-red-600">정말 삭제?</span>
-                        <Button
-                          variant="danger"
-                          size="xs"
-                          type="button"
-                          onClick={async () => {
-                            const fd = new FormData();
-                            fd.append("id", row.id);
-                            const result = await pending.run(() => Promise.resolve(deleteAction(fd)));
-                            if (result && typeof result === "object" && "error" in result && result.error) {
-                              setDeleteError(String(result.error));
-                              return;
-                            }
-                            setDeleteError(null);
-                            setConfirmDeleteId(null);
-                          }}
-                        >
-                          확인
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="xs"
-                          type="button"
-                          onClick={() => {
-                            setConfirmDeleteId(null);
-                            setDeleteError(null);
-                          }}
-                        >
-                          취소
-                        </Button>
-                      </div>
-                      {deleteError && <span className="max-w-[200px] text-right text-xs text-red-600">{deleteError}</span>}
-                    </div>
-                  ) : (
-                    <Button
-                      variant="danger"
-                      size="xs"
-                      type="button"
-                      onClick={() => {
-                        setConfirmDeleteId(row.id);
-                        setDeleteError(null);
-                      }}
-                    >
-                      삭제
-                    </Button>
-                  )}
-                </div>
-              </Td>
-            </Tr>
-          )
-        )}
+                  {open ? "▼" : "▶"}
+                </button>,
+                anchorId,
+                <span className="ml-1 shrink-0 text-xs font-semibold text-slate-500">외 {b.children.length}건</span>
+              )}
+              {open &&
+                [b.anchor, ...b.children].map((row) =>
+                  renderRow(row, <span className="mr-1 text-slate-300">└</span>)
+                )}
+            </Fragment>
+          );
+        })}
       </tbody>
     </Table>
 
