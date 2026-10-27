@@ -14,6 +14,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { updateAgencyPurchase } from "@/lib/actions/projectAgencyPurchases";
 import { MoneyInput } from "@/components/ui/MoneyInput";
+import { categoryReportHref } from "@/components/CategoryAggregateTable";
 
 type Category = { id: string; name: string; project_only: boolean; color: string | null };
 
@@ -28,12 +29,16 @@ type DetailRow = {
   amount: number;
   category_id?: string | null;
   memo?: string | null;
+  // 여러 카테고리를 한 번에 볼 때 줄마다 어느 카테고리인지.
+  category_name?: string;
 };
 
-type SortKey = "trans_date" | "client_name" | "project_name" | "item_name" | "amount";
+type SortKey = "category_name" | "trans_date" | "client_name" | "project_name" | "item_name" | "amount";
 
 function sortValue(r: DetailRow, key: SortKey): string | number {
   switch (key) {
+    case "category_name":
+      return r.category_name ?? "";
     case "trans_date":
       return r.trans_date ?? "";
     case "client_name":
@@ -50,7 +55,17 @@ function sortValue(r: DetailRow, key: SortKey): string | number {
 // 대행구매 항목은 별도 테이블(project_agency_purchases)이라 매입(거래) 항목처럼
 // 전용 수정 팝업으로 보내는 대신, 이 행 자체를 인라인 편집 폼으로 바꿔서 처리함
 // (ProjectAgencyPurchaseList의 AgencyRow와 같은 방식).
-function AgencyDetailRow({ row, categories, clientNames }: { row: DetailRow; categories: Category[]; clientNames: string[] }) {
+function AgencyDetailRow({
+  row,
+  categories,
+  clientNames,
+  showCategory,
+}: {
+  row: DetailRow;
+  categories: Category[];
+  clientNames: string[];
+  showCategory: boolean;
+}) {
   const confirm = useConfirm();
   const pending = useGlobalPending();
   const router = useRouter();
@@ -84,6 +99,7 @@ function AgencyDetailRow({ row, categories, clientNames }: { row: DetailRow; cat
     return (
       <tr className="border-b border-slate-100 bg-slate-50 align-top last:border-0">
         <td className="py-2 pr-4 text-slate-500">대행구매</td>
+        {showCategory && <td className="py-2 pr-4 text-slate-700">{row.category_name ?? "-"}</td>}
         <td className="py-2 pr-4 text-slate-400">-</td>
         <td className="py-2 pr-4">
           <input
@@ -154,6 +170,7 @@ function AgencyDetailRow({ row, categories, clientNames }: { row: DetailRow; cat
       <td className="py-2 pr-4">
         <span className="text-slate-500">대행구매</span>
       </td>
+      {showCategory && <td className="py-2 pr-4 text-slate-700">{row.category_name ?? "-"}</td>}
       <td className="py-2 pr-4 text-slate-600">-</td>
       <td className="py-2 pr-4 text-slate-700">{row.client_name ?? "-"}</td>
       <td className="py-2 pr-4 text-slate-700">
@@ -175,7 +192,7 @@ function AgencyDetailRow({ row, categories, clientNames }: { row: DetailRow; cat
 }
 
 export function CategoryDetailReport({
-  categoryName,
+  categoryNames,
   year,
   purchaseRows,
   agencyRows,
@@ -183,7 +200,8 @@ export function CategoryDetailReport({
   clientNames,
   closeHref,
 }: {
-  categoryName: string;
+  // 이름을 눌러 열면 하나, 체크해서 "선택한 카테고리 보기"로 열면 여러 개.
+  categoryNames: string[];
   year: number;
   purchaseRows: DetailRow[];
   agencyRows: DetailRow[];
@@ -197,8 +215,11 @@ export function CategoryDetailReport({
   const [statusFilter, setStatusFilter] = useState("");
   useEscapeKey(true, () => router.push(closeHref, { scroll: false }));
 
+  const multi = categoryNames.length > 1;
+  const titleName = multi ? `선택한 카테고리 ${categoryNames.length}개` : categoryNames[0];
+
   function editHrefFor(id: string) {
-    return `/reports?year=${year}&category=${encodeURIComponent(categoryName)}&editTx=${id}`;
+    return `${categoryReportHref(year, categoryNames)}&editTx=${id}`;
   }
 
   const statusOptions = useMemo(
@@ -222,8 +243,17 @@ export function CategoryDetailReport({
   );
   const purchaseTotal = filteredPurchaseRows.reduce((s, r) => s + r.amount, 0);
   const agencyTotal = filteredAgencyRows.reduce((s, r) => s + r.amount, 0);
+  // 여러 카테고리면 카테고리별 합계도(선택한 순서대로).
+  const categoryTotals = multi
+    ? categoryNames.map((name) => ({
+        name,
+        purchase: filteredPurchaseRows.filter((r) => r.category_name === name).reduce((s, r) => s + r.amount, 0),
+        agency: filteredAgencyRows.filter((r) => r.category_name === name).reduce((s, r) => s + r.amount, 0),
+      }))
+    : [];
   const exportRows = combined.map((r) => [
     r.kind,
+    ...(multi ? [r.category_name ?? "-"] : []),
     r.trans_date ? formatDate(r.trans_date) : "-",
     r.client_name ?? "-",
     r.project_name ?? "-",
@@ -264,9 +294,12 @@ export function CategoryDetailReport({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold text-slate-900">
-          {categoryName} 총 매입내역 <span className="tabular-nums text-sm font-normal text-slate-400">{year}년</span>
-        </h2>
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">
+            {titleName} 총 매입내역 <span className="tabular-nums text-sm font-normal text-slate-400">{year}년</span>
+          </h2>
+          {multi && <p className="mt-0.5 text-xs text-slate-500">{categoryNames.join(" · ")}</p>}
+        </div>
         <div className="flex items-center gap-3 max-md:flex-wrap print:hidden">
           {statusOptions.length > 0 && (
             <select
@@ -283,11 +316,12 @@ export function CategoryDetailReport({
             </select>
           )}
           <CategoryReportActions
-            categoryName={categoryName}
+            categoryName={multi ? `카테고리${categoryNames.length}개` : categoryNames[0]}
             year={year}
             rows={exportRows}
             purchaseTotal={purchaseTotal}
             agencyTotal={agencyTotal}
+            categoryTotals={multi ? categoryTotals : undefined}
           />
           <Link href={closeHref} className="text-sm text-slate-500 hover:text-slate-800">
             닫기
@@ -300,6 +334,7 @@ export function CategoryDetailReport({
           <thead>
             <tr className="border-b border-slate-200 text-left text-slate-500">
               <th className="pb-2 pr-4">구분</th>
+              {multi && <th className="pb-2 pr-4">{headerButton("category_name", "카테고리")}</th>}
               <th className="pb-2 pr-4">{headerButton("trans_date", "날짜")}</th>
               <th className="pb-2 pr-4">{headerButton("client_name", "거래처")}</th>
               <th className="pb-2 pr-4">{headerButton("project_name", "프로젝트")}</th>
@@ -311,12 +346,19 @@ export function CategoryDetailReport({
           <tbody>
             {sortedRows.map((r) =>
               r.kind === "대행구매" ? (
-                <AgencyDetailRow key={`${r.kind}-${r.id}`} row={r} categories={categories} clientNames={clientNames} />
+                <AgencyDetailRow
+                  key={`${r.kind}-${r.id}`}
+                  row={r}
+                  categories={categories}
+                  clientNames={clientNames}
+                  showCategory={multi}
+                />
               ) : (
                 <tr key={`${r.kind}-${r.id}`} className="border-b border-slate-100 last:border-0">
                   <td className="py-2 pr-4">
                     <span className="text-slate-700">{r.kind}</span>
                   </td>
+                  {multi && <td className="py-2 pr-4 text-slate-700">{r.category_name ?? "-"}</td>}
                   <td className="py-2 pr-4 text-slate-600">{r.trans_date ? formatDate(r.trans_date) : "-"}</td>
                   <td className="py-2 pr-4 text-slate-700">{r.client_name ?? "-"}</td>
                   <td className="py-2 pr-4 text-slate-700">
@@ -337,7 +379,7 @@ export function CategoryDetailReport({
             )}
             {sortedRows.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-6 text-center text-slate-400">
+                <td colSpan={multi ? 8 : 7} className="py-6 text-center text-slate-400">
                   매입 내역이 없습니다.
                 </td>
               </tr>
@@ -345,6 +387,22 @@ export function CategoryDetailReport({
           </tbody>
         </table>
       </div>
+
+      {multi && (
+        <div className="space-y-1 border-t border-slate-100 pt-3 text-sm text-slate-600">
+          {categoryTotals.map((c) => (
+            <p key={c.name} className="flex flex-wrap justify-end gap-x-4">
+              <span className="font-medium text-slate-700">{c.name}</span>
+              <span>
+                매입 <span className="tabular-nums font-semibold text-slate-900">{formatWon(c.purchase)}</span>
+              </span>
+              <span>
+                대행구매 <span className="tabular-nums font-semibold text-slate-900">{formatWon(c.agency)}</span>
+              </span>
+            </p>
+          ))}
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-end gap-6 border-t border-slate-100 pt-4">
         <span className="text-sm text-slate-600">

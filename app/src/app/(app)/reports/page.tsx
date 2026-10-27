@@ -113,7 +113,8 @@ export default async function ReportsPage({
     project?: string;
     vendor?: string;
     vendorAgency?: string;
-    category?: string;
+    // 카테고리별 집계 팝업 — 여러 개를 체크해서 열면 category가 반복돼 배열로 옴.
+    category?: string | string[];
     site?: string;
     siteReport?: string;
     editTx?: string;
@@ -138,6 +139,9 @@ export default async function ReportsPage({
     printSection,
   } = await searchParams;
   const includeVendorAgency = vendorAgency === "1";
+  const categoryNames = category ? (Array.isArray(category) ? category : [category]) : [];
+  const categorySet = new Set(categoryNames);
+  const categoryQuery = categoryNames.map((n) => `category=${encodeURIComponent(n)}`).join("&");
   const currentYear = nowKst().year;
   const selectedYear = year ? Number(year) : currentYear;
 
@@ -656,17 +660,18 @@ export default async function ReportsPage({
   }));
   const unassignedDayCount = new Set(unassignedRows.map((r) => r.date)).size;
 
-  // 카테고리별 집계 팝업 — 매입 내역 + 대행구매 내역을 합쳐서 보여줌
-  const categoryPurchaseRows = category
+  // 카테고리별 집계 팝업 — 매입 내역 + 대행구매 내역을 합쳐서 보여줌(체크한 카테고리 여러 개면 한 번에).
+  const categoryPurchaseRows = categoryNames.length
     ? transactions
         .filter((t) => t.type === "매입")
         .filter((t) => {
           const c = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
-          return (c?.name ?? "미분류") === category;
+          return categorySet.has(c?.name ?? "미분류");
         })
         .map((t) => {
           const client = one(t.clients) as { name: string } | null;
           const proj = one(t.projects) as { name: string; status: string | null } | null;
+          const c = one(t.expense_categories) as { name: string } | null;
           return {
             id: t.id,
             kind: "매입" as const,
@@ -676,18 +681,20 @@ export default async function ReportsPage({
             project_status: proj?.status ?? null,
             item_name: t.item_name,
             amount: t.purchase_amount + t.purchase_vat,
+            category_name: c?.name ?? "미분류",
           };
         })
     : [];
 
-  const categoryAgencyRows = category
+  const categoryAgencyRows = categoryNames.length
     ? (agencyPurchases ?? [])
         .filter((a) => {
           const c = one(a.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
-          return (c?.name ?? "미분류") === category;
+          return categorySet.has(c?.name ?? "미분류");
         })
         .map((a) => {
           const proj = one(a.projects) as { name: string; status: string | null } | null;
+          const c = one(a.expense_categories) as { name: string } | null;
           return {
             id: a.id,
             kind: "대행구매" as const,
@@ -699,6 +706,7 @@ export default async function ReportsPage({
             amount: a.amount,
             category_id: a.category_id as string | null,
             memo: a.memo as string | null,
+            category_name: c?.name ?? "미분류",
           };
         })
     : [];
@@ -761,7 +769,7 @@ export default async function ReportsPage({
 
   const vendorAllRows = [...vendorRows, ...vendorAgencyRows];
 
-  const popupOpen = Boolean(project || vendor || category);
+  const popupOpen = Boolean(project || vendor || categoryNames.length);
   const isolate = Boolean(printSection);
 
   // 항목별 "인쇄" 버튼 — 해당 항목 하나만 남기고 나머지는 인쇄에서 숨긴 채로
@@ -1358,11 +1366,11 @@ export default async function ReportsPage({
         </div>
       )}
 
-      {category && (
+      {categoryNames.length > 0 && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-brand-ink/50 p-4 py-10 print:static print:bg-transparent print:p-0">
           <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
             <CategoryDetailReport
-              categoryName={category}
+              categoryNames={categoryNames}
               year={selectedYear}
               purchaseRows={categoryPurchaseRows}
               agencyRows={categoryAgencyRows}
@@ -1390,8 +1398,8 @@ export default async function ReportsPage({
       <TransactionEditPopup
         editTx={editTx}
         redirectTo={
-          category
-            ? `/reports?year=${selectedYear}&category=${encodeURIComponent(category)}`
+          categoryNames.length
+            ? `/reports?year=${selectedYear}&${categoryQuery}`
             : siteReport
               ? `/reports?year=${selectedYear}&siteReport=${encodeURIComponent(siteReport)}`
               : `/reports?year=${selectedYear}${includeVendorAgency ? "&vendorAgency=1" : ""}&vendor=${encodeURIComponent(vendor ?? "")}`
