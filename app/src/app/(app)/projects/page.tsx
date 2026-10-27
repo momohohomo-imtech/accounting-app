@@ -72,9 +72,17 @@ const HIGHLIGHT_COLOR_IDENTITY_MAP: Record<string, RowBgColor> = Object.fromEntr
 export default async function ProjectsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; year?: string; site_id?: string; status?: string; report?: string; suppliers?: string }>;
+  searchParams: Promise<{
+    tab?: string;
+    year?: string;
+    site_id?: string;
+    status?: string;
+    report?: string;
+    own?: string;
+    suppliers?: string;
+  }>;
 }) {
-  const { tab, year, site_id, status, report, suppliers } = await searchParams;
+  const { tab, year, site_id, status, report, own, suppliers } = await searchParams;
   const active = tab ?? "list";
 
   return (
@@ -86,7 +94,9 @@ export default async function ProjectsPage({
       {active === "sites" && <SitesSection />}
       {active === "quotes" && <QuotesSection suppliersOpen={suppliers === "1"} />}
       {active === "purchase_orders" && <PurchaseOrdersSection />}
-      {active === "list" && <ProjectListSection year={year} siteId={site_id} status={status} report={report} />}
+      {active === "list" && (
+        <ProjectListSection year={year} siteId={site_id} status={status} report={report} ownOnly={own === "1"} />
+      )}
     </div>
   );
 }
@@ -96,11 +106,14 @@ async function ProjectListSection({
   siteId,
   status,
   report,
+  ownOnly,
 }: {
   year?: string;
   siteId?: string;
   status?: string;
   report?: string;
+  // 보고서를 귀속 하위 없이 그 프로젝트만(묶음을 펼친 어미 줄의 "보고서").
+  ownOnly: boolean;
 }) {
   const supabase = await createClient();
   const currentYear = nowKst().year;
@@ -149,6 +162,15 @@ async function ProjectListSection({
   const projectIds = Array.from(
     new Set([...displayedIds, ...Array.from(childrenByParent.values()).flat().map((c) => c.id)])
   );
+  // 어미+귀속 하위는 목록에서 한 묶음(접힌 요약 줄)이라, 상태·현장 필터에 안 걸린 하위도 어미와 함께 보이게 가져옴.
+  const hiddenChildIds = projectIds.filter((id) => !displayedIds.has(id));
+  const hiddenChildrenPromise = hiddenChildIds.length
+    ? supabase
+        .from("projects")
+        .select("*, sites(name)")
+        .in("id", hiddenChildIds)
+        .then((r) => r.data ?? [])
+    : Promise.resolve([]);
   type ProjectPurchaseRow = {
     id: string;
     type: string;
@@ -349,35 +371,32 @@ async function ProjectListSection({
     new Set([...(allYears ?? []).map((p) => p.year), currentYear, selectedYear])
   ).sort((a, b) => b - a);
 
-  const tableRows = (projects ?? []).map((p) => {
+  const listProjects = [...(projects ?? []), ...(await hiddenChildrenPromise)];
+  const tableRows = listProjects.map((p) => {
     const agencyAmount = agencyByProject.get(p.id) ?? 0;
     // 수주액이 발주액-대행구매액과 다르면(입력 실수 가능성) 프로젝트명을 노란색으로 표시.
     // 단, 결산 정리가 끝난 프로젝트는 목록에서 일반 검정으로 되돌림(보고서 팝업 안 경고는 별개, 항상 유지).
     const contractMismatch =
       !p.settlement_finalized &&
       (p.contract_amount ?? 0) > 0 && (p.quote_amount ?? 0) - (p.contract_amount ?? 0) - agencyAmount !== 0;
-    // 귀속 하위 행은 이익금·이익율을 비워 둠(어미 행에 합산돼 있어 합계에서 두 번 세지 않게).
-    // 총 매입은 참고로 자기 몫만 보여주고, 하단 합계에서는 어미가 목록에 있으면 뺀다.
-    const isChild = Boolean(p.parent_project_id);
-    const g = groupProjectProfit([p, ...(childrenByParent.get(p.id) ?? [])], purchaseByProject, agencyByProject);
+    // 줄마다 자기 값(사용자 요청: 묶음을 펼치면 각자 따로 보고 수정) — 어미+귀속 하위의 합산은 접힌 요약 줄(groupSummaries).
     const own = groupProjectProfit([p], purchaseByProject, agencyByProject);
-    const profit = isChild ? null : g.profit;
     // 이익율은 발주액 대비 비율 — 손익보고서 팝업/보고서 페이지와 동일한 계산 기준.
-    const profitRate = !isChild && g.rate !== null ? `${g.rate.toFixed(1)}%` : "-";
+    const profitRate = own.rate !== null ? `${own.rate.toFixed(1)}%` : "-";
     // 수주예상액 = 발주액 - 구매 대행비.
     const contractAmountExpected = (p.quote_amount ?? 0) - agencyAmount;
     // 총 매입 = 매입 합계 + 구매대행 합계.
-    const totalPurchase = isChild ? own.purchase + own.agency : g.purchase + g.agency;
-    const countedInParent = isChild && displayedIds.has(p.parent_project_id as string);
+    const totalPurchase = own.purchase + own.agency;
     return {
       ...p,
       site_name: (one(p.sites) as { name: string } | undefined)?.name,
-      profit,
+      profit: own.profit,
       profitRate,
       contractMismatch,
       contractAmountExpected,
       totalPurchase,
-      countedInParent,
+      // 상태·현장 필터에 걸린 줄(어미 묶음 때문에 함께 가져온 하위는 false).
+      inFilter: displayedIds.has(p.id),
     };
   });
 
@@ -402,13 +421,54 @@ async function ProjectListSection({
     return { ...p, rowColorKey: statusRowColor(effectiveStatus), mergeGroupColor };
   });
 
-  const awaitingPaymentProjects = tableRows.filter((p) => p.status === PROJECT_STATUS_AWAITING_PAYMENT);
+  // 어미+귀속 하위 묶음의 접힌 요약 줄 — 이름은 어미 이름(표가 뒤에 "외 N건"을 붙임), 발주액·수주예상액·총 매입은 합계,
+  // 이익금·이익율은 손익보고서와 같은 묶음 기준(groupProjectProfit — 발주액 없는 하위의 매입도 빠짐). 펼치면 어미·하위가 각자
+  // 원래 줄(자기 값·수정·자기 보고서).
+  const rowById = new Map(coloredRows.map((r) => [r.id, r]));
+  const groupSummaries: Record<string, (typeof coloredRows)[number]> = {};
+  for (const [parentId, kids] of childrenByParent) {
+    const parent = rowById.get(parentId);
+    if (!parent) continue;
+    const members = [
+      parent,
+      ...kids.map((k) => rowById.get(k.id)).filter((r): r is (typeof coloredRows)[number] => Boolean(r)),
+    ];
+    if (members.length < 2) continue;
+    const g = groupProjectProfit(members, purchaseByProject, agencyByProject);
+    groupSummaries[parentId] = {
+      ...parent,
+      id: `group:${parentId}`,
+      quote_amount: members.some((m) => m.quote_amount != null)
+        ? members.reduce((sum, m) => sum + (m.quote_amount ?? 0), 0)
+        : null,
+      contractAmountExpected: members.reduce((sum, m) => sum + m.contractAmountExpected, 0),
+      profit: g.profit,
+      profitRate: g.rate !== null ? `${g.rate.toFixed(1)}%` : "-",
+      totalPurchase: g.purchase + g.agency,
+      contractMismatch: members.some((m) => m.contractMismatch),
+    };
+  }
+  // 묶음(요약 줄이 있는 어미)에 들어간 하위 줄인지.
+  const inGroup = (p: { parent_project_id: string | null }) =>
+    Boolean(p.parent_project_id && groupSummaries[p.parent_project_id]);
+  // 엑셀은 예전처럼 어미 줄에 묶음 이익금, 묶음 안 하위 줄은 이익금 빈칸(엑셀에서 합계를 내도 두 번 세지 않게).
+  const exportRows = coloredRows.map((p) =>
+    groupSummaries[p.id] ? { ...p, profit: groupSummaries[p.id].profit } : inGroup(p) ? { ...p, profit: null } : p
+  );
+  const listHref = `/projects?tab=list&year=${selectedYear}${siteId ? `&site_id=${siteId}` : ""}${status ? `&status=${encodeURIComponent(status)}` : ""}`;
+
+  const awaitingPaymentProjects = tableRows.filter((p) => p.inFilter && p.status === PROJECT_STATUS_AWAITING_PAYMENT);
   const awaitingPaymentContractSum = awaitingPaymentProjects.reduce((sum, p) => sum + p.contractAmountExpected, 0);
 
+  // 하단 합계 — 발주액·수주예상액·총 매입은 줄마다 자기 값의 합(= 묶음 합계와 같음), 이익금은 묶음이면 묶음 이익금(발주액 없는
+  // 하위의 매입까지 빠지게), 아니면 자기 이익금.
   const filteredQuoteSum = tableRows.reduce((sum, p) => sum + (p.quote_amount ?? 0), 0);
   const filteredContractSum = tableRows.reduce((sum, p) => sum + p.contractAmountExpected, 0);
-  const filteredProfitSum = tableRows.reduce((sum, p) => sum + (p.profit ?? 0), 0);
-  const filteredPurchaseSum = tableRows.reduce((sum, p) => sum + (p.countedInParent ? 0 : p.totalPurchase), 0);
+  const filteredProfitSum = tableRows.reduce(
+    (sum, p) => sum + (inGroup(p) ? 0 : (groupSummaries[p.id]?.profit ?? p.profit ?? 0)),
+    0
+  );
+  const filteredPurchaseSum = tableRows.reduce((sum, p) => sum + p.totalPurchase, 0);
 
   return (
     <div className="space-y-6">
@@ -441,7 +501,7 @@ async function ProjectListSection({
             statusOptions={PROJECT_STATUS_OPTIONS}
             selectedStatuses={statusList}
           />
-          <ProjectListExportButtons year={selectedYear} rows={tableRows} />
+          <ProjectListExportButtons year={selectedYear} rows={exportRows} />
         </div>
 
         <div className="print:hidden">
@@ -453,27 +513,33 @@ async function ProjectListSection({
             fields={fields}
             rows={coloredRows}
             groupByField="parent_project_id"
+            groupSummaries={groupSummaries}
+            // 접힌 묶음 줄 — 어미+귀속 하위 합산 보고서(ProjectProfitReport는 어미 id로 열면 하위까지 합침).
+            groupActions={Object.fromEntries(
+              Object.keys(groupSummaries).map((parentId) => [
+                parentId,
+                <LinkButton key={parentId} href={`${listHref}&report=${parentId}`} variant="secondary" size="xs">
+                  합산 보고서
+                </LinkButton>,
+              ])
+            )}
             updateAction={updateProjectRecord}
             deleteAction={deleteProjectRecord}
             editPopup
+            // 줄마다 자기 보고서(사용자 요청: 묶음 안에서도 각자 따로) — 묶음 어미 줄은 하위를 뺀 자기 것만(own=1),
+            // 하위는 자기 id로 열면 자기 것만(보고서에 "귀속 상위" 표시).
             extraActions={Object.fromEntries(
-              (projects ?? []).map((p) => {
-                // 귀속(parent_project_id가 있는) 프로젝트는 보고서를 열어도 항상 어미
-                // 프로젝트 보고서로 이동 — 하위 프로젝트만 단독으로 열면 귀속 합산 전
-                // 불완전한 수치가 보임(ProjectProfitReport는 어미 id로 열어야 하위까지 합침).
-                const reportId = p.parent_project_id ?? p.id;
-                return [
-                  p.id,
-                  <LinkButton
-                    key={p.id}
-                    href={`/projects?tab=list&year=${selectedYear}${siteId ? `&site_id=${siteId}` : ""}${status ? `&status=${encodeURIComponent(status)}` : ""}&report=${reportId}`}
-                    variant="secondary"
-                    size="xs"
-                  >
-                    보고서
-                  </LinkButton>,
-                ];
-              })
+              tableRows.map((p) => [
+                p.id,
+                <LinkButton
+                  key={p.id}
+                  href={`${listHref}&report=${p.id}${groupSummaries[p.id] ? "&own=1" : ""}`}
+                  variant="secondary"
+                  size="xs"
+                >
+                  보고서
+                </LinkButton>,
+              ])
             )}
           />
           <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-slate-100 pt-3 text-sm text-slate-600">
@@ -501,6 +567,7 @@ async function ProjectListSection({
           <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
             <ProjectProfitReport
               projectId={report}
+              ownOnly={ownOnly}
               closeHref={`/projects?tab=list&year=${selectedYear}${siteId ? `&site_id=${siteId}` : ""}${status ? `&status=${encodeURIComponent(status)}` : ""}`}
             />
           </div>

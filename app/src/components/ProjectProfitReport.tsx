@@ -35,7 +35,16 @@ import {
 import type { WorkLogTitleRow } from "@/lib/workLogSummary";
 import { ProjectTripDetailTable } from "@/components/ProjectTripDetailTable";
 
-export async function ProjectProfitReport({ projectId, closeHref }: { projectId: string; closeHref: string }) {
+// ownOnly: 귀속 하위가 있는 어미 프로젝트를 하위 없이 자기 것만(프로젝트 목록에서 묶음을 펼친 어미 줄의 "보고서").
+export async function ProjectProfitReport({
+  projectId,
+  closeHref,
+  ownOnly = false,
+}: {
+  projectId: string;
+  closeHref: string;
+  ownOnly?: boolean;
+}) {
   const supabase = await createClient();
   const { data: project } = await supabase.from("projects").select("*, sites(name)").eq("id", projectId).single();
   if (!project) return null;
@@ -45,8 +54,9 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
     ? await supabase.from("projects").select("name, project_code").eq("id", project.parent_project_id).single()
     : { data: null };
 
-  const { data: children } = await supabase.from("projects").select("*").eq("parent_project_id", projectId);
-  const group = [project, ...(children ?? [])];
+  const { data: childRows } = await supabase.from("projects").select("*").eq("parent_project_id", projectId);
+  const children = ownOnly ? [] : (childRows ?? []);
+  const group = [project, ...children];
   const groupIds = group.map((p) => p.id);
 
   // 작업일지(달력)에서 이 프로젝트(+귀속 하위 프로젝트)가 직접 선택된 날짜 수만 집계.
@@ -245,9 +255,14 @@ export async function ProjectProfitReport({ projectId, closeHref }: { projectId:
           <p className="tabular-nums text-sm text-slate-400 print:text-xs">{project.project_code ?? "-"}</p>
           <h2 className="text-lg font-semibold text-slate-900 print:text-base">
             {project.name}
-            {children && children.length > 0 && (
+            {children.length > 0 && (
               <span className="ml-2 text-sm font-semibold text-red-600">
                 (귀속 하위: {children.map((c) => `${c.project_code ? `${c.project_code} ` : ""}${c.name}`).join(", ")})
+              </span>
+            )}
+            {ownOnly && (childRows ?? []).length > 0 && (
+              <span className="ml-2 text-sm font-semibold text-slate-500">
+                (이 프로젝트만 — 귀속 하위 {(childRows ?? []).length}건 제외)
               </span>
             )}
             {parentLabel && <span className="ml-2 text-sm font-semibold text-red-600">(귀속 상위: {parentLabel})</span>}
