@@ -28,10 +28,39 @@ function parse(formData: FormData) {
   };
 }
 
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+// 귀속은 한 단계만(어미 ← 하위) — 손익보고서·이익 예상이 한 단계로 묶어서, 하위의 하위(3단)는 어미 합산에서 빠졌음.
+// 새로 고르는 귀속만 확인(예전에 3단으로 저장된 자료도 다른 칸을 고칠 때는 그대로 저장되게).
+async function parentError(supabase: Supabase, projectId: string | null, parentId: string | null) {
+  if (!parentId) return null;
+  if (parentId === projectId) return "자기 자신에게 귀속할 수 없습니다.";
+  const { data: parent, error } = await supabase.from("projects").select("parent_project_id").eq("id", parentId).maybeSingle();
+  if (error) return error.message;
+  if (!parent) return "귀속 프로젝트를 찾을 수 없습니다.";
+  if (parent.parent_project_id) {
+    return "이미 다른 프로젝트에 귀속된 프로젝트에는 귀속할 수 없습니다. 그 위의 어미 프로젝트를 골라주세요.";
+  }
+  if (projectId) {
+    const { count, error: childError } = await supabase
+      .from("projects")
+      .select("id", { count: "exact", head: true })
+      .eq("parent_project_id", projectId);
+    if (childError) return childError.message;
+    if ((count ?? 0) > 0) {
+      return "하위 프로젝트가 있는 프로젝트는 다른 프로젝트에 귀속할 수 없습니다. 하위 프로젝트의 귀속을 먼저 바꿔주세요.";
+    }
+  }
+  return null;
+}
+
 export async function createProjectRecord(formData: FormData) {
   try {
     const supabase = await createClient();
-    const { error } = await supabase.from("projects").insert(parse(formData));
+    const row = parse(formData);
+    const invalidParent = await parentError(supabase, null, row.parent_project_id);
+    if (invalidParent) return { error: invalidParent };
+    const { error } = await supabase.from("projects").insert(row);
     if (error) return { error: error.message };
     revalidatePath("/projects");
     revalidatePath("/reports");
@@ -46,7 +75,18 @@ export async function updateProjectRecord(formData: FormData) {
   try {
     const supabase = await createClient();
     const id = String(formData.get("id"));
-    const { error } = await supabase.from("projects").update(parse(formData)).eq("id", id);
+    const row = parse(formData);
+    const { data: current, error: currentError } = await supabase
+      .from("projects")
+      .select("parent_project_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (currentError) return { error: currentError.message };
+    if (row.parent_project_id !== (current?.parent_project_id ?? null)) {
+      const invalidParent = await parentError(supabase, id, row.parent_project_id);
+      if (invalidParent) return { error: invalidParent };
+    }
+    const { error } = await supabase.from("projects").update(row).eq("id", id);
     if (error) return { error: error.message };
     revalidatePath("/projects");
     revalidatePath("/reports");

@@ -190,7 +190,7 @@ export async function bulkImportTransactions(
 export type GroupLineInput = BulkTransactionInput & { id?: string };
 
 // 묶음 전체 수정 — 줄 수정·추가·삭제를 한 번에. keepGroup이 꺼져 있거나 한 줄만 남으면 묶음을 푼다.
-// 중간에 실패해도 데이터가 덜 사라지게 수정 → 추가 → 삭제 순서, 삭제는 이 묶음의 줄만(묶음 번호로 한 번 더 거름).
+// 중간에 실패해도 데이터가 덜 사라지게 수정 → 추가 → 삭제 순서, 수정·삭제는 이 묶음의 줄만(묶음 번호로 한 번 더 거름).
 export async function saveTransactionGroup(input: {
   groupId: string;
   lines: GroupLineInput[];
@@ -204,6 +204,19 @@ export async function saveTransactionGroup(input: {
 
   if (input.lines.length === 0) return { error: "저장할 줄이 없습니다." };
   const paymentGroupId = input.keepGroup && input.lines.length > 1 ? input.groupId : null;
+
+  // 화면이 들고 있던 줄이 지금도 이 묶음의 줄인지 먼저 확인 — 그사이 다른 곳에서 묶음을 풀거나 바꿨으면 엉뚱한 거래를
+  // 덮어쓰거나 일부만 저장되지 않게 아무것도 바꾸지 않는다.
+  const { data: currentLines, error: currentError } = await supabase
+    .from("transactions")
+    .select("id")
+    .eq("payment_group_id", input.groupId);
+  if (currentError) return { error: currentError.message };
+  const currentIds = new Set((currentLines ?? []).map((r) => r.id));
+  const touchedIds = [...input.lines.flatMap((l) => (l.id ? [l.id] : [])), ...input.removedIds];
+  if (touchedIds.some((id) => !currentIds.has(id))) {
+    return { error: "그사이 묶음이 바뀌었습니다. 수정 화면을 다시 열어 저장해주세요." };
+  }
 
   const fieldsOf = (r: BulkTransactionInput) => ({
     trans_date: r.trans_date,
@@ -229,7 +242,9 @@ export async function saveTransactionGroup(input: {
   const updates = await Promise.all(
     input.lines
       .filter((l) => l.id)
-      .map((l) => supabase.from("transactions").update(fieldsOf(l)).eq("id", l.id!))
+      .map((l) =>
+        supabase.from("transactions").update(fieldsOf(l)).eq("id", l.id!).eq("payment_group_id", input.groupId)
+      )
   );
   const updateError = updates.find((r) => r.error)?.error;
   if (updateError) return { error: updateError.message };

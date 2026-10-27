@@ -14,6 +14,8 @@ export const PROJECT_STATUS_COLLECTED = "collected";
 export const PROJECT_STATUS_AWAITING_PAYMENT = "done_awaiting_payment";
 // 검토중(아직 수주 전) — 발주액은 예상 매출·예상 이익 같은 합계 계산에 넣지 않음(사용자 요청, lib/projectProfit.ts).
 export const PROJECT_STATUS_REVIEW = "review";
+// 타 프로젝트 귀속 — 자기 상태가 없어 어미 프로젝트의 상태를 물려받음(목록 상태색·이익 예상 계산).
+export const PROJECT_STATUS_MERGED = "merged";
 
 export function projectStatusLabel(status: string | null | undefined) {
   return PROJECT_STATUS_OPTIONS.find((o) => o.value === status)?.label ?? status ?? "-";

@@ -206,3 +206,80 @@ test("1월 부가세 미발행 예상분: 남은 발주액(대행구매·이미 
   assert.deepEqual(unbilledInvoiceVat(ps, ofProjects(txs, ps), AG), { count: 2, supply: 95_000_000, vat: 9_500_000 });
   assert.deepEqual(unbilledInvoiceVat([PB], ofProjects(txs, [PB]), AG), { count: 0, supply: 0, vat: 0 });
 });
+
+// ── 어미 + 귀속 하위 묶음 (가짜 데이터) ──
+const childOf = (id: string, parent: string, quote: number | null, status = "merged"): OutlookProject => ({
+  id,
+  name: `귀속 하위 ${id}`,
+  status,
+  quote_amount: quote,
+  parent_project_id: parent,
+});
+
+test("하반기 예상: 귀속 하위에 끊은 매출은 어미 발주액에 포함된 것으로 — 두 번 안 잡음", () => {
+  const child = childOf("PC", "PA", null);
+  const txs = [
+    ...baseTx(),
+    sale("2026-05-01", 11_000_000, "PC"), // 상반기에 하위로 끊은 기성금 1,000만 — 상반기 확정 이익에 이미 있음
+    sale("2026-09-10", 11_000_000, "PC"), // 하반기에 하위로 끊은 1,000만 — 어미 발주액의 일부
+  ];
+  const h2 = h2Of([PA, PB, child], txs);
+  // 하반기 매출-매입은 하위 매출을 빼고 1,000만, 미발행 = 9,000만 − 1,000만(상반기분) − 5,000만 − 500만 = 2,500만
+  assert.equal(h2.h2Profit, 10_000_000);
+  assert.equal(h2.unbilledPendingProfit, 25_000_000);
+  assert.equal(h2.h1BilledSales, 10_000_000);
+  assert.equal(h2.h2EstimatedProfit, 27_000_000);
+  assert.deepEqual(h2.unbilledProjectNames, ["진행중 A 외 1건"]);
+});
+
+test("하반기 예상: 타 프로젝트 귀속 하위의 발주액도 어미 묶음 발주액으로(예전엔 빠졌음), 하위 매입은 한 번만", () => {
+  const child = childOf("PC", "PA", 10_000_000);
+  const txs = [...baseTx(), buy("2026-10-01", 2_200_000, "PC")];
+  const h2 = h2Of([PA, PB, child], txs);
+  // 미발행 = (9,000만 + 1,000만) − (5,000만 + 200만) − 500만 = 4,300만, 하위 매입 200만은 미발행 쪽에서만 차감
+  assert.equal(h2.unbilledPendingProfit, 43_000_000);
+  assert.equal(h2.h2Profit, 10_000_000);
+  assert.equal(h2.h2EstimatedProfit, 45_000_000);
+});
+
+test("하반기 예상: 작년에 끊은 계산서도 발주액에서 뺌(그 해 이익에 이미 들어감)", () => {
+  const txs = [...baseTx(), sale("2025-12-15", 22_000_000, "PA")];
+  const h2 = h2Of([PA, PB], txs);
+  // 미발행 = 9,000만 − 2,000만(작년분) − 5,000만 − 500만 = 1,500만
+  assert.equal(h2.unbilledPendingProfit, 15_000_000);
+  assert.equal(h2.priorBilledSales, 20_000_000);
+  assert.equal(h2.h1BilledSales, 0);
+  assert.equal(h2.h2EstimatedProfit, 17_000_000);
+});
+
+test("1월 부가세 미발행 예상분: 하위 발주액은 더하고 하위로 끊은 매출은 빼서 묶음 하나로", () => {
+  const child = childOf("PC", "PA", 10_000_000);
+  const ps = [PA, PB, child];
+  const txs = [...baseTx(), sale("2026-09-10", 11_000_000, "PC")];
+  // (9,000만 + 1,000만) − 대행구매 500만 − 하위 매출 1,000만 = 8,500만 → 850만, 묶음 1건
+  assert.deepEqual(unbilledInvoiceVat(ps, ofProjects(txs, ps), AG), { count: 1, supply: 85_000_000, vat: 8_500_000 });
+});
+
+test("묶음 상태: 귀속 하위는 어미 상태를 따르고, 자기 상태가 있는 하위는 자기 상태로", () => {
+  // 어미가 수금 완료면 귀속 하위도 끝난 것 — 미발행 대상 아님
+  const doneRoot: OutlookProject = { id: "PX", name: "수금완료 X", status: "collected", quote_amount: 30_000_000 };
+  const merged = childOf("PXC", "PX", 5_000_000);
+  // 자기 상태가 진행중인 하위는 그 하위만 미발행 대상(어미 없이 하위 이름으로)
+  const ongoingChild = childOf("PXO", "PX", 4_000_000, "ongoing");
+  const ps = [doneRoot, merged, ongoingChild];
+  assert.deepEqual(unbilledInvoiceVat(ps, [], new Map()), { count: 1, supply: 4_000_000, vat: 400_000 });
+  assert.deepEqual(secondHalfOutlook(2026, ps, [], [], new Map()).unbilledProjectNames, ["귀속 하위 PXO"]);
+});
+
+test("검토중 어미의 귀속 하위 발주액도 합계에서 뺌(이미 쓴 매입은 비용)", () => {
+  const reviewRoot: OutlookProject = { id: "PR", name: "검토중 R", status: "review", quote_amount: 20_000_000 };
+  const child = childOf("PRC", "PR", 5_000_000);
+  const ps = [reviewRoot, child];
+  const txs = [buy("2026-10-01", 1_100_000, "PRC")];
+  const est = projectBasedProfit(ps, ofProjects(txs, ps), inYear(txs), new Map());
+  assert.equal(est.quoteTotal, 0);
+  assert.equal(est.profit, -1_000_000);
+  assert.equal(expectedRevenueOf(ps, new Map()), 0);
+  // 진행중 어미면 하위 발주액까지 예상 매출액
+  assert.equal(expectedRevenueOf([{ ...reviewRoot, status: "ongoing" }, child], new Map()), 25_000_000);
+});

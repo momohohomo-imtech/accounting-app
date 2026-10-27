@@ -83,6 +83,11 @@ export function sameCommonFields(lines: Pick<Transaction, (typeof GROUP_COMMON_F
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
+// select("*")로 받은 거래에 묶음 번호 칸이 있으면 092 SQL 실행 후 — 따로 조회하지 않고 판단(거래가 없으면 묶을 것도 없음).
+export function hasPaymentGroupColumn(rows: object[]) {
+  return rows.length > 0 && "payment_group_id" in rows[0];
+}
+
 // 092 SQL 실행 전에는 칸이 없어서 묶기 체크·버튼을 숨긴다 — 실행 전에도 화면·등록이 깨지지 않게.
 export async function paymentGroupReady(supabase: Supabase) {
   const { error } = await supabase.from("transactions").select("payment_group_id").limit(1);

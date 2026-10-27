@@ -3,7 +3,7 @@ import { isLedgerVisible } from "@/lib/credit";
 import { purchaseCostOf, salesSupplyOf, type VatBasisRow } from "@/lib/vatBasis";
 import { one } from "@/lib/relations";
 import { PAYROLL_CATEGORY_NAME } from "@/lib/vatExempt";
-import { PROJECT_STATUS_AWAITING_PAYMENT, PROJECT_STATUS_REVIEW } from "@/lib/projectStatus";
+import { PROJECT_STATUS_AWAITING_PAYMENT, PROJECT_STATUS_MERGED, PROJECT_STATUS_REVIEW } from "@/lib/projectStatus";
 
 type ProjectAmountRow = { id: string; quote_amount: number | null };
 
@@ -55,12 +55,55 @@ export function countedQuote(p: Pick<OutlookProject, "status" | "quote_amount">)
   return p.status === PROJECT_STATUS_REVIEW ? 0 : p.quote_amount ?? 0;
 }
 
-// 세금계산서를 아직 다 안 끊었을 수 있는 "미발행" 프로젝트 — 진행중·공사 완료·완료 수금대기이고 발주액이 있는(0원·검토중
-// 제외) 것. 하반기 예상 이익과 1월 부가세 미발행 예상분이 같은 대상을 쓴다.
-function isUnbilledProject(p: OutlookProject) {
-  return (
-    (p.status === "ongoing" || p.status === "done" || p.status === PROJECT_STATUS_AWAITING_PAYMENT) && countedQuote(p) > 0
-  );
+// ── 어미 + 귀속 하위 묶음 ──
+// 손익보고서·프로젝트 목록과 같은 한 단계 묶음: 어미가 같은 목록(그 해 프로젝트)에 있는 하위만 어미 묶음에 들어간다.
+export function projectGroups<P extends OutlookProject>(projects: P[]) {
+  const byId = new Map(projects.map((p) => [p.id, p]));
+  const groups = new Map<string, { root: P; members: P[] }>();
+  for (const p of projects) {
+    const root = (p.parent_project_id ? byId.get(p.parent_project_id) : undefined) ?? p;
+    const group = groups.get(root.id) ?? { root, members: [] };
+    group.members.push(p);
+    groups.set(root.id, group);
+  }
+  return Array.from(groups.values());
+}
+
+// 묶음 안 "타 프로젝트 귀속" 하위는 어미 상태를 물려받음(프로젝트 목록 상태색과 같은 규칙) — 검토중 어미의 하위 발주액은
+// 합계에서 빠지고, 진행중 어미의 하위는 미발행·수금 예정 계산에 같이 들어간다.
+export function effectiveStatus(p: OutlookProject, root: OutlookProject) {
+  return p.id !== root.id && p.status === PROJECT_STATUS_MERGED ? root.status : p.status;
+}
+
+export function sumByProject(projects: { id: string }[], amountByProject: Map<string, number>) {
+  return projects.reduce((s, p) => s + (amountByProject.get(p.id) ?? 0), 0);
+}
+
+// 묶음에서 그 상태들(귀속 하위는 어미 상태)인 프로젝트만 모은 것 — 하반기 미발행 예상·1월 부가세 미발행 예상분·수금
+// 예정액의 계산 단위. 발주액·매출·매입·대행구매를 이 프로젝트들 것끼리 합쳐서 봐서, 하위에 끊은 매출은 어미 발주액에서 빠지고
+// 하위 발주액도 들어간다(예전엔 프로젝트마다 따로라 하위 매출이 두 번 잡히고 귀속 하위 발주액은 빠졌음). 대표(상태·이름)는
+// 어미, 어미가 빠졌으면(수금 완료 등) 남은 첫 프로젝트.
+export function activeGroups<P extends OutlookProject>(projects: P[], statuses: readonly string[]) {
+  return projectGroups(projects).flatMap(({ root, members }) => {
+    const active = members.filter((p) => statuses.includes(effectiveStatus(p, root) ?? ""));
+    if (active.length === 0) return [];
+    const lead = active.find((p) => p.id === root.id) ?? active[0];
+    return [
+      {
+        status: effectiveStatus(lead, root) ?? "",
+        label: active.length > 1 ? `${lead.name ?? ""} 외\u00a0${active.length - 1}건` : lead.name ?? "",
+        members: active,
+        quote: active.reduce((s, p) => s + (p.quote_amount ?? 0), 0),
+      },
+    ];
+  });
+}
+
+// 세금계산서를 아직 다 안 끊었을 수 있는 "미발행" 묶음 — 진행중·공사 완료·완료 수금대기(귀속 하위는 어미 상태)이고 발주액
+// 합계가 있는(0원·검토중 제외) 것. 하반기 예상 이익과 1월 부가세 미발행 예상분이 같은 대상을 쓴다.
+const UNBILLED_STATUSES = ["ongoing", "done", PROJECT_STATUS_AWAITING_PAYMENT];
+function unbilledGroups(projects: OutlookProject[]) {
+  return activeGroups(projects, UNBILLED_STATUSES).filter((g) => g.quote > 0);
 }
 
 // 프로젝트 기준 예상 이익 = Σ 프로젝트(어미 + 귀속 하위 묶음) 이익 − 프로젝트 없는 일반경비 − 직원급여/상여/4대보험.
@@ -74,7 +117,6 @@ export function projectBasedProfit(
   agencyByProject: Map<string, number>
 ) {
   const ids = new Set(projects.map((p) => p.id));
-  const rootOf = (p: OutlookProject) => (p.parent_project_id && ids.has(p.parent_project_id) ? p.parent_project_id : p.id);
   const salesBy = new Map<string, number>();
   const purchaseBy = new Map<string, number>();
   for (const t of projectTx) {
@@ -82,15 +124,13 @@ export function projectBasedProfit(
     salesBy.set(t.project_id, (salesBy.get(t.project_id) ?? 0) + salesSupplyOf(t));
     purchaseBy.set(t.project_id, (purchaseBy.get(t.project_id) ?? 0) + purchaseCostOf(t));
   }
-  const groups = new Map<string, OutlookProject[]>();
-  for (const p of projects) groups.set(rootOf(p), [...(groups.get(rootOf(p)) ?? []), p]);
 
   let projectProfit = 0;
   let quoteTotal = 0;
-  for (const group of groups.values()) {
-    const quote = group.reduce((s, p) => s + countedQuote(p), 0);
-    const actualSales = group.reduce((s, p) => s + (salesBy.get(p.id) ?? 0), 0);
-    const cost = group.reduce((s, p) => s + (purchaseBy.get(p.id) ?? 0) + (agencyByProject.get(p.id) ?? 0), 0);
+  for (const { root, members } of projectGroups(projects)) {
+    const quote = members.reduce((s, p) => s + countedQuote({ status: effectiveStatus(p, root), quote_amount: p.quote_amount }), 0);
+    const actualSales = sumByProject(members, salesBy);
+    const cost = sumByProject(members, purchaseBy) + sumByProject(members, agencyByProject);
     projectProfit += (quote > 0 ? quote : actualSales) - cost;
     quoteTotal += quote;
   }
@@ -102,11 +142,11 @@ export function projectBasedProfit(
 }
 
 // 연간 예상 이익(상반기 확정 + 하반기 예상)의 하반기 부분.
-// - 하반기 매출−매입: 7~12월 거래(세금계산서 기준), 단 아래 "미발행" 프로젝트의 거래와 인건비 카테고리는 뺌.
-// - 미발행 예상 이익: 진행중·공사 완료·완료 수금대기이고 발주액이 있는(0원·검토중 제외) 그 해 귀속 프로젝트는 남은 발주액을
-//   그 해 매출로 봄(발주액 − 상반기에 끊은 매출 − 7~12월 매입 − 대행구매). 다음 해에 계산서를 끊을 프로젝트는 사용자가 귀속
-//   연도를 다음 해로 바꿈(사용자 운영 방식). 매입은 그 해 12월 31일까지만 — 다음 해 매입은 다음 해 비용.
-// - 하반기 인건비: 7~12월 직원급여/상여/4대보험 — 프로젝트를 지정한 것도 포함(미발행 프로젝트에 붙은 건 위에서 이미 뺌).
+// - 하반기 매출−매입: 7~12월 거래(세금계산서 기준), 단 아래 "미발행" 묶음의 거래와 인건비 카테고리는 뺌.
+// - 미발행 예상 이익: 진행중·공사 완료·완료 수금대기이고 발주액이 있는(0원·검토중 제외) 그 해 귀속 프로젝트 묶음(어미 + 귀속
+//   하위)은 남은 발주액을 그 해 매출로 봄(발주액 − 하반기 전에 이미 끊은 매출 − 7~12월 매입 − 대행구매). 다음 해에 계산서를 끊을
+//   프로젝트는 사용자가 귀속 연도를 다음 해로 바꿈(사용자 운영 방식). 매입은 그 해 12월 31일까지만 — 다음 해 매입은 다음 해 비용.
+// - 하반기 인건비: 7~12월 직원급여/상여/4대보험 — 프로젝트를 지정한 것도 포함(미발행 묶음에 붙은 건 위에서 이미 뺌).
 export function secondHalfOutlook(
   year: number,
   projects: OutlookProject[],
@@ -114,30 +154,34 @@ export function secondHalfOutlook(
   yearTx: OutlookTx[],
   agencyByProject: Map<string, number>
 ) {
+  const yearStart = `${year}-01-01`;
   const h2Start = `${year}-07-01`;
   const yearEnd = `${year}-12-31`;
-  const unbilled = projects.filter(isUnbilledProject);
-  const unbilledIds = new Set(unbilled.map((p) => p.id));
-  const inUnbilled = (t: OutlookTx) => Boolean(t.project_id && unbilledIds.has(t.project_id));
+  const unbilled = unbilledGroups(projects);
+  const groupIndex = new Map<string, number>();
+  unbilled.forEach((g, i) => g.members.forEach((p) => groupIndex.set(p.id, i)));
+  const inUnbilled = (t: OutlookTx) => Boolean(t.project_id && groupIndex.has(t.project_id));
 
-  const h2PurchaseBy = new Map<string, number>();
+  // 묶음마다 하반기 매입과 하반기 전에 이미 끊은 매출(기성금) — 올해 상반기분은 상반기 확정 이익(세무사 결산)에, 작년까지
+  // 끊은 것은 그 해 이익에 들어가 있어 발주액에서 뺀다(예전엔 올해 상반기분만 빼서 작년 계산서가 올해 또 잡힐 수 있었음).
+  const h2PurchaseBy = unbilled.map(() => 0);
+  const h1BilledBy = unbilled.map(() => 0);
+  const priorBilledBy = unbilled.map(() => 0);
   for (const t of projectTx) {
-    if (t.type !== "매입" || !inUnbilled(t) || t.trans_date < h2Start || t.trans_date > yearEnd) continue;
-    h2PurchaseBy.set(t.project_id!, (h2PurchaseBy.get(t.project_id!) ?? 0) + purchaseCostOf(t));
-  }
-  // 상반기에 이미 끊은 기성금 — 상반기 확정 이익(세무사 결산)에 들어가 있어 발주액에서 뺀다.
-  const h1BilledBy = new Map<string, number>();
-  for (const t of yearTx) {
-    if (t.type !== "매출" || !inUnbilled(t) || t.trans_date >= h2Start) continue;
-    h1BilledBy.set(t.project_id!, (h1BilledBy.get(t.project_id!) ?? 0) + salesSupplyOf(t));
+    const i = t.project_id ? groupIndex.get(t.project_id) : undefined;
+    if (i === undefined) continue;
+    if (t.type === "매입" && t.trans_date >= h2Start && t.trans_date <= yearEnd) h2PurchaseBy[i] += purchaseCostOf(t);
+    if (t.type === "매출" && t.trans_date < h2Start) {
+      if (t.trans_date < yearStart) priorBilledBy[i] += salesSupplyOf(t);
+      else h1BilledBy[i] += salesSupplyOf(t);
+    }
   }
   const unbilledPendingProfit = unbilled.reduce(
-    (s, p) =>
-      s +
-      unbilledH2Profit(countedQuote(p), h1BilledBy.get(p.id) ?? 0, h2PurchaseBy.get(p.id) ?? 0, agencyByProject.get(p.id) ?? 0),
+    (s, g, i) =>
+      s + unbilledH2Profit(g.quote, h1BilledBy[i] + priorBilledBy[i], h2PurchaseBy[i], sumByProject(g.members, agencyByProject)),
     0
   );
-  const h1BilledSales = Array.from(h1BilledBy.values()).reduce((s, v) => s + v, 0);
+  const total = (xs: number[]) => xs.reduce((s, v) => s + v, 0);
 
   const h2Tx = yearTx.filter((t) => t.trans_date >= h2Start && t.trans_date <= yearEnd);
   const h2LedgerTx = h2Tx.filter((t) => !inUnbilled(t) && !isPayroll(t));
@@ -150,14 +194,15 @@ export function secondHalfOutlook(
     h2Purchase,
     h2Profit,
     unbilledPendingProfit,
-    h1BilledSales,
-    unbilledProjectNames: unbilled.map((p) => p.name ?? ""),
+    h1BilledSales: total(h1BilledBy),
+    priorBilledSales: total(priorBilledBy),
+    unbilledProjectNames: unbilled.map((g) => g.label),
     h2PayrollCost,
     h2EstimatedProfit: h2Profit + unbilledPendingProfit - h2PayrollCost,
   };
 }
 
-// 1월 부가세(제2기 확정) 추정에 따로 더하는 "미발행 계산서 예상분"(사용자 결정). 미발행 프로젝트마다 남은 계산서 공급가액
+// 1월 부가세(제2기 확정) 추정에 따로 더하는 "미발행 계산서 예상분"(사용자 결정). 미발행 묶음마다 남은 계산서 공급가액
 // = 발주액 − 대행구매액 − 이미 끊은 매출(날짜·외상 정산 무관, 0 아래로는 안 내려감 — 수금 예정액과 같은 기준)을 12월까지
 // 끊는다고 보고 그 10%. 그 프로젝트에 앞으로 받을 매입 계산서의 부가세는 알 수 없어 빼지 않음(실제로는 그만큼 줄어듦).
 export function unbilledInvoiceVat(
@@ -173,8 +218,8 @@ export function unbilledInvoiceVat(
   let count = 0;
   let supply = 0;
   let vat = 0;
-  for (const p of projects.filter(isUnbilledProject)) {
-    const remaining = Math.max(0, countedQuote(p) - (agencyByProject.get(p.id) ?? 0) - (billedBy.get(p.id) ?? 0));
+  for (const g of unbilledGroups(projects)) {
+    const remaining = Math.max(0, g.quote - sumByProject(g.members, agencyByProject) - sumByProject(g.members, billedBy));
     if (remaining === 0) continue;
     count += 1;
     supply += remaining;
@@ -183,10 +228,10 @@ export function unbilledInvoiceVat(
   return { count, supply, vat };
 }
 
-// 그 해 예상 매출액 = 발주액 − 대행구매(프로젝트 목록 수주예상액 합계와 같은 기준), 검토중은 뺌.
+// 그 해 예상 매출액 = 발주액 − 대행구매(프로젝트 목록 수주예상액 합계와 같은 기준), 검토중(귀속 하위는 어미 상태)은 뺌.
 export function expectedRevenueOf(projects: OutlookProject[], agencyByProject: Map<string, number>) {
-  return projects
-    .filter((p) => p.status !== PROJECT_STATUS_REVIEW)
+  return projectGroups(projects)
+    .flatMap(({ root, members }) => members.filter((p) => effectiveStatus(p, root) !== PROJECT_STATUS_REVIEW))
     .reduce((s, p) => s + (p.quote_amount ?? 0) - (agencyByProject.get(p.id) ?? 0), 0);
 }
 

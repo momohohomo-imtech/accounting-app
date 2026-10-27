@@ -25,6 +25,7 @@ import { monthRange } from "@/lib/dateRange";
 import { isLedgerVisible } from "@/lib/credit";
 import type { CreditPayment, Transaction } from "@/lib/types";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { hasPaymentGroupColumn } from "@/lib/paymentGroup";
 import { nowKst } from "@/lib/kstDate";
 
 const TABS = [
@@ -242,7 +243,7 @@ async function TransactionListSection({
   ]);
 
   // 092 SQL 실행 전에는 거래에 묶음 번호 칸이 없음 → 묶기 버튼을 숨김(거래가 없으면 고를 것도 없어서 상관없음).
-  const groupingReady = transactions.length > 0 && "payment_group_id" in transactions[0];
+  const groupingReady = hasPaymentGroupColumn(transactions);
 
   const filteredNetTotal = transactions.reduce(
     (s, t) => s + (t.type === "매출" ? t.sales_amount + t.sales_vat : -(t.purchase_amount + t.purchase_vat)),

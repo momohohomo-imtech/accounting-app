@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import {
   deleteTransactionRecord,
   deleteTransactionRecords,
@@ -14,7 +14,7 @@ import {
 } from "@/lib/actions/transactions";
 import { formatWon, formatDate } from "@/lib/format";
 import { transactionTotal } from "@/lib/credit";
-import { dateSpan, groupKindLabel, groupLedgerRows, sortGroupLines, summaryLabel } from "@/lib/paymentGroup";
+import { dateSpan, groupKindLabel, groupLedgerRows, sameCommonFields, sortGroupLines, summaryLabel } from "@/lib/paymentGroup";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import { paymentMethodColorStyle } from "@/lib/paymentMethodColors";
 import { Badge } from "@/components/ui/Badge";
@@ -26,6 +26,7 @@ import { cx } from "@/lib/cx";
 import type { Transaction } from "@/lib/types";
 import type { ProjectTreeNode } from "@/components/ProjectTreeFilter";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 const CLIENT_NAMES_DATALIST_ID = "bulk-client-names";
 
@@ -161,6 +162,7 @@ export function TransactionTable({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const pending = useGlobalPending();
+  const confirm = useConfirm();
   const [bulkField, setBulkField] = useState<BulkField>("project");
   const [bulkYear, setBulkYear] = useState("");
   const [bulkSiteId, setBulkSiteId] = useState("");
@@ -222,6 +224,31 @@ export function TransactionTable({
       const matched = picked && picked.name === text ? picked : clients.find((c) => c.name === text);
       fd.set("client_id", matched?.id ?? "");
       fd.set("client_name_raw", matched ? "" : text);
+    }
+
+    // 한 결제 묶음에서 줄마다 다르던 프로젝트·품목명을 한 값으로 덮으면 나눠 둔 게 사라짐 — 묶음 줄을 체크하면 그 묶음의
+    // 줄이 모두 선택되므로, 바꾸기 전에 한 번 확인.
+    if (bulkField === "project" || bulkField === "item_name") {
+      const field = bulkField === "project" ? "project_id" : "item_name";
+      const valuesByGroup = new Map<string, Set<string>>();
+      for (const t of transactions) {
+        if (!t.payment_group_id || !selected.has(t.id)) continue;
+        const values = valuesByGroup.get(t.payment_group_id) ?? new Set<string>();
+        values.add(t[field] ?? "");
+        valuesByGroup.set(t.payment_group_id, values);
+      }
+      const splitGroups = Array.from(valuesByGroup.values()).filter((v) => v.size > 1).length;
+      if (
+        splitGroups > 0 &&
+        !(await confirm(
+          bulkField === "project"
+            ? `프로젝트별로 나눠 둔 묶음(한 결제) ${splitGroups}개가 선택돼 있어요. 줄마다 다르던 프로젝트가 모두 같은 프로젝트로 바뀝니다. 그래도 바꿀까요?`
+            : `품목명이 줄마다 다른 묶음(한 결제) ${splitGroups}개가 선택돼 있어요. 모든 줄의 품목명이 같은 이름으로 바뀝니다. 그래도 바꿀까요?`,
+          { confirmLabel: "모두 바꾸기" }
+        ))
+      ) {
+        return;
+      }
     }
 
     const result = await pending.run(() => bulkAction(fd));
@@ -346,14 +373,19 @@ export function TransactionTable({
     );
   }
 
-  // 수정·삭제 칸 — 묶음 줄(묶음 전체·펼친 줄)의 수정은 묶음 전체 수정 화면이 열림. ids가 여러 개면 묶음 전체 삭제.
-  function actionsCell(editId: string, confirmKey: string, ids: string[]) {
+  // 수정·삭제 칸 — 묶음 줄(묶음 전체·펼친 줄)의 수정은 공통 칸(날짜·카테고리 등)이 같으면 묶음 전체 수정 화면, 다르면 그
+  // 줄만 수정 화면이 열림. ids가 여러 개면 묶음 전체 삭제. edit: 수정 버튼 대신 넣을 것(null이면 수정 버튼 없음).
+  function actionsCell(editId: string, confirmKey: string, ids: string[], edit?: ReactNode) {
     return (
       <Td className="text-right">
         <div className="flex justify-end gap-2">
-          <LinkButton href={editHrefFor(editId)} variant="secondary" size="xs">
-            수정
-          </LinkButton>
+          {edit === undefined ? (
+            <LinkButton href={editHrefFor(editId)} variant="secondary" size="xs">
+              수정
+            </LinkButton>
+          ) : (
+            edit
+          )}
           {confirmDeleteId === confirmKey ? (
             <div className="flex items-center gap-1">
               <span className="whitespace-nowrap text-xs font-medium text-red-600">
@@ -758,6 +790,9 @@ export function TransactionTable({
             const open = expanded.has(groupId);
             // 외상 정산 묶음 — 정산일(줄마다 같음, 다르면 마지막 날).
             const paidDate = item.lines.map((l) => paidDateById[l.id] ?? "").sort().at(-1);
+            // 공통 칸(계산서 날짜 등)이 줄마다 다른 묶음(외상 정산 등)은 묶음 전체 수정이 안 돼서, 한 줄 수정 화면 대신 펼쳐서
+            // 줄마다 수정하게 함(펼치면 펼친 줄의 수정 버튼만).
+            const lineByLineEdit = !sameCommonFields(item.lines);
             return (
               <Fragment key={item.key}>
                 <Tr className={ids.every((id) => selected.has(id)) ? "bg-brand-soft" : undefined}>
@@ -781,7 +816,22 @@ export function TransactionTable({
                       <span className="mt-0.5 block text-[11px] text-slate-500">{formatDate(paidDate).slice(5)} 정산</span>
                     ) : undefined,
                   })}
-                  {actionsCell(item.lines[0].id, `group:${groupId}`, ids)}
+                  {actionsCell(
+                    item.lines[0].id,
+                    `group:${groupId}`,
+                    ids,
+                    !lineByLineEdit ? undefined : open ? null : (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="xs"
+                        onClick={() => toggleExpand(groupId)}
+                        title="줄마다 날짜 등이 달라 펼친 줄에서 하나씩 수정"
+                      >
+                        수정
+                      </Button>
+                    )
+                  )}
                 </Tr>
                 {open && item.lines.map((l) => lineRow(l))}
               </Fragment>

@@ -6,11 +6,12 @@ import {
   expectedRevenueOf,
   projectBasedProfit,
   secondHalfOutlook,
-  countedQuote,
   unbilledInvoiceVat,
   type OutlookProject,
   type OutlookTx,
 } from "@/lib/projectProfit";
+
+type ProjectTx = OutlookTx & { id: string; payment_type: string };
 
 // 대시보드의 이익·세금 추정치를 한 번에 계산 — 계산식은 lib/projectProfit.ts(자동 검사 있음), 여기서는 조회만.
 // 선택 연도의 거래·프로젝트는 대시보드가 이미 받아온 것을 그대로 넘겨받아 같은 데이터를 다시 조회하지 않는다.
@@ -30,10 +31,10 @@ export async function loadProfitOutlook(
     .eq("half", 1)
     .maybeSingle()
     .then((r) => r);
-  // 그 해 귀속 프로젝트에 붙은 거래 전부(기간 무관, 매출·매입) + 대행구매.
+  // 그 해 귀속 프로젝트에 붙은 거래 전부(기간 무관, 매출·매입) + 대행구매 — 대시보드 수금 예정액도 이것으로 계산.
   const [projectTx, agencyRows] = projectIds.length
     ? await Promise.all([
-        fetchAllRows<OutlookTx>((from, to) =>
+        fetchAllRows<ProjectTx>((from, to) =>
           supabase
             .from("transactions")
             .select("id, type, payment_type, sales_amount, sales_vat, project_id, purchase_amount, purchase_vat, trans_date, expense_categories(*)")
@@ -50,7 +51,7 @@ export async function loadProfitOutlook(
             .range(from, to)
         ),
       ])
-    : [[] as OutlookTx[], [] as { project_id: string; amount: number }[]];
+    : [[] as ProjectTx[], [] as { project_id: string; amount: number }[]];
   const { data: halfYearRow } = await halfYearPromise;
 
   const agencyByProject = new Map<string, number>();
@@ -70,7 +71,7 @@ export async function loadProfitOutlook(
 
   return {
     expectedRevenue: expectedRevenueOf(yearProjects, agencyByProject),
-    hasProjectsWithProfit: yearProjects.some((p) => countedQuote(p) > 0),
+    hasProjectsWithProfit: estimate.quoteTotal > 0,
     profitEstimate: estimate.profit,
     profitTax,
     // 추가 매출·매입이 더 생길 수 있는 건 아직 공사 중인 프로젝트뿐(검토중은 계산에 안 넣음).
@@ -81,6 +82,9 @@ export async function loadProfitOutlook(
     combinedTax,
     // 1월 부가세(제2기 확정) 추정에 따로 더하는 미발행 계산서 예상분.
     unbilledVat: unbilledInvoiceVat(yearProjects, projectTx, agencyByProject),
+    // 대시보드 수금 예정액 계산용(같은 거래를 다시 조회하지 않게) — 화면에 그대로 내보내지 말 것.
+    projectTx,
+    agencyByProject,
   };
 }
 
@@ -113,6 +117,13 @@ export function ProfitCalculationDetail({ year, o }: { year: number; o: ProfitOu
             {"은 상반기 확정 이익에 포함되어 차감"}
           </span>
         )}
+        {o.priorBilledSales > 0 && (
+          <span className="text-slate-500">
+            {" — 전년도 이전에 발행한 기성금 "}
+            <span className="tabular-nums">{formatWon(o.priorBilledSales)}</span>
+            {"은 해당 연도 이익에 포함되어 차감"}
+          </span>
+        )}
       </p>
       {o.unbilledProjectNames.length > 0 && (
         <p className="pl-4 text-xs text-slate-500">{o.unbilledProjectNames.join(", ")}</p>
@@ -140,7 +151,9 @@ export function ProfitCalculationDetail({ year, o }: { year: number; o: ProfitOu
           반영되었으나, 세금계산서(매출)는 아직 발행 전이어서 매출이 누락되어 있습니다.
           <br />
           검토중 프로젝트의 발주액은 반영하지 않음(이미 지출한 매입은 반영) · 귀속 연도가 그 해인 프로젝트만 대상(다음
-          해에 세금계산서를 발행할 프로젝트는 귀속 연도를 다음 해로 변경) · 외상 미정산 거래도 세금계산서 기준으로 반영
+          해에 세금계산서를 발행할 프로젝트는 귀속 연도를 다음 해로 변경) · 외상 미정산 거래도 세금계산서 기준으로 반영 ·
+          귀속 하위 프로젝트는 어미 프로젝트와 한 묶음으로 산출(하위의 발주액·매출·매입 합산, &quot;타 프로젝트 귀속&quot;
+          상태는 어미 프로젝트의 상태 적용)
         </p>
         <p>
           (나)를 원장 그대로 &quot;하반기 매출-매입&quot;에 합산하면 매입만 반영되고 매출은 누락된 불완전한
@@ -152,7 +165,8 @@ export function ProfitCalculationDetail({ year, o }: { year: number; o: ProfitOu
         <p>
           (나) 프로젝트에 상반기(1~6월)에 이미 발행한 기성금이 있으면, 해당 매출은 상반기 확정 이익(세무사
           결산)에 포함되어 있으므로 발주액에서 차감한 잔액만 하반기분으로 반영합니다. 예: 발주액 5,000만원 중
-          5월에 기성금 2,000만원을 발행했다면 하반기에는 3,000만원만 반영합니다.
+          5월에 기성금 2,000만원을 발행했다면 하반기에는 3,000만원만 반영합니다. 전년도 이전에 발행한 기성금도 해당 연도
+          이익에 포함되어 있으므로 같은 방식으로 차감합니다.
         </p>
         <p className="font-semibold text-slate-900">산출 예시</p>
         <p>

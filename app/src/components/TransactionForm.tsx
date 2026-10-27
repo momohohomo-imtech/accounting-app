@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ExpenseCategory, PaymentMethod, Transaction } from "@/lib/types";
 import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components/ProjectPicker";
@@ -43,7 +43,8 @@ function lineItemFromInitial(t: Transaction): LineItem {
     item_name: t.item_name ?? "",
     quantity: t.quantity?.toString() ?? "",
     unit_price: t.unit_price?.toString() ?? "",
-    subtotal: amount ? String(amount) : "",
+    // 0원 줄도 "0"으로 — 빈칸이면 묶음 전체 수정에서 빈 줄로 보고 저장할 때 그 줄을 지웠음.
+    subtotal: amount != null ? String(amount) : "",
     // 비워두면 위쪽 공통 "프로젝트" 선택값을 그대로 씀 — 계산서 1건이 여러 프로젝트에 걸칠 때만 줄별로 덮어씀.
     project_id: "",
   };
@@ -179,11 +180,19 @@ export function TransactionForm({
   }
 
   // 줄 수가 바뀌는 곳(추가·삭제·OCR·엑셀)은 모두 이걸로 — 줄마다 프로젝트/공통 프로젝트를 splitLineProjects 규칙대로.
-  function applyLines(next: LineItem[]) {
-    const r = splitLineProjects(next, values.project_id);
+  // common: 지금 공통 프로젝트(OCR·엑셀처럼 기다렸다가 바꾸는 곳은 latest에서 읽은 값).
+  function applyLines(next: LineItem[], common = values.project_id) {
+    const r = splitLineProjects(next, common);
     setLineItems(r.lines);
-    if (r.common !== values.project_id) set("project_id", r.common);
+    if (r.common !== common) set("project_id", r.common);
   }
+
+  // OCR·엑셀 인식을 기다리는 몇 초 사이에 품목 줄·프로젝트를 고쳐도 인식 결과가 그 내용을 덮어쓰지 않게, 기다린 뒤에는
+  // 화면을 연 때의 값이 아니라 지금 값을 읽는다.
+  const latest = useRef({ lineItems, projectId: values.project_id });
+  useEffect(() => {
+    latest.current = { lineItems, projectId: values.project_id };
+  });
 
   function addLineItem() {
     // 새 줄은 바로 윗줄 프로젝트로 시작 — 묶음 수정에서 새 줄이 일반경비로 들어가던 것.
@@ -230,7 +239,7 @@ export function TransactionForm({
         return;
       }
       setOcrExtracted(valid[0]);
-      const updated = [...lineItems];
+      const updated = [...latest.current.lineItems];
       valid.forEach((ex, idx) => {
         const patch = {
           item_name: (ex.item_name as string) ?? "",
@@ -241,7 +250,7 @@ export function TransactionForm({
         if (idx < updated.length) updated[idx] = { ...updated[idx], ...patch };
         else updated.push({ ...emptyLineItem(), ...patch });
       });
-      applyLines(updated);
+      applyLines(updated, latest.current.projectId);
       const ex = valid[0];
       const matchedCategory = expenseCategories.find((c) => c.name === ex.category);
       const ocrExempt = isVatExemptCategory(matchedCategory);
@@ -303,7 +312,8 @@ export function TransactionForm({
           unit_price: r.unit_price != null ? String(r.unit_price) : "",
           subtotal: r.amount != null ? String(r.amount) : "",
           project_id: (r.project_name && projects.find((p) => p.name === r.project_name)?.id) || "",
-        }))
+        })),
+        latest.current.projectId
       );
 
       const first = rows[0];

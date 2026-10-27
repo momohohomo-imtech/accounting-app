@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { receivedSalesByProject, remainingReceivable } from "@/lib/expectedReceivable";
+import { expectedReceivableByStatus, receivedSalesByProject, remainingReceivable } from "@/lib/expectedReceivable";
 import type { CreditPayment } from "@/lib/types";
 
 const sale = (id: string, project_id: string, total: number, payment_type = "transfer") => ({
@@ -60,4 +60,28 @@ test("프로젝트별로 따로 모으고 매입은 무시", () => {
   const received = receivedSalesByProject(rows, []);
   assert.equal(received.get("A"), 1_000_000);
   assert.equal(received.get("B"), 2_000_000);
+});
+
+test("수금 예정액: 어미 + 귀속 하위는 한 묶음 — 하위 발주액은 더하고 하위로 받은 기성금은 빼서 어미 상태 칸에 한 건", () => {
+  const projects = [
+    { id: "P", name: "진행중 어미", status: "ongoing", quote_amount: 10_000_000 },
+    { id: "C", name: "귀속 하위", status: "merged", quote_amount: 5_000_000, parent_project_id: "P" },
+    { id: "D", name: "공사 완료 단독", status: "done", quote_amount: 3_000_000 },
+    { id: "X", name: "수금 완료 어미", status: "collected", quote_amount: 8_000_000 },
+    { id: "XC", name: "그 귀속 하위", status: "merged", quote_amount: 1_000_000, parent_project_id: "X" },
+    { id: "O", name: "다른 해 어미의 하위", status: "merged", quote_amount: 2_000_000, parent_project_id: "다른 해" },
+  ];
+  const received = receivedSalesByProject([sale("s1", "C", 11_000_000)], []);
+  const rows = expectedReceivableByStatus(
+    projects,
+    ["ongoing", "done", "done_awaiting_payment"],
+    new Map([["P", 1_000_000]]),
+    received
+  );
+  // 진행중 묶음: (1,000만 + 500만) − 대행구매 100만 − 하위 기성금 1,000만 = 400만
+  assert.deepEqual(rows, [
+    { status: "ongoing", count: 1, amount: 4_000_000, received: 10_000_000 },
+    { status: "done", count: 1, amount: 3_000_000, received: 0 },
+    { status: "done_awaiting_payment", count: 0, amount: 0, received: 0 },
+  ]);
 });

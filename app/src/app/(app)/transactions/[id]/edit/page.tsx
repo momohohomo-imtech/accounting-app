@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { TransactionForm } from "@/components/TransactionForm";
 import { updateTransactionRecord } from "@/lib/actions/transactions";
-import { loadPaymentGroupForEdit } from "@/lib/paymentGroup";
+import { hasPaymentGroupColumn, loadPaymentGroupForEdit } from "@/lib/paymentGroup";
 
 export default async function EditTransactionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,7 +22,7 @@ export default async function EditTransactionPage({ params }: { params: Promise<
 
   if (!tx) notFound();
   // 한 결제로 묶인 거래면 묶음 줄을 같이 열어 한꺼번에 수정(092 SQL 실행 전엔 칸이 없어 묶기 기능을 숨김).
-  const groupingReady = "payment_group_id" in tx;
+  const groupingReady = hasPaymentGroupColumn([tx]);
   const { group, partOfGroup } = await loadPaymentGroupForEdit(supabase, tx);
 
   const siteOptions = (sites ?? []).map((s) => ({

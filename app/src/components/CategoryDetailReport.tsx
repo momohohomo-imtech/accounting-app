@@ -14,7 +14,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { updateAgencyPurchase } from "@/lib/actions/projectAgencyPurchases";
 import { MoneyInput } from "@/components/ui/MoneyInput";
-import { categoryReportHref } from "@/components/CategoryAggregateTable";
+import { categoryReportHref } from "@/lib/reportLinks";
 
 type Category = { id: string; name: string; project_only: boolean; color: string | null };
 
