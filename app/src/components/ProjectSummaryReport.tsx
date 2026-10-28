@@ -31,6 +31,8 @@ export type ProjectSummaryRow = {
   purchaseSupply: number;
   purchaseVat: number;
   contractAmountExpected: number;
+  /** 남은 금액(미수) — 수주예상액 − 받은 매출(진행중·공사 완료·수금 대기만, 아니거나 발주액이 없으면 null). */
+  receivable: number | null;
   profit: number;
   margin: number | null;
   categoryBreakdown: (CategoryAmount & { color?: string })[];
@@ -164,9 +166,9 @@ export function ProjectSummaryReport({ rows }: { rows: ProjectSummaryRow[] }) {
               <div className="mb-3 border-b border-slate-100 pb-3 print:pb-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="tabular-nums text-xs text-slate-400 print:text-[10px]">{p.projectCode ?? "-"}</p>
-                  {p.status === PROJECT_STATUS_AWAITING_PAYMENT && (
+                  {p.status === PROJECT_STATUS_AWAITING_PAYMENT && p.receivable !== null && (
                     <Badge variant="red" className="print:border print:border-red-600 print:bg-white">
-                      미수금 {formatWon(p.contractAmountExpected)}
+                      미수금 {formatWon(p.receivable)}
                     </Badge>
                   )}
                 </div>
@@ -227,6 +229,12 @@ export function ProjectSummaryReport({ rows }: { rows: ProjectSummaryRow[] }) {
                   <p className="text-xs text-slate-500 print:text-[9px]">수주예상액</p>
                   <p className="tabular-nums text-sm font-bold whitespace-nowrap text-slate-900 print:text-xs">
                     {formatWon(p.contractAmountExpected)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 print:text-[9px]">남은 금액 (받을 금액)</p>
+                  <p className="tabular-nums text-sm font-bold whitespace-nowrap text-slate-900 print:text-xs">
+                    {p.receivable === null ? "-" : formatWon(p.receivable)}
                   </p>
                 </div>
                 <div>

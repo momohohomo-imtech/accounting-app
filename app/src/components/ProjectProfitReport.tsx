@@ -23,7 +23,7 @@ import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import { purchaseCostOf } from "@/lib/vatBasis";
 import { unsettledCreditPurchase } from "@/lib/projectProfit";
-import { projectReceipts } from "@/lib/expectedReceivable";
+import { billedSalesByProject, projectReceipts, receivableOf, receivedSalesByProject } from "@/lib/expectedReceivable";
 import {
   formatHeadcount,
   formatWorkDays,
@@ -243,8 +243,18 @@ export async function ProjectProfitReport({
   // 그래프·보고서 상단 참고용 — 발주액의 25%를 이윤+잡비로 가정했을 때 금액(실제 이익금/이익율
   // 계산에는 영향 없는 순수 표시용 수치).
   const handlingFeeAmount = quoteTotal > 0 ? Math.round((quoteTotal * HANDLING_FEE_PCT) / 100) : 0;
-  // 받은 돈(선급금·중도금·잔금) — 요약은 대시보드 수금 예정액·연말 점검과 같은 기준(공급가액, lib/expectedReceivable.ts).
+  // 받은 돈(선급금·중도금·잔금) — 요약은 대시보드 수금 예정액과 같은 기준(공급가액, lib/expectedReceivable.ts). 남은 금액(미수)은
+  // 프로젝트 목록 미수 금액 칸·보고서 메뉴와 같은 receivableOf(진행중·공사 완료·수금 대기만, 아니면 "-").
   const receipts = projectReceipts(salesRowsRaw, creditPayments, quoteTotal, agencyTotal);
+  const agencyByProject = new Map<string, number>();
+  for (const a of agencyRows ?? []) agencyByProject.set(a.project_id, (agencyByProject.get(a.project_id) ?? 0) + a.amount);
+  const receivable = receivableOf(
+    group,
+    agencyByProject,
+    receivedSalesByProject(salesRowsRaw, creditPayments),
+    billedSalesByProject(salesRowsRaw)
+  );
+  const receivableLabel = !receivable ? "-" : receivable.quote === 0 ? "발주액 미입력" : formatWon(receivable.amount);
   const projectLabelOf = (id: string | null) => (id ? projectLabelById.get(id) ?? "" : "");
   const receiptRows = receipts.lines.map((l) => ({
     id: l.row.id,
@@ -303,7 +313,7 @@ export async function ProjectProfitReport({
       : []),
     ["이익율", margin === null ? "-" : `${margin.toFixed(2)}%`],
     ["받은 금액 (부가세 제외)", formatWon(receipts.received)],
-    ["남은 금액 (받을 돈, 부가세 제외)", quoteTotal ? formatWon(receipts.remaining) : "발주액 미입력"],
+    ["남은 금액 (받을 금액, 부가세 제외)", receivableLabel],
   ];
 
   const parentLabel = parentProject
@@ -478,19 +488,23 @@ export async function ProjectProfitReport({
           </p>
         </div>
         <div>
-          <p className="text-xs text-slate-500 print:text-[9px]">남은 금액 (받을 돈, 부가세 제외)</p>
+          <p className="text-xs text-slate-500 print:text-[9px]">남은 금액 (받을 금액, 부가세 제외)</p>
           <p
             className={`tabular-nums text-sm font-bold whitespace-nowrap print:text-xs ${
-              quoteTotal ? "text-slate-900" : "text-slate-400"
+              receivable && receivable.quote > 0 ? "text-slate-900" : "text-slate-400"
             }`}
           >
-            {quoteTotal ? formatWon(receipts.remaining) : "발주액 미입력"}
+            {receivableLabel}
           </p>
-          {quoteTotal > 0 && (
+          {receivable && receivable.quote > 0 ? (
             <p className="mt-0.5 text-[11px] text-slate-400 print:text-[8px]">
-              입금 대기 {formatWon(receipts.waiting)} · 계산서 미발행 {formatWon(receipts.unbilled)}
-              {receipts.remaining > 0 && ` · 부가세 포함 약 ${formatWon(Math.round(receipts.remaining * 1.1))}`}
+              입금 대기 {formatWon(receivable.waiting)} · 계산서 미발행 {formatWon(receivable.unbilled)}
+              {receivable.amount > 0 && ` · 부가세 포함 약 ${formatWon(Math.round(receivable.amount * 1.1))}`}
             </p>
+          ) : (
+            !receivable && (
+              <p className="mt-0.5 text-[11px] text-slate-400 print:text-[8px]">진행중·공사 완료·수금 대기 프로젝트만 계산</p>
+            )
           )}
         </div>
       </div>
@@ -569,8 +583,8 @@ export async function ProjectProfitReport({
             <ProjectReceiptsTable rows={receiptRows} showProject={group.length > 1} />
             <p className="text-xs text-slate-500 print:text-[9px]">
               받은 돈·계산서 금액은 부가세 포함. 위 요약의 받은 금액·남은 금액은 발주액과 같은 부가세 제외 기준이고, 대시보드
-              수금 예정액과 같은 계산입니다(남은 금액 = 수주예상액 {formatWon(receipts.expected)} − 받은 금액). 일부만 입금된 계산서는
-              다 받을 때까지 받은 금액에 넣지 않습니다.
+              수금 예정액·프로젝트 목록 미수 금액과 같은 계산입니다(남은 금액 = 수주예상액 {formatWon(receipts.expected)} − 받은 금액,
+              진행중·공사 완료·수금 대기 프로젝트만). 일부만 입금된 계산서는 다 받을 때까지 받은 금액에 넣지 않습니다.
             </p>
             {receipts.billed > receipts.expected && quoteTotal > 0 && (
               <p className="text-xs text-amber-600 print:text-[9px]">

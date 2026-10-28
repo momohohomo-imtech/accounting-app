@@ -112,6 +112,26 @@ function visibilityStorageKey(fields: FieldConfig[]) {
   return `entityTableColVisible:${fields.map((f) => f.name).join(",")}`;
 }
 
+// 저장 키가 표의 전체 칸 이름 목록이라, 칸이 새로 생기면 예전에 저장한 열 표시·폭이 사라졌음 → 지금 키에 저장값이 없으면 칸이
+// 1~2개만 새로 생긴 같은 표의 예전 키(예전 칸 이름이 지금 칸에 다 있음)에서 가져옴. 새 칸은 기본값 그대로.
+function readStoredTableSetting(key: string) {
+  const current = localStorage.getItem(key);
+  if (current) return current;
+  const sep = key.indexOf(":") + 1;
+  const prefix = key.slice(0, sep);
+  const names = new Set(key.slice(sep).split(","));
+  let best: { raw: string; size: number } | null = null;
+  for (let i = 0; i < localStorage.length; i++) {
+    const oldKey = localStorage.key(i);
+    if (!oldKey?.startsWith(prefix)) continue;
+    const oldNames = oldKey.slice(sep).split(",");
+    if (oldNames.length >= names.size || names.size - oldNames.length > 2 || !oldNames.every((n) => names.has(n))) continue;
+    const raw = localStorage.getItem(oldKey);
+    if (raw && (!best || oldNames.length > best.size)) best = { raw, size: oldNames.length };
+  }
+  return best?.raw ?? null;
+}
+
 // 진행률은 막대 대신 3단계 동그라미: 0% 준비중(노랑) · 1~99% 진행중(주황) · 100% 공사완료(녹색).
 function ProgressCell({ value }: { value: number }) {
   const pct = Math.max(0, Math.min(100, value));
@@ -191,7 +211,7 @@ export function EntityTable({
   useEffect(() => {
     if (toggleableFields.length === 0) return;
     try {
-      const raw = localStorage.getItem(visibilityKey);
+      const raw = readStoredTableSetting(visibilityKey);
       // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 후 localStorage에서 저장된 표시 상태를 1회 불러옴(SSR 시엔 값이 없어 하이드레이션 불일치 없음)
       if (raw) setColVisible((prev) => ({ ...prev, ...JSON.parse(raw) }));
     } catch {
@@ -238,7 +258,7 @@ export function EntityTable({
   useEffect(() => {
     if (!hasWidths) return;
     try {
-      const raw = localStorage.getItem(storageKey);
+      const raw = readStoredTableSetting(storageKey);
       // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 후 localStorage에서 저장된 폭을 1회 불러옴(SSR 시엔 값이 없어 하이드레이션 불일치 없음)
       if (raw) setColWidths(JSON.parse(raw));
     } catch {

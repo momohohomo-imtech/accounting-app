@@ -25,17 +25,23 @@ import { Badge } from "@/components/ui/Badge";
 import { Table, THead, Th, Tr, Td, EmptyRow } from "@/components/ui/Table";
 import { cx } from "@/lib/cx";
 import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
-import { expectedReceivableByStatus as receivableByStatus, receivedSalesByProject } from "@/lib/expectedReceivable";
+import {
+  expectedReceivableByStatus as receivableByStatus,
+  receivedSalesByProject,
+  RECEIVABLE_STATUSES,
+} from "@/lib/expectedReceivable";
 import { nowKst, kstDateTime } from "@/lib/kstDate";
 import { PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
 import { getCurrentRole } from "@/lib/currentRole";
 import { backupStatus, AUTO_BACKUP_STALE_DAYS, type BackupRecord } from "@/lib/backupStatus";
 
-const EXPECTED_RECEIVABLE_STATUSES = [
-  { value: "ongoing", label: "진행중" },
-  { value: "done", label: "공사 완료" },
-  { value: PROJECT_STATUS_AWAITING_PAYMENT, label: "수금 대기" },
-];
+// 수금 예정액 상태 칸 — 상태 목록은 프로젝트 목록 미수 금액·보고서 남은 금액과 같은 RECEIVABLE_STATUSES.
+const RECEIVABLE_STATUS_LABEL: Record<string, string> = {
+  ongoing: "진행중",
+  done: "공사 완료",
+  [PROJECT_STATUS_AWAITING_PAYMENT]: "수금 대기",
+};
+const EXPECTED_RECEIVABLE_STATUSES = RECEIVABLE_STATUSES.map((value) => ({ value, label: RECEIVABLE_STATUS_LABEL[value] }));
 
 function Money({ value, className }: { value: number; className?: string }) {
   return <span className={cx("tabular-nums", moneyClass(value), className)}>{formatWon(value)}</span>;
