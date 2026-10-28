@@ -54,8 +54,19 @@ export async function ProjectProfitReport({
     ? await supabase.from("projects").select("name, project_code").eq("id", project.parent_project_id).single()
     : { data: null };
 
-  const { data: childRows } = await supabase.from("projects").select("*").eq("parent_project_id", projectId);
-  const children = ownOnly ? [] : (childRows ?? []);
+  // 귀속 하위 — 예전 3단 자료(하위의 하위)까지(프로젝트 목록 묶음 요약 줄·이익 예상과 같은 맨 위 어미 기준, 예전엔 바로 아래
+  // 하위만이라 요약 줄과 합산 보고서 숫자가 달랐음). 하위가 있을 때만 그 아래를 한 번 더 찾고, 서로를 가리키는 잘못된 자료는
+  // 이미 본 프로젝트를 건너뛰어 멈춤.
+  const childRows: NonNullable<typeof project>[] = [];
+  const seenIds = new Set([projectId]);
+  for (let parentIds = [projectId], depth = 0; parentIds.length > 0 && depth < 5; depth++) {
+    const { data: found } = await supabase.from("projects").select("*").in("parent_project_id", parentIds);
+    const fresh = (found ?? []).filter((p) => !seenIds.has(p.id));
+    fresh.forEach((p) => seenIds.add(p.id));
+    childRows.push(...fresh);
+    parentIds = fresh.map((p) => p.id);
+  }
+  const children = ownOnly ? [] : childRows;
   const group = [project, ...children];
   const groupIds = group.map((p) => p.id);
 
@@ -260,9 +271,9 @@ export async function ProjectProfitReport({
                 (귀속 하위: {children.map((c) => `${c.project_code ? `${c.project_code} ` : ""}${c.name}`).join(", ")})
               </span>
             )}
-            {ownOnly && (childRows ?? []).length > 0 && (
+            {ownOnly && childRows.length > 0 && (
               <span className="ml-2 text-sm font-semibold text-slate-500">
-                (이 프로젝트만 — 귀속 하위 {(childRows ?? []).length}건 제외)
+                (이 프로젝트만 — 귀속 하위 {childRows.length}건 제외)
               </span>
             )}
             {parentLabel && <span className="ml-2 text-sm font-semibold text-red-600">(귀속 상위: {parentLabel})</span>}

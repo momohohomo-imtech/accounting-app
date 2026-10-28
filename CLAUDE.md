@@ -57,7 +57,8 @@
     `sticky-col-table`만 달고 고정 칸 없이 둠(`TransactionBulkImport`).
   - 칸이 많은 표는 휴대폰에서 칸마다 읽을 수 있는 최소 폭을 줄 것(`EntityTable`은 칸 수 ×
     105px). 긴 글자 칸은 휴대폰에서만 `max-md:max-w-[10rem] max-md:truncate` + `title`로
-    한 줄 말줄임.
+    한 줄 말줄임. 휴대폰은 title 풍선이 안 떠서, 잘린 이름을 꼭 봐야 하는 칸은 `tap-full` 클래스 + `tabIndex={0}`(누르면 그 칸만
+    줄바꿈해서 전체 글자 — globals.css, 장부 점검 표 예시).
   - 표 칸 안에 `absolute` 요소(`sr-only` 화면 낭독용 글자 포함)를 넣으면 칸 안의 감싸는 요소에
     `relative`를 줄 것. 없으면 가로 스크롤 상자를 빠져나가 페이지 폭을 넓혀서, 휴대폰 크롬이
     페이지 전체를 축소해 오른쪽이 텅 빈 화면이 됨(프로젝트 목록 진행률 동그라미에서 실제로 발생 —
@@ -117,6 +118,9 @@
   ```
   카테고리·결제수단·계좌처럼 몇십 행에서 늘지 않는 설정 목록이나, `.eq("id", …)`·
   `.maybeSingle()`처럼 결과가 정해진 조회는 그냥 조회해도 됨.
+  백업(`lib/backup.ts`)도 표마다 고유 칸 순으로 끝까지 읽음 — 예전엔 한 번에 `select`해서 백업 파일이 표마다 1,000줄에서
+  잘렸음(복원은 다 지우고 파일 내용만 넣어서 나머지가 영구히 사라짐). 백업에 새 표를 넣으면 고유 칸(`id`, 없으면 `ORDER_KEY`)을
+  확인하고, 복원은 `restoreBlockReason`(잘린·손상 파일 막기)을 거치게 둘 것.
 
 - **금액 입력칸은 `@/components/ui/MoneyInput`을 쓸 것**(`type="number"` 대신). 입력하는 동안 천 단위
   쉼표("1,234,567")가 보이고, 폼으로 제출되는 값(`name`)은 숨은 칸에 쉼표 없는 숫자로 들어감.
@@ -125,7 +129,8 @@
 
 - **금액 계산을 바꾸면 `npm test`(app 폴더)로 자동 검사를 돌릴 것.** 부가세 분리(`vatBasis`),
   외상 잔액(`credit`), 종합소득세(`tax`), 견적 금액·한글 금액(`quoteCalc`·`numberToKorean`),
-  예상 미수액(`expectedReceivable`), 이익 예상(`projectProfit` — 대시보드·보고서 공통), 엑셀 거래 읽기(`transactionExcel`), 작업일지 집계(`workLogSummary`), 출장일지 합계·보고서 작업일수 나눔·출장 투입 인원(`tripLog`), 보고서 출장 현황(`tripOverview`), 매입장 한 결제 묶기(`paymentGroup`), 장부 점검(`ledgerCheck`), 거래 수정 이력 표시(`transactionHistory`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
+  예상 미수액(`expectedReceivable`), 이익 예상(`projectProfit` — 대시보드·보고서 공통), 엑셀 거래 읽기(`transactionExcel`), 작업일지 집계(`workLogSummary`), 출장일지 합계·보고서 작업일수 나눔·출장 투입 인원(`tripLog`), 보고서 출장 현황(`tripOverview`), 매입장 한 결제 묶기(`paymentGroup`), 장부 점검(`ledgerCheck`), 거래 수정 이력 표시·일괄 변경 접기(`transactionHistory`), 백업
+  끝까지 담기·복원 막기(`backup`), 백업 상태(`backupStatus`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
   (vitest는 npm 설치 오류로 못 씀 — 새 테스트 라이브러리를 넣지 말 것)
@@ -136,7 +141,9 @@
   매입은 비용) · 연도는 프로젝트 귀속 연도(연말까지 계산서를 못 끊은 프로젝트는 사용자가 귀속 연도를 다음 해로 바꿈) · 발주액
   0원은 빈칸과 같게 · 어미 + 귀속 하위는 한 묶음(`projectGroups`, "타 프로젝트 귀속" 하위는 어미 상태 — `effectiveStatus`) —
   하위에 붙인 발주액·매출·매입도 어미 묶음으로 합침 · "미발행" 묶음(하반기 예상 이익·1월 부가세 예상분 대상)과 대시보드 수금
-  예정액(`lib/expectedReceivable.ts`의 `expectedReceivableByStatus`)은 `activeGroups` 하나로 판단 · 하반기 미발행 예상은 하반기
+  예정액(`lib/expectedReceivable.ts`의 `expectedReceivableByStatus`)·연말 점검은 `activeGroups` 하나로 판단 — 계산 단위는 어미 +
+  "타 프로젝트 귀속" 하위, 자기 상태가 있는 하위는 따로 한 단위(프로젝트 목록 상태와 같게 — 진행중 어미 아래 "완료 수금대기" 하위가
+  진행중 칸에 들어간 적이 있음) · 하반기 미발행 예상은 하반기
   전에 끊은 매출(작년 것 포함)을 발주액에서 뺌. 화면마다 따로 계산하다가 대시보드와 보고서 숫자가 어긋난 적이 있고, 프로젝트마다
   따로 세다가 하위 매출이 두 번 잡힌 적이 있음.
 
@@ -150,20 +157,27 @@
   요약 줄은 합계(이익금·이익율은 손익보고서와 같은 `groupProjectProfit` 묶음 기준), 하단 합계·엑셀에서 이익금이 두 번 세지지
   않게(`inGroup`). 보고서는 요약 줄 = 합산, 펼친 어미 줄 = 자기 것만(`own=1`), 하위 줄 = 자기 것만. 하단 합계는 그 해 프로젝트만
   (다른 해 하위는 묶음에 보이기만 — 그 해 목록에서 셈).
-- **귀속은 한 단계(어미 ← 하위)만.** 손익보고서·이익 예상이 한 단계로 묶어서, 하위의 하위(3단)는 어미 합산에서 빠짐. 귀속 대상
-  선택은 다른 프로젝트에 귀속 안 된 것만, 서버(`actions/projects.ts`의 `parentError`)에서도 새로 고르는 귀속을 확인(하위가 있는
-  프로젝트·이미 귀속된 프로젝트는 안 됨). 예전에 3단으로 저장된 자료는 표에서 맨 위 어미 묶음에 보이게만 함(사라지지 않게).
+- **귀속은 한 단계(어미 ← 하위)만.** 귀속 대상 선택은 다른 프로젝트에 귀속 안 된 것만, 서버(`actions/projects.ts`의
+  `parentError`)에서도 새로 고르는 귀속을 확인(하위가 있는 프로젝트·이미 귀속된 프로젝트는 안 됨). 예전에 3단으로 저장된 자료는
+  프로젝트 목록·이익 예상(`lib/projectProfit.ts`의 `topProjectOf`)·보고서 요약 카드·합산 보고서 모두 맨 위 어미 묶음으로 봄(예전엔
+  화면마다 묶는 단계가 달라 숫자가 어긋났음). 귀속 선택 목록의 가운데 프로젝트는 지금 값일 때만 보임(`onlyIfCurrent`).
 
 - **장부 점검·수정 이력·연말 점검·예정고지액**(10/28 사용자 요청 "전부"):
   - 매입매출 "장부 점검" 탭(`LedgerCheckSection`)은 찾기만 함 — 중복 의심(같은 날·구분·거래처·품목·금액, 한 결제 묶음끼리는 제외)과
-    카테고리 빈 매입(세금·보험·금융으로 보이는 글자 표시)은 `lib/ledgerCheck.ts`로. 고치는 건 기존 수정·삭제·`bulkUpdateCategoryId`.
+    카테고리 빈 매입(세금·보험·금융으로 보이는 글자 표시 — 칸마다·단어마다, 두 글자 낱말은 단어 앞·끝에서만. 칸을 붙여 찾다가
+    "○○자재"가 금융으로 잡힌 적이 있음)은 `lib/ledgerCheck.ts`로. 고치는 건 기존 수정·삭제·`bulkUpdateCategoryId`.
     중복 "아님" 표시는 DB 변경이 필요해서 안 만듦(사용자에게 "DB 변경 없음"으로 안내함).
   - 거래 수정 이력은 DB 트리거(094 SQL `transaction_history`)가 남김 — 앱 코드에서 이력을 쓰지 말 것(트리거만, 이력 표에는 쓰기
-    정책 없음). 표시는 `lib/transactionHistoryLoad.ts`(이름표 조회) + `lib/transactionHistory.ts`(칸별 "전 → 후"). 표가 없으면(SQL
-    실행 전) 이력 칸을 숨김.
+    정책 없음, 095 SQL부터 영수증 인식 원문은 빼고 남김). 표시는 `lib/transactionHistoryLoad.ts`(이름표 조회) +
+    `lib/transactionHistory.ts`(칸별 "전 → 후"). 한 요청으로 20건 이상 바뀐 것(백업 복원·일괄 변경)은 한 줄로 접음
+    (`collapseBulkChanges`). 표가 없을 때만(SQL 실행 전) 이력 칸을 숨기고, 다른 조회 오류는 오류로 보여 줌(`HistoryLoad`).
   - 부가세 예정고지서 금액(093 SQL `vat_prepayment_notices`)을 넣으면 대시보드 1월 부가세에서 추정 대신 그 금액을 차감.
   - 연말 점검(프로젝트 목록, 10월부터)은 `unbilledRemainingByGroup`(1월 부가세 미발행 예상분과 같은 기준)으로 고르고, 귀속 연도
-    옮기기는 `moveProjectsToNextYear` 하나로(지금 그 해인 프로젝트만 — 두 번 눌러도 두 해 뒤로 안 감).
+    옮기기는 `moveProjectsToNextYear` 하나로(지금 그 해인 프로젝트만 — 두 번 눌러도 두 해 뒤로 안 감). 어미 줄은 같은 묶음의 검토중
+    하위도 같이 옮김(자기 상태로 따로 보이는 하위는 따로 고름).
+- **백업 상태**(10/29 사용자 요청 "A"): 대시보드 접힘 목록 맨 아래 "백업" 줄 + 마지막 자동 백업 후 8일이 넘을 때만 맨 위 카드에
+  경고 한 줄(`lib/backupStatus.ts`, 관리자·직원만 — 백업 기록은 그 두 역할만 읽음). 자동 백업 주기(vercel.json 크론)를 바꾸면
+  `AUTO_BACKUP_STALE_DAYS`도 같이.
 
 - **세무사(tax_agent) 계정은 매입매출장(매입매출 목록)만**(사용자 요청 10/28): 미들웨어(`lib/supabase/middleware.ts`)가
   `/transactions` 목록 외 경로·다른 탭·`editTx`를 목록으로 돌려보내고, 화면은 `getCurrentRole()`(`lib/currentRole.ts`)로 탭·

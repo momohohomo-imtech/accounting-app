@@ -310,3 +310,23 @@ test("연말 점검: 미발행 묶음마다 남은 발행 예정액·발행한 �
     { label: "다 끊은 D", members: ["PD"], quote: 10_000_000, agency: 0, billed: 10_000_000, remaining: 0, lastBilled: "2026-08-01" },
   ]);
 });
+
+test("예전 3단 귀속(어미 ← 하위 ← 하위의 하위)은 맨 위 어미 묶음으로 — 상태도 맨 위 어미를 따름", () => {
+  const middle = childOf("PM", "PA", 10_000_000);
+  const grandchild = childOf("PG", "PM", 5_000_000);
+  const ps = [PA, middle, grandchild];
+  const txs = [sale("2026-09-10", 11_000_000, "PG")];
+  const rows = unbilledRemainingByGroup(ps, ofProjects(txs, ps), AG);
+  // (9,000만 + 1,000만 + 500만) − 대행구매 500만 − 하위의 하위 매출 1,000만 = 9,000만, 한 묶음
+  assert.deepEqual(
+    rows.map((g) => [g.rootId, g.members.map((p) => p.id), g.remaining]),
+    [["PA", ["PA", "PM", "PG"], 90_000_000]]
+  );
+  // 검토중 맨 위 어미면 하위의 하위 발주액도 합계에서 빠짐
+  const reviewTop = { ...PA, status: "review" };
+  assert.equal(projectBasedProfit([reviewTop, middle, grandchild], [], [], new Map()).quoteTotal, 0);
+  // 서로를 가리키는 잘못된 자료는 묶지 않고 각자
+  const loopA = childOf("LA", "LB", 1_000_000, "ongoing");
+  const loopB = childOf("LB", "LA", 2_000_000, "ongoing");
+  assert.equal(unbilledRemainingByGroup([loopA, loopB], [], new Map()).length, 2);
+});

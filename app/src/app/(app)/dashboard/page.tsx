@@ -26,8 +26,10 @@ import { Table, THead, Th, Tr, Td, EmptyRow } from "@/components/ui/Table";
 import { cx } from "@/lib/cx";
 import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
 import { expectedReceivableByStatus as receivableByStatus, receivedSalesByProject } from "@/lib/expectedReceivable";
-import { nowKst } from "@/lib/kstDate";
+import { nowKst, kstDateTime } from "@/lib/kstDate";
 import { PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
+import { getCurrentRole } from "@/lib/currentRole";
+import { backupStatus, AUTO_BACKUP_STALE_DAYS, type BackupRecord } from "@/lib/backupStatus";
 
 const EXPECTED_RECEIVABLE_STATUSES = [
   { value: "ongoing", label: "진행중" },
@@ -110,6 +112,16 @@ export default async function DashboardPage({
 
   // 외상 정산 이력 — 장부 표시(정산 전 외상 숨김)·외상 잔액·수금 예정액(이미 받은 매출)이 같이 쓴다.
   const creditPaymentsPromise = fetchAllCreditPayments(supabase);
+  // 백업 상태 — 백업 기록은 관리자·직원만 읽을 수 있어서(조회 전용 계정은 빈 목록) 그 두 역할에만 보여 줌. 가장 최근 백업과
+  // 가장 최근 자동 백업만(줄 수 칸은 095 SQL 실행 전이면 없어서 select("*")).
+  const backupRecordsPromise = getCurrentRole().then(async (role) => {
+    if (role !== "admin" && role !== "staff") return null;
+    const [{ data: latest }, { data: latestAuto }] = await Promise.all([
+      supabase.from("backups").select("*").order("created_at", { ascending: false }).limit(1),
+      supabase.from("backups").select("*").eq("backup_type", "auto").order("created_at", { ascending: false }).limit(1),
+    ]);
+    return [...(latest ?? []), ...(latestAuto ?? [])] as BackupRecord[];
+  });
 
   const [
     { data: monthTxRaw },
@@ -124,6 +136,7 @@ export default async function DashboardPage({
     { data: employeeRows },
     { data: pageMemo },
     { data: vatNoticeRows, error: vatNoticeError },
+    backupRecords,
   ] = await Promise.all([
     fetchAllRows<Transaction>((from, to) =>
       supabase
@@ -176,6 +189,7 @@ export default async function DashboardPage({
     supabase.from("dashboard_page_memo").select("content").maybeSingle(),
     // 부가가치세 예정고지서 금액(093 SQL) — 실행 전이면 표가 없어 오류 → 입력칸을 숨기고 장부 기준 추정만.
     supabase.from("vat_prepayment_notices").select("month, amount").eq("year", selectedYear),
+    backupRecordsPromise,
   ]);
   const yearProjects = yearProjectRows ?? [];
   const categoryById = new Map(((categoryRows ?? []) as ExpenseCategory[]).map((c) => [c.id, c]));
@@ -324,6 +338,18 @@ export default async function DashboardPage({
       )}`
     : "거래 내역 없음";
 
+  // 백업 상태(관리자·직원만, lib/backupStatus.ts) — 마지막 자동 백업 후 8일이 넘으면 맨 위 카드에 경고.
+  const backup = backupRecords ? backupStatus(backupRecords, new Date().toISOString()) : null;
+  const backupTypeLabel = (type: string) => (type === "auto" ? "자동" : "수동");
+  const backupTime = (iso: string) => {
+    const d = kstDateTime(iso);
+    return `${Number(d.slice(5, 7))}월 ${Number(d.slice(8, 10))}일 ${d.slice(11)}`;
+  };
+  const autoBackupLabel =
+    backup?.daysSinceAuto == null
+      ? "자동 백업 기록 없음"
+      : `자동 백업 ${backup.daysSinceAuto === 0 ? "당일" : `${backup.daysSinceAuto}일 전`}`;
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -396,6 +422,13 @@ export default async function DashboardPage({
         </div>
         {o.hasIncompleteProjects && (
           <p className="mt-1.5 text-[11px] font-semibold text-red-600">진행 중인 프로젝트가 있어 추가 매출·매입이 발생할 수 있습니다.</p>
+        )}
+        {backup?.autoStale && (
+          <Link href="/backups" className="mt-1.5 block text-[11px] font-semibold text-red-600 hover:underline">
+            {backup.daysSinceAuto == null
+              ? "자동 백업 기록이 없습니다(백업 화면 확인 필요)."
+              : `자동 백업이 ${backup.daysSinceAuto}일간 실행되지 않았습니다(백업 화면 확인 필요).`}
+          </Link>
         )}
       </Card>
 
@@ -749,6 +782,65 @@ export default async function DashboardPage({
             </Link>
           </div>
         </FoldRow>
+
+        {backup && (
+          <FoldRow
+            title="백업"
+            summary={
+              backup.latest ? (
+                <>
+                  {`최근 백업 ${backupTime(backup.latest.created_at)}(${backupTypeLabel(backup.latest.backup_type)})`}
+                  {backup.latestTransactionCount != null && ` · 거래 ${backup.latestTransactionCount.toLocaleString()}건 포함`}
+                  {backup.latestComplete === false && <span className="font-semibold text-amber-600"> · 예전 방식 백업(새 백업 필요)</span>}
+                  {" · "}
+                  <span className={backup.autoStale ? "font-semibold text-red-600" : undefined}>{autoBackupLabel}</span>
+                </>
+              ) : (
+                <span className="font-semibold text-red-600">백업 기록 없음</span>
+              )
+            }
+          >
+            <div className="grid grid-cols-2 gap-2">
+              <Link href="/backups" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
+                <Stat
+                  label="최근 백업"
+                  sub={
+                    backup.latest
+                      ? `${backupTypeLabel(backup.latest.backup_type)}${
+                          backup.latestTransactionCount != null ? ` · 거래 ${backup.latestTransactionCount.toLocaleString()}건 포함` : ""
+                        }`
+                      : undefined
+                  }
+                >
+                  {backup.latest ? backupTime(backup.latest.created_at) : "-"}
+                </Stat>
+              </Link>
+              <Link href="/backups" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
+                <Stat
+                  label="최근 자동 백업"
+                  sub={<span className={backup.autoStale ? "font-semibold text-red-600" : undefined}>{autoBackupLabel}</span>}
+                >
+                  {backup.lastAutoAt ? backupTime(backup.lastAutoAt) : "-"}
+                </Stat>
+              </Link>
+            </div>
+            <Footnote>
+              <p>
+                자동 백업 = 매주 일요일 오전 6시 전체 자료 백업 · 마지막 자동 백업 후 {AUTO_BACKUP_STALE_DAYS}일 경과 시 맨 위에 경고 표시 ·
+                백업 파일 다운로드·복구는 백업 화면에서 관리
+              </p>
+              {backup.latestComplete === false && (
+                <p className="text-amber-600">
+                  최근 백업은 표마다 1,000줄까지만 담기던 예전 방식으로 생성되어 일부 자료가 누락되었을 수 있음 — 백업 화면의
+                  &quot;지금 백업&quot;으로 새 백업 생성 필요
+                </p>
+              )}
+              {backup.latest && backup.latestComplete === null && (
+                <p>백업별 거래 수는 Supabase에서 095 SQL 실행 후 생성한 백업부터 표시</p>
+              )}
+            </Footnote>
+          </FoldRow>
+        )}
       </Card>
     </div>
   );

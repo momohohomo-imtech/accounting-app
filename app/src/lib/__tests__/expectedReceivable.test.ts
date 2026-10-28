@@ -85,3 +85,19 @@ test("수금 예정액: 어미 + 귀속 하위는 한 묶음 — 하위 발주�
     { status: "done_awaiting_payment", count: 0, amount: 0, received: 0 },
   ]);
 });
+
+test("수금 예정액: 자기 상태가 있는 하위는 자기 상태 칸에 따로(프로젝트 목록과 같게), 귀속 하위만 어미 칸에", () => {
+  const projects = [
+    { id: "P", name: "진행중 어미", status: "ongoing", quote_amount: 10_000_000 },
+    { id: "M", name: "귀속 하위", status: "merged", quote_amount: 2_000_000, parent_project_id: "P" },
+    { id: "W", name: "수금대기 하위", status: "done_awaiting_payment", quote_amount: 3_000_000, parent_project_id: "P" },
+  ];
+  const received = receivedSalesByProject([sale("s2", "W", 1_100_000)], []);
+  const rows = expectedReceivableByStatus(projects, ["ongoing", "done", "done_awaiting_payment"], new Map(), received);
+  // 진행중: 어미 1,000만 + 귀속 하위 200만 / 수금 대기: 하위 300만 − 받은 100만(예전엔 진행중 칸에 합쳐졌음)
+  assert.deepEqual(rows, [
+    { status: "ongoing", count: 1, amount: 12_000_000, received: 0 },
+    { status: "done", count: 0, amount: 0, received: 0 },
+    { status: "done_awaiting_payment", count: 1, amount: 2_000_000, received: 1_000_000 },
+  ]);
+});

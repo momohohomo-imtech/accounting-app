@@ -205,16 +205,17 @@ export async function saveTransactionGroup(input: {
   if (input.lines.length === 0) return { error: "저장할 줄이 없습니다." };
   const paymentGroupId = input.keepGroup && input.lines.length > 1 ? input.groupId : null;
 
-  // 화면이 들고 있던 줄이 지금도 이 묶음의 줄인지 먼저 확인 — 그사이 다른 곳에서 묶음을 풀거나 바꿨으면 엉뚱한 거래를
-  // 덮어쓰거나 일부만 저장되지 않게 아무것도 바꾸지 않는다.
+  // 화면이 들고 있던 줄(고친 줄 + 지운 줄)이 지금 이 묶음의 줄과 똑같은지 먼저 확인 — 그사이 다른 곳에서 묶음을 풀거나 바꿨으면
+  // 엉뚱한 거래를 덮어쓰거나 일부만 저장되지 않게 아무것도 바꾸지 않는다. 다른 창에서 줄을 추가한 경우도 막음(예전엔 이 창에서
+  // 묶음을 풀거나 한 줄로 줄이면 그 줄만 묶음 번호를 가진 채 혼자 남았음).
   const { data: currentLines, error: currentError } = await supabase
     .from("transactions")
     .select("id")
     .eq("payment_group_id", input.groupId);
   if (currentError) return { error: currentError.message };
   const currentIds = new Set((currentLines ?? []).map((r) => r.id));
-  const touchedIds = [...input.lines.flatMap((l) => (l.id ? [l.id] : [])), ...input.removedIds];
-  if (touchedIds.some((id) => !currentIds.has(id))) {
+  const touchedIds = new Set([...input.lines.flatMap((l) => (l.id ? [l.id] : [])), ...input.removedIds]);
+  if ([...touchedIds].some((id) => !currentIds.has(id)) || [...currentIds].some((id) => !touchedIds.has(id))) {
     return { error: "그사이 묶음이 바뀌었습니다. 수정 화면을 다시 열어 저장해주세요." };
   }
 

@@ -1,4 +1,5 @@
-export type ProjectSearchOption = { value: string; label: string; year: number; siteLabel: string };
+// onlyIfCurrent: 새로 고를 수는 없고 지금 값일 때만 보이는 항목(예전 3단 귀속 자료의 가운데 프로젝트 — 고르면 서버가 거절함).
+export type ProjectSearchOption = { value: string; label: string; year: number; siteLabel: string; onlyIfCurrent?: boolean };
 
 export type RowBgColor =
   | "red"

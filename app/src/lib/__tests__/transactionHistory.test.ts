@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { describeChanges, summarizeHistoryTx, type HistoryNames, type HistoryTx } from "@/lib/transactionHistory";
+import { collapseBulkChanges, describeChanges, summarizeHistoryTx, type HistoryNames, type HistoryTx } from "@/lib/transactionHistory";
 
 // 가짜 이름표·거래(실제 회사 자료 아님)
 const names: HistoryNames = {
@@ -64,4 +64,24 @@ test("수정 이력 요약: 날짜·거래처·품목·합계(매출은 매출 �
   const sale = { ...base, type: "매출", sales_amount: 1_000_000, sales_vat: 100_000, client_id: "없는 거래처", client_name_raw: "가짜 발주처" };
   assert.deepEqual(summarizeHistoryTx(sale, names).total, 1_100_000);
   assert.equal(summarizeHistoryTx(sale, names).client, "가짜 발주처");
+});
+
+test("수정 이력 접기: 같은 사람·같은 시각·같은 구분이 20건 이상이면 한 묶음, 적으면 한 건씩(최근 순 유지)", () => {
+  let id = 0;
+  const entry = (action: string, changed_at: string, changed_by: string | null = "u1") => ({ id: ++id, action, changed_at, changed_by });
+  const restoreAt = "2026-10-28T01:00:00.123456+00:00";
+  const restore = Array.from({ length: 25 }, () => entry("delete", restoreAt));
+  const newer = entry("update", "2026-10-28T02:00:00+00:00");
+  const fewDeletes = Array.from({ length: 3 }, () => entry("delete", "2026-10-27T05:00:00+00:00"));
+  const otherPerson = entry("delete", restoreAt, "u2");
+  const items = collapseBulkChanges([newer, ...restore.slice(0, 10), otherPerson, ...restore.slice(10), ...fewDeletes]);
+  assert.deepEqual(
+    items.map((list) => list.length),
+    [1, 25, 1, 1, 1, 1]
+  );
+  assert.equal(items[1][0].id, restore[0].id);
+  assert.equal(items[2][0].changed_by, "u2");
+  // 같은 시각이라도 수정·삭제는 따로 셈
+  const mixed = [...Array.from({ length: 19 }, () => entry("update", restoreAt)), entry("delete", restoreAt)];
+  assert.equal(collapseBulkChanges(mixed).length, 20);
 });

@@ -4,11 +4,16 @@ import { formatWon } from "@/lib/format";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 
 // 거래 수정 화면 아래 "수정 이력"(094 SQL) — 그 거래(묶음이면 묶음의 모든 줄)를 누가 언제 무엇을 바꿨는지. 이력이 없거나
-// SQL 실행 전이면 아무것도 안 보임.
+// SQL 실행 전이면 아무것도 안 보임. 지금 있는 거래라 "삭제" 기록은 지운 뒤 백업 복원으로 다시 들어온 것.
 export async function TransactionHistoryList({ transactionIds }: { transactionIds: string[] }) {
   const supabase = await createClient();
-  const history = await loadTransactionHistory(supabase, { transactionIds, limit: 50 });
-  if (!history || history.length === 0) return null;
+  const result = await loadTransactionHistory(supabase, { transactionIds, limit: 50 });
+  if (result.state === "missing") return null;
+  if (result.state === "error") {
+    return <p className="mt-4 text-xs text-slate-400 print:hidden">수정 이력을 불러오지 못했어요({result.message}).</p>;
+  }
+  const history = result.rows;
+  if (history.length === 0) return null;
   const many = transactionIds.length > 1;
 
   return (
@@ -24,8 +29,13 @@ export async function TransactionHistoryList({ transactionIds }: { transactionId
         {history.map((h) => (
           <li key={h.id} className="rounded-lg bg-slate-50 px-3 py-2">
             <p className="text-xs text-slate-500">
-              {h.time} · {h.who} · <span className={h.action === "delete" ? "font-medium text-red-600" : ""}>{h.action === "delete" ? "삭제" : "수정"}</span>
-              {many && ` · ${h.item || "-"} ${formatWon(h.total)}`}
+              {h.time} · {h.who} ·{" "}
+              <span className={h.action === "delete" ? "font-medium text-red-600" : ""}>
+                {h.action === "delete" ? (h.restored ? "삭제 → 이후 백업 복원으로 다시 들어옴" : "삭제") : "수정"}
+              </span>
+              {h.bulkCount
+                ? ` · 이 화면의 거래 ${h.bulkCount}건을 한 번에`
+                : many && ` · ${h.item || "-"} ${formatWon(h.total)}`}
             </p>
             {h.changes.length > 0 ? (
               <ul className="mt-1 space-y-0.5 text-slate-700">
