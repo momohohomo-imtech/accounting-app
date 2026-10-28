@@ -339,14 +339,28 @@ export function EntityTable({
     const childrenByParentId = new Map<string, Row[]>();
     const childIds = new Set<string>();
     if (groupByField) {
-      for (const r of rows) {
-        const parentId = r[groupByField] as string | null | undefined;
-        if (parentId && rowById.has(parentId)) {
-          childIds.add(r.id);
-          const list = childrenByParentId.get(parentId) ?? [];
-          list.push(r);
-          childrenByParentId.set(parentId, list);
+      // 표에 있는 맨 위 조상 — 자식의 자식(3단)도 맨 위 부모 묶음에(예전엔 가운데 줄이 자식이라 그 아래 줄이 표에서 사라졌음).
+      // 서로를 가리키는 잘못된 자료는 묶지 않고 각자 한 줄.
+      const topOf = (r: Row) => {
+        const seen = new Set([r.id]);
+        let top = r;
+        for (let parentId = r[groupByField] as string | null | undefined; parentId; ) {
+          const parent = rowById.get(parentId);
+          if (!parent) break;
+          if (seen.has(parent.id)) return r;
+          seen.add(parent.id);
+          top = parent;
+          parentId = parent[groupByField] as string | null | undefined;
         }
+        return top;
+      };
+      for (const r of rows) {
+        const top = topOf(r);
+        if (top.id === r.id) continue;
+        childIds.add(r.id);
+        const list = childrenByParentId.get(top.id) ?? [];
+        list.push(r);
+        childrenByParentId.set(top.id, list);
       }
     }
 
@@ -616,7 +630,9 @@ export function EntityTable({
       </THead>
       <tbody>
         {blocks.map((b) => {
-          if (!b.summary) return [b.anchor, ...b.children].map((row) => renderRow(row));
+          if (!b.summary) {
+            return <Fragment key={`block:${b.anchor.id}`}>{[b.anchor, ...b.children].map((row) => renderRow(row))}</Fragment>;
+          }
           const anchorId = b.anchor.id;
           const open = expandedGroups.has(anchorId);
           return (
@@ -655,7 +671,7 @@ export function EntityTable({
               const form = e.currentTarget;
               if (!(await confirm("수정 내용을 저장하시겠습니까?"))) return;
               try {
-                const result = await updateAction(new FormData(form));
+                const result = await pending.run(() => Promise.resolve(updateAction(new FormData(form))));
                 if (result && typeof result === "object" && "error" in result && result.error) {
                   setFormError(String(result.error));
                   return;

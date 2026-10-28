@@ -4,7 +4,7 @@ import { one } from "@/lib/relations";
 import { TransactionForm } from "@/components/TransactionForm";
 import { updateTransactionRecord } from "@/lib/actions/transactions";
 import { EscapeCloseLink } from "@/components/EscapeCloseLink";
-import { loadPaymentGroupForEdit } from "@/lib/paymentGroup";
+import { hasPaymentGroupColumn, loadPaymentGroupForEdit } from "@/lib/paymentGroup";
 
 // 거래 수정 팝업 — 매입매출 목록, 외상 관리, 보고서(매입처별 집계) 어디서 열든 공통으로 씀.
 export async function TransactionEditPopup({ editTx, redirectTo }: { editTx?: string; redirectTo: string }) {
@@ -24,7 +24,7 @@ export async function TransactionEditPopup({ editTx, redirectTo }: { editTx?: st
 
   if (!tx) return null;
   // 한 결제로 묶인 거래면 묶음 줄을 같이 열어 한꺼번에 수정(092 SQL 실행 전엔 칸이 없어 묶기 기능을 숨김).
-  const groupingReady = "payment_group_id" in tx;
+  const groupingReady = hasPaymentGroupColumn([tx]);
   const { group, partOfGroup } = await loadPaymentGroupForEdit(supabase, tx);
 
   const siteOptions = (sites ?? []).map((s) => ({

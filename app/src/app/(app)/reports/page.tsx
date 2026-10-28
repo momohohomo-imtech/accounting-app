@@ -48,6 +48,7 @@ import { purchaseCostOf, salesSupplyOf, supplyOf, vatOf } from "@/lib/vatBasis";
 import type { WorkLog } from "@/lib/types";
 import { nowKst } from "@/lib/kstDate";
 import { projectBasedProfit } from "@/lib/projectProfit";
+import { categoryReportHref } from "@/lib/reportLinks";
 
 const MONTH_LABELS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
 
@@ -141,7 +142,6 @@ export default async function ReportsPage({
   const includeVendorAgency = vendorAgency === "1";
   const categoryNames = category ? (Array.isArray(category) ? category : [category]) : [];
   const categorySet = new Set(categoryNames);
-  const categoryQuery = categoryNames.map((n) => `category=${encodeURIComponent(n)}`).join("&");
   const currentYear = nowKst().year;
   const selectedYear = year ? Number(year) : currentYear;
 
@@ -1399,7 +1399,7 @@ export default async function ReportsPage({
         editTx={editTx}
         redirectTo={
           categoryNames.length
-            ? `/reports?year=${selectedYear}&${categoryQuery}`
+            ? categoryReportHref(selectedYear, categoryNames)
             : siteReport
               ? `/reports?year=${selectedYear}&siteReport=${encodeURIComponent(siteReport)}`
               : `/reports?year=${selectedYear}${includeVendorAgency ? "&vendorAgency=1" : ""}&vendor=${encodeURIComponent(vendor ?? "")}`

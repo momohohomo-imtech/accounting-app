@@ -4,11 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatWon } from "@/lib/format";
 import { LinkButton, Button } from "@/components/ui/Button";
-
-// 카테고리 상세(보고서 팝업) 주소 — 여러 개면 category를 반복(이름에 쉼표가 들어갈 수 있어 한 칸에 이어 붙이지 않음).
-export function categoryReportHref(year: number, names: string[]) {
-  return `/reports?year=${year}&${names.map((n) => `category=${encodeURIComponent(n)}`).join("&")}`;
-}
+import { categoryReportHref } from "@/lib/reportLinks";
 
 type CategoryAgg = { name: string; count: number; amount: number; color?: string };
 type MergedRow = { name: string; count: number; amount: number; agencyCount: number; agencyAmount: number; color?: string };

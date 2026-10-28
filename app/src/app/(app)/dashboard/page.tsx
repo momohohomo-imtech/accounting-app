@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Table, THead, Th, Tr, Td, EmptyRow } from "@/components/ui/Table";
 import { cx } from "@/lib/cx";
 import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
-import { receivedSalesByProject, remainingReceivable } from "@/lib/expectedReceivable";
+import { expectedReceivableByStatus as receivableByStatus, receivedSalesByProject } from "@/lib/expectedReceivable";
 import { nowKst } from "@/lib/kstDate";
 import { PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
 
@@ -107,7 +107,7 @@ export default async function DashboardPage({
   const monthStart = `${currentYear}-${mm}-01`;
   const monthEnd = `${currentYear}-${mm}-${String(new Date(currentYear, today.month, 0).getDate()).padStart(2, "0")}`;
 
-  // 외상 정산 이력은 한 번만 받아서 이 페이지와 이익 예상 계산(loadProfitOutlook)이 같이 쓴다.
+  // 외상 정산 이력 — 장부 표시(정산 전 외상 숨김)·외상 잔액·수금 예정액(이미 받은 매출)이 같이 쓴다.
   const creditPaymentsPromise = fetchAllCreditPayments(supabase);
 
   const [
@@ -177,56 +177,13 @@ export default async function DashboardPage({
   const categoryById = new Map(((categoryRows ?? []) as ExpenseCategory[]).map((c) => [c.id, c]));
   const categoryRel = (categoryId: string | null) => (categoryId ? categoryById.get(categoryId) ?? null : null);
 
-  const receivableStatuses = new Set(EXPECTED_RECEIVABLE_STATUSES.map((st) => st.value));
-  const receivableProjects = yearProjects.filter((p) => receivableStatuses.has(p.status ?? ""));
-  const receivableProjectIds = receivableProjects.map((p) => p.id);
-  const [o, receivableAgencyRows, receivableSalesRows] = await Promise.all([
-    // 이익 예상은 세금계산서 기준 — 외상 미정산도 포함한 그 해 거래 전부를 넘긴다.
-    loadProfitOutlook(selectedYear, {
-      yearProjects,
-      yearTx: yearTxRaw.map((t) => ({ ...t, expense_categories: categoryRel(t.category_id) })),
-    }),
-    receivableProjectIds.length
-      ? fetchAllRows<{ project_id: string; amount: number }>((from, to) =>
-          supabase
-            .from("project_agency_purchases")
-            .select("project_id, amount")
-            .in("project_id", receivableProjectIds)
-            .order("id", { ascending: true })
-            .range(from, to)
-        )
-      : Promise.resolve([]),
-    // 기성금 등 이미 받은 매출 — 연도와 상관없이 그 프로젝트로 등록된 매출 전부.
-    receivableProjectIds.length
-      ? fetchAllRows<{
-          id: string;
-          type: string;
-          payment_type: string;
-          project_id: string;
-          category_id: string | null;
-          sales_amount: number;
-          sales_vat: number;
-          purchase_amount: number;
-          purchase_vat: number;
-        }>((from, to) =>
-          supabase
-            .from("transactions")
-            .select("id, type, payment_type, project_id, category_id, sales_amount, sales_vat, purchase_amount, purchase_vat")
-            .eq("type", "매출")
-            .in("project_id", receivableProjectIds)
-            .order("id", { ascending: true })
-            .range(from, to)
-        )
-      : Promise.resolve([]),
-  ]);
-  const agencyByReceivableProject = new Map<string, number>();
-  for (const a of receivableAgencyRows) {
-    agencyByReceivableProject.set(a.project_id, (agencyByReceivableProject.get(a.project_id) ?? 0) + Number(a.amount));
-  }
-  const receivedByProject = receivedSalesByProject(
-    receivableSalesRows.map((t) => ({ ...t, expense_categories: categoryRel(t.category_id) })),
-    payments
-  );
+  // 이익 예상은 세금계산서 기준 — 외상 미정산도 포함한 그 해 거래 전부를 넘긴다.
+  const o = await loadProfitOutlook(selectedYear, {
+    yearProjects,
+    yearTx: yearTxRaw.map((t) => ({ ...t, expense_categories: categoryRel(t.category_id) })),
+  });
+  // 기성금 등 이미 받은 매출 — 연도와 상관없이 그 해 프로젝트로 등록된 매출 전부(이익 예상이 받아 온 거래를 그대로 씀).
+  const receivedByProject = receivedSalesByProject(o.projectTx, payments);
 
   const monthTx = (monthTxRaw ?? []).filter((t) => isLedgerVisible(t as Transaction, payments));
   const recentTx = (recentTxRaw ?? []).filter((t) => isLedgerVisible(t as Transaction, payments)).slice(0, 8);
@@ -246,23 +203,17 @@ export default async function DashboardPage({
   const yearProfit = yearSales - yearPurchase;
 
   // 예상 미수액 — 아직 돈을 다 받지 않은 프로젝트(진행중·공사 완료·완료 수금대기)의 남은 받을 금액.
-  // 프로젝트 목록의 "수주예상액"(발주액 − 대행구매액)에서 이미 받은 매출(기성금 등)을 뺀다
+  // 프로젝트 목록의 "수주예상액"(발주액 − 대행구매액)에서 이미 받은 매출(기성금 등)을 뺀다. 어미 + 귀속 하위는 한 묶음
   // (계산은 lib/expectedReceivable.ts — 자동 검사 있음).
-  const expectedReceivableByStatus = EXPECTED_RECEIVABLE_STATUSES.map(({ value, label }) => {
-    const rows = receivableProjects.filter((p) => p.status === value);
-    return {
-      label,
-      count: rows.length,
-      amount: rows.reduce(
-        (s, p) =>
-          s +
-          remainingReceivable(p.quote_amount, agencyByReceivableProject.get(p.id) ?? 0, receivedByProject.get(p.id) ?? 0),
-        0
-      ),
-    };
-  });
+  const expectedReceivableByStatus = receivableByStatus(
+    yearProjects,
+    EXPECTED_RECEIVABLE_STATUSES.map((st) => st.value),
+    o.agencyByProject,
+    receivedByProject
+  ).map((r, i) => ({ ...r, label: EXPECTED_RECEIVABLE_STATUSES[i].label }));
   const expectedReceivable = expectedReceivableByStatus.reduce((s, r) => s + r.amount, 0);
-  const receivedSalesTotal = receivableProjects.reduce((s, p) => s + (receivedByProject.get(p.id) ?? 0), 0);
+  const receivableGroupCount = expectedReceivableByStatus.reduce((s, r) => s + r.count, 0);
+  const receivedSalesTotal = expectedReceivableByStatus.reduce((s, r) => s + r.received, 0);
   // "공사 완료 · 수금 대기" 칸도 같은 기준 — 두 칸의 수금 대기 금액이 항상 같게.
   const awaitingPayment = expectedReceivableByStatus[EXPECTED_RECEIVABLE_STATUSES.findIndex((st) => st.value === PROJECT_STATUS_AWAITING_PAYMENT)];
 
@@ -422,7 +373,7 @@ export default async function DashboardPage({
             {headlineTax ? <Money value={headlineTax.totalTax} /> : "-"}
           </Stat>
           <Link href="/projects" className="rounded-lg transition hover:ring-2 hover:ring-slate-200 lg:col-span-3 xl:col-span-1">
-            <Stat label="수금 예정액" sub={`대상 프로젝트 ${receivableProjects.length}건`}>
+            <Stat label="수금 예정액" sub={`대상 프로젝트 ${receivableGroupCount}건`}>
               <Money value={expectedReceivable} />
             </Stat>
           </Link>
