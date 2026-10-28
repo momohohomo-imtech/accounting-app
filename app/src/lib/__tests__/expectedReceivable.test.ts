@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { expectedReceivableByStatus, projectReceipts, receivedSalesByProject, remainingReceivable } from "@/lib/expectedReceivable";
+import {
+  billedSalesByProject,
+  expectedReceivableByStatus,
+  projectReceipts,
+  RECEIVABLE_STATUSES,
+  receivableOf,
+  receivedSalesByProject,
+  remainingReceivable,
+} from "@/lib/expectedReceivable";
 import type { CreditPayment } from "@/lib/types";
 
 const sale = (id: string, project_id: string, total: number, payment_type = "transfer") => ({
@@ -102,7 +110,7 @@ test("수금 예정액: 자기 상태가 있는 하위는 자기 상태 칸에 �
   ]);
 });
 
-test("프로젝트 받은 돈: 계산서마다 입금 상태, 요약은 대시보드 수금 예정액과 같은 기준", () => {
+test("프로젝트 받은 돈: 계산서마다 입금 상태, 미수 금액은 대시보드 수금 예정액과 같은 계산", () => {
   const on = (date: string, row: ReturnType<typeof sale>) => ({ ...row, trans_date: date });
   const pay = (transaction_id: string, paid_date: string, paid_amount: number, remaining_amount: number): CreditPayment => ({
     id: `p-${transaction_id}-${paid_date}`,
@@ -129,29 +137,62 @@ test("프로젝트 받은 돈: 계산서마다 입금 상태, 요약은 대시�
       ["mid2", "partial", 1_000_000, "2026-09-15"],
     ]
   );
-  // 수주예상액 900만 − 받은 금액 600만(일부 입금은 다 받을 때까지 빼지 않음) = 300만 = 입금 대기 200만 + 계산서 미발행 100만
+  // 받은 금액 600만(일부 입금은 다 받을 때까지 빼지 않음), 실제 입금 760만(부가세 포함)
   assert.deepEqual(
-    { expected: r.expected, billed: r.billed, received: r.received, actual: r.receivedActual, waiting: r.waiting, unbilled: r.unbilled, remaining: r.remaining },
-    { expected: 9_000_000, billed: 8_000_000, received: 6_000_000, actual: 7_600_000, waiting: 2_000_000, unbilled: 1_000_000, remaining: 3_000_000 }
+    { expected: r.expected, billed: r.billed, received: r.received, actual: r.receivedActual },
+    { expected: 9_000_000, billed: 8_000_000, received: 6_000_000, actual: 7_600_000 }
   );
-  // 대시보드 수금 예정액(같은 프로젝트 하나)과 같은 숫자
-  const dash = expectedReceivableByStatus(
-    [{ id: "P", name: "가짜 현장", status: "ongoing", quote_amount: 10_000_000 }],
-    ["ongoing"],
-    new Map([["P", 1_000_000]]),
-    receivedSalesByProject(rows, payments)
-  );
-  assert.equal(dash[0].amount, r.remaining);
+  // 미수 금액 = 수주예상액 900만 − 받은 금액 600만 = 300만 = 입금 대기 200만 + 계산서 미발행 100만
+  const project = [{ id: "P", name: "가짜 현장", status: "ongoing", quote_amount: 10_000_000 }];
+  const agency = new Map([["P", 1_000_000]]);
+  const received = receivedSalesByProject(rows, payments);
+  assert.deepEqual(receivableOf(project, agency, received, billedSalesByProject(rows)), {
+    amount: 3_000_000,
+    waiting: 2_000_000,
+    unbilled: 1_000_000,
+    count: 1,
+    quote: 10_000_000,
+  });
+  // 대시보드 수금 예정액과 같은 숫자
+  assert.equal(expectedReceivableByStatus(project, ["ongoing"], agency, received)[0].amount, 3_000_000);
 });
 
-test("프로젝트 받은 돈: 입금 전 외상은 입금 대기, 발주액보다 더 끊어도 남은 금액은 0 아래로 안 내려감", () => {
+test("미수 금액: 입금 전 외상은 입금 대기, 발주액보다 더 끊어도 0 아래로 안 내려감", () => {
   const rows = [{ ...sale("only", "P", 12_100_000, "credit"), trans_date: "2026-10-01" }];
   const r = projectReceipts(rows, [], 10_000_000, 0);
   assert.equal(r.lines[0].status, "waiting");
   assert.equal(r.lines[0].paidDate, null);
   assert.equal(r.lines[0].received, 0);
   assert.equal(r.billed, 11_000_000);
-  assert.equal(r.unbilled, 0);
-  assert.equal(r.waiting, 11_000_000);
-  assert.equal(r.remaining, 10_000_000);
+  const m = receivableOf(
+    [{ id: "P", status: "done", quote_amount: 10_000_000 }],
+    new Map(),
+    receivedSalesByProject(rows, []),
+    billedSalesByProject(rows)
+  );
+  assert.deepEqual(m, { amount: 10_000_000, waiting: 11_000_000, unbilled: 0, count: 1, quote: 10_000_000 });
+});
+
+test("미수 금액: 검토중·수금 완료·귀속 하위 하나만이면 없음(null), 묶음은 대시보드처럼 단위마다 더함", () => {
+  const none = new Map<string, number>();
+  assert.equal(receivableOf([{ id: "R", status: "review", quote_amount: 5_000_000 }], none, none), null);
+  assert.equal(receivableOf([{ id: "C", status: "collected", quote_amount: 5_000_000 }], none, none), null);
+  assert.equal(receivableOf([{ id: "M", status: "merged", quote_amount: 0, parent_project_id: "X" }], none, none), null);
+  // 진행중 어미(1,000만) + 귀속 하위(하위로 600만 받음) + 수금대기 하위(300만 중 100만 받음) + 수금 완료 하위(빠짐)
+  const group = [
+    { id: "P", status: "ongoing", quote_amount: 10_000_000 },
+    { id: "M", status: "merged", quote_amount: 0, parent_project_id: "P" },
+    { id: "W", status: "done_awaiting_payment", quote_amount: 3_000_000, parent_project_id: "P" },
+    { id: "D", status: "collected", quote_amount: 2_000_000, parent_project_id: "P" },
+  ];
+  const received = new Map([
+    ["M", 6_000_000],
+    ["W", 1_000_000],
+    ["D", 2_000_000],
+  ]);
+  const m = receivableOf(group, none, received);
+  assert.equal(m?.amount, 4_000_000 + 2_000_000);
+  assert.equal(m?.count, 2);
+  const dash = expectedReceivableByStatus(group, RECEIVABLE_STATUSES, none, received);
+  assert.equal(dash.reduce((s, r) => s + r.amount, 0), m?.amount);
 });

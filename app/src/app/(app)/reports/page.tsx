@@ -48,6 +48,7 @@ import { purchaseCostOf, salesSupplyOf, supplyOf, vatOf } from "@/lib/vatBasis";
 import type { WorkLog } from "@/lib/types";
 import { nowKst } from "@/lib/kstDate";
 import { effectiveStatus, projectBasedProfit, projectGroups } from "@/lib/projectProfit";
+import { receivableOf, receivedSalesByProject } from "@/lib/expectedReceivable";
 import { categoryReportHref } from "@/lib/reportLinks";
 
 const MONTH_LABELS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
@@ -307,6 +308,13 @@ export default async function ReportsPage({
     agencyByProject.set(a.project_id, (agencyByProject.get(a.project_id) ?? 0) + a.amount);
   }
 
+  // 이미 받은 매출(즉시결제·정산 끝난 외상) — 남은 금액(미수) = 수주예상액 − 받은 매출(대시보드 수금 예정액·프로젝트 목록 미수 금액과
+  // 같은 계산, receivableOf — 진행중·공사 완료·수금 대기만).
+  const receivedByProject = receivedSalesByProject(projectTxRaw, creditPayments);
+  const receivableAmount = (group: Parameters<typeof receivableOf>[0]) => {
+    const r = receivableOf(group, agencyByProject, receivedByProject);
+    return r && r.quote > 0 ? r.amount : null;
+  };
   const byProjectAll = (projects ?? []).map((p) => {
     const rows = projectTx.filter((t) => t.project_id === p.id);
     // 손익은 부가세 제외 기준 — 발주액·대행구매액이 부가세 제외라 매출·매입도 공급가로 맞춘다
@@ -321,7 +329,7 @@ export default async function ReportsPage({
     // 단, 결산 정리가 끝난 프로젝트는 목록에서 일반 검정으로 되돌림(보고서 팝업 안 경고는 별개, 항상 유지).
     const contractMismatch =
       !p.settlement_finalized && (p.contract_amount ?? 0) > 0 && quoteAmount - (p.contract_amount ?? 0) - agencyAmount !== 0;
-    return { ...p, quoteAmount, sales, purchase, profit, contractMismatch };
+    return { ...p, quoteAmount, sales, purchase, profit, contractMismatch, receivable: receivableAmount([p]) };
   });
   // 묶음(맨 위 어미 + 귀속 하위 — 예전 3단 자료도 맨 위 어미로)과 "타 프로젝트 귀속" 하위가 물려받는 어미 상태 — 대시보드
   // 이익 예상·프로젝트 목록과 같은 기준(lib/projectProfit.ts).
@@ -409,6 +417,7 @@ export default async function ReportsPage({
         purchaseSupply,
         purchaseVat,
         contractAmountExpected: quoteAmount - agencyAmount,
+        receivable: receivableAmount(group),
         profit,
         margin,
         categoryBreakdown: Array.from(catMap.values()).sort((a, b) => b.amount - a.amount),
@@ -433,6 +442,7 @@ export default async function ReportsPage({
     p.purchaseVat,
     p.purchaseTotal,
     p.contractAmountExpected,
+    p.receivable ?? "",
     p.profit,
     p.margin === null ? 0 : Math.round(p.margin * 100) / 100,
     p.memo ?? "",
@@ -469,6 +479,8 @@ export default async function ReportsPage({
     quoteAmount: projectSummaryQuoteAmount,
     profit: projectSummaryProfit,
     profitRate: projectSummaryQuoteAmount > 0 ? (projectSummaryProfit / projectSummaryQuoteAmount) * 100 : null,
+    // 남은 금액(미수) 합계 — 현장 필터가 없으면 대시보드 수금 예정액과 같음.
+    receivable: receivableOf(byProject, agencyByProject, receivedByProject)?.amount ?? 0,
   };
 
   // 상단 박스의 "예상 순이익율" — 대시보드 "프로젝트 기준 예상 이익"과 같은 계산(lib/projectProfit.ts의
@@ -839,6 +851,7 @@ export default async function ReportsPage({
     p.progress_pct ?? 0,
     p.quoteAmount,
     p.sales,
+    p.receivable ?? "",
     p.purchase,
     p.profit,
     p.quoteAmount > 0 ? Math.round((p.profit / p.quoteAmount) * 1000) / 10 : 0,
@@ -1098,13 +1111,13 @@ export default async function ReportsPage({
             "projects",
             {
               filename: `프로젝트별_손익_${selectedYear}.xlsx`,
-              headers: ["프로젝트", "진행률", "발주액", "매출(VAT제외)", "매입(VAT제외)", "이익금", "이익율"],
+              headers: ["프로젝트", "진행률", "발주액", "매출(VAT제외)", "남은 금액", "매입(VAT제외)", "이익금", "이익율"],
               rows: projectExportRows,
             },
             <>
               <span className="text-xs text-slate-500">
                 {selectedYear}년 총 {projectSummary.count}건{projectSummary.reviewCount > 0 && ` (검토중 ${projectSummary.reviewCount}건은 발주액 제외·매입 반영)`} · 매출(VAT제외) {formatWon(projectSummary.sales)} · 매입(VAT제외){" "}
-                {formatWon(projectSummary.purchase)} · 이익금 {formatWon(projectSummary.profit)} · 이익율{" "}
+                {formatWon(projectSummary.purchase)} · 남은 금액 {formatWon(projectSummary.receivable)} · 이익금 {formatWon(projectSummary.profit)} · 이익율{" "}
                 {projectSummary.profitRate === null ? "-" : `${projectSummary.profitRate.toFixed(2)}%`}
               </span>
               {projectSiteOptions.length > 0 && (
@@ -1127,7 +1140,7 @@ export default async function ReportsPage({
         >
           <p className="mb-3 hidden text-xs text-slate-500 print:block">
             {selectedYear}년 총 {projectSummary.count}건{projectSummary.reviewCount > 0 && ` (검토중 ${projectSummary.reviewCount}건은 발주액 제외·매입 반영)`} · 매출(VAT제외) {formatWon(projectSummary.sales)} · 매입(VAT제외){" "}
-            {formatWon(projectSummary.purchase)} · 이익금 {formatWon(projectSummary.profit)} · 이익율{" "}
+            {formatWon(projectSummary.purchase)} · 남은 금액 {formatWon(projectSummary.receivable)} · 이익금 {formatWon(projectSummary.profit)} · 이익율{" "}
             {projectSummary.profitRate === null ? "-" : `${projectSummary.profitRate.toFixed(2)}%`}
           </p>
 
@@ -1185,6 +1198,7 @@ export default async function ReportsPage({
               "매입 부가세",
               "매입합계",
               "수주예상액",
+              "남은 금액",
               "이익금",
               "이익율(%)",
               "메모",

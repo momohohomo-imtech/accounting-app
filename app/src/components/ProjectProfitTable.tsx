@@ -13,9 +13,11 @@ type ProjectRow = {
   purchase: number;
   profit: number;
   contractMismatch?: boolean;
+  // 남은 금액(미수) — 진행중·공사 완료·수금 대기가 아니거나 발주액이 없으면 null("-").
+  receivable: number | null;
 };
 
-type SortKey = "name" | "progress_pct" | "quoteAmount" | "profitRate" | "sales" | "purchase" | "profit";
+type SortKey = "name" | "progress_pct" | "quoteAmount" | "profitRate" | "sales" | "receivable" | "purchase" | "profit";
 
 function sortValue(p: ProjectRow & { profitRate: number }, key: SortKey): string | number {
   switch (key) {
@@ -29,6 +31,8 @@ function sortValue(p: ProjectRow & { profitRate: number }, key: SortKey): string
       return p.profitRate;
     case "sales":
       return p.sales;
+    case "receivable":
+      return p.receivable ?? -1;
     case "purchase":
       return p.purchase;
     case "profit":
@@ -85,7 +89,7 @@ export function ProjectProfitTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[750px] text-sm">
+      <table className="w-full min-w-[860px] text-sm">
         <thead>
           <tr className="border-b border-slate-200 text-left text-slate-500">
             <th className="pb-2 pr-4">{headerButton("name", "프로젝트")}</th>
@@ -93,6 +97,7 @@ export function ProjectProfitTable({
             <th className="pb-2 pr-4 text-right">{headerButton("quoteAmount", "발주액")}</th>
             <th className="pb-2 pr-4 text-right">{headerButton("profitRate", "이익율")}</th>
             <th className="pb-2 pr-4 text-right">{headerButton("sales", "매출(VAT제외)")}</th>
+            <th className="pb-2 pr-4 text-right">{headerButton("receivable", "남은 금액")}</th>
             <th className="pb-2 pr-4 text-right">{headerButton("purchase", "매입(VAT제외)")}</th>
             <th className="pb-2 text-right">{headerButton("profit", "손익")}</th>
           </tr>
@@ -114,13 +119,16 @@ export function ProjectProfitTable({
               <td className="py-2 pr-4 text-right tabular-nums text-slate-700">{formatWon(p.quoteAmount)}</td>
               <td className="py-2 pr-4 text-right tabular-nums text-slate-700">{p.profitRate.toFixed(1)}%</td>
               <td className="py-2 pr-4 text-right tabular-nums text-slate-700">{formatWon(p.sales)}</td>
+              <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums text-slate-900">
+                {p.receivable === null ? <span className="text-slate-400">-</span> : formatWon(p.receivable)}
+              </td>
               <td className="py-2 pr-4 text-right tabular-nums text-slate-700">{formatWon(p.purchase)}</td>
               <td className="py-2 text-right tabular-nums text-slate-700">{formatWon(p.profit)}</td>
             </tr>
           ))}
           {sorted.length === 0 && (
             <tr>
-              <td colSpan={7} className="py-8 text-center text-slate-400">
+              <td colSpan={8} className="py-8 text-center text-slate-400">
                 {year}년 프로젝트가 없습니다.
               </td>
             </tr>

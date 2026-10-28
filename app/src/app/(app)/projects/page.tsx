@@ -23,6 +23,7 @@ import { updateProjectsPageMemo } from "@/lib/actions/projectsPageMemo";
 import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
 import { purchaseCostOf } from "@/lib/vatBasis";
 import { groupProjectProfit } from "@/lib/projectProfit";
+import { expectedReceivableByStatus, receivableOf, receivedSalesByProject } from "@/lib/expectedReceivable";
 import { nowKst } from "@/lib/kstDate";
 
 const TABS = [
@@ -199,7 +200,7 @@ async function ProjectListSection({
         .in("id", hiddenChildIds)
         .then((r) => r.data ?? [])
     : Promise.resolve([]);
-  type ProjectPurchaseRow = {
+  type ProjectTxRow = {
     id: string;
     type: string;
     payment_type: string;
@@ -210,13 +211,13 @@ async function ProjectListSection({
     purchase_vat: number;
     expense_categories: { name: string } | { name: string }[] | null;
   };
-  const [purchaseRowsRaw, { data: agencyRows }, creditPayments] = projectIds.length
+  // 프로젝트에 붙은 거래 전부(매입은 이익·총 매입, 매출은 미수 금액의 받은 돈).
+  const [projectTxRows, { data: agencyRows }, creditPayments] = projectIds.length
     ? await Promise.all([
-        fetchAllRows<ProjectPurchaseRow>((from, to) =>
+        fetchAllRows<ProjectTxRow>((from, to) =>
           supabase
             .from("transactions")
             .select("id, type, payment_type, sales_amount, sales_vat, project_id, purchase_amount, purchase_vat, expense_categories(*)")
-            .eq("type", "매입")
             .in("project_id", projectIds)
             .order("id", { ascending: true })
             .range(from, to)
@@ -231,10 +232,12 @@ async function ProjectListSection({
         ).then((data) => ({ data })),
         fetchAllCreditPayments(supabase),
       ])
-    : [[] as ProjectPurchaseRow[], { data: [] as { project_id: string; amount: number }[] }, [] as CreditPayment[]];
+    : [[] as ProjectTxRow[], { data: [] as { project_id: string; amount: number }[] }, [] as CreditPayment[]];
 
   // 외상(미완납)은 완납 전까지 장부에서 제외 — 대시보드·보고서와 동일한 기준.
-  const purchaseRows = purchaseRowsRaw.filter((t) => isLedgerVisible(t, creditPayments));
+  const purchaseRows = projectTxRows.filter((t) => t.type === "매입" && isLedgerVisible(t, creditPayments));
+  // 이미 받은 매출(즉시결제·정산 끝난 외상) — 미수 금액 = 수주예상액 − 받은 매출(대시보드 수금 예정액과 같은 계산).
+  const receivedByProject = receivedSalesByProject(projectTxRows, creditPayments);
 
   // 발주액·대행구매액이 부가세 제외라 매입도 공급가(부가세 제외)로 맞춰 이익을 계산.
   const purchaseByProject = new Map<string, number>();
@@ -332,6 +335,18 @@ async function ProjectListSection({
       defaultVisible: false,
     },
     {
+      // 미수 금액(받을 금액) = 수주예상액 − 받은 매출 — 진행중·공사 완료·수금 대기만(검토중·수금 완료·귀속 하위 줄은 "-"),
+      // 대시보드 수금 예정액·프로젝트 보고서 남은 금액과 같은 계산(lib/expectedReceivable.ts의 receivableOf).
+      name: "receivable",
+      label: "미수 금액 (받을 금액 = 수주예상액 − 받은 금액)",
+      tableLabel: "미수 금액",
+      readOnly: true,
+      format: "currency",
+      width: "8%",
+      toggleable: true,
+      defaultVisible: true,
+    },
+    {
       name: "contract_amount",
       label: "수주액 (수기 입력, 다른 보고서용 · 표에는 수주예상액으로 표시됨)",
       type: "number",
@@ -415,6 +430,7 @@ async function ProjectListSection({
     const contractAmountExpected = (p.quote_amount ?? 0) - agencyAmount;
     // 총 매입 = 매입 합계 + 구매대행 합계.
     const totalPurchase = own.purchase + own.agency;
+    const ownReceivable = receivableOf([p], agencyByProject, receivedByProject);
     return {
       ...p,
       site_name: (one(p.sites) as { name: string } | undefined)?.name,
@@ -423,6 +439,7 @@ async function ProjectListSection({
       contractMismatch,
       contractAmountExpected,
       totalPurchase,
+      receivable: ownReceivable && ownReceivable.quote > 0 ? ownReceivable.amount : null,
       // 상태·현장 필터에 걸린 줄(어미 묶음 때문에 함께 가져온 하위는 false).
       inFilter: displayedIds.has(p.id),
     };
@@ -461,6 +478,8 @@ async function ProjectListSection({
     ];
     if (members.length < 2) continue;
     const g = groupProjectProfit(members, purchaseByProject, agencyByProject);
+    // 미수 금액은 합산 보고서와 같은 묶음 기준(어미 + 귀속 하위 한 단위, 자기 상태가 있는 하위는 따로 — receivableOf).
+    const groupReceivable = receivableOf(members, agencyByProject, receivedByProject);
     groupSummaries[parentId] = {
       ...parent,
       id: `group:${parentId}`,
@@ -471,6 +490,7 @@ async function ProjectListSection({
       profit: g.profit,
       profitRate: g.rate !== null ? `${g.rate.toFixed(1)}%` : "-",
       totalPurchase: g.purchase + g.agency,
+      receivable: groupReceivable && groupReceivable.quote > 0 ? groupReceivable.amount : null,
       contractMismatch: members.some((m) => m.contractMismatch),
     };
   }
@@ -478,12 +498,13 @@ async function ProjectListSection({
   const inGroup = (p: { id: string }) => Boolean(groupSummaries[groupTopOf.get(p.id) ?? ""]);
   // 엑셀은 예전처럼 어미 줄에 묶음 이익금, 묶음 안 하위 줄은 이익금 빈칸(엑셀에서 합계를 내도 두 번 세지 않게).
   const exportRows = coloredRows.map((p) =>
-    groupSummaries[p.id] ? { ...p, profit: groupSummaries[p.id].profit } : inGroup(p) ? { ...p, profit: null } : p
+    groupSummaries[p.id]
+      ? { ...p, profit: groupSummaries[p.id].profit, receivable: groupSummaries[p.id].receivable }
+      : inGroup(p)
+        ? { ...p, profit: null, receivable: null }
+        : p
   );
   const listHref = `/projects?tab=list&year=${selectedYear}${siteId ? `&site_id=${siteId}` : ""}${status ? `&status=${encodeURIComponent(status)}` : ""}`;
-
-  const awaitingPaymentProjects = tableRows.filter((p) => p.inFilter && p.status === PROJECT_STATUS_AWAITING_PAYMENT);
-  const awaitingPaymentContractSum = awaitingPaymentProjects.reduce((sum, p) => sum + p.contractAmountExpected, 0);
 
   // 하단 합계 — 그 해 프로젝트만(다른 해 하위는 묶음 표시용으로만 가져온 것 — 그 해 목록에서 셈, 여기서도 세면 두 해에 두 번
   // 들어감). 발주액·수주예상액·총 매입은 줄마다 자기 값의 합, 이익금은 묶음이면 그 해 프로젝트끼리의 묶음 이익금(발주액 없는
@@ -500,19 +521,36 @@ async function ProjectListSection({
     return sum + (groupProjectProfit(members, purchaseByProject, agencyByProject).profit ?? 0);
   }, 0);
   const filteredPurchaseSum = footerRows.reduce((sum, p) => sum + p.totalPurchase, 0);
+  // 미수 금액 합계 — 묶음은 그 해 프로젝트끼리의 묶음 미수 금액, 아니면 자기 것(필터 없으면 대시보드 수금 예정액과 같음).
+  const filteredReceivableSum = footerRows.reduce((sum, p) => {
+    if (inGroup(p)) return sum;
+    if (!groupSummaries[p.id]) return sum + (p.receivable ?? 0);
+    const members = footerRows.filter((m) => m.id === p.id || groupTopOf.get(m.id) === p.id);
+    return sum + (receivableOf(members, agencyByProject, receivedByProject)?.amount ?? 0);
+  }, 0);
+  // 공사완료 예상 미수액 — 완료 수금대기(귀속 하위는 어미 상태)의 미수 금액(예전엔 받은 돈을 빼지 않은 수주예상액 합계였음).
+  // 대시보드 "공사 완료 · 수금 대기"와 같은 계산.
+  const awaitingReceivable = expectedReceivableByStatus(
+    footerRows,
+    [PROJECT_STATUS_AWAITING_PAYMENT],
+    agencyByProject,
+    receivedByProject
+  )[0];
 
   return (
     <div className="space-y-6">
       <div className={report ? "space-y-6 print:hidden" : "space-y-6"}>
-        {awaitingPaymentProjects.length > 0 && (
+        {awaitingReceivable.count > 0 && (
           <CollapsibleSection
             bare
             defaultOpen={false}
             title={<span className="text-red-600">공사완료 예상 미수액</span>}
             className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 print:hidden"
           >
-            <p className="text-xs text-red-600">완료 수금대기 {awaitingPaymentProjects.length}건의 수주예상액 합계</p>
-            <p className="mt-1 tabular-nums text-xl font-bold text-red-600">{formatWon(awaitingPaymentContractSum)}</p>
+            <p className="text-xs text-red-600">
+              완료 수금대기 {awaitingReceivable.count}건의 미수 금액 합계(수주예상액 − 받은 금액)
+            </p>
+            <p className="mt-1 tabular-nums text-xl font-bold text-red-600">{formatWon(awaitingReceivable.amount)}</p>
           </CollapsibleSection>
         )}
 
@@ -587,6 +625,9 @@ async function ProjectListSection({
             </span>
             <span>
               수주예상액 <span className="tabular-nums font-semibold text-slate-900">{formatWon(filteredContractSum)}</span>
+            </span>
+            <span>
+              미수 금액 <span className="tabular-nums font-semibold text-slate-900">{formatWon(filteredReceivableSum)}</span>
             </span>
             <span>
               이익금 <span className="tabular-nums font-semibold text-slate-900">{formatWon(filteredProfitSum)}</span>
