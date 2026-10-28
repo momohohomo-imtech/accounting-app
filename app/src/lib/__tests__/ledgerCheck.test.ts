@@ -64,6 +64,25 @@ test("세금·보험·금융으로 보이는 글자: 세금계산서·부가세 
   assert.equal(k("가짜 자재(세금계산서 발행)"), null);
   assert.equal(k("가짜 자재 부가세 포함"), null);
   assert.equal(k("가짜 음료"), null);
+  // 띄어 쓴 "세금 계산서"·"부가세 10%"도 세금이 아님 — 부가세 납부 자체는 세금
+  assert.equal(k("가짜 자재 세금 계산서"), null);
+  assert.equal(k("가짜 자재비(부가세 10%)"), null);
+  assert.equal(k("부가세 2기 확정 납부"), "세금");
+});
+
+test("세금·보험·금융으로 보이는 글자: 칸마다·단어마다 봐서 엉뚱한 곳이 걸리지 않음", () => {
+  const k = (item_name: string, extra: Partial<LedgerCheckRow> = {}) => taxFinanceKind(tx("2026-09-01", 1, { item_name, ...extra }));
+  // 단어 가운데 낀 두 글자 낱말은 아님(가짜 이름)
+  assert.equal(k("가짜케이자재 시멘트"), null);
+  assert.equal(k("전국세일 할인"), null);
+  assert.equal(k("이자카야 회식"), null);
+  // 품목 끝 + 거래처 앞 글자가 붙어서 "이자"가 되지 않게
+  assert.equal(k("가짜 넥타이", { clients: { name: "자연 가짜상사" } }), null);
+  // 단어 앞·끝의 낱말은 걸림
+  assert.equal(k("대출이자 10월"), "금융");
+  assert.equal(k("이자비용"), "금융");
+  assert.equal(k("약속어음 할인"), "금융");
+  assert.equal(k("가짜 자재", { note1: "국세청 납부" }), "세금");
 });
 
 test("카테고리 빈 매입: 매출·카테고리 있는 매입은 빼고, 세금·금융으로 보이는 것을 앞에", () => {

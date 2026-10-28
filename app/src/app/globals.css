@@ -81,6 +81,14 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  /* 말줄임 칸(.tap-full + tabIndex=0)을 누르면 그 칸만 줄바꿈해서 전체 글자 — 휴대폰은 title 풍선이 안 떠서 잘린 이름을 볼
+     방법이 없었음(장부 점검 표). 다른 곳을 누르면 다시 한 줄. */
+  :is(.overflow-x-auto, .overflow-auto) > table :is(th, td).tap-full:focus {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    outline: none;
+  }
   /* 첫 칸 안의 링크·버튼(거래처 이름 등)도 칸 폭 안에서 말줄임 */
   :is(.overflow-x-auto, .overflow-auto)
     > table:not(.sticky-col-table)

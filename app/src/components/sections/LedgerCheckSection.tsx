@@ -32,7 +32,7 @@ export async function LedgerCheckSection({ year, years }: { year: number; years:
     ),
     // select("*") — 비과세·불공제 칸(082·083 SQL) 실행 전에도 조회가 깨지지 않게.
     supabase.from("expense_categories").select("*").order("sort_order"),
-    // 최근 수정·삭제 이력(094 SQL 실행 전이면 null) — 연도와 상관없이 최근 100건.
+    // 최근 수정·삭제 이력(094 SQL) — 연도와 상관없이 최근 100줄(한꺼번에 바뀐 묶음은 한 줄).
     loadTransactionHistory(supabase, { limit: 100 }),
   ]);
 
@@ -99,16 +99,24 @@ export async function LedgerCheckSection({ year, years }: { year: number; years:
         title={
           <span>
             최근 수정·삭제 이력{" "}
-            <span className="text-sm font-normal text-slate-500">{history ? `최근 ${history.length}건` : "094 SQL 실행 후 표시"}</span>
+            <span className="text-sm font-normal text-slate-500">
+              {history.state === "ok"
+                ? `최근 ${history.rows.length}줄`
+                : history.state === "missing"
+                  ? "094 SQL 실행 후 표시"
+                  : "불러오지 못함"}
+            </span>
           </span>
         }
       >
-        {history ? (
-          <TransactionHistoryTable rows={history} year={year} />
-        ) : (
+        {history.state === "ok" ? (
+          <TransactionHistoryTable rows={history.rows} year={year} />
+        ) : history.state === "missing" ? (
           <p className="text-sm text-slate-400">
             Supabase에서 094 SQL(거래 수정 이력)을 실행하면 그때부터 거래를 고치거나 지울 때마다 기록이 남아요.
           </p>
+        ) : (
+          <p className="text-sm text-red-600">수정 이력을 불러오지 못했어요({history.message}). 잠시 뒤 새로고침해 주세요.</p>
         )}
       </CollapsibleSection>
     </div>

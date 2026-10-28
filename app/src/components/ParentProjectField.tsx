@@ -15,25 +15,30 @@ export function ParentProjectField({
   defaultValue?: string;
   required?: boolean;
 }) {
-  const initial = options.find((o) => o.value === defaultValue);
+  // 새로 고를 수 없는 항목(onlyIfCurrent)은 지금 값일 때만.
+  const selectable = useMemo(
+    () => options.filter((o) => !o.onlyIfCurrent || o.value === defaultValue),
+    [options, defaultValue]
+  );
+  const initial = selectable.find((o) => o.value === defaultValue);
   const [year, setYear] = useState(initial ? String(initial.year) : "");
   const [site, setSite] = useState(initial ? initial.siteLabel : "");
   const [value, setValue] = useState(defaultValue ?? "");
 
   const years = useMemo(
-    () => Array.from(new Set(options.map((o) => o.year))).sort((a, b) => b - a),
-    [options]
+    () => Array.from(new Set(selectable.map((o) => o.year))).sort((a, b) => b - a),
+    [selectable]
   );
   const sites = useMemo(
     () =>
       Array.from(
-        new Set(options.filter((o) => !year || String(o.year) === year).map((o) => o.siteLabel))
+        new Set(selectable.filter((o) => !year || String(o.year) === year).map((o) => o.siteLabel))
       ).sort(),
-    [options, year]
+    [selectable, year]
   );
   const filtered = useMemo(
-    () => options.filter((o) => (!year || String(o.year) === year) && (!site || o.siteLabel === site)),
-    [options, year, site]
+    () => selectable.filter((o) => (!year || String(o.year) === year) && (!site || o.siteLabel === site)),
+    [selectable, year, site]
   );
 
   return (

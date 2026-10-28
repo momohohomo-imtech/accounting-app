@@ -194,15 +194,29 @@ export function UncategorizedPurchasesTable({
                   />
                 </td>
                 <td className="whitespace-nowrap py-2 pr-4 text-slate-700">{formatDate(r.date)}</td>
-                <td className="sticky-col py-2 pr-4 text-slate-800 max-md:max-w-[10rem] max-md:truncate" title={r.client || undefined}>
+                <td
+                  tabIndex={0}
+                  className="tap-full sticky-col py-2 pr-4 text-slate-800 max-md:max-w-[10rem] max-md:truncate"
+                  title={r.client || undefined}
+                >
                   {r.client || <span className="text-slate-400">거래처 없음</span>}
                 </td>
-                <td className="py-2 pr-4 text-slate-700 max-md:max-w-[10rem] max-md:truncate" title={r.item || undefined}>
+                <td
+                  tabIndex={0}
+                  className="tap-full py-2 pr-4 text-slate-700 max-md:max-w-[10rem] max-md:truncate"
+                  title={r.item || undefined}
+                >
                   {r.item || "-"}
                 </td>
                 <td className="whitespace-nowrap py-2 pr-4">{r.kind ? <Badge variant={KIND_BADGE[r.kind]}>{r.kind}</Badge> : "-"}</td>
                 <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums text-slate-900">{formatWon(r.total)}</td>
-                <td className="py-2 pr-4 text-slate-600 max-md:max-w-[10rem] max-md:truncate">{r.projectName ?? "일반경비"}</td>
+                <td
+                  tabIndex={0}
+                  className="tap-full py-2 pr-4 text-slate-600 max-md:max-w-[10rem] max-md:truncate"
+                  title={r.projectName ?? "일반경비"}
+                >
+                  {r.projectName ?? "일반경비"}
+                </td>
                 <td className="whitespace-nowrap py-2 text-right">
                   <LinkButton href={`/transactions?tab=check&year=${year}&editTx=${r.id}`} variant="secondary" size="xs">
                     수정

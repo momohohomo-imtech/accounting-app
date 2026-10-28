@@ -30,8 +30,8 @@ function parse(formData: FormData) {
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
-// 귀속은 한 단계만(어미 ← 하위) — 손익보고서·이익 예상이 한 단계로 묶어서, 하위의 하위(3단)는 어미 합산에서 빠졌음.
-// 새로 고르는 귀속만 확인(예전에 3단으로 저장된 자료도 다른 칸을 고칠 때는 그대로 저장되게).
+// 귀속은 한 단계만(어미 ← 하위) — 예전에 3단으로 저장된 자료는 화면·계산에서 맨 위 어미 묶음으로 보지만(lib/projectProfit.ts의
+// topProjectOf), 새로 3단을 만들지는 않게. 새로 고르는 귀속만 확인(예전 3단 자료도 다른 칸을 고칠 때는 그대로 저장되게).
 async function parentError(supabase: Supabase, projectId: string | null, parentId: string | null) {
   if (!parentId) return null;
   if (parentId === projectId) return "자기 자신에게 귀속할 수 없습니다.";

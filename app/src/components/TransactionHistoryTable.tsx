@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/Badge";
 
 type SortKey = "changedAt" | "who" | "action" | "date" | "client" | "item" | "total";
 
-// 장부 점검 — 최근 거래 수정·삭제 이력(094 SQL). 삭제된 거래는 지우기 전 값으로 보여 줌.
+// 장부 점검 — 최근 거래 수정·삭제 이력(094 SQL). 삭제된 거래는 지우기 전 값으로 보여 줌. 한꺼번에 바뀐 묶음(백업 복원·
+// 여러 건 선택 삭제·일괄 변경)은 한 줄로(거래 수만).
 export function TransactionHistoryTable({ rows, year }: { rows: HistoryView[]; year: number }) {
   const [sortKey, setSortKey] = useState<SortKey>("changedAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -66,31 +67,64 @@ export function TransactionHistoryTable({ rows, year }: { rows: HistoryView[]; y
               <td className="whitespace-nowrap py-2 pr-4 text-xs text-slate-500">{h.time}</td>
               <td className="whitespace-nowrap py-2 pr-4 text-slate-700">{h.who}</td>
               <td className="whitespace-nowrap py-2 pr-4">
-                {h.action === "delete" ? <Badge variant="red">삭제</Badge> : <Badge variant="slate">수정</Badge>}
+                {h.action === "delete" ? (
+                  <Badge variant="red">{h.bulkCount ? "일괄 삭제" : "삭제"}</Badge>
+                ) : (
+                  <Badge variant="slate">{h.bulkCount ? "일괄 수정" : "수정"}</Badge>
+                )}
               </td>
-              <td className="whitespace-nowrap py-2 pr-4 text-slate-700">
-                {formatDate(h.date)} <span className="text-xs text-slate-400">{h.type}</span>
-              </td>
-              <td className="sticky-col py-2 pr-4 text-slate-800 max-md:max-w-[10rem] max-md:truncate" title={h.client}>
-                {h.client}
-              </td>
-              <td className="py-2 pr-4 text-slate-700 max-md:max-w-[10rem] max-md:truncate" title={h.item || undefined}>
-                {h.item || "-"}
-              </td>
-              <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums text-slate-900">{formatWon(h.total)}</td>
+              {h.bulkCount ? (
+                <td colSpan={4} className="py-2 pr-4 text-slate-700">
+                  거래 {h.bulkCount.toLocaleString()}건을 한 번에 {h.action === "delete" ? "삭제" : "수정"}
+                </td>
+              ) : (
+                <>
+                  <td className="whitespace-nowrap py-2 pr-4 text-slate-700">
+                    {formatDate(h.date)} <span className="text-xs text-slate-400">{h.type}</span>
+                  </td>
+                  <td
+                    tabIndex={0}
+                    className="tap-full sticky-col py-2 pr-4 text-slate-800 max-md:max-w-[10rem] max-md:truncate"
+                    title={h.client}
+                  >
+                    {h.client}
+                  </td>
+                  <td
+                    tabIndex={0}
+                    className="tap-full py-2 pr-4 text-slate-700 max-md:max-w-[10rem] max-md:truncate"
+                    title={h.item || undefined}
+                  >
+                    {h.item || "-"}
+                  </td>
+                  <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums text-slate-900">{formatWon(h.total)}</td>
+                </>
+              )}
               <td className="min-w-[16rem] py-2 pr-4 text-xs text-slate-600">
                 {h.action === "delete"
-                  ? "거래 삭제(지우기 전 값)"
+                  ? h.bulkCount
+                    ? h.restored
+                      ? "백업 복원으로 보임(지운 거래가 지금 다시 있음) — 복원은 거래를 모두 지운 뒤 백업 내용으로 다시 넣음"
+                      : "선택 삭제 등으로 한 번에 지움"
+                    : h.restored
+                      ? "거래 삭제 — 이후 백업 복원으로 다시 들어옴"
+                      : "거래 삭제(지우기 전 값)"
                   : h.changes.length > 0
-                    ? h.changes.map((c) => (
-                        <span key={c.label} className="block">
-                          <span className="text-slate-400">{c.label}</span> {c.before} → <span className="font-medium text-slate-800">{c.after}</span>
-                        </span>
-                      ))
+                    ? [
+                        h.bulkCount ? (
+                          <span key="sample" className="block text-slate-400">
+                            앞쪽 몇 건의 바뀐 내용
+                          </span>
+                        ) : null,
+                        ...h.changes.map((c) => (
+                          <span key={`${c.label}|${c.before}|${c.after}`} className="block">
+                            <span className="text-slate-400">{c.label}</span> {c.before} → <span className="font-medium text-slate-800">{c.after}</span>
+                          </span>
+                        )),
+                      ]
                     : "화면에 보이는 칸은 바뀌지 않음"}
               </td>
               <td className="whitespace-nowrap py-2 text-right">
-                {h.action === "update" && (
+                {((h.action === "update" && !h.bulkCount) || (h.restored && !h.bulkCount)) && (
                   <LinkButton href={`/transactions?tab=check&year=${year}&editTx=${h.transactionId}`} variant="secondary" size="xs">
                     수정
                   </LinkButton>

@@ -110,12 +110,17 @@ export function DuplicateCandidatesTable({ groups, year }: { groups: DuplicateGr
                       {formatDate(g.date)} <span className="text-xs text-slate-400">{g.type}</span>
                     </td>
                     <td
-                      className="sticky-col py-2 pr-4 text-slate-800 max-md:max-w-[10rem] max-md:truncate"
+                      tabIndex={0}
+                      className="tap-full sticky-col py-2 pr-4 text-slate-800 max-md:max-w-[10rem] max-md:truncate"
                       title={g.client || undefined}
                     >
                       {g.client || <span className="text-slate-400">거래처 없음</span>}
                     </td>
-                    <td className="py-2 pr-4 text-slate-700 max-md:max-w-[10rem] max-md:truncate" title={g.item || undefined}>
+                    <td
+                      tabIndex={0}
+                      className="tap-full py-2 pr-4 text-slate-700 max-md:max-w-[10rem] max-md:truncate"
+                      title={g.item || undefined}
+                    >
                       {g.item || "-"}
                     </td>
                     <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums text-slate-900">{formatWon(g.total)}</td>
@@ -123,7 +128,13 @@ export function DuplicateCandidatesTable({ groups, year }: { groups: DuplicateGr
                       {i === 0 ? <Badge variant="amber">{g.lines.length}건</Badge> : null}
                       {line.credit && <span className="ml-1 text-xs text-slate-400">외상</span>}
                     </td>
-                    <td className="py-2 pr-4 text-slate-600 max-md:max-w-[10rem] max-md:truncate">{line.projectName ?? "일반경비"}</td>
+                    <td
+                      tabIndex={0}
+                      className="tap-full py-2 pr-4 text-slate-600 max-md:max-w-[10rem] max-md:truncate"
+                      title={line.projectName ?? "일반경비"}
+                    >
+                      {line.projectName ?? "일반경비"}
+                    </td>
                     <td className="whitespace-nowrap py-2 pr-4 text-slate-600">{line.categoryName ?? "-"}</td>
                     <td className="whitespace-nowrap py-2 pr-4 text-xs text-slate-400">
                       {line.createdAt ? kstDateTime(line.createdAt) : "-"}

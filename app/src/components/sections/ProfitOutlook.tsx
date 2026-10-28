@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatWon, moneyClass } from "@/lib/format";
 import { taxEstimate } from "@/lib/tax";
-import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { loadProjectTxAndAgency } from "@/lib/projectTxLoad";
 import {
   expectedRevenueOf,
   projectBasedProfit,
@@ -10,8 +10,6 @@ import {
   type OutlookProject,
   type OutlookTx,
 } from "@/lib/projectProfit";
-
-type ProjectTx = OutlookTx & { id: string; payment_type: string };
 
 // 대시보드의 이익·세금 추정치를 한 번에 계산 — 계산식은 lib/projectProfit.ts(자동 검사 있음), 여기서는 조회만.
 // 선택 연도의 거래·프로젝트는 대시보드가 이미 받아온 것을 그대로 넘겨받아 같은 데이터를 다시 조회하지 않는다.
@@ -32,32 +30,8 @@ export async function loadProfitOutlook(
     .maybeSingle()
     .then((r) => r);
   // 그 해 귀속 프로젝트에 붙은 거래 전부(기간 무관, 매출·매입) + 대행구매 — 대시보드 수금 예정액도 이것으로 계산.
-  const [projectTx, agencyRows] = projectIds.length
-    ? await Promise.all([
-        fetchAllRows<ProjectTx>((from, to) =>
-          supabase
-            .from("transactions")
-            .select("id, type, payment_type, sales_amount, sales_vat, project_id, purchase_amount, purchase_vat, trans_date, expense_categories(*)")
-            .in("project_id", projectIds)
-            .order("id", { ascending: true })
-            .range(from, to)
-        ),
-        fetchAllRows<{ project_id: string; amount: number }>((from, to) =>
-          supabase
-            .from("project_agency_purchases")
-            .select("project_id, amount")
-            .in("project_id", projectIds)
-            .order("id", { ascending: true })
-            .range(from, to)
-        ),
-      ])
-    : [[] as ProjectTx[], [] as { project_id: string; amount: number }[]];
+  const { projectTx, agencyByProject } = await loadProjectTxAndAgency(supabase, projectIds);
   const { data: halfYearRow } = await halfYearPromise;
-
-  const agencyByProject = new Map<string, number>();
-  for (const a of agencyRows) {
-    agencyByProject.set(a.project_id, (agencyByProject.get(a.project_id) ?? 0) + Number(a.amount));
-  }
 
   // 프로젝트 기준 예상 이익(진행 중 포함) — 귀속 연도 프로젝트의 발주액(검토중 제외) 기준.
   const estimate = projectBasedProfit(yearProjects, projectTx, yearTx, agencyByProject);

@@ -97,3 +97,34 @@ export function describeChanges(oldRow: HistoryTx, newRow: HistoryTx, names: His
   const totalChanged = changes.some((c) => c.label === "금액(합계)");
   return totalChanged ? changes.filter((c) => c.label !== "공급가·부가세") : changes;
 }
+
+// 한꺼번에 바뀐 거래 — 백업 복원은 거래를 전부 지운 뒤 다시 넣어서 거래 수만큼 "삭제"가 남고, 여러 건 선택 삭제·일괄 변경도
+// 한 번에 수십 건이 남음. 같은 사람이 같은 시각(한 번의 요청 = 같은 changed_at)에 같은 구분으로 바꾼 것이 BULK_MIN건 이상이면
+// 한 묶음으로 접어서, 이력 목록이 그 줄들로 덮이지 않게. 나머지는 한 건씩. 순서는 받은 순서(최근 순) 그대로.
+export const BULK_MIN = 20;
+
+type Batchable = { action: string; changed_at: string; changed_by: string | null };
+
+export function collapseBulkChanges<E extends Batchable>(entries: E[], min = BULK_MIN): E[][] {
+  const keyOf = (e: E) => `${e.action}|${e.changed_by ?? ""}|${e.changed_at}`;
+  const count = new Map<string, number>();
+  for (const e of entries) count.set(keyOf(e), (count.get(keyOf(e)) ?? 0) + 1);
+  const items: E[][] = [];
+  const bulkByKey = new Map<string, E[]>();
+  for (const e of entries) {
+    const key = keyOf(e);
+    if ((count.get(key) ?? 0) < min) {
+      items.push([e]);
+      continue;
+    }
+    const bulk = bulkByKey.get(key);
+    if (bulk) {
+      bulk.push(e);
+    } else {
+      const fresh = [e];
+      bulkByKey.set(key, fresh);
+      items.push(fresh);
+    }
+  }
+  return items;
+}

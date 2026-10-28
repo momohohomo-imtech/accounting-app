@@ -149,7 +149,8 @@ async function ProjectListSection({
   const siteLabelMap = new Map(siteOptions.map((s) => [s.value, s.label]));
 
   // 귀속 대상은 어미가 될 수 있는 프로젝트(다른 프로젝트에 귀속 안 된 것)만 — 귀속은 한 단계(서버에서도 확인). 예전에 3단으로
-  // 저장된 자료의 지금 값은 목록에 남겨 둠(빠지면 수정 화면에서 "없음"으로 보여 다른 칸만 고쳐도 귀속이 풀림).
+  // 저장된 자료의 가운데 프로젝트는 그 값을 가진 줄의 수정 화면에서만 보이게 남겨 둠(빠지면 "없음"으로 보여 다른 칸만 고쳐도
+  // 귀속이 풀리고, 다른 줄에서 고르면 서버가 거절해서 선택 목록에서는 뺌 — onlyIfCurrent).
   const usedAsParent = new Set((allProjects ?? []).map((p) => p.parent_project_id).filter(Boolean));
   const parentProjectOptions = (allProjects ?? [])
     .filter((p) => !p.parent_project_id || usedAsParent.has(p.id))
@@ -158,6 +159,7 @@ async function ProjectListSection({
       label: p.name,
       year: p.year,
       siteLabel: siteLabelMap.get(p.site_id) ?? "미지정 현장",
+      onlyIfCurrent: Boolean(p.parent_project_id),
     }));
 
   // 어미 프로젝트의 이익금·이익율·총 매입은 손익보고서처럼 귀속 하위 프로젝트까지 합산 —

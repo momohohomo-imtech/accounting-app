@@ -56,12 +56,29 @@ export function countedQuote(p: Pick<OutlookProject, "status" | "quote_amount">)
 }
 
 // ── 어미 + 귀속 하위 묶음 ──
-// 손익보고서·프로젝트 목록과 같은 한 단계 묶음: 어미가 같은 목록(그 해 프로젝트)에 있는 하위만 어미 묶음에 들어간다.
+// 맨 위 어미 — 귀속은 한 단계지만(새로 지정은 막음) 예전에 3단(어미 ← 하위 ← 하위의 하위)으로 저장된 자료는 맨 위 어미
+// 묶음으로(프로젝트 목록 표·손익보고서와 같은 기준 — 예전엔 가운데 하위가 따로 묶음이 돼 화면마다 숫자가 달랐음). 목록(byId)에
+// 있는 조상까지만 올라가고, 서로를 가리키는 잘못된 자료는 묶지 않음(자기 자신).
+export function topProjectOf<P extends { id: string; parent_project_id?: string | null }>(p: P, byId: Map<string, P>): P {
+  let top = p;
+  const seen = new Set([p.id]);
+  for (let parentId = p.parent_project_id; parentId; ) {
+    const parent = byId.get(parentId);
+    if (!parent) break;
+    if (seen.has(parent.id)) return p;
+    seen.add(parent.id);
+    top = parent;
+    parentId = parent.parent_project_id;
+  }
+  return top;
+}
+
+// 손익보고서·프로젝트 목록과 같은 묶음: 어미가 같은 목록(그 해 프로젝트)에 있는 하위만 어미 묶음에 들어간다.
 export function projectGroups<P extends OutlookProject>(projects: P[]) {
   const byId = new Map(projects.map((p) => [p.id, p]));
   const groups = new Map<string, { root: P; members: P[] }>();
   for (const p of projects) {
-    const root = (p.parent_project_id ? byId.get(p.parent_project_id) : undefined) ?? p;
+    const root = topProjectOf(p, byId);
     const group = groups.get(root.id) ?? { root, members: [] };
     group.members.push(p);
     groups.set(root.id, group);
@@ -79,23 +96,33 @@ export function sumByProject(projects: { id: string }[], amountByProject: Map<st
   return projects.reduce((s, p) => s + (amountByProject.get(p.id) ?? 0), 0);
 }
 
-// 묶음에서 그 상태들(귀속 하위는 어미 상태)인 프로젝트만 모은 것 — 하반기 미발행 예상·1월 부가세 미발행 예상분·수금
-// 예정액의 계산 단위. 발주액·매출·매입·대행구매를 이 프로젝트들 것끼리 합쳐서 봐서, 하위에 끊은 매출은 어미 발주액에서 빠지고
-// 하위 발주액도 들어간다(예전엔 프로젝트마다 따로라 하위 매출이 두 번 잡히고 귀속 하위 발주액은 빠졌음). 대표(상태·이름)는
-// 어미, 어미가 빠졌으면(수금 완료 등) 남은 첫 프로젝트.
+// 하반기 미발행 예상·1월 부가세 미발행 예상분·수금 예정액·연말 점검의 계산 단위 중 그 상태들인 것. 단위 = 어미 + "타 프로젝트
+// 귀속" 하위(어미 상태) — 발주액·매출·매입·대행구매를 단위 안에서 합쳐서 봐서, 하위에 끊은 매출은 어미 발주액에서 빠지고 하위
+// 발주액도 들어간다(예전엔 프로젝트마다 따로라 하위 매출이 두 번 잡히고 귀속 하위 발주액은 빠졌음). 자기 상태가 있는 하위는
+// 따로 한 단위(프로젝트 목록 상태와 같게 — 예전엔 진행중 어미 아래 "완료 수금대기" 하위 금액이 진행중 칸으로 들어갔음).
+// 대표(상태·이름)는 단위의 맨 앞(어미 단위면 어미). rootId = 묶음 맨 위 어미.
 export function activeGroups<P extends OutlookProject>(projects: P[], statuses: readonly string[]) {
   return projectGroups(projects).flatMap(({ root, members }) => {
-    const active = members.filter((p) => statuses.includes(effectiveStatus(p, root) ?? ""));
-    if (active.length === 0) return [];
-    const lead = active.find((p) => p.id === root.id) ?? active[0];
-    return [
-      {
-        status: effectiveStatus(lead, root) ?? "",
-        label: active.length > 1 ? `${lead.name ?? ""} 외\u00a0${active.length - 1}건` : lead.name ?? "",
-        members: active,
-        quote: active.reduce((s, p) => s + (p.quote_amount ?? 0), 0),
-      },
-    ];
+    const units = new Map<string, P[]>();
+    for (const p of members) {
+      const unitId = p.id !== root.id && p.status === PROJECT_STATUS_MERGED ? root.id : p.id;
+      units.set(unitId, [...(units.get(unitId) ?? []), p]);
+    }
+    return Array.from(units.entries()).flatMap(([unitId, unit]) => {
+      const lead = unit.find((p) => p.id === unitId) ?? unit[0];
+      const status = effectiveStatus(lead, root) ?? "";
+      if (!statuses.includes(status)) return [];
+      const ordered = [lead, ...unit.filter((p) => p !== lead)];
+      return [
+        {
+          rootId: root.id,
+          status,
+          label: ordered.length > 1 ? `${lead.name ?? ""} 외\u00a0${ordered.length - 1}건` : lead.name ?? "",
+          members: ordered,
+          quote: ordered.reduce((s, p) => s + (p.quote_amount ?? 0), 0),
+        },
+      ];
+    });
   });
 }
 

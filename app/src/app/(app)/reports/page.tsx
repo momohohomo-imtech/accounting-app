@@ -47,7 +47,7 @@ import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
 import { purchaseCostOf, salesSupplyOf, supplyOf, vatOf } from "@/lib/vatBasis";
 import type { WorkLog } from "@/lib/types";
 import { nowKst } from "@/lib/kstDate";
-import { projectBasedProfit } from "@/lib/projectProfit";
+import { effectiveStatus, projectBasedProfit, projectGroups } from "@/lib/projectProfit";
 import { categoryReportHref } from "@/lib/reportLinks";
 
 const MONTH_LABELS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
@@ -323,6 +323,13 @@ export default async function ReportsPage({
       !p.settlement_finalized && (p.contract_amount ?? 0) > 0 && quoteAmount - (p.contract_amount ?? 0) - agencyAmount !== 0;
     return { ...p, quoteAmount, sales, purchase, profit, contractMismatch };
   });
+  // 묶음(맨 위 어미 + 귀속 하위 — 예전 3단 자료도 맨 위 어미로)과 "타 프로젝트 귀속" 하위가 물려받는 어미 상태 — 대시보드
+  // 이익 예상·프로젝트 목록과 같은 기준(lib/projectProfit.ts).
+  const yearGroups = projectGroups(byProjectAll);
+  const groupMembersByRoot = new Map(yearGroups.map((g) => [g.root.id, g.members]));
+  const effectiveStatusById = new Map(
+    yearGroups.flatMap(({ root, members }) => members.map((m) => [m.id, effectiveStatus(m, root)] as const))
+  );
 
   const projectSiteOptions = Array.from(
     new Map(
@@ -339,22 +346,16 @@ export default async function ReportsPage({
   // 프로젝트 요약(A4 재무제표) 대상 — 공사완료·완료 수금대기·수금완료 3개 상태만.
   // 귀속(parent_project_id가 있는) 프로젝트는 절대 단독으로 카드를 만들지 않고 항상
   // 어미(상위) 프로젝트 쪽에 발주액·매입·대행구매·카테고리 내역을 합산해서 보여준다
-  // (같은 해에 등록된 귀속 프로젝트만 대상 — 연도가 다르면 못 합침, 기존 한계와 동일).
+  // (같은 해에 등록된 귀속 프로젝트만 대상 — 연도가 다르면 못 합침, 기존 한계와 동일. 예전 3단 자료의 하위의 하위도 맨 위
+  // 어미 카드에 — 예전엔 가운데 하위가 카드를 못 만들어 그 아래 금액이 어느 카드에도 안 들어갔음).
   // 매입내역 전체가 아니라 카테고리별 합산 금액만 쓰므로 프로젝트별로 매입/대행구매를
   // 카테고리 단위로 다시 묶는다(전체 집계용 byCategory/agencyByCategory와 같은 방식,
   // 프로젝트(+귀속 하위) 그룹 단위로만 좁힌 버전).
   const PROJECT_SUMMARY_STATUSES = ["done", "done_awaiting_payment", "collected"];
-  const childrenByParentId = new Map<string, typeof byProjectAll>();
-  for (const p of byProjectAll) {
-    if (!p.parent_project_id) continue;
-    const arr = childrenByParentId.get(p.parent_project_id) ?? [];
-    arr.push(p);
-    childrenByParentId.set(p.parent_project_id, arr);
-  }
   const projectSummaryRows: ProjectSummaryRow[] = byProject
     .filter((p) => !p.parent_project_id && PROJECT_SUMMARY_STATUSES.includes(p.status ?? ""))
     .map((p) => {
-      const group = [p, ...(childrenByParentId.get(p.id) ?? [])];
+      const group = [p, ...(groupMembersByRoot.get(p.id) ?? []).filter((m) => m.id !== p.id)];
       const groupIds = new Set(group.map((g) => g.id));
 
       const catMap = new Map<string, { name: string; amount: number; color?: string }>();
@@ -453,15 +454,13 @@ export default async function ReportsPage({
     }));
 
   // 합계에서 검토중(아직 수주 전) 프로젝트의 발주액은 뺀다(사용자 요청) — 이미 쓴 매입·대행구매는 실제 지출이라 매입 합계·
-  // 이익금에 넣음(사용자 결정 10/28, 대시보드 프로젝트 기준 예상 이익과 같은 기준). 표에는 검토중 행도 그대로 보임.
-  const reviewProjects = byProject.filter((p) => p.status === PROJECT_STATUS_REVIEW);
-  const projectSummaryQuoteAmount = byProject
-    .filter((p) => p.status !== PROJECT_STATUS_REVIEW)
-    .reduce((s, p) => s + p.quoteAmount, 0);
-  const projectSummaryProfit = byProject.reduce(
-    (s, p) => s + (p.status === PROJECT_STATUS_REVIEW ? p.profit - p.quoteAmount : p.profit),
-    0
-  );
+  // 이익금에 넣음(사용자 결정 10/28, 대시보드 프로젝트 기준 예상 이익과 같은 기준). 검토중 어미의 "타 프로젝트 귀속" 하위도
+  // 검토중으로 봄(대시보드와 같게 — 예전엔 하위 발주액이 여기만 들어갔음). 표에는 검토중 행도 그대로 보임.
+  const isReview = (p: { id: string; status: string | null }) =>
+    (effectiveStatusById.get(p.id) ?? p.status) === PROJECT_STATUS_REVIEW;
+  const reviewProjects = byProject.filter(isReview);
+  const projectSummaryQuoteAmount = byProject.filter((p) => !isReview(p)).reduce((s, p) => s + p.quoteAmount, 0);
+  const projectSummaryProfit = byProject.reduce((s, p) => s + (isReview(p) ? p.profit - p.quoteAmount : p.profit), 0);
   const projectSummary = {
     count: byProject.length,
     reviewCount: reviewProjects.length,
