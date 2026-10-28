@@ -10,6 +10,7 @@ export function ProjectReportActions({
   infoLines,
   exportRows,
   agencyExportRows = [],
+  receiptExportRows = [],
   summaryRows,
 }: {
   filename: string;
@@ -17,6 +18,8 @@ export function ProjectReportActions({
   infoLines: string[];
   exportRows: (string | number)[][];
   agencyExportRows?: [string, number][];
+  // 받은 돈 내역(매출 계산서) — [날짜, 거래처, 품목(입금 상태), 금액(부가세 포함)]
+  receiptExportRows?: (string | number)[][];
   summaryRows: [string, string | number][];
 }) {
   async function handleExport() {
@@ -30,6 +33,9 @@ export function ProjectReportActions({
             ...agencyExportRows.map(([name, amount]) => ["", "", name, amount] as (string | number)[]),
             ["", "", "", ""],
           ]
+        : []),
+      ...(receiptExportRows.length > 0
+        ? [["", "", "── 받은 돈 내역 (매출 계산서, 부가세 포함) ──", ""] as (string | number)[], ...receiptExportRows, ["", "", "", ""]]
         : []),
       ...summaryRows.map(([label, value]) => ["", "", label, value] as (string | number)[]),
     ];
