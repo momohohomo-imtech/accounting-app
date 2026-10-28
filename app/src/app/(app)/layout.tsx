@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentRole, getCurrentUser } from "@/lib/currentRole";
 import { signOut } from "@/lib/actions/auth";
 import { SidebarNav, MobileNav } from "@/components/AppNav";
 import { IdleLogout } from "@/components/IdleLogout";
@@ -7,14 +7,7 @@ import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { GlobalPendingProvider } from "@/components/GlobalPendingProvider";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const { data: profile } = user
-    ? await supabase.from("users").select("role").eq("id", user.id).maybeSingle()
-    : { data: null };
-  const role = profile?.role ?? null;
+  const [user, role] = await Promise.all([getCurrentUser(), getCurrentRole()]);
 
   return (
     <ConfirmProvider>

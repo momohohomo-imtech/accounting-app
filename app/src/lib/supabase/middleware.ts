@@ -137,17 +137,19 @@ async function updateSessionInner(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // tax_agent(세무사 사무실 계정)는 매입매출·외상 화면 + 대시보드(전반적인 수익현황)만 볼 수
-  // 있음 — 그 외 경로는 강제 이동.
-  if (
-    user &&
-    role === "tax_agent" &&
-    !request.nextUrl.pathname.startsWith("/transactions") &&
-    !request.nextUrl.pathname.startsWith("/dashboard")
-  ) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/transactions";
-    return NextResponse.redirect(url);
+  // tax_agent(세무사 사무실 계정)는 매입매출장(매입매출 목록)만 볼 수 있음(사용자 요청 10/28 — 예전엔 대시보드·외상
+  // 등 매입매출·외상 화면 전체) — 다른 경로(대시보드·거래 등록·수정 화면 포함)와 다른 탭·수정 팝업은 목록으로 강제 이동.
+  if (user && role === "tax_agent") {
+    const { pathname, searchParams } = request.nextUrl;
+    const tab = searchParams.get("tab");
+    if (pathname !== "/transactions" || (tab && tab !== "list") || searchParams.has("editTx")) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/transactions";
+      if (pathname !== "/transactions") url.search = "";
+      url.searchParams.delete("tab");
+      url.searchParams.delete("editTx");
+      return NextResponse.redirect(url);
+    }
   }
 
   // viewer(조회 전용 계정)는 개인정보 화면·백업·계정 관리와 AI/OCR 호출을 쓸 수 없음 —

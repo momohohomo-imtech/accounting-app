@@ -59,10 +59,8 @@ function groupsFor(role: string | null): NavGroup[] {
     );
   }
   if (role !== "tax_agent") return NAV_GROUPS;
-  const allowed = new Set(["/dashboard", "/transactions"]);
-  return NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => allowed.has(i.href)) })).filter(
-    (g) => g.items.length > 0
-  );
+  // 세무사 계정은 매입매출장(매입매출 목록)만(사용자 요청 10/28 — 예전엔 대시보드·외상 등도). 화면 제목과 같은 이름으로.
+  return [{ title: "회계", items: [{ href: "/transactions", label: "매입매출" }] }];
 }
 
 function GroupedLinks({
