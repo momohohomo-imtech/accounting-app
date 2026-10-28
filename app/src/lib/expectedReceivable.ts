@@ -1,4 +1,4 @@
-import { isLedgerVisible } from "@/lib/credit";
+import { isLedgerVisible, remainingBalance, transactionTotal } from "@/lib/credit";
 import { salesSupplyOf, type VatBasisRow } from "@/lib/vatBasis";
 import { activeGroups, sumByProject, type OutlookProject } from "@/lib/projectProfit";
 import type { CreditPayment } from "@/lib/types";
@@ -48,4 +48,52 @@ export function expectedReceivableByStatus(
       received: rows.reduce((s, g) => s + sumByProject(g.members, receivedByProject), 0),
     };
   });
+}
+
+// 프로젝트 보고서 "받은 돈" — 보고서에 합친 프로젝트들의 매출 계산서(선급금·중도금·잔금·기성금)마다 받은 상태와 요약.
+// 요약은 대시보드 수금 예정액·연말 점검과 같은 기준(공급가액): 받은 금액 = 즉시결제·정산 끝난 외상 계산서(일부만 받은 외상은 다
+// 받을 때까지 안 넣음), 남은 금액 = 수주예상액(발주액 − 대행구매액) − 받은 금액(0 아래로 안 내려감) = 입금 대기 + 계산서 미발행.
+// 줄마다 received는 실제로 들어온 돈(부가세 포함, 일부 입금 포함), paidDate는 즉시결제면 계산서 날짜·외상이면 마지막 정산일.
+export type ReceiptStatus = "received" | "partial" | "waiting";
+
+export function projectReceipts<T extends ProjectSalesRow & { trans_date: string }>(
+  rows: T[],
+  payments: CreditPayment[],
+  quote: number,
+  agency: number
+) {
+  const lines = rows
+    .filter((t) => t.type === "매출")
+    .map((t) => {
+      const total = transactionTotal(t);
+      const done = isLedgerVisible(t, payments);
+      const left = done ? 0 : remainingBalance(t, payments);
+      const status: ReceiptStatus = done ? "received" : left < total ? "partial" : "waiting";
+      const lastPaid = payments
+        .filter((p) => p.transaction_id === t.id)
+        .map((p) => p.paid_date)
+        .sort()
+        .at(-1);
+      return {
+        row: t,
+        total,
+        supply: salesSupplyOf(t),
+        received: total - left,
+        status,
+        paidDate: t.payment_type === "credit" ? lastPaid ?? null : t.trans_date,
+      };
+    });
+  const expected = quote - agency;
+  const billed = lines.reduce((s, l) => s + l.supply, 0);
+  const received = lines.filter((l) => l.status === "received").reduce((s, l) => s + l.supply, 0);
+  return {
+    lines,
+    expected,
+    billed,
+    received,
+    receivedActual: lines.reduce((s, l) => s + l.received, 0),
+    waiting: billed - received,
+    unbilled: Math.max(0, expected - billed),
+    remaining: remainingReceivable(quote, agency, received),
+  };
 }

@@ -23,6 +23,7 @@ import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import { purchaseCostOf } from "@/lib/vatBasis";
 import { unsettledCreditPurchase } from "@/lib/projectProfit";
+import { projectReceipts } from "@/lib/expectedReceivable";
 import {
   formatHeadcount,
   formatWorkDays,
@@ -34,6 +35,7 @@ import {
 } from "@/lib/tripLog";
 import type { WorkLogTitleRow } from "@/lib/workLogSummary";
 import { ProjectTripDetailTable } from "@/components/ProjectTripDetailTable";
+import { ProjectReceiptsTable } from "@/components/ProjectReceiptsTable";
 
 // ownOnly: 귀속 하위가 있는 어미 프로젝트를 하위 없이 자기 것만(프로젝트 목록에서 묶음을 펼친 어미 줄의 "보고서").
 export async function ProjectProfitReport({
@@ -80,6 +82,7 @@ export async function ProjectProfitReport({
     workLogDateRows,
     tripDayRows,
     purchaseRowsRaw,
+    salesRowsRaw,
     { data: agencyRows },
     { data: expenseCategories },
     { data: clientRows },
@@ -108,6 +111,38 @@ export async function ProjectProfitReport({
         .select("*, clients(name), expense_categories(*)")
         .in("project_id", groupIds)
         .eq("type", "매입")
+        .order("trans_date", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
+    // 받은 돈 내역 — 이 프로젝트(+귀속 하위)로 등록한 매출 계산서(선급금·중도금·잔금·기성금) 전부(기간 무관).
+    fetchAllRows<
+      Pick<
+        Transaction,
+        | "id"
+        | "trans_date"
+        | "type"
+        | "payment_type"
+        | "project_id"
+        | "item_name"
+        | "client_name_raw"
+        | "sales_amount"
+        | "sales_vat"
+        | "purchase_amount"
+        | "purchase_vat"
+        | "tax_invoice_issued"
+      > & {
+        clients: { name: string } | { name: string }[] | null;
+        expense_categories: ExpenseCategory | ExpenseCategory[] | null;
+      }
+    >((from, to) =>
+      supabase
+        .from("transactions")
+        .select(
+          "id, trans_date, type, payment_type, project_id, item_name, client_name_raw, sales_amount, sales_vat, purchase_amount, purchase_vat, tax_invoice_issued, clients(name), expense_categories(*)"
+        )
+        .in("project_id", groupIds)
+        .eq("type", "매출")
         .order("trans_date", { ascending: true })
         .order("id", { ascending: true })
         .range(from, to)
@@ -143,8 +178,8 @@ export async function ProjectProfitReport({
   const clientNames = (clientRows ?? []).map((c) => c.name);
 
   // 외상(미완납)은 완납 전까지 장부에서 제외 — 대시보드·보고서와 동일한 기준.
-  // 정산 이력은 회사 전체가 아니라 이 프로젝트의 외상 매입 건 것만 가져온다.
-  const creditIds = purchaseRowsRaw.filter((t) => t.payment_type === "credit").map((t) => t.id);
+  // 정산 이력은 회사 전체가 아니라 이 프로젝트의 외상 매입·매출 건 것만 가져온다(매출은 받은 돈 내역의 입금 상태용).
+  const creditIds = [...purchaseRowsRaw, ...salesRowsRaw].filter((t) => t.payment_type === "credit").map((t) => t.id);
   const creditPayments = creditIds.length
     ? await fetchAllRows<CreditPayment>((from, to) =>
         supabase
@@ -208,6 +243,30 @@ export async function ProjectProfitReport({
   // 그래프·보고서 상단 참고용 — 발주액의 25%를 이윤+잡비로 가정했을 때 금액(실제 이익금/이익율
   // 계산에는 영향 없는 순수 표시용 수치).
   const handlingFeeAmount = quoteTotal > 0 ? Math.round((quoteTotal * HANDLING_FEE_PCT) / 100) : 0;
+  // 받은 돈(선급금·중도금·잔금) — 요약은 대시보드 수금 예정액·연말 점검과 같은 기준(공급가액, lib/expectedReceivable.ts).
+  const receipts = projectReceipts(salesRowsRaw, creditPayments, quoteTotal, agencyTotal);
+  const projectLabelOf = (id: string | null) => (id ? projectLabelById.get(id) ?? "" : "");
+  const receiptRows = receipts.lines.map((l) => ({
+    id: l.row.id,
+    date: l.row.trans_date,
+    item: l.row.item_name ?? "-",
+    projectLabel: projectLabelOf(l.row.project_id),
+    client: one(l.row.clients)?.name ?? l.row.client_name_raw ?? "-",
+    total: l.total,
+    received: l.received,
+    status: l.status,
+    paidDate: l.paidDate,
+    taxInvoice: Boolean(l.row.tax_invoice_issued),
+  }));
+  const RECEIPT_STATUS_LABEL = { received: "입금 완료", partial: "일부 입금", waiting: "입금 대기" } as const;
+  const receiptExportRows: (string | number)[][] = receiptRows.map((r) => [
+    formatDate(r.date),
+    r.client,
+    `${r.item} (${RECEIPT_STATUS_LABEL[r.status]}${r.paidDate ? ` ${formatDate(r.paidDate)}` : ""}${
+      r.status === "partial" ? ` · 받은 돈 ${formatWon(r.received)}` : ""
+    })`,
+    r.total,
+  ]);
 
   const exportRows = rows.map((t) => [
     formatDate(t.trans_date),
@@ -243,6 +302,8 @@ export async function ProjectProfitReport({
       ? ([["이익금 − 외상 미정산분", formatWon(profitAfterUnsettled)]] as [string, string][])
       : []),
     ["이익율", margin === null ? "-" : `${margin.toFixed(2)}%`],
+    ["받은 금액 (부가세 제외)", formatWon(receipts.received)],
+    ["남은 금액 (받을 돈, 부가세 제외)", quoteTotal ? formatWon(receipts.remaining) : "발주액 미입력"],
   ];
 
   const parentLabel = parentProject
@@ -301,6 +362,7 @@ export async function ProjectProfitReport({
             infoLines={infoLines}
             exportRows={exportRows}
             agencyExportRows={agencyExportRows}
+            receiptExportRows={receiptExportRows}
             summaryRows={summaryRows}
           />
           <ReportCloseButton />
@@ -408,6 +470,29 @@ export async function ProjectProfitReport({
           <p className="text-xs text-slate-500 print:text-[9px]">이윤+잡비 ({HANDLING_FEE_PCT}%, 참고용)</p>
           <p className="tabular-nums text-sm font-bold whitespace-nowrap text-slate-900 print:text-xs">{formatWon(handlingFeeAmount)}</p>
         </div>
+        <div>
+          <p className="text-xs text-slate-500 print:text-[9px]">받은 금액 (부가세 제외)</p>
+          <p className="tabular-nums text-sm font-bold whitespace-nowrap text-slate-900 print:text-xs">{formatWon(receipts.received)}</p>
+          <p className="mt-0.5 text-[11px] text-slate-400 print:text-[8px]">
+            실제 입금 {formatWon(receipts.receivedActual)} (부가세 포함)
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-500 print:text-[9px]">남은 금액 (받을 돈, 부가세 제외)</p>
+          <p
+            className={`tabular-nums text-sm font-bold whitespace-nowrap print:text-xs ${
+              quoteTotal ? "text-slate-900" : "text-slate-400"
+            }`}
+          >
+            {quoteTotal ? formatWon(receipts.remaining) : "발주액 미입력"}
+          </p>
+          {quoteTotal > 0 && (
+            <p className="mt-0.5 text-[11px] text-slate-400 print:text-[8px]">
+              입금 대기 {formatWon(receipts.waiting)} · 계산서 미발행 {formatWon(receipts.unbilled)}
+              {receipts.remaining > 0 && ` · 부가세 포함 약 ${formatWon(Math.round(receipts.remaining * 1.1))}`}
+            </p>
+          )}
+        </div>
       </div>
 
       <CollapsibleSection title="매입내역 · 대행구매액" defaultOpen printAlways bare className="order-2 print:order-3">
@@ -472,6 +557,35 @@ export async function ProjectProfitReport({
       <div className="order-7 print:order-6 print:break-inside-avoid">
         <ReportPrintChart data={categoryBreakdown} quoteTotal={quoteTotal} />
       </div>
+
+      {/* 받은 돈 내역 — 기본은 접힘(위 요약 칸에 받은 금액·남은 금액), 펼친 채로 인쇄하면 같이 나옴(출장 내역과 같게). */}
+      <CollapsibleSection
+        title={`받은 돈 내역 (선급금·중도금·잔금 계산서 ${receiptRows.length}건)`}
+        bare
+        className="order-5 print:order-3"
+      >
+        {receiptRows.length > 0 ? (
+          <div className="space-y-2">
+            <ProjectReceiptsTable rows={receiptRows} showProject={group.length > 1} />
+            <p className="text-xs text-slate-500 print:text-[9px]">
+              받은 돈·계산서 금액은 부가세 포함. 위 요약의 받은 금액·남은 금액은 발주액과 같은 부가세 제외 기준이고, 대시보드
+              수금 예정액과 같은 계산입니다(남은 금액 = 수주예상액 {formatWon(receipts.expected)} − 받은 금액). 일부만 입금된 계산서는
+              다 받을 때까지 받은 금액에 넣지 않습니다.
+            </p>
+            {receipts.billed > receipts.expected && quoteTotal > 0 && (
+              <p className="text-xs text-amber-600 print:text-[9px]">
+                발행한 계산서 합계(부가세 제외 {formatWon(receipts.billed)})가 수주예상액보다 많습니다 — 추가 공사가 있었다면 발주액을
+                확인해 주세요.
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-400">
+            이 프로젝트로 등록된 매출(계산서)이 없습니다. 선급금·중도금·잔금은 세금계산서를 발행할 때마다 프로젝트를 골라 매출로
+            등록하면 여기에 보입니다.
+          </p>
+        )}
+      </CollapsibleSection>
 
       {tripDetailRows.length > 0 && (
         // 기본은 접힘 — 펼친 채로 인쇄하면 손익 보고서에 같이 나옴(늘 넣으면 출장이 많은 프로젝트는 인쇄가 길어짐).

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { expectedReceivableByStatus, receivedSalesByProject, remainingReceivable } from "@/lib/expectedReceivable";
+import { expectedReceivableByStatus, projectReceipts, receivedSalesByProject, remainingReceivable } from "@/lib/expectedReceivable";
 import type { CreditPayment } from "@/lib/types";
 
 const sale = (id: string, project_id: string, total: number, payment_type = "transfer") => ({
@@ -100,4 +100,58 @@ test("수금 예정액: 자기 상태가 있는 하위는 자기 상태 칸에 �
     { status: "done", count: 0, amount: 0, received: 0 },
     { status: "done_awaiting_payment", count: 1, amount: 2_000_000, received: 1_000_000 },
   ]);
+});
+
+test("프로젝트 받은 돈: 계산서마다 입금 상태, 요약은 대시보드 수금 예정액과 같은 기준", () => {
+  const on = (date: string, row: ReturnType<typeof sale>) => ({ ...row, trans_date: date });
+  const pay = (transaction_id: string, paid_date: string, paid_amount: number, remaining_amount: number): CreditPayment => ({
+    id: `p-${transaction_id}-${paid_date}`,
+    transaction_id,
+    paid_date,
+    paid_amount,
+    remaining_amount,
+    settlement_transaction_id: null,
+    created_at: `${paid_date}T00:00:00Z`,
+  });
+  const rows = [
+    on("2026-03-02", sale("advance", "P", 3_300_000)), // 선급금 — 계산서와 같은 날 입금
+    on("2026-05-31", sale("mid1", "P", 3_300_000, "credit")), // 1차 중도금 — 외상, 6/10 다 받음
+    on("2026-08-31", sale("mid2", "P", 2_200_000, "credit")), // 2차 중도금 — 외상, 일부만 받음
+    { ...on("2026-04-01", sale("buy", "P", 999_000)), type: "매입" }, // 매입은 빼고
+  ];
+  const payments = [pay("mid1", "2026-06-10", 3_300_000, 0), pay("mid2", "2026-09-15", 1_000_000, 1_200_000)];
+  const r = projectReceipts(rows, payments, 10_000_000, 1_000_000);
+  assert.deepEqual(
+    r.lines.map((l) => [l.row.id, l.status, l.received, l.paidDate]),
+    [
+      ["advance", "received", 3_300_000, "2026-03-02"],
+      ["mid1", "received", 3_300_000, "2026-06-10"],
+      ["mid2", "partial", 1_000_000, "2026-09-15"],
+    ]
+  );
+  // 수주예상액 900만 − 받은 금액 600만(일부 입금은 다 받을 때까지 빼지 않음) = 300만 = 입금 대기 200만 + 계산서 미발행 100만
+  assert.deepEqual(
+    { expected: r.expected, billed: r.billed, received: r.received, actual: r.receivedActual, waiting: r.waiting, unbilled: r.unbilled, remaining: r.remaining },
+    { expected: 9_000_000, billed: 8_000_000, received: 6_000_000, actual: 7_600_000, waiting: 2_000_000, unbilled: 1_000_000, remaining: 3_000_000 }
+  );
+  // 대시보드 수금 예정액(같은 프로젝트 하나)과 같은 숫자
+  const dash = expectedReceivableByStatus(
+    [{ id: "P", name: "가짜 현장", status: "ongoing", quote_amount: 10_000_000 }],
+    ["ongoing"],
+    new Map([["P", 1_000_000]]),
+    receivedSalesByProject(rows, payments)
+  );
+  assert.equal(dash[0].amount, r.remaining);
+});
+
+test("프로젝트 받은 돈: 입금 전 외상은 입금 대기, 발주액보다 더 끊어도 남은 금액은 0 아래로 안 내려감", () => {
+  const rows = [{ ...sale("only", "P", 12_100_000, "credit"), trans_date: "2026-10-01" }];
+  const r = projectReceipts(rows, [], 10_000_000, 0);
+  assert.equal(r.lines[0].status, "waiting");
+  assert.equal(r.lines[0].paidDate, null);
+  assert.equal(r.lines[0].received, 0);
+  assert.equal(r.billed, 11_000_000);
+  assert.equal(r.unbilled, 0);
+  assert.equal(r.waiting, 11_000_000);
+  assert.equal(r.remaining, 10_000_000);
 });
