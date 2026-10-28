@@ -13,6 +13,7 @@ import {
 } from "@/lib/ownerSocialInsurance";
 import { loadProfitOutlook, ProfitCalculationDetail } from "@/components/sections/ProfitOutlook";
 import { HalfYearSettlementInput } from "@/components/sections/HalfYearSettlementInput";
+import { VatNoticeInput } from "@/components/sections/VatNoticeInput";
 import { PageMemo } from "@/components/PageMemo";
 import { updateDashboardPageMemo } from "@/lib/actions/dashboardPageMemo";
 import { DetailToggle } from "@/components/DetailToggle";
@@ -122,6 +123,7 @@ export default async function DashboardPage({
     { data: categoryRows },
     { data: employeeRows },
     { data: pageMemo },
+    { data: vatNoticeRows, error: vatNoticeError },
   ] = await Promise.all([
     fetchAllRows<Transaction>((from, to) =>
       supabase
@@ -172,6 +174,8 @@ export default async function DashboardPage({
     supabase.from("employees").select("health_insurance, long_term_care_insurance, national_pension, resigned_date"),
     // 맨 위 메모칸 — 087 SQL 실행 전이라 표가 없어도 에러 없이 빈 메모로 보이게 data만 쓴다.
     supabase.from("dashboard_page_memo").select("content").maybeSingle(),
+    // 부가가치세 예정고지서 금액(093 SQL) — 실행 전이면 표가 없어 오류 → 입력칸을 숨기고 장부 기준 추정만.
+    supabase.from("vat_prepayment_notices").select("month, amount").eq("year", selectedYear),
   ]);
   const yearProjects = yearProjectRows ?? [];
   const categoryById = new Map(((categoryRows ?? []) as ExpenseCategory[]).map((c) => [c.id, c]));
@@ -281,9 +285,13 @@ export default async function DashboardPage({
   const ownerPensionPaidMonthly = ownerPaidMonthly((e) => Number(e.national_pension));
   // 1월 부가세 2기 확정 = 7~12월 부가세 − 10월 예정고지(1~6월 납부세액의 1/2, 50만원 미만이면 고지 없음)
   // + 미발행 계산서 예상분(그 해 귀속 미발행 프로젝트의 남은 발주액 부가세, 12월까지 끊는다고 봄 — 사용자 결정).
-  // 실제 예정고지는 세무사가 매입장 외 공제까지 반영해 신고한 1기 세액 기준이라 이 장부 기준 추정과 다를 수 있음.
+  // 실제 예정고지는 세무사가 매입장 외 공제까지 반영해 신고한 1기 세액 기준이라 이 장부 기준 추정과 다를 수 있음 —
+  // 고지서 금액을 입력해 두면(093 SQL) 추정 대신 그 금액.
   const vat1 = vatQuarters[0].net + vatQuarters[1].net;
-  const vatOctoberNotice = vatPrepaymentNotice(vat1);
+  const vatNoticeReady = !vatNoticeError;
+  const enteredOctoberNotice = (vatNoticeRows ?? []).find((n) => Number(n.month) === 10);
+  const octoberNoticeAmount = enteredOctoberNotice ? Number(enteredOctoberNotice.amount) : null;
+  const vatOctoberNotice = octoberNoticeAmount ?? vatPrepaymentNotice(vat1);
   const cashOut = {
     vat2: vatQuarters[2].net + vatQuarters[3].net - vatOctoberNotice + o.unbilledVat.vat,
     mayTax: nextYearTax.totalTax,
@@ -516,8 +524,10 @@ export default async function DashboardPage({
                 sub={[
                   o.unbilledVat.vat > 0 &&
                     `미발행 계산서 ${o.unbilledVat.count}건 예상분 약 ${formatWon(o.unbilledVat.vat)} 포함`,
-                  vatOctoberNotice > 0 && `10월 예정고지액 약 ${formatWon(vatOctoberNotice)} 차감`,
-                  vatOctoberNotice === 0 && vat1 > 0 && "10월 예정고지 없음(50만원 미만)",
+                  octoberNoticeAmount != null
+                    ? `10월 예정고지액 ${formatWon(octoberNoticeAmount)} 차감(고지서 기준)`
+                    : vatOctoberNotice > 0 && `10월 예정고지액 약 ${formatWon(vatOctoberNotice)} 차감`,
+                  octoberNoticeAmount == null && vatOctoberNotice === 0 && vat1 > 0 && "10월 예정고지 없음(50만원 미만)",
                   cashOut.vat2 < 0 && "환급 예상",
                   o.unbilledVat.vat > 0 ? "추가 매입 시 감소 가능" : "4분기 실적에 따라 증가 가능",
                 ]
@@ -581,7 +591,8 @@ export default async function DashboardPage({
               )}
               <p>
                 10월 부가가치세 예정고지(제1기 납부세액의 1/2)·11월 중간예납(소득세의 1/2)은 50만원 미만 시 고지 없음 · 실제
-                고지액은 세무사가 매입장 외 공제까지 반영해 신고한 세액 기준으로, 장부 기준 추정액과 차이 발생 가능
+                고지액은 세무사가 매입장 외 공제까지 반영해 신고한 세액 기준으로, 장부 기준 추정액과 차이 발생 가능 · 부가가치세
+                예정고지서 금액은 &quot;부가가치세 (분기별)&quot;에 입력 시 그 금액으로 산출
               </p>
             </Footnote>
           </FoldRow>
@@ -657,6 +668,35 @@ export default async function DashboardPage({
           </p>
           <div className="mt-2 [&_table]:text-xs [&_td]:py-1 [&_th]:pb-1">
             <VatQuarterTable rows={vatQuarters} total={vatTotal} />
+          </div>
+          <div className="mt-2 space-y-1 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span>
+                10월 예정고지액{" "}
+                {octoberNoticeAmount != null ? (
+                  <span className="whitespace-nowrap font-semibold text-slate-900">{formatWon(octoberNoticeAmount)} (고지서 기준)</span>
+                ) : (
+                  <span className="whitespace-nowrap font-semibold text-slate-900">
+                    약 {formatWon(vatOctoberNotice)} (장부 기준 추정{vatOctoberNotice === 0 && vat1 > 0 ? " · 50만원 미만 고지 없음" : ""})
+                  </span>
+                )}
+              </span>
+              {vatNoticeReady && (
+                <VatNoticeInput key={`${selectedYear}-${octoberNoticeAmount}`} year={selectedYear} month={10} initialAmount={octoberNoticeAmount} />
+              )}
+            </div>
+            <p>
+              제2기 확정신고(1월) 예상 납부세액{" "}
+              <span className="whitespace-nowrap font-semibold text-slate-900">{formatWon(cashOut.vat2)}</span> = 7~12월{" "}
+              <span className="whitespace-nowrap">{formatWon(vatQuarters[2].net + vatQuarters[3].net)}</span> − 10월 예정고지{" "}
+              <span className="whitespace-nowrap">{formatWon(vatOctoberNotice)}</span>
+              {o.unbilledVat.vat > 0 && (
+                <>
+                  {" "}+ 미발행 계산서 예상분 <span className="whitespace-nowrap">{formatWon(o.unbilledVat.vat)}</span>
+                </>
+              )}
+              {cashOut.vat2 < 0 && " (환급 예상)"}
+            </p>
           </div>
           <Footnote>
             <p>

@@ -26,6 +26,7 @@ import { isLedgerVisible } from "@/lib/credit";
 import type { CreditPayment, Transaction } from "@/lib/types";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import { hasPaymentGroupColumn } from "@/lib/paymentGroup";
+import { LedgerCheckSection } from "@/components/sections/LedgerCheckSection";
 import { nowKst } from "@/lib/kstDate";
 
 const TABS = [
@@ -34,6 +35,7 @@ const TABS = [
   { key: "clients", label: "거래처" },
   { key: "payment-methods", label: "결제수단" },
   { key: "expense-categories", label: "지출카테고리" },
+  { key: "check", label: "장부 점검" },
 ];
 
 const FLOOR_YEAR = 2026;
@@ -59,6 +61,7 @@ export default async function TransactionsPage({
   const active = tab ?? "list";
 
   const redirectTo = (() => {
+    if (active === "check" && year) return `/transactions?tab=check&year=${year}`;
     if (active !== "list") return `/transactions?tab=${active}`;
     const p = new URLSearchParams();
     if (year) p.set("year", year);
@@ -100,6 +103,7 @@ export default async function TransactionsPage({
       {active === "clients" && <ClientsSection />}
       {active === "payment-methods" && <PaymentMethodsSection />}
       {active === "expense-categories" && <ExpenseCategoriesSection />}
+      {active === "check" && <LedgerCheckTab year={year} />}
       {active === "list" && (
         <TransactionListSection
           year={year}
@@ -116,6 +120,15 @@ export default async function TransactionsPage({
       <TransactionEditPopup editTx={editTx} redirectTo={redirectTo} />
     </div>
   );
+}
+
+// 장부 점검 탭 — 연도는 2026(앱 시작)부터 올해(또는 고른 해)까지.
+function LedgerCheckTab({ year }: { year?: string }) {
+  const currentYear = nowKst().year;
+  const selectedYear = year ? Number(year) : currentYear;
+  const topYear = Math.max(currentYear, selectedYear);
+  const years = Array.from({ length: topYear - FLOOR_YEAR + 1 }, (_, i) => topYear - i);
+  return <LedgerCheckSection year={selectedYear} years={years} />;
 }
 
 // 086 SQL 실행 전이라 표가 없어도 에러 없이 빈 메모로 보이게 data만 쓴다.

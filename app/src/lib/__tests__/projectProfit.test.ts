@@ -9,6 +9,7 @@ import {
   expectedRevenueOf,
   countedQuote,
   unbilledInvoiceVat,
+  unbilledRemainingByGroup,
   type OutlookProject,
   type OutlookTx,
 } from "@/lib/projectProfit";
@@ -282,4 +283,30 @@ test("검토중 어미의 귀속 하위 발주액도 합계에서 뺌(이미 쓴
   assert.equal(expectedRevenueOf(ps, new Map()), 0);
   // 진행중 어미면 하위 발주액까지 예상 매출액
   assert.equal(expectedRevenueOf([{ ...reviewRoot, status: "ongoing" }, child], new Map()), 25_000_000);
+});
+
+test("연말 점검: 미발행 묶음마다 남은 발행 예정액·발행한 매출·마지막 발행일(어미 + 귀속 하위)", () => {
+  const child = childOf("PC", "PA", 10_000_000);
+  const done: OutlookProject = { id: "PD", name: "다 끊은 D", status: "done", quote_amount: 10_000_000 };
+  const ps = [PA, PB, child, done];
+  const txs = [
+    ...baseTx(),
+    sale("2026-05-10", 6_600_000, "PC"), // 하위로 끊은 600만
+    sale("2026-09-20", 3_300_000, "PA"), // 어미로 끊은 300만 — 마지막 발행일
+    sale("2026-08-01", 11_000_000, "PD"), // 다 끊음 → 남은 것 0
+  ];
+  const rows = unbilledRemainingByGroup(ps, ofProjects(txs, ps), AG).map((g) => ({
+    label: g.label,
+    members: g.members.map((p) => p.id),
+    quote: g.quote,
+    agency: g.agency,
+    billed: g.billed,
+    remaining: g.remaining,
+    lastBilled: g.lastBilled,
+  }));
+  assert.deepEqual(rows, [
+    // (9,000만 + 1,000만) − 대행구매 500만 − (300만 + 600만) = 8,600만
+    { label: "진행중 A 외\u00a01건", members: ["PA", "PC"], quote: 100_000_000, agency: 5_000_000, billed: 9_000_000, remaining: 86_000_000, lastBilled: "2026-09-20" },
+    { label: "다 끊은 D", members: ["PD"], quote: 10_000_000, agency: 0, billed: 10_000_000, remaining: 0, lastBilled: "2026-08-01" },
+  ]);
 });

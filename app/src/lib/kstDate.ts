@@ -4,3 +4,9 @@ export function nowKst() {
   const d = new Date(Date.now() + 9 * 3600_000);
   return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
 }
+
+// 저장된 시각(UTC, ISO 문자열) → 한국 시각 "YYYY-MM-DD HH:MM" — 등록 시각·수정 이력 표시용.
+export function kstDateTime(iso: string) {
+  const d = new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString();
+  return `${d.slice(0, 10)} ${d.slice(11, 16)}`;
+}

@@ -20,7 +20,8 @@
   `QuotesTable`, `PurchaseOrdersTable`, `UnassignedWorkLogTable`,
   `ClassificationPendingTable`, `RevenueVerificationTable`, `SiteProfitTable`,
   `SiteProfitReport`, `PurchaseItemSearchTable`, `VatQuarterTable`, `TripLogList`,
-  `TripOverviewReport`, `ProjectTripDetailTable`)에
+  `TripOverviewReport`, `ProjectTripDetailTable`, `YearEndCheckTable`, `DuplicateCandidatesTable`,
+  `UncategorizedPurchasesTable`, `TransactionHistoryTable`)에
   이 패턴이 적용돼 있음 — 새 표를 추가할 때 이 목록도 같이 업데이트할 것.
   (예외: `DailyWorkerUsageStatementTable`은 세무사 제출용 사용내역서 문서라
   근로자별 연속일 소계 순서가 고정돼야 해서 임의 정렬을 지원하지 않음 —
@@ -124,7 +125,7 @@
 
 - **금액 계산을 바꾸면 `npm test`(app 폴더)로 자동 검사를 돌릴 것.** 부가세 분리(`vatBasis`),
   외상 잔액(`credit`), 종합소득세(`tax`), 견적 금액·한글 금액(`quoteCalc`·`numberToKorean`),
-  예상 미수액(`expectedReceivable`), 이익 예상(`projectProfit` — 대시보드·보고서 공통), 엑셀 거래 읽기(`transactionExcel`), 작업일지 집계(`workLogSummary`), 출장일지 합계·보고서 작업일수 나눔·출장 투입 인원(`tripLog`), 보고서 출장 현황(`tripOverview`), 매입장 한 결제 묶기(`paymentGroup`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
+  예상 미수액(`expectedReceivable`), 이익 예상(`projectProfit` — 대시보드·보고서 공통), 엑셀 거래 읽기(`transactionExcel`), 작업일지 집계(`workLogSummary`), 출장일지 합계·보고서 작업일수 나눔·출장 투입 인원(`tripLog`), 보고서 출장 현황(`tripOverview`), 매입장 한 결제 묶기(`paymentGroup`), 장부 점검(`ledgerCheck`), 거래 수정 이력 표시(`transactionHistory`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
   (vitest는 npm 설치 오류로 못 씀 — 새 테스트 라이브러리를 넣지 말 것)
@@ -152,6 +153,17 @@
 - **귀속은 한 단계(어미 ← 하위)만.** 손익보고서·이익 예상이 한 단계로 묶어서, 하위의 하위(3단)는 어미 합산에서 빠짐. 귀속 대상
   선택은 다른 프로젝트에 귀속 안 된 것만, 서버(`actions/projects.ts`의 `parentError`)에서도 새로 고르는 귀속을 확인(하위가 있는
   프로젝트·이미 귀속된 프로젝트는 안 됨). 예전에 3단으로 저장된 자료는 표에서 맨 위 어미 묶음에 보이게만 함(사라지지 않게).
+
+- **장부 점검·수정 이력·연말 점검·예정고지액**(10/28 사용자 요청 "전부"):
+  - 매입매출 "장부 점검" 탭(`LedgerCheckSection`)은 찾기만 함 — 중복 의심(같은 날·구분·거래처·품목·금액, 한 결제 묶음끼리는 제외)과
+    카테고리 빈 매입(세금·보험·금융으로 보이는 글자 표시)은 `lib/ledgerCheck.ts`로. 고치는 건 기존 수정·삭제·`bulkUpdateCategoryId`.
+    중복 "아님" 표시는 DB 변경이 필요해서 안 만듦(사용자에게 "DB 변경 없음"으로 안내함).
+  - 거래 수정 이력은 DB 트리거(094 SQL `transaction_history`)가 남김 — 앱 코드에서 이력을 쓰지 말 것(트리거만, 이력 표에는 쓰기
+    정책 없음). 표시는 `lib/transactionHistoryLoad.ts`(이름표 조회) + `lib/transactionHistory.ts`(칸별 "전 → 후"). 표가 없으면(SQL
+    실행 전) 이력 칸을 숨김.
+  - 부가세 예정고지서 금액(093 SQL `vat_prepayment_notices`)을 넣으면 대시보드 1월 부가세에서 추정 대신 그 금액을 차감.
+  - 연말 점검(프로젝트 목록, 10월부터)은 `unbilledRemainingByGroup`(1월 부가세 미발행 예상분과 같은 기준)으로 고르고, 귀속 연도
+    옮기기는 `moveProjectsToNextYear` 하나로(지금 그 해인 프로젝트만 — 두 번 눌러도 두 해 뒤로 안 감).
 
 - **작업일지의 "내용 이어받기"는 `lib/workLogSummary.ts`의 `resolveWorkLogTitles` 하나로만 정할 것.** 내용을 비운 줄은 같은
   현장·같은 프로젝트의 앞 내용 → 없으면 프로젝트 이름 → 프로젝트도 없으면 그 현장의 앞 내용. 작업일지를 날짜·내용별로 세는

@@ -5,6 +5,7 @@ import { one } from "@/lib/relations";
 import { TransactionForm } from "@/components/TransactionForm";
 import { updateTransactionRecord } from "@/lib/actions/transactions";
 import { hasPaymentGroupColumn, loadPaymentGroupForEdit } from "@/lib/paymentGroup";
+import { TransactionHistoryList } from "@/components/TransactionHistoryList";
 
 export default async function EditTransactionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -50,6 +51,7 @@ export default async function EditTransactionPage({ params }: { params: Promise<
         groupingReady={groupingReady}
         action={updateTransactionRecord}
       />
+      <TransactionHistoryList transactionIds={group ? group.map((t) => t.id) : [tx.id]} />
     </div>
   );
 }
