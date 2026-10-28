@@ -165,6 +165,11 @@
   - 연말 점검(프로젝트 목록, 10월부터)은 `unbilledRemainingByGroup`(1월 부가세 미발행 예상분과 같은 기준)으로 고르고, 귀속 연도
     옮기기는 `moveProjectsToNextYear` 하나로(지금 그 해인 프로젝트만 — 두 번 눌러도 두 해 뒤로 안 감).
 
+- **세무사(tax_agent) 계정은 매입매출장(매입매출 목록)만**(사용자 요청 10/28): 미들웨어(`lib/supabase/middleware.ts`)가
+  `/transactions` 목록 외 경로·다른 탭·`editTx`를 목록으로 돌려보내고, 화면은 `getCurrentRole()`(`lib/currentRole.ts`)로 탭·
+  "+ 거래 등록"·메모·엑셀 일괄 등록·수정 팝업을 숨기고 표는 `TransactionTable`의 `readOnly`(체크칸·관리 칸 없음). 메뉴도 "매입매출"
+  하나(`AppNav`). 새 화면·탭을 세무사에게 열려면 미들웨어부터 고칠 것.
+
 - **작업일지의 "내용 이어받기"는 `lib/workLogSummary.ts`의 `resolveWorkLogTitles` 하나로만 정할 것.** 내용을 비운 줄은 같은
   현장·같은 프로젝트의 앞 내용 → 없으면 프로젝트 이름 → 프로젝트도 없으면 그 현장의 앞 내용. 작업일지를 날짜·내용별로 세는
   곳을 새로 만들 때도 이 함수를 쓰고, 그 해 1월 1일부터 넘겨서 정한 뒤 기간 안의 줄만 셀 것 — 곳마다 따로 이어받다가 다른

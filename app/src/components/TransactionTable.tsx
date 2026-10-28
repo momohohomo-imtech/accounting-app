@@ -121,6 +121,7 @@ export function TransactionTable({
   showItem = true,
   groupingReady = false,
   paidDateById = {},
+  readOnly = false,
 }: {
   transactions: Transaction[];
   projectNodes: ProjectTreeNode[];
@@ -135,6 +136,8 @@ export function TransactionTable({
   groupingReady?: boolean;
   // 외상 거래의 정산일(마지막 정산 이력) — 외상 정산 묶음 줄에 "MM-DD 정산"으로.
   paidDateById?: Record<string, string>;
+  // 세무사 계정(읽기 전용) — 체크칸·일괄 변경·수정·삭제 칸 없이 장부만.
+  readOnly?: boolean;
 }) {
   const COLUMNS = ALL_COLUMNS.filter(
     (c) =>
@@ -361,6 +364,7 @@ export function TransactionTable({
   }
 
   function checkboxCell(ids: string[]) {
+    if (readOnly) return null;
     return (
       <Td className="pr-2">
         <input
@@ -376,6 +380,7 @@ export function TransactionTable({
   // 수정·삭제 칸 — 묶음 줄(묶음 전체·펼친 줄)의 수정은 공통 칸(날짜·카테고리 등)이 같으면 묶음 전체 수정 화면, 다르면 그
   // 줄만 수정 화면이 열림. ids가 여러 개면 묶음 전체 삭제. edit: 수정 버튼 대신 넣을 것(null이면 수정 버튼 없음).
   function actionsCell(editId: string, confirmKey: string, ids: string[], edit?: ReactNode) {
+    if (readOnly) return null;
     return (
       <Td className="text-right">
         <div className="flex justify-end gap-2">
@@ -744,14 +749,16 @@ export function TransactionTable({
           조금 넓어서 맨 오른쪽 수정·삭제가 가려졌음 → 1280부터는 상자 폭에 맞춰 긴 글자를 줄바꿈 */}
       <Table stickyHeader className="sticky-col-table min-w-[1020px] xl:min-w-0">
         <THead>
-          <th className="w-8 pb-2 pr-2">
-            <input
-              type="checkbox"
-              checked={selected.size > 0 && selected.size === transactions.length}
-              onChange={toggleAll}
-              className="h-4 w-4 accent-slate-900"
-            />
-          </th>
+          {!readOnly && (
+            <th className="w-8 pb-2 pr-2">
+              <input
+                type="checkbox"
+                checked={selected.size > 0 && selected.size === transactions.length}
+                onChange={toggleAll}
+                className="h-4 w-4 accent-slate-900"
+              />
+            </th>
+          )}
           {COLUMNS.map((c) => (
             <th
               key={c.key}
@@ -771,7 +778,7 @@ export function TransactionTable({
               </button>
             </th>
           ))}
-          <th className="pb-2 text-right font-medium">관리</th>
+          {!readOnly && <th className="pb-2 text-right font-medium">관리</th>}
         </THead>
         <tbody>
           {sorted.map((item) => {
@@ -837,7 +844,7 @@ export function TransactionTable({
               </Fragment>
             );
           })}
-          {sorted.length === 0 && <EmptyRow colSpan={COLUMNS.length + 2}>거래 내역이 없습니다.</EmptyRow>}
+          {sorted.length === 0 && <EmptyRow colSpan={COLUMNS.length + (readOnly ? 0 : 2)}>거래 내역이 없습니다.</EmptyRow>}
         </tbody>
       </Table>
     </div>

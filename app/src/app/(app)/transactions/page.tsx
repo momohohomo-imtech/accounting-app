@@ -27,6 +27,7 @@ import type { CreditPayment, Transaction } from "@/lib/types";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import { hasPaymentGroupColumn } from "@/lib/paymentGroup";
 import { LedgerCheckSection } from "@/components/sections/LedgerCheckSection";
+import { getCurrentRole } from "@/lib/currentRole";
 import { nowKst } from "@/lib/kstDate";
 
 const TABS = [
@@ -58,7 +59,9 @@ export default async function TransactionsPage({
 }) {
   const { tab, year, month, type, project_id, payment_method_id, editTx, showProject, showCategory, showItem } =
     await searchParams;
-  const active = tab ?? "list";
+  // 세무사 계정은 매입매출장(매입매출 목록)만 — 다른 탭·등록·수정 없이 읽기만(사용자 요청 10/28, 미들웨어에서도 막음).
+  const ledgerOnly = (await getCurrentRole()) === "tax_agent";
+  const active = ledgerOnly ? "list" : (tab ?? "list");
 
   const redirectTo = (() => {
     if (active === "check" && year) return `/transactions?tab=check&year=${year}`;
@@ -80,7 +83,7 @@ export default async function TransactionsPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          <h1 className="text-2xl font-bold text-slate-900">매입매출·외상</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{ledgerOnly ? "매입매출" : "매입매출·외상"}</h1>
           {totals && (
             <div className="flex flex-wrap items-baseline gap-x-3 text-sm text-slate-500">
               <span>
@@ -94,10 +97,10 @@ export default async function TransactionsPage({
             </div>
           )}
         </div>
-        {active === "list" && <LinkButton href="/transactions/new">+ 거래 등록</LinkButton>}
+        {active === "list" && !ledgerOnly && <LinkButton href="/transactions/new">+ 거래 등록</LinkButton>}
       </div>
 
-      <PageTabs basePath="/transactions" tabs={TABS} active={active} />
+      {!ledgerOnly && <PageTabs basePath="/transactions" tabs={TABS} active={active} />}
 
       {active === "credit" && <CreditSection />}
       {active === "clients" && <ClientsSection />}
@@ -114,10 +117,11 @@ export default async function TransactionsPage({
           showProject={showProject}
           showCategory={showCategory}
           showItem={showItem}
+          readOnly={ledgerOnly}
         />
       )}
 
-      <TransactionEditPopup editTx={editTx} redirectTo={redirectTo} />
+      {!ledgerOnly && <TransactionEditPopup editTx={editTx} redirectTo={redirectTo} />}
     </div>
   );
 }
@@ -213,6 +217,7 @@ async function TransactionListSection({
   showProject,
   showCategory,
   showItem,
+  readOnly = false,
 }: {
   year?: string;
   month?: string;
@@ -222,6 +227,8 @@ async function TransactionListSection({
   showProject?: string;
   showCategory?: string;
   showItem?: string;
+  // 세무사 계정 — 장부만(메모·엑셀 일괄 등록·체크·수정·삭제 없이).
+  readOnly?: boolean;
 }) {
   const columnVisibility = {
     showProject: showProject !== "0",
@@ -252,7 +259,7 @@ async function TransactionListSection({
     supabase.from("projects").select("id, name").order("name"),
     supabase.from("payment_methods").select("id, name, text_color, background_color").order("sort_order"),
     supabase.from("expense_categories").select("id, name").order("sort_order"),
-    loadPageMemo(),
+    readOnly ? Promise.resolve(null) : loadPageMemo(),
   ]);
 
   // 092 SQL 실행 전에는 거래에 묶음 번호 칸이 없음 → 묶기 버튼을 숨김(거래가 없으면 고를 것도 없어서 상관없음).
@@ -313,15 +320,17 @@ async function TransactionListSection({
           ))}
         </div>
         <TransactionExportButtons transactions={transactions as Transaction[]} />
-        <div className="min-w-[16rem] max-w-2xl flex-1 print:hidden">
-          <PageMemo
-            bare
-            rows={2}
-            initialContent={pageMemo?.content ?? ""}
-            placeholder="매입매출 관련 메모..."
-            save={updateTransactionsPageMemo}
-          />
-        </div>
+        {!readOnly && (
+          <div className="min-w-[16rem] max-w-2xl flex-1 print:hidden">
+            <PageMemo
+              bare
+              rows={2}
+              initialContent={pageMemo?.content ?? ""}
+              placeholder="매입매출 관련 메모..."
+              save={updateTransactionsPageMemo}
+            />
+          </div>
+        )}
       </div>
 
       <p className="text-sm text-slate-600">
@@ -343,6 +352,7 @@ async function TransactionListSection({
           listParams={{ year: selectedYear, month: selectedMonth, type: type ?? "", project_id: project_id ?? "" }}
           groupingReady={groupingReady}
           paidDateById={paidDateById}
+          readOnly={readOnly}
           {...columnVisibility}
         />
       </Card>
@@ -363,15 +373,17 @@ async function TransactionListSection({
         </CollapsibleSection>
       )}
 
-      <Card className="print:hidden">
-        <h2 className="mb-3 font-semibold text-slate-900">엑셀로 여러 거래 한 번에 등록</h2>
-        <TransactionBulkImport
-          clients={importClients ?? []}
-          projects={importProjects ?? []}
-          paymentMethods={importPaymentMethods ?? []}
-          expenseCategories={importExpenseCategories ?? []}
-        />
-      </Card>
+      {!readOnly && (
+        <Card className="print:hidden">
+          <h2 className="mb-3 font-semibold text-slate-900">엑셀로 여러 거래 한 번에 등록</h2>
+          <TransactionBulkImport
+            clients={importClients ?? []}
+            projects={importProjects ?? []}
+            paymentMethods={importPaymentMethods ?? []}
+            expenseCategories={importExpenseCategories ?? []}
+          />
+        </Card>
+      )}
     </div>
   );
 }
