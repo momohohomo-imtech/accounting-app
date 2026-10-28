@@ -18,6 +18,7 @@ import { formatWon } from "@/lib/format";
 import { ProjectListExportButtons } from "@/components/ProjectListExportButtons";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { PageMemo } from "@/components/PageMemo";
+import { YearEndCheckSection } from "@/components/sections/YearEndCheckSection";
 import { updateProjectsPageMemo } from "@/lib/actions/projectsPageMemo";
 import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
 import { purchaseCostOf } from "@/lib/vatBasis";
@@ -116,8 +117,11 @@ async function ProjectListSection({
   ownOnly: boolean;
 }) {
   const supabase = await createClient();
-  const currentYear = nowKst().year;
+  const today = nowKst();
+  const currentYear = today.year;
   const selectedYear = year ? Number(year) : currentYear;
+  // 연말 점검은 그 해 10월부터(지난 해는 늘) — 계산서를 다 못 끊을 프로젝트를 귀속 연도 다음 해로 옮길 때.
+  const showYearEndCheck = selectedYear < currentYear || (selectedYear === currentYear && today.month >= 10);
   // 상태 필터는 체크박스로 여러 개를 동시에 고를 수 있어서 콤마로 구분된 값으로 옴.
   const statusList = status ? status.split(",").filter(Boolean) : [];
 
@@ -515,6 +519,8 @@ async function ProjectListSection({
           placeholder="프로젝트 관련 메모..."
           save={updateProjectsPageMemo}
         />
+
+        {showYearEndCheck && <YearEndCheckSection year={selectedYear} />}
 
         <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
           <YearFilter

@@ -95,6 +95,24 @@ export async function updateProjectRecord(formData: FormData) {
   }
 }
 
+// 연말 점검 — 12월 31일까지 세금계산서를 다 못 끊는 프로젝트(귀속 하위 포함)의 귀속 연도를 다음 해로(사용자 운영 방식:
+// 계산서를 끊는 해가 그 프로젝트의 매출·이익 해). 금액은 그대로. 지금 fromYear인 프로젝트만 옮김 — 두 번 눌러도 두 해
+// 뒤로 가지 않게.
+export async function moveProjectsToNextYear(ids: string[], fromYear: number) {
+  try {
+    if (ids.length === 0) return { error: "옮길 프로젝트를 선택해주세요." };
+    if (!Number.isInteger(fromYear)) return { error: "연도가 올바르지 않습니다." };
+    const supabase = await createClient();
+    const { error } = await supabase.from("projects").update({ year: fromYear + 1 }).in("id", ids).eq("year", fromYear);
+    if (error) return { error: error.message };
+    revalidatePath("/projects");
+    revalidatePath("/reports");
+    revalidatePath("/dashboard");
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 export async function updateProjectMemo(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));

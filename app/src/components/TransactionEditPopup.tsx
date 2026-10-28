@@ -5,6 +5,7 @@ import { TransactionForm } from "@/components/TransactionForm";
 import { updateTransactionRecord } from "@/lib/actions/transactions";
 import { EscapeCloseLink } from "@/components/EscapeCloseLink";
 import { hasPaymentGroupColumn, loadPaymentGroupForEdit } from "@/lib/paymentGroup";
+import { TransactionHistoryList } from "@/components/TransactionHistoryList";
 
 // 거래 수정 팝업 — 매입매출 목록, 외상 관리, 보고서(매입처별 집계) 어디서 열든 공통으로 씀.
 export async function TransactionEditPopup({ editTx, redirectTo }: { editTx?: string; redirectTo: string }) {
@@ -58,6 +59,7 @@ export async function TransactionEditPopup({ editTx, redirectTo }: { editTx?: st
           action={updateTransactionRecord}
           redirectTo={redirectTo}
         />
+        <TransactionHistoryList transactionIds={group ? group.map((t) => t.id) : [tx.id]} />
       </div>
     </div>
   );

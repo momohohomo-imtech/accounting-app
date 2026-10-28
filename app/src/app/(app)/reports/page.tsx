@@ -452,15 +452,21 @@ export default async function ReportsPage({
       ledgerSales: p.sales,
     }));
 
-  // 합계는 검토중(아직 수주 전) 프로젝트를 뺀다(사용자 요청) — 표에는 검토중 행도 그대로 보임.
-  const summaryProjects = byProject.filter((p) => p.status !== PROJECT_STATUS_REVIEW);
-  const projectSummaryQuoteAmount = summaryProjects.reduce((s, p) => s + p.quoteAmount, 0);
-  const projectSummaryProfit = summaryProjects.reduce((s, p) => s + p.profit, 0);
+  // 합계에서 검토중(아직 수주 전) 프로젝트의 발주액은 뺀다(사용자 요청) — 이미 쓴 매입·대행구매는 실제 지출이라 매입 합계·
+  // 이익금에 넣음(사용자 결정 10/28, 대시보드 프로젝트 기준 예상 이익과 같은 기준). 표에는 검토중 행도 그대로 보임.
+  const reviewProjects = byProject.filter((p) => p.status === PROJECT_STATUS_REVIEW);
+  const projectSummaryQuoteAmount = byProject
+    .filter((p) => p.status !== PROJECT_STATUS_REVIEW)
+    .reduce((s, p) => s + p.quoteAmount, 0);
+  const projectSummaryProfit = byProject.reduce(
+    (s, p) => s + (p.status === PROJECT_STATUS_REVIEW ? p.profit - p.quoteAmount : p.profit),
+    0
+  );
   const projectSummary = {
-    count: summaryProjects.length,
-    reviewExcluded: byProject.length - summaryProjects.length,
-    sales: summaryProjects.reduce((s, p) => s + p.sales, 0),
-    purchase: summaryProjects.reduce((s, p) => s + p.purchase, 0),
+    count: byProject.length,
+    reviewCount: reviewProjects.length,
+    sales: byProject.reduce((s, p) => s + p.sales, 0),
+    purchase: byProject.reduce((s, p) => s + p.purchase, 0),
     quoteAmount: projectSummaryQuoteAmount,
     profit: projectSummaryProfit,
     profitRate: projectSummaryQuoteAmount > 0 ? (projectSummaryProfit / projectSummaryQuoteAmount) * 100 : null,
@@ -1098,7 +1104,7 @@ export default async function ReportsPage({
             },
             <>
               <span className="text-xs text-slate-500">
-                {selectedYear}년 총 {projectSummary.count}건{projectSummary.reviewExcluded > 0 && ` (검토중 ${projectSummary.reviewExcluded}건 제외)`} · 매출(VAT제외) {formatWon(projectSummary.sales)} · 매입(VAT제외){" "}
+                {selectedYear}년 총 {projectSummary.count}건{projectSummary.reviewCount > 0 && ` (검토중 ${projectSummary.reviewCount}건은 발주액 제외·매입 반영)`} · 매출(VAT제외) {formatWon(projectSummary.sales)} · 매입(VAT제외){" "}
                 {formatWon(projectSummary.purchase)} · 이익금 {formatWon(projectSummary.profit)} · 이익율{" "}
                 {projectSummary.profitRate === null ? "-" : `${projectSummary.profitRate.toFixed(2)}%`}
               </span>
@@ -1121,7 +1127,7 @@ export default async function ReportsPage({
           )}
         >
           <p className="mb-3 hidden text-xs text-slate-500 print:block">
-            {selectedYear}년 총 {projectSummary.count}건{projectSummary.reviewExcluded > 0 && ` (검토중 ${projectSummary.reviewExcluded}건 제외)`} · 매출(VAT제외) {formatWon(projectSummary.sales)} · 매입(VAT제외){" "}
+            {selectedYear}년 총 {projectSummary.count}건{projectSummary.reviewCount > 0 && ` (검토중 ${projectSummary.reviewCount}건은 발주액 제외·매입 반영)`} · 매출(VAT제외) {formatWon(projectSummary.sales)} · 매입(VAT제외){" "}
             {formatWon(projectSummary.purchase)} · 이익금 {formatWon(projectSummary.profit)} · 이익율{" "}
             {projectSummary.profitRate === null ? "-" : `${projectSummary.profitRate.toFixed(2)}%`}
           </p>

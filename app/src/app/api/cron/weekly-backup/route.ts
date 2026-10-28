@@ -6,8 +6,10 @@ import { sendEmail } from "@/lib/email";
 export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization");
-  if (process.env.CRON_SECRET && auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  // Vercel Cron은 Vercel 환경변수 CRON_SECRET이 있으면 "Authorization: Bearer <CRON_SECRET>"를 붙여서 부름. 설정이 없거나
+  // 다르면 거부 — 예전엔 설정이 없을 때 그냥 실행해서 주소만 알면 누구나 백업을 돌릴 수 있었음(백업 파일이 쌓임).
+  const secret = process.env.CRON_SECRET;
+  if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

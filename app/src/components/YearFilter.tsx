@@ -11,6 +11,7 @@ export function YearFilter({
   selectedSiteId,
   statusOptions,
   selectedStatuses,
+  extraParams,
 }: {
   basePath: string;
   years: number[];
@@ -20,12 +21,14 @@ export function YearFilter({
   statusOptions?: { value: string; label: string }[];
   /** 체크된 상태 값들 — 비어있으면 전체 상태(필터 없음). */
   selectedStatuses?: string[];
+  /** 주소에 함께 남길 값(예: 탭 { tab: "check" }). */
+  extraParams?: Record<string, string>;
 }) {
   const router = useRouter();
   const statuses = selectedStatuses ?? [];
 
   const navigate = (year: number | string, siteId: string, statusList: string[]) => {
-    const params = new URLSearchParams({ year: String(year) });
+    const params = new URLSearchParams({ ...extraParams, year: String(year) });
     if (siteId) params.set("site_id", siteId);
     if (statusList.length > 0) params.set("status", statusList.join(","));
     router.push(`${basePath}?${params.toString()}`, { scroll: false });

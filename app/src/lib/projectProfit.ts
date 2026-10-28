@@ -202,28 +202,45 @@ export function secondHalfOutlook(
   };
 }
 
-// 1월 부가세(제2기 확정) 추정에 따로 더하는 "미발행 계산서 예상분"(사용자 결정). 미발행 묶음마다 남은 계산서 공급가액
-// = 발주액 − 대행구매액 − 이미 끊은 매출(날짜·외상 정산 무관, 0 아래로는 안 내려감 — 수금 예정액과 같은 기준)을 12월까지
-// 끊는다고 보고 그 10%. 그 프로젝트에 앞으로 받을 매입 계산서의 부가세는 알 수 없어 빼지 않음(실제로는 그만큼 줄어듦).
+// 미발행 묶음마다 남은 계산서 공급가액 = 발주액 − 대행구매액 − 이미 끊은 매출(날짜·외상 정산 무관, 0 아래로는 안 내려감 —
+// 수금 예정액과 같은 기준). lastBilled = 마지막으로 끊은 매출 날짜. 1월 부가세 미발행 예상분과 프로젝트 목록 "연말 점검"이 같이 씀.
+export function unbilledRemainingByGroup<P extends OutlookProject>(
+  projects: P[],
+  projectTx: OutlookTx[],
+  agencyByProject: Map<string, number>
+) {
+  const billedBy = new Map<string, number>();
+  const lastBilledBy = new Map<string, string>();
+  for (const t of projectTx) {
+    if (t.type !== "매출" || !t.project_id) continue;
+    billedBy.set(t.project_id, (billedBy.get(t.project_id) ?? 0) + salesSupplyOf(t));
+    if (t.trans_date > (lastBilledBy.get(t.project_id) ?? "")) lastBilledBy.set(t.project_id, t.trans_date);
+  }
+  return activeGroups(projects, UNBILLED_STATUSES)
+    .filter((g) => g.quote > 0)
+    .map((g) => {
+      const agency = sumByProject(g.members, agencyByProject);
+      const billed = sumByProject(g.members, billedBy);
+      const lastBilled = g.members.map((p) => lastBilledBy.get(p.id) ?? "").sort().at(-1) || null;
+      return { ...g, agency, billed, lastBilled, remaining: Math.max(0, g.quote - agency - billed) };
+    });
+}
+
+// 1월 부가세(제2기 확정) 추정에 따로 더하는 "미발행 계산서 예상분"(사용자 결정). 미발행 묶음마다 남은 계산서 공급가액을
+// 12월까지 끊는다고 보고 그 10%. 그 프로젝트에 앞으로 받을 매입 계산서의 부가세는 알 수 없어 빼지 않음(실제로는 그만큼 줄어듦).
 export function unbilledInvoiceVat(
   projects: OutlookProject[],
   projectTx: OutlookTx[],
   agencyByProject: Map<string, number>
 ) {
-  const billedBy = new Map<string, number>();
-  for (const t of projectTx) {
-    if (t.type !== "매출" || !t.project_id) continue;
-    billedBy.set(t.project_id, (billedBy.get(t.project_id) ?? 0) + salesSupplyOf(t));
-  }
   let count = 0;
   let supply = 0;
   let vat = 0;
-  for (const g of unbilledGroups(projects)) {
-    const remaining = Math.max(0, g.quote - sumByProject(g.members, agencyByProject) - sumByProject(g.members, billedBy));
-    if (remaining === 0) continue;
+  for (const g of unbilledRemainingByGroup(projects, projectTx, agencyByProject)) {
+    if (g.remaining === 0) continue;
     count += 1;
-    supply += remaining;
-    vat += Math.round(remaining * 0.1);
+    supply += g.remaining;
+    vat += Math.round(g.remaining * 0.1);
   }
   return { count, supply, vat };
 }
