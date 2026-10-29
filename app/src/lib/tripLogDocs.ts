@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { fetchAllRows, fetchAllRowsIn } from "@/lib/supabaseFetchAll";
 import { one } from "@/lib/relations";
 import type { WorkLogTitleRow } from "@/lib/workLogSummary";
 import { workLogContentsByProjectDate, type TripDayRow, type TripProjectDoc } from "@/lib/tripLog";
@@ -51,13 +51,21 @@ export async function loadTripProjectDocs(
   if (projectIds.length === 0) return { docs: [], siteOptions, tableMissing: false };
 
   // 머리 정보(작업구분·비고)와 날짜별 작업 내용(작업일지 — 작업 집계와 같은 이어받기, 그 해 1월 1일부터).
-  const [{ data: headRows }, workRows] = await Promise.all([
-    supabase.from("trip_logs").select("project_id, work_types, note").in("project_id", projectIds),
-    fetchAllRows<WorkLogTitleRow & { id: string }>((from, to) =>
+  // 프로젝트가 많아도 요청 주소가 너무 길어지지 않게 나눠 조회(fetchAllRowsIn) — 작업일지는 조각마다 날짜순이라 합친 뒤 다시 정렬.
+  const [headRows, workRowsRaw] = await Promise.all([
+    fetchAllRowsIn<{ project_id: string; work_types: string[] | null; note: string | null }>(projectIds, (ids, from, to) =>
+      supabase
+        .from("trip_logs")
+        .select("project_id, work_types, note")
+        .in("project_id", ids)
+        .order("project_id", { ascending: true })
+        .range(from, to)
+    ).catch(() => []), // 머리 정보는 없어도 문서는 만듦(예전처럼)
+    fetchAllRowsIn<WorkLogTitleRow & { id: string }>(projectIds, (ids, from, to) =>
       supabase
         .from("work_logs")
         .select("id, log_date, site_id, project_id, title, sort_order, projects(name)")
-        .in("project_id", projectIds)
+        .in("project_id", ids)
         .gte("log_date", `${year}-01-01`)
         .lte("log_date", end)
         .order("log_date", { ascending: true })
@@ -66,9 +74,10 @@ export async function loadTripProjectDocs(
         .range(from, to)
     ),
   ]);
-  const headByProject = new Map(
-    ((headRows ?? []) as { project_id: string; work_types: string[] | null; note: string | null }[]).map((h) => [h.project_id, h])
+  const workRows = [...workRowsRaw].sort(
+    (a, b) => a.log_date.localeCompare(b.log_date) || (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id.localeCompare(b.id)
   );
+  const headByProject = new Map(headRows.map((h) => [h.project_id, h]));
   const contentsByKey = workLogContentsByProjectDate(workRows);
   // 출장 업무 내역서의 내근 일수 — 조회 기간 안에 그 프로젝트가 작업일지에 있는 날짜(이 중 출장 아닌 날을 셈).
   const workDatesByProject = new Map<string, Set<string>>();

@@ -1,5 +1,5 @@
 import type { createClient } from "@/lib/supabase/server";
-import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { fetchAllRowsIn } from "@/lib/supabaseFetchAll";
 import type { OutlookTx } from "@/lib/projectProfit";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -10,20 +10,21 @@ export type ProjectTx = OutlookTx & { id: string; payment_type: string };
 export async function loadProjectTxAndAgency(supabase: Supabase, projectIds: string[], opts: { type?: "매출" | "매입" } = {}) {
   const agencyByProject = new Map<string, number>();
   if (projectIds.length === 0) return { projectTx: [] as ProjectTx[], agencyByProject };
+  // 프로젝트가 수백 개여도 요청 주소가 너무 길어지지 않게 나눠 조회(fetchAllRowsIn).
   const [projectTx, agencyRows] = await Promise.all([
-    fetchAllRows<ProjectTx>((from, to) => {
+    fetchAllRowsIn<ProjectTx>(projectIds, (ids, from, to) => {
       let query = supabase
         .from("transactions")
         .select("id, type, payment_type, sales_amount, sales_vat, project_id, purchase_amount, purchase_vat, trans_date, expense_categories(*)")
-        .in("project_id", projectIds);
+        .in("project_id", ids);
       if (opts.type) query = query.eq("type", opts.type);
       return query.order("id", { ascending: true }).range(from, to);
     }),
-    fetchAllRows<{ project_id: string; amount: number }>((from, to) =>
+    fetchAllRowsIn<{ project_id: string; amount: number }>(projectIds, (ids, from, to) =>
       supabase
         .from("project_agency_purchases")
         .select("project_id, amount")
-        .in("project_id", projectIds)
+        .in("project_id", ids)
         .order("id", { ascending: true })
         .range(from, to)
     ),

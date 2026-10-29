@@ -43,7 +43,7 @@ import { tripProjectRows } from "@/lib/tripOverview";
 import { TripOverviewReport } from "@/components/TripOverviewReport";
 import { parseMonthRange } from "@/lib/monthRange";
 import { ReportExcelButton } from "@/components/ReportExcelButton";
-import { fetchAllRows, fetchAllCreditPayments, fetchAllData } from "@/lib/supabaseFetchAll";
+import { fetchAllRows, fetchAllCreditPayments, fetchAllData, fetchAllRowsIn } from "@/lib/supabaseFetchAll";
 import { purchaseCostOf, salesSupplyOf, supplyOf, vatOf } from "@/lib/vatBasis";
 import type { WorkLog } from "@/lib/types";
 import { nowKst } from "@/lib/kstDate";
@@ -225,30 +225,31 @@ export default async function ReportsPage({
   // 프로젝트 목록·손익 팝업·대시보드 이익 예상과 같은 기준. 작업일수·출장 투입 인원도 같은 이유로 기간 제한 없음.
   // 출장 날짜 줄(trip_log_days, 작업일지 팝업에서 "출장"을 체크한 날) — 작업일수를 사내·출장으로 나누고, 그날 적은
   // 사내·조공 인원을 출장 투입 인원으로 합산. 090 SQL 전이라 표가 없으면 null(출장 0일, 출장 투입 인원 "-").
+  // 프로젝트가 수백 개여도 요청 주소가 너무 길어지지 않게 나눠 조회(fetchAllRowsIn).
   const projectIdList = (projects ?? []).map((p) => p.id);
   const [projectTxRaw, projectWorkLogRows, projectTripDays] = projectIdList.length
     ? await Promise.all([
-        fetchAllRows<Row>((from, to) =>
+        fetchAllRowsIn<Row>(projectIdList, (ids, from, to) =>
           supabase
             .from("transactions")
             .select(TX_SELECT)
-            .in("project_id", projectIdList)
+            .in("project_id", ids)
             .order("id", { ascending: true })
             .range(from, to)
         ),
-        fetchAllRows<{ log_date: string; project_id: string | null }>((from, to) =>
+        fetchAllRowsIn<{ log_date: string; project_id: string | null }>(projectIdList, (ids, from, to) =>
           supabase
             .from("work_logs")
             .select("log_date, project_id")
-            .in("project_id", projectIdList)
+            .in("project_id", ids)
             .order("id", { ascending: true })
             .range(from, to)
         ),
-        fetchAllRows<ProjectTripDayRow>((from, to) =>
+        fetchAllRowsIn<ProjectTripDayRow>(projectIdList, (ids, from, to) =>
           supabase
             .from("trip_log_days")
             .select("project_id, work_date, staff_count, helper_count")
-            .in("project_id", projectIdList)
+            .in("project_id", ids)
             .order("id", { ascending: true })
             .range(from, to)
         ).catch(() => null),
@@ -485,7 +486,8 @@ export default async function ReportsPage({
 
   // 상단 박스의 "예상 순이익율" — 대시보드 "프로젝트 기준 예상 이익"과 같은 계산(lib/projectProfit.ts의
   // projectBasedProfit: 연도 전체, site 필터와 무관, 세금계산서 기준이라 외상 미정산 포함, 검토중 발주액 제외,
-  // 발주액 없는 프로젝트는 실제 매출) ÷ 발주액 합계(검토중 제외). 수주액(수기 입력)은 입력 확인용이라 계산에 안 씀.
+  // 발행 세금계산서가 더 많거나 발주액이 없으면 실제 매출, 프로젝트 없는 매출 포함) ÷ 발주액 합계(검토중 제외).
+  // 수주액(수기 입력)은 입력 확인용이라 계산에 안 씀.
   const yearEstimate = projectBasedProfit(projects ?? [], projectTxRaw, rawTx, agencyByProject);
   const yearProfitEstimateRate =
     yearEstimate.quoteTotal > 0 ? (yearEstimate.profit / yearEstimate.quoteTotal) * 100 : null;

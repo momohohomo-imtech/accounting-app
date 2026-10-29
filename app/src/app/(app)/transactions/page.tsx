@@ -24,7 +24,7 @@ import { formatWon } from "@/lib/format";
 import { monthRange } from "@/lib/dateRange";
 import { isLedgerVisible } from "@/lib/credit";
 import type { CreditPayment, Transaction } from "@/lib/types";
-import { fetchAllRows, fetchAllData } from "@/lib/supabaseFetchAll";
+import { fetchAllRows, fetchAllData, fetchAllRowsIn } from "@/lib/supabaseFetchAll";
 import { hasPaymentGroupColumn } from "@/lib/paymentGroup";
 import { LedgerCheckSection } from "@/components/sections/LedgerCheckSection";
 import { getCurrentRole } from "@/lib/currentRole";
@@ -161,13 +161,14 @@ const loadLedgerTransactions = cache(
       if (paymentMethodId) q = q.eq("payment_method_id", paymentMethodId);
       return q;
     });
+    // 한 해 전체를 보면 외상이 수백 건일 수 있어 요청 주소가 너무 길어지지 않게 나눠 조회(fetchAllRowsIn).
     const creditIds = rawTransactions.filter((t) => t.payment_type === "credit").map((t) => t.id);
     const relevantPayments = creditIds.length
-      ? await fetchAllRows<CreditPayment>((from, to) =>
+      ? await fetchAllRowsIn<CreditPayment>(creditIds, (ids, from, to) =>
           supabase
             .from("credit_payments")
             .select("*")
-            .in("transaction_id", creditIds)
+            .in("transaction_id", ids)
             .order("id", { ascending: true })
             .range(from, to)
         )

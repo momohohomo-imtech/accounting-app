@@ -22,11 +22,20 @@ export function groupProjectProfit(
   return { quote, purchase, agency, profit, rate };
 }
 
-// 세금계산서를 아직 다 안 끊은 프로젝트의 하반기 예상 이익. 상반기에 이미 끊은 기성금 매출은
-// 상반기 확정 이익금(세무사 결산)에 들어가 있으니 발주액에서 빼서 두 번 잡히지 않게 한다.
-// 매입도 하반기분만 뺀다(상반기분은 상반기 결산에서 처리됨). 금액은 모두 부가세 제외.
-export function unbilledH2Profit(quote: number, h1BilledSales: number, h2Purchase: number, agency: number) {
-  return quote - h1BilledSales - h2Purchase - agency;
+// 세금계산서를 아직 다 안 끊은 프로젝트의 하반기 예상 이익. 하반기 매출 = 발주액 − 대행구매 − 하반기 전에 이미 끊은 매출
+// (상반기분은 상반기 확정 이익금(세무사 결산)에, 작년까지 끊은 것은 그 해 이익에 들어가 있어 두 번 잡히지 않게), 단 하반기에
+// 실제로 끊은 매출이 더 크면 그 금액 — 추가공사분을 발주액에 안 고치고 계산서를 더 끊은 경우(예전엔 발주액에서 멈춰 이익이 적게
+// 잡혔고, 하반기 전에 이미 발주액보다 더 끊었으면 음수가 돼서 하반기 예상이 더 깎였음). 매입은 하반기분만(상반기분은 상반기
+// 결산에서 처리됨). 금액은 모두 부가세 제외.
+export function unbilledH2Profit(quote: number, billedBefore: number, h2Purchase: number, agency: number, h2Billed = 0) {
+  return Math.max(quote - agency - billedBefore, h2Billed) - h2Purchase;
+}
+
+// 묶음 매출(공급가) — 발주액(검토중 제외) − 대행구매액, 실제로 끊은 매출이 더 크면 그 금액(발주액보다 계산서를 더 끊은 경우),
+// 발주액이 없으면(빈칸·0원·검토중) 실제로 끊은 매출. 대행구매는 발주처가 직접 사는 몫이라 우리 매출·매입이 아님 — 발주액에서만
+// 빼고(실제 매출에는 처음부터 없음) 비용으로 또 빼지 않음.
+export function groupRevenue(quote: number, agency: number, actualSales: number) {
+  return quote > 0 ? Math.max(quote - agency, actualSales) : actualSales;
 }
 
 // ── 대시보드 "프로젝트 기준 예상 이익"·"연간 예상 이익(확정+예상)", 보고서 "예상 순이익율" 공통 계산 ──
@@ -133,10 +142,10 @@ function unbilledGroups(projects: OutlookProject[]) {
   return activeGroups(projects, UNBILLED_STATUSES).filter((g) => g.quote > 0);
 }
 
-// 프로젝트 기준 예상 이익 = Σ 프로젝트(어미 + 귀속 하위 묶음) 이익 − 프로젝트 없는 일반경비 − 직원급여/상여/4대보험.
-// 묶음 이익 = 매출 − 매입(공급가) − 대행구매. 매출은 발주액(검토중 제외)이 있으면 발주액, 없으면(발주액 빈칸·0원·검토중)
-// 그 묶음에 실제로 끊은 매출 — 발주액이 없다고 실제 매출까지 빠지면 안 됨. 매입·대행구매는 발주액과 상관없이 실제로 나간
-// 돈이라 빠짐없이 뺀다. projectTx = 이 프로젝트들에 붙은 거래 전부(기간 무관), yearTx = 그 해 거래 전부.
+// 프로젝트 기준 예상 이익 = Σ 프로젝트(어미 + 귀속 하위 묶음) 이익 + 프로젝트 없는 매출 − 프로젝트 없는 일반경비 −
+// 직원급여/상여/4대보험. 묶음 이익 = 묶음 매출(groupRevenue) − 매입(공급가) — 매입은 발주액과 상관없이 실제로 나간 돈이라
+// 빠짐없이 뺀다. 프로젝트 없이 등록한 매출도 그 해 매출로 더함(예전엔 매입만 일반경비로 빠지고 매출은 빠져 이익이 적게 잡혔음).
+// revenue = 그 매출 합계(대시보드 "예상 매출액"). projectTx = 이 프로젝트들에 붙은 거래 전부(기간 무관), yearTx = 그 해 거래 전부.
 export function projectBasedProfit(
   projects: OutlookProject[],
   projectTx: OutlookTx[],
@@ -153,26 +162,37 @@ export function projectBasedProfit(
   }
 
   let projectProfit = 0;
+  let projectRevenue = 0;
   let quoteTotal = 0;
   for (const { root, members } of projectGroups(projects)) {
     const quote = members.reduce((s, p) => s + countedQuote({ status: effectiveStatus(p, root), quote_amount: p.quote_amount }), 0);
-    const actualSales = sumByProject(members, salesBy);
-    const cost = sumByProject(members, purchaseBy) + sumByProject(members, agencyByProject);
-    projectProfit += (quote > 0 ? quote : actualSales) - cost;
+    const revenue = groupRevenue(quote, sumByProject(members, agencyByProject), sumByProject(members, salesBy));
+    projectRevenue += revenue;
+    projectProfit += revenue - sumByProject(members, purchaseBy);
     quoteTotal += quote;
   }
 
+  const generalSales = yearTx.filter((t) => t.type === "매출" && !t.project_id).reduce((s, t) => s + salesSupplyOf(t), 0);
   const nullProjectPurchases = yearTx.filter((t) => t.type === "매입" && !t.project_id);
   const payrollCost = nullProjectPurchases.filter(isPayroll).reduce((s, t) => s + purchaseCostOf(t), 0);
   const generalExpense = nullProjectPurchases.filter((t) => !isPayroll(t)).reduce((s, t) => s + purchaseCostOf(t), 0);
-  return { projectProfit, generalExpense, payrollCost, profit: projectProfit - generalExpense - payrollCost, quoteTotal };
+  return {
+    projectProfit,
+    generalSales,
+    generalExpense,
+    payrollCost,
+    profit: projectProfit + generalSales - generalExpense - payrollCost,
+    quoteTotal,
+    revenue: projectRevenue + generalSales,
+  };
 }
 
 // 연간 예상 이익(상반기 확정 + 하반기 예상)의 하반기 부분.
 // - 하반기 매출−매입: 7~12월 거래(세금계산서 기준), 단 아래 "미발행" 묶음의 거래와 인건비 카테고리는 뺌.
 // - 미발행 예상 이익: 진행중·공사 완료·완료 수금대기이고 발주액이 있는(0원·검토중 제외) 그 해 귀속 프로젝트 묶음(어미 + 귀속
-//   하위)은 남은 발주액을 그 해 매출로 봄(발주액 − 하반기 전에 이미 끊은 매출 − 7~12월 매입 − 대행구매). 다음 해에 계산서를 끊을
-//   프로젝트는 사용자가 귀속 연도를 다음 해로 바꿈(사용자 운영 방식). 매입은 그 해 12월 31일까지만 — 다음 해 매입은 다음 해 비용.
+//   하위)은 남은 발주액을 그 해 매출로 봄(unbilledH2Profit — 발주액 − 대행구매 − 하반기 전에 이미 끊은 매출, 하반기에 실제로 끊은
+//   매출이 더 크면 그 금액, − 7~12월 매입). 다음 해에 계산서를 끊을 프로젝트는 사용자가 귀속 연도를 다음 해로 바꿈(사용자 운영
+//   방식). 매출·매입은 그 해 12월 31일까지만 — 다음 해 것은 다음 해.
 // - 하반기 인건비: 7~12월 직원급여/상여/4대보험 — 프로젝트를 지정한 것도 포함(미발행 묶음에 붙은 건 위에서 이미 뺌).
 export function secondHalfOutlook(
   year: number,
@@ -194,6 +214,7 @@ export function secondHalfOutlook(
   const h2PurchaseBy = unbilled.map(() => 0);
   const h1BilledBy = unbilled.map(() => 0);
   const priorBilledBy = unbilled.map(() => 0);
+  const h2BilledBy = unbilled.map(() => 0);
   for (const t of projectTx) {
     const i = t.project_id ? groupIndex.get(t.project_id) : undefined;
     if (i === undefined) continue;
@@ -202,10 +223,18 @@ export function secondHalfOutlook(
       if (t.trans_date < yearStart) priorBilledBy[i] += salesSupplyOf(t);
       else h1BilledBy[i] += salesSupplyOf(t);
     }
+    if (t.type === "매출" && t.trans_date >= h2Start && t.trans_date <= yearEnd) h2BilledBy[i] += salesSupplyOf(t);
   }
   const unbilledPendingProfit = unbilled.reduce(
     (s, g, i) =>
-      s + unbilledH2Profit(g.quote, h1BilledBy[i] + priorBilledBy[i], h2PurchaseBy[i], sumByProject(g.members, agencyByProject)),
+      s +
+      unbilledH2Profit(
+        g.quote,
+        h1BilledBy[i] + priorBilledBy[i],
+        h2PurchaseBy[i],
+        sumByProject(g.members, agencyByProject),
+        h2BilledBy[i]
+      ),
     0
   );
   const total = (xs: number[]) => xs.reduce((s, v) => s + v, 0);
@@ -270,13 +299,6 @@ export function unbilledInvoiceVat(
     vat += Math.round(g.remaining * 0.1);
   }
   return { count, supply, vat };
-}
-
-// 그 해 예상 매출액 = 발주액 − 대행구매(프로젝트 목록 수주예상액 합계와 같은 기준), 검토중(귀속 하위는 어미 상태)은 뺌.
-export function expectedRevenueOf(projects: OutlookProject[], agencyByProject: Map<string, number>) {
-  return projectGroups(projects)
-    .flatMap(({ root, members }) => members.filter((p) => effectiveStatus(p, root) !== PROJECT_STATUS_REVIEW))
-    .reduce((s, p) => s + (p.quote_amount ?? 0) - (agencyByProject.get(p.id) ?? 0), 0);
 }
 
 // 외상 미정산(완납 전) 매입 — 손익보고서의 매입 합계·이익금에는 빠져 있어서 따로 합산한다. 이익금과 같은
