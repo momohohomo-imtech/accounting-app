@@ -14,14 +14,18 @@ type PurchaseRow = {
   amount: number;
   // 외상(미완납) 건 — 정산 전까지 매입 합계·이익금 계산에서는 빠지지만 목록에는 참고용으로 표시.
   unsettled?: boolean;
+  // 여러 프로젝트를 합친 보고서(통합 보고서)에서 어느 프로젝트 매입인지 — showProject일 때만 칸이 보임.
+  project?: string;
 };
 
-type SortKey = "date" | "vendor" | "item" | "category" | "amount";
+type SortKey = "date" | "project" | "vendor" | "item" | "category" | "amount";
 
 function sortValue(r: PurchaseRow, key: SortKey): string | number {
   switch (key) {
     case "date":
       return r.date;
+    case "project":
+      return r.project ?? "";
     case "vendor":
       return r.vendor;
     case "item":
@@ -33,7 +37,7 @@ function sortValue(r: PurchaseRow, key: SortKey): string | number {
   }
 }
 
-export function ProjectPurchaseTable({ rows }: { rows: PurchaseRow[] }) {
+export function ProjectPurchaseTable({ rows, showProject = false }: { rows: PurchaseRow[]; showProject?: boolean }) {
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
@@ -70,10 +74,15 @@ export function ProjectPurchaseTable({ rows }: { rows: PurchaseRow[] }) {
   return (
     <div className="overflow-x-auto">
       {/* 휴대폰에서는 거래처·카테고리 칸을 넓혀 덜 잘리게(표 전체를 옆으로 넘김), 인쇄는 원래 폭 그대로 */}
-      <table className="sticky-col-table w-full min-w-[600px] table-fixed text-sm max-md:min-w-[680px] print:min-w-[600px] print:text-[10px]">
+      <table
+        className={`sticky-col-table w-full table-fixed text-sm print:text-[10px] ${
+          showProject ? "min-w-[760px] max-md:min-w-[840px] print:min-w-0" : "min-w-[600px] max-md:min-w-[680px] print:min-w-[600px]"
+        }`}
+      >
         <thead>
           <tr className="border-b border-slate-200 text-left text-slate-500">
             <th className="w-[88px] pb-2 pr-4 print:pb-1">{headerButton("date", "날짜")}</th>
+            {showProject && <th className="w-[160px] pb-2 pr-4 print:w-[130px] print:pb-1">{headerButton("project", "프로젝트")}</th>}
             <th className="sticky-col w-[100px] pb-2 pr-4 max-md:w-[140px] print:w-[100px] print:pb-1">{headerButton("vendor", "거래처")}</th>
             <th className="pb-2 pr-4 print:pb-1">{headerButton("item", "품목")}</th>
             <th className="w-[90px] pb-2 pr-4 max-md:w-[120px] print:w-[90px] print:pb-1">{headerButton("category", "카테고리")}</th>
@@ -84,6 +93,11 @@ export function ProjectPurchaseTable({ rows }: { rows: PurchaseRow[] }) {
           {sorted.map((r) => (
             <tr key={r.id} className={`border-b border-slate-100 last:border-0 ${r.unsettled ? "bg-amber-50/60" : ""}`}>
               <td className="py-2 pr-4 text-slate-600 print:py-0.5">{formatDate(r.date)}</td>
+              {showProject && (
+                <td tabIndex={0} className="tap-full truncate py-2 pr-4 text-slate-700 print:py-0.5" title={r.project}>
+                  {r.project}
+                </td>
+              )}
               <td className="sticky-col truncate py-2 pr-4 text-slate-700 print:py-0.5" title={r.vendor ?? undefined}>{r.vendor}</td>
               <td className="truncate py-2 pr-4 text-slate-700 print:py-0.5">
                 {r.item}
@@ -105,7 +119,7 @@ export function ProjectPurchaseTable({ rows }: { rows: PurchaseRow[] }) {
           ))}
           {sorted.length === 0 && (
             <tr>
-              <td colSpan={5} className="py-6 text-center text-slate-400">
+              <td colSpan={showProject ? 6 : 5} className="py-6 text-center text-slate-400">
                 매입 내역이 없습니다.
               </td>
             </tr>

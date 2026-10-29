@@ -21,7 +21,8 @@
   `ClassificationPendingTable`, `RevenueVerificationTable`, `SiteProfitTable`,
   `SiteProfitReport`, `PurchaseItemSearchTable`, `VatQuarterTable`, `TripLogList`,
   `TripOverviewReport`, `ProjectTripDetailTable`, `YearEndCheckTable`, `DuplicateCandidatesTable`,
-  `UncategorizedPurchasesTable`, `TransactionHistoryTable`, `ProjectReceiptsTable`)에
+  `UncategorizedPurchasesTable`, `TransactionHistoryTable`, `ProjectReceiptsTable`, 통합 보고서의 `ProjectsCombinedTable`·
+  `CombinedCategorySection`·`CombinedAgencyTable`)에
   이 패턴이 적용돼 있음 — 새 표를 추가할 때 이 목록도 같이 업데이트할 것.
   (예외: `DailyWorkerUsageStatementTable`은 세무사 제출용 사용내역서 문서라
   근로자별 연속일 소계 순서가 고정돼야 해서 임의 정렬을 지원하지 않음 —
@@ -144,7 +145,8 @@
 
 - **금액 계산을 바꾸면 `npm test`(app 폴더)로 자동 검사를 돌릴 것.** 부가세 분리(`vatBasis`),
   외상 잔액(`credit`), 종합소득세(`tax`), 견적 금액·한글 금액(`quoteCalc`·`numberToKorean`),
-  예상 미수액·프로젝트 받은 돈(`expectedReceivable`), 이익 예상(`projectProfit` — 대시보드·보고서 공통), 엑셀 거래 읽기(`transactionExcel`), 작업일지 집계(`workLogSummary`), 출장일지 합계·보고서 작업일수 나눔·출장 투입 인원(`tripLog`), 보고서 출장 현황(`tripOverview`), 매입장 한 결제 묶기(`paymentGroup`), 장부 점검(`ledgerCheck`), 거래 수정 이력 표시·일괄 변경 접기(`transactionHistory`), 백업
+  예상 미수액·프로젝트 받은 돈(`expectedReceivable`), 이익 예상(`projectProfit` — 대시보드·보고서 공통), 프로젝트 목록 하단 합계·통합
+  보고서(`projectListTotals`), 엑셀 거래 읽기(`transactionExcel`), 작업일지 집계(`workLogSummary`), 출장일지 합계·보고서 작업일수 나눔·출장 투입 인원(`tripLog`), 보고서 출장 현황(`tripOverview`), 매입장 한 결제 묶기(`paymentGroup`), 장부 점검(`ledgerCheck`), 거래 수정 이력 표시·일괄 변경 접기(`transactionHistory`), 백업
   끝까지 담기(`backup`), 복원 막기·표 목록·나눠 올리기(`restore`), 백업 상태(`backupStatus`), 삭제 막기(`deleteGuard`), 급여 중복
   확인(`payrollDuplicates`), 긴 ID 목록 나눠 조회(`supabaseFetchAll`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
@@ -186,6 +188,10 @@
   요약 줄은 합계(이익금·이익율은 손익보고서와 같은 `groupProjectProfit` 묶음 기준), 하단 합계·엑셀에서 이익금이 두 번 세지지
   않게(`inGroup`). 보고서는 요약 줄 = 합산, 펼친 어미 줄 = 자기 것만(`own=1`), 하위 줄 = 자기 것만. 하단 합계는 그 해 프로젝트만
   (다른 해 하위는 묶음에 보이기만 — 그 해 목록에서 셈).
+- **프로젝트 목록 "통합 보고서"**(`report=combined`, `ProjectsCombinedReport`)는 지금 필터의 그 해 프로젝트 전부(묶음 때문에 함께
+  보이는 하위 포함, 다른 해 하위 제외 — 하단 합계와 같은 대상)를 합친 읽기 전용 보고서. 요약·프로젝트별 표와 목록 하단 합계는
+  `lib/projectListTotals.ts`(`listUnits`·`unitAmounts`·`listTotals`)로만 계산(귀속 묶음은 한 단위, 발주액 없는 단위는 이익금에서 빠지고
+  따로 표시). 거기서 연 프로젝트 보고서는 `back=combined`라 닫으면 통합 보고서로 돌아감.
 - **귀속은 한 단계(어미 ← 하위)만.** 귀속 대상 선택은 다른 프로젝트에 귀속 안 된 것만, 서버(`actions/projects.ts`의
   `parentError`)에서도 새로 고르는 귀속을 확인(하위가 있는 프로젝트·이미 귀속된 프로젝트는 안 됨). 예전에 3단으로 저장된 자료는
   프로젝트 목록·이익 예상(`lib/projectProfit.ts`의 `topProjectOf`)·보고서 요약 카드·합산 보고서 모두 맨 위 어미 묶음으로 봄(예전엔
