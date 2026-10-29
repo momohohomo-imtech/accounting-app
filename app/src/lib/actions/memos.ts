@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isMemoCategory, MEMO_UNCATEGORIZED } from "@/lib/memoCategories";
+import { fetchAllRows } from "@/lib/supabaseFetchAll";
 
 // 구분(category)은 085 SQL 실행 후에만 폼에 나옴 — 폼에 칸이 없으면 아예 건드리지 않는다.
 function parse(formData: FormData) {
@@ -17,6 +18,7 @@ function parse(formData: FormData) {
   return row;
 }
 
+// 저장 실패는 화면에 보이게 { error }로 돌려줌(예전엔 오류를 버려서 실패해도 된 것처럼 보였음).
 export async function createMemoRecord(formData: FormData) {
   const supabase = await createClient();
   const {
@@ -25,24 +27,27 @@ export async function createMemoRecord(formData: FormData) {
   // 새 메모는 항상 맨 위에 오도록 현재 최소 정렬순서보다 더 작은 값을 준다.
   const { data: minRow } = await supabase.from("memos").select("sort_order").order("sort_order").limit(1).maybeSingle();
   const sort_order = (minRow?.sort_order ?? 1) - 1;
-  await supabase.from("memos").insert({ ...parse(formData), created_by: user?.id ?? null, sort_order });
+  const { error } = await supabase.from("memos").insert({ ...parse(formData), created_by: user?.id ?? null, sort_order });
+  if (error) return { error: error.message };
   revalidatePath("/memos");
 }
 
 export async function updateMemoRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase
+  const { error } = await supabase
     .from("memos")
     .update({ ...parse(formData), updated_at: new Date().toISOString() })
     .eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/memos");
 }
 
 export async function deleteMemoRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("memos").delete().eq("id", id);
+  const { error } = await supabase.from("memos").delete().eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/memos");
 }
 
@@ -55,11 +60,17 @@ export async function moveMemoRecord(formData: FormData) {
   const direction = String(formData.get("direction"));
   const scope = formData.has("scope") ? String(formData.get("scope")) : null;
 
-  let query = supabase.from("memos").select("id, sort_order");
-  if (scope === MEMO_UNCATEGORIZED) query = query.is("category", null);
-  else if (scope && isMemoCategory(scope)) query = query.eq("category", scope);
-  const { data: memos } = await query.order("sort_order").order("created_at", { ascending: false });
-  if (!memos) return;
+  let memos: { id: string; sort_order: number }[];
+  try {
+    memos = await fetchAllRows<{ id: string; sort_order: number }>((from, to) => {
+      let query = supabase.from("memos").select("id, sort_order");
+      if (scope === MEMO_UNCATEGORIZED) query = query.is("category", null);
+      else if (scope && isMemoCategory(scope)) query = query.eq("category", scope);
+      return query.order("sort_order").order("created_at", { ascending: false }).order("id").range(from, to);
+    });
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 
   const idx = memos.findIndex((m) => m.id === id);
   if (idx === -1) return;
@@ -68,7 +79,9 @@ export async function moveMemoRecord(formData: FormData) {
 
   const current = memos[idx];
   const neighbor = memos[swapIdx];
-  await supabase.from("memos").update({ sort_order: neighbor.sort_order }).eq("id", current.id);
-  await supabase.from("memos").update({ sort_order: current.sort_order }).eq("id", neighbor.id);
+  const first = await supabase.from("memos").update({ sort_order: neighbor.sort_order }).eq("id", current.id);
+  if (first.error) return { error: first.error.message };
+  const second = await supabase.from("memos").update({ sort_order: current.sort_order }).eq("id", neighbor.id);
   revalidatePath("/memos");
+  if (second.error) return { error: second.error.message };
 }

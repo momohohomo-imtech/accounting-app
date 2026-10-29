@@ -2,6 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { EMPLOYEE_LINKS, deleteBlockReason, deleteErrorMessage } from "@/lib/deleteGuard";
+import { duplicatePayrollNames, monthRangeOf } from "@/lib/payrollDuplicates";
+import { one } from "@/lib/relations";
 
 function parse(formData: FormData) {
   return {
@@ -33,23 +36,36 @@ function parse(formData: FormData) {
   };
 }
 
+// 저장 실패는 화면에 보이게 { error }로 돌려줌 — 예전엔 오류를 버려서 로그인 만료 등으로 저장이 안 돼도 된 것처럼 보였음.
 export async function createEmployeeRecord(formData: FormData) {
   const supabase = await createClient();
-  await supabase.from("employees").insert(parse(formData));
+  const { error } = await supabase.from("employees").insert(parse(formData));
+  if (error) return { error: error.message };
   revalidatePath("/employees");
 }
 
 export async function updateEmployeeRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("employees").update(parse(formData)).eq("id", id);
+  const { error } = await supabase.from("employees").update(parse(formData)).eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/employees");
 }
 
+// 급여 기록이 있는 직원은 막음 — 지우면 급여 기록이 같이 지워짐(DB 규칙).
 export async function deleteEmployeeRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("employees").delete().eq("id", id);
+  const blocked = await deleteBlockReason(
+    supabase,
+    EMPLOYEE_LINKS,
+    id,
+    "이 직원에게",
+    "퇴사한 직원은 지우지 말고 퇴사일을 넣어 두세요(지우면 급여 기록이 같이 지워짐)."
+  );
+  if (blocked) return { error: blocked };
+  const { error } = await supabase.from("employees").delete().eq("id", id);
+  if (error) return { error: deleteErrorMessage(error) };
   revalidatePath("/employees");
 }
 
@@ -75,21 +91,24 @@ function parsePayroll(formData: FormData) {
 
 export async function createPayrollRecord(formData: FormData) {
   const supabase = await createClient();
-  await supabase.from("payroll").insert(parsePayroll(formData));
+  const { error } = await supabase.from("payroll").insert(parsePayroll(formData));
+  if (error) return { error: error.message };
   revalidatePath("/employees");
 }
 
 export async function updatePayrollRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("payroll").update(parsePayroll(formData)).eq("id", id);
+  const { error } = await supabase.from("payroll").update(parsePayroll(formData)).eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/employees");
 }
 
 export async function deletePayrollRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
-  await supabase.from("payroll").delete().eq("id", id);
+  const { error } = await supabase.from("payroll").delete().eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/employees");
 }
 
@@ -108,11 +127,40 @@ export type PayrollImportRow = {
   rural_tax: number;
 };
 
-export async function bulkImportPayroll(rows: PayrollImportRow[]) {
-  const supabase = await createClient();
-  const valid = rows.filter((r) => r.employee_id && r.pay_month);
-  if (valid.length) {
-    await supabase.from("payroll").insert(valid.map((r) => ({ ...r, non_taxable_unreported: 0 })));
+// 같은 직원·같은 달 급여가 이미 있으면 등록하지 않고 { duplicates: 이름 }을 돌려줌 → 화면에서 확인받고 allowDuplicates로 다시.
+// (같은 대장을 두 번 올리면 그 달 급여가 두 번 잡힘 — 상여금처럼 같은 달에 따로 주는 경우가 있어 막지는 않음)
+export async function bulkImportPayroll(
+  rows: PayrollImportRow[],
+  opts: { allowDuplicates?: boolean } = {}
+): Promise<{ error?: string; duplicates?: string[] }> {
+  try {
+    const supabase = await createClient();
+    const valid = rows.filter((r) => r.employee_id && r.pay_month);
+    if (valid.length === 0) return { error: "등록할 급여가 없습니다." };
+    if (!opts.allowDuplicates) {
+      const existing: { employee_id: string; pay_month: string; name: string | null }[] = [];
+      for (const month of new Set(valid.map((r) => r.pay_month.slice(0, 7)))) {
+        const { start, end } = monthRangeOf(month);
+        const { data, error } = await supabase
+          .from("payroll")
+          .select("employee_id, pay_month, employees(name)")
+          .in("employee_id", [...new Set(valid.map((r) => r.employee_id))])
+          .gte("pay_month", start)
+          .lt("pay_month", end);
+        if (error) return { error: error.message };
+        type Existing = { employee_id: string; pay_month: string; employees: { name: string } | { name: string }[] | null };
+        for (const e of (data ?? []) as Existing[]) {
+          existing.push({ employee_id: e.employee_id, pay_month: e.pay_month, name: one(e.employees)?.name ?? null });
+        }
+      }
+      const duplicates = duplicatePayrollNames(valid, existing);
+      if (duplicates.length > 0) return { duplicates };
+    }
+    const { error } = await supabase.from("payroll").insert(valid.map((r) => ({ ...r, non_taxable_unreported: 0 })));
+    if (error) return { error: error.message };
+    revalidatePath("/employees");
+    return {};
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
   }
-  revalidatePath("/employees");
 }

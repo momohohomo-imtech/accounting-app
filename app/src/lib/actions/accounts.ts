@@ -98,8 +98,14 @@ export async function createAccount(formData: FormData): Promise<{ error?: strin
     if (error) return { error: error.message };
     if (data.user) {
       // handle_new_user 트리거가 role 기본값(staff)으로 행을 만들어두므로, 다른 역할로
-      // 만들었으면 여기서 덮어씀.
-      await admin.from("users").update({ name, role }).eq("id", data.user.id);
+      // 만들었으면 여기서 덮어씀. 실패하면 꼭 알림 — 세무사·조회 전용으로 만든 계정이 직원 권한(쓰기 가능)으로 남음.
+      const { error: roleError } = await admin.from("users").update({ name, role }).eq("id", data.user.id);
+      if (roleError) {
+        revalidatePath("/backups");
+        return {
+          error: `계정은 만들어졌지만 이름·역할을 저장하지 못했습니다(지금은 직원 권한). 아래 계정 목록에서 역할을 다시 지정해주세요. (${roleError.message})`,
+        };
+      }
     }
     revalidatePath("/backups");
     return {};
@@ -259,7 +265,12 @@ export async function unsuspendAccount(formData: FormData): Promise<{ error?: st
       }
       return { error: error.message };
     }
-    await admin.from("users").update({ resuspend_at: resuspendAt }).eq("id", userId);
+    const { error: scheduleError } = await admin.from("users").update({ resuspend_at: resuspendAt }).eq("id", userId);
+    if (scheduleError) {
+      // 다시 정지할 시각을 못 남기면 그대로 열려 있게 되므로 바로 다시 정지
+      await admin.auth.admin.updateUserById(userId, { ban_duration: TAX_AGENT_SUSPEND_DURATION });
+      return { error: `정지 해제 기록을 저장하지 못해 다시 정지해 두었습니다. 잠시 후 다시 시도해주세요. (${scheduleError.message})` };
+    }
     revalidatePath("/backups");
     return {};
   } catch (err) {

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { deleteBlockReason, deleteErrorMessage, OFFICE_LINKS } from "@/lib/deleteGuard";
 
 function parse(formData: FormData) {
   return {
@@ -29,7 +30,9 @@ export async function updateOfficeRecord(formData: FormData) {
 export async function deleteOfficeRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
+  const blocked = await deleteBlockReason(supabase, OFFICE_LINKS, id, "이 사무소에", "일용직을 다른 사무소로 옮긴 뒤 삭제해주세요.");
+  if (blocked) return { error: blocked };
   const { error } = await supabase.from("daily_worker_offices").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: deleteErrorMessage(error) };
   revalidatePath("/daily-workers");
 }

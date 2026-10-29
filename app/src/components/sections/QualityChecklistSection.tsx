@@ -12,6 +12,7 @@ import {
 import { KnowHowSection } from "@/components/KnowHowSection";
 import { createKnowHowNote, updateKnowHowNote, deleteKnowHowNote } from "@/lib/actions/knowHow";
 import { Card } from "@/components/ui/Card";
+import { fetchAllData } from "@/lib/supabaseFetchAll";
 
 function buildFields(projectSearchOptions: { value: string; label: string; year: number; siteLabel: string }[]): FieldConfig[] {
   return [
@@ -47,7 +48,14 @@ function buildFields(projectSearchOptions: { value: string; label: string; year:
 export async function QualityChecklistSection({ projectId }: { projectId?: string }) {
   const supabase = await createClient();
   const [{ data: projectTree }, { data: items }, { data: knowHowNotes }] = await Promise.all([
-    supabase.from("projects").select("id, name, year, site_id, sites(name, clients(name))").order("name"),
+    fetchAllData((from, to) =>
+      supabase
+        .from("projects")
+        .select("id, name, year, site_id, sites(name, clients(name))")
+        .order("name")
+        .order("id")
+        .range(from, to)
+    ),
     projectId
       ? supabase
           .from("quality_checklist_items")

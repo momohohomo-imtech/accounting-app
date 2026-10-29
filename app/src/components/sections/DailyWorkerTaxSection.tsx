@@ -7,7 +7,7 @@ import { DailyWorkerUsageLogForm } from "@/components/DailyWorkerUsageLogForm";
 import { DailyWorkerUsageStatementTable } from "@/components/DailyWorkerUsageStatementTable";
 import { DailyWorkerUsageStatementExportButtons } from "@/components/DailyWorkerUsageStatementExportButtons";
 import { nowKst } from "@/lib/kstDate";
-import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { fetchAllRows, fetchAllData } from "@/lib/supabaseFetchAll";
 
 type UsageLogRow = {
   id: string;
@@ -36,7 +36,7 @@ export async function DailyWorkerTaxSection({ year, month }: { year?: string; mo
   const [{ data: offices }, { data: workers }, { data: sites }, { data: logs }, { data: firstLog }] = await Promise.all([
     supabase.from("daily_worker_offices").select("id, name").order("name"),
     supabase.from("daily_workers").select("id, name, office_id, status, grade").eq("status", "active").order("name"),
-    supabase.from("sites").select("id, name").order("name"),
+    fetchAllData((from, to) => supabase.from("sites").select("id, name").order("name").order("id").range(from, to)),
     // 세무사 제출용 문서라 한 달 사용 기록이 1000건을 넘어도 빠지면 안 됨 — 끝까지 가져온다.
     fetchAllRows<UsageLogRow>((from, to) =>
       supabase

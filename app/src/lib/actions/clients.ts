@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { deleteBlockReason, deleteErrorMessage, CLIENT_LINKS } from "@/lib/deleteGuard";
 
 function parse(formData: FormData) {
   return {
@@ -38,7 +39,15 @@ export async function updateClientRecord(formData: FormData) {
 export async function deleteClientRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
+  const blocked = await deleteBlockReason(
+    supabase,
+    CLIENT_LINKS,
+    id,
+    "이 거래처에",
+    "다른 거래처로 바꾼 뒤 삭제해주세요(그대로 지우면 거래의 거래처 칸이 빈칸이 됨)."
+  );
+  if (blocked) return { error: blocked };
   const { error } = await supabase.from("clients").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: deleteErrorMessage(error) };
   revalidatePath("/transactions");
 }

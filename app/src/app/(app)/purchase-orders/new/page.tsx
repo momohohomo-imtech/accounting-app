@@ -1,13 +1,23 @@
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { PurchaseOrderForm } from "@/components/PurchaseOrderForm";
+import { fetchAllData } from "@/lib/supabaseFetchAll";
 
 export default async function NewPurchaseOrderPage() {
   const supabase = await createClient();
   const [{ data: clients }, { data: sites }, { data: projects }] = await Promise.all([
-    supabase.from("clients").select("id, name").order("name"),
-    supabase.from("sites").select("id, name, clients(name)").order("name"),
-    supabase.from("projects").select("id, name, site_id, status, year, project_code").order("name"),
+    fetchAllData((from, to) => supabase.from("clients").select("id, name").order("name").order("id").range(from, to)),
+    fetchAllData((from, to) =>
+      supabase.from("sites").select("id, name, clients(name)").order("name").order("id").range(from, to)
+    ),
+    fetchAllData((from, to) =>
+      supabase
+        .from("projects")
+        .select("id, name, site_id, status, year, project_code")
+        .order("name")
+        .order("id")
+        .range(from, to)
+    ),
   ]);
 
   const siteOptions = (sites ?? []).map((s) => ({

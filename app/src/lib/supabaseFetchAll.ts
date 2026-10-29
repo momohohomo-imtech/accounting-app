@@ -23,6 +23,15 @@ export async function fetchAllRows<T>(
   return all;
 }
 
+// 해마다 늘어나는 목록(거래처·프로젝트·현장·메모)을 끝까지 — 선택칸·보고서가 1,000줄에서 조용히 잘리지 않게. 기존
+// 호출부의 `{ data }` 모양 그대로 돌려줌. 이름순처럼 겹칠 수 있는 정렬이면 마지막에 id 정렬을 붙여 페이지가 겹치거나
+// 빠지지 않게 할 것.
+export function fetchAllData<T>(
+  buildQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>
+) {
+  return fetchAllRows<T>(buildQuery).then((data) => ({ data }));
+}
+
 // 외상 정산 이력 전체 — 외상 거래의 완납 여부(isLedgerVisible)·잔액 계산에 여러 화면에서 공통으로 씀.
 export function fetchAllCreditPayments(supabase: Awaited<ReturnType<typeof createClient>>) {
   return fetchAllRows<CreditPayment>((from, to) =>

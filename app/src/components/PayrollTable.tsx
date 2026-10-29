@@ -34,11 +34,12 @@ export function PayrollTable({
   payroll: PayrollRow[];
   employees: EmployeeOption[];
   year: number;
-  updateAction: (formData: FormData) => void | Promise<void>;
-  deleteAction: (formData: FormData) => void;
+  updateAction: (formData: FormData) => unknown;
+  deleteAction: (formData: FormData) => unknown;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const pending = useGlobalPending();
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -102,10 +103,8 @@ export function PayrollTable({
                 <td colSpan={7} className="py-3 pr-4">
                   <PayrollForm
                     employees={employees}
-                    action={async (fd) => {
-                      await updateAction(fd);
-                      setEditingId(null);
-                    }}
+                    action={updateAction}
+                    onDone={() => setEditingId(null)}
                     initial={p}
                     submitLabel="수정 저장"
                     onCancel={() => setEditingId(null)}
@@ -140,19 +139,35 @@ export function PayrollTable({
                       onSubmit={async (e) => {
                         e.preventDefault();
                         const fd = new FormData(e.currentTarget);
-                        await pending.run(() => Promise.resolve(deleteAction(fd)));
+                        const result = await pending.run(() => Promise.resolve(deleteAction(fd)));
+                        if (result && typeof result === "object" && "error" in result && result.error) {
+                          setDeleteError(String(result.error));
+                          return;
+                        }
+                        setDeleteError(null);
                         setConfirmDeleteId(null);
                       }}
-                      className="flex items-center gap-1"
+                      className="flex flex-col items-end gap-1"
                     >
-                      <input type="hidden" name="id" value={p.id} />
-                      <span className="text-xs font-medium text-red-600">정말 삭제?</span>
-                      <Button variant="danger" size="xs" type="submit">
-                        확인
-                      </Button>
-                      <Button variant="secondary" size="xs" type="button" onClick={() => setConfirmDeleteId(null)}>
-                        취소
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <input type="hidden" name="id" value={p.id} />
+                        <span className="text-xs font-medium text-red-600">정말 삭제?</span>
+                        <Button variant="danger" size="xs" type="submit">
+                          확인
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="xs"
+                          type="button"
+                          onClick={() => {
+                            setConfirmDeleteId(null);
+                            setDeleteError(null);
+                          }}
+                        >
+                          취소
+                        </Button>
+                      </div>
+                      {deleteError && <p className="max-w-xs text-right text-xs text-red-600">{deleteError}</p>}
                     </form>
                   ) : (
                     <Button variant="danger" size="xs" type="button" onClick={() => setConfirmDeleteId(p.id)}>

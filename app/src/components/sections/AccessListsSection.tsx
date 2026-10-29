@@ -8,6 +8,7 @@ import { AccessListSubmitButton } from "@/components/AccessListSubmitButton";
 import { AccessListCard } from "@/components/AccessListCard";
 import { YearMonthFilter } from "@/components/YearMonthFilter";
 import { nowKst } from "@/lib/kstDate";
+import { fetchAllData } from "@/lib/supabaseFetchAll";
 
 const FLOOR_YEAR = 2026;
 
@@ -29,7 +30,7 @@ export async function AccessListsSection({ year, month }: { year?: string; month
 
   const [{ data: sites }, { data: offices }, { data: workers }, { data: employeesRaw }, { data: allLists }, { data: lists }] =
     await Promise.all([
-      supabase.from("sites").select("id, name").order("name"),
+      fetchAllData((from, to) => supabase.from("sites").select("id, name").order("name").order("id").range(from, to)),
       supabase.from("daily_worker_offices").select("id, name").order("name"),
       supabase.from("daily_workers").select("id, name, office_id, status, grade").eq("status", "active").order("name"),
       supabase.from("employees").select("id, name, employee_no"),

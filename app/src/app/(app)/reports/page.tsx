@@ -43,7 +43,7 @@ import { tripProjectRows } from "@/lib/tripOverview";
 import { TripOverviewReport } from "@/components/TripOverviewReport";
 import { parseMonthRange } from "@/lib/monthRange";
 import { ReportExcelButton } from "@/components/ReportExcelButton";
-import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
+import { fetchAllRows, fetchAllCreditPayments, fetchAllData } from "@/lib/supabaseFetchAll";
 import { purchaseCostOf, salesSupplyOf, supplyOf, vatOf } from "@/lib/vatBasis";
 import type { WorkLog } from "@/lib/types";
 import { nowKst } from "@/lib/kstDate";
@@ -188,7 +188,7 @@ export default async function ReportsPage({
           .range(from, to)
       ).then((data) => ({ data })),
       supabase.from("expense_categories").select("id, name, project_only, color").order("sort_order"),
-      supabase.from("clients").select("name").order("name"),
+      fetchAllData((from, to) => supabase.from("clients").select("name").order("name").order("id").range(from, to)),
       // 현재 자금 내역용 — 선택 연도와 무관하게 항상 "현재 시점" 기준이라 연도 필터를 안 건다.
       supabase.from("bank_accounts").select("id, opening_balance"),
       fetchAllRows<{ bank_account_id: string; direction: string; amount: number }>((from, to) =>
@@ -639,7 +639,7 @@ export default async function ReportsPage({
         .order("id", { ascending: true })
         .range(from, to)
     ),
-    supabase.from("sites").select("id, name, color"),
+    fetchAllData((from, to) => supabase.from("sites").select("id, name, color").order("id").range(from, to)),
     fetchAllRows<{ id: string; log_date: string; site_id: string | null; title: string | null }>((from, to) =>
       supabase
         .from("work_logs")

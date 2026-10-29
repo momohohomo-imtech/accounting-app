@@ -560,7 +560,10 @@ export function EntityTable({
                       취소
                     </Button>
                   </div>
-                  {deleteError && <span className="max-w-[200px] text-right text-xs text-red-600">{deleteError}</span>}
+                  {deleteError && (
+                    // 관리 칸은 줄바꿈 안 함(whitespace-nowrap) — 긴 안내(연결된 자료 N건…)는 이 안에서만 줄바꿈
+                    <span className="max-w-[240px] whitespace-normal text-right text-xs text-red-600">{deleteError}</span>
+                  )}
                 </div>
               ) : (
                 <Button

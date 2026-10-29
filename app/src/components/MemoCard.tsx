@@ -26,27 +26,39 @@ export function MemoCard({
   moveScope?: string | null;
   isFirst: boolean;
   isLast: boolean;
-  updateAction: (formData: FormData) => void;
-  deleteAction: (formData: FormData) => void;
-  moveAction: (formData: FormData) => void;
+  updateAction: (formData: FormData) => unknown;
+  deleteAction: (formData: FormData) => unknown;
+  moveAction: (formData: FormData) => unknown;
 }) {
   const pending = useGlobalPending();
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // 실패하면 카드에 오류를 보여 주고 true(성공) 대신 false
+  async function run(action: (fd: FormData) => unknown, fd: FormData) {
+    const result = await pending.run(() => Promise.resolve(action(fd)));
+    if (result && typeof result === "object" && "error" in result && result.error) {
+      setError(`저장하지 못했습니다: ${String(result.error)}`);
+      return false;
+    }
+    setError(null);
+    return true;
+  }
 
   async function handleMove(direction: "up" | "down") {
     const fd = new FormData();
     fd.append("id", memo.id);
     fd.append("direction", direction);
     if (moveScope) fd.append("scope", moveScope);
-    await pending.run(() => Promise.resolve(moveAction(fd)));
+    await run(moveAction, fd);
   }
 
   async function handleDelete() {
     const fd = new FormData();
     fd.append("id", memo.id);
-    await pending.run(() => Promise.resolve(deleteAction(fd)));
+    if (!(await run(deleteAction, fd))) setOpen(true);
   }
 
   if (editing) {
@@ -56,8 +68,7 @@ export function MemoCard({
           onSubmit={async (e) => {
             e.preventDefault();
             const fd = new FormData(e.currentTarget);
-            await pending.run(() => Promise.resolve(updateAction(fd)));
-            setEditing(false);
+            if (await run(updateAction, fd)) setEditing(false);
           }}
           className="space-y-3"
         >
@@ -71,11 +82,20 @@ export function MemoCard({
             <label className={labelClass}>내용</label>
             <textarea name="content" defaultValue={memo.content ?? ""} rows={5} className={fieldClass} />
           </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex items-center gap-2">
             <Button type="submit" size="sm">
               저장
             </Button>
-            <Button type="button" variant="secondary" size="sm" onClick={() => setEditing(false)}>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setEditing(false);
+                setError(null);
+              }}
+            >
               취소
             </Button>
           </div>
@@ -139,6 +159,7 @@ export function MemoCard({
           <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-slate-400">{formatDate(memo.created_at)}</span>
         </button>
       </div>
+      {error && <p className="px-4 pb-2 text-sm text-red-600 print:hidden">{error}</p>}
 
       <div id={contentId} className={`${open ? "" : "hidden print:block"} border-t border-slate-100 px-4 pb-4 pt-3`}>
         <div className="flex flex-wrap items-center justify-between gap-2">

@@ -89,18 +89,22 @@ function valuesFromInitial(p: PayrollInitial): Values {
 export function PayrollForm({
   employees,
   action,
+  onDone,
   initial,
   submitLabel = "등록",
   onCancel,
 }: {
   employees: EmployeeOption[];
-  action: (formData: FormData) => void | Promise<void>;
+  action: (formData: FormData) => unknown;
+  // 저장이 성공했을 때만(실패하면 폼을 그대로 두고 오류를 보여 줌)
+  onDone?: () => void;
   initial?: PayrollInitial;
   submitLabel?: string;
   onCancel?: () => void;
 }) {
   const confirm = useConfirm();
   const pending = useGlobalPending();
+  const [error, setError] = useState<string | null>(null);
   const [employeeId, setEmployeeId] = useState(initial?.employee_id ?? employees[0]?.id ?? "");
   const [values, setValues] = useState<Values>(() =>
     initial ? valuesFromInitial(initial) : defaultsFor(employees[0])
@@ -133,7 +137,13 @@ export function PayrollForm({
         e.preventDefault();
         const form = e.currentTarget;
         if (!(await confirm(initial ? "수정 내용을 저장하시겠습니까?" : "이 급여를 등록하시겠습니까?"))) return;
-        await pending.run(() => Promise.resolve(action(new FormData(form))));
+        const result = await pending.run(() => Promise.resolve(action(new FormData(form))));
+        if (result && typeof result === "object" && "error" in result && result.error) {
+          setError(String(result.error));
+          return;
+        }
+        setError(null);
+        onDone?.();
       }}
       className="space-y-3"
     >
@@ -265,6 +275,7 @@ export function PayrollForm({
         </span>
       </div>
 
+      {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex gap-2">
         <Button type="submit">{submitLabel}</Button>
         {onCancel && (

@@ -4,6 +4,7 @@ import { one } from "@/lib/relations";
 import { QuoteForm } from "@/components/QuoteForm";
 import { QuotePrintView } from "@/components/QuotePrintView";
 import { fetchCompanyProfiles } from "@/lib/companyProfileQuery";
+import { fetchAllData } from "@/lib/supabaseFetchAll";
 
 export default async function EditQuotePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -18,9 +19,18 @@ export default async function EditQuotePage({ params }: { params: Promise<{ id: 
   ] = await Promise.all([
     supabase.from("quotes").select("*, clients(name)").eq("id", id).single(),
     supabase.from("quote_items").select("*").eq("quote_id", id).order("sort_order", { ascending: true }),
-    supabase.from("clients").select("id, name").order("name"),
-    supabase.from("sites").select("id, name, clients(name)").order("name"),
-    supabase.from("projects").select("id, name, site_id, status, year, project_code").order("name"),
+    fetchAllData((from, to) => supabase.from("clients").select("id, name").order("name").order("id").range(from, to)),
+    fetchAllData((from, to) =>
+      supabase.from("sites").select("id, name, clients(name)").order("name").order("id").range(from, to)
+    ),
+    fetchAllData((from, to) =>
+      supabase
+        .from("projects")
+        .select("id, name, site_id, status, year, project_code")
+        .order("name")
+        .order("id")
+        .range(from, to)
+    ),
     fetchCompanyProfiles(supabase),
   ]);
 

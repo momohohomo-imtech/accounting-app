@@ -11,6 +11,7 @@ export function ProjectSummaryMemoEditor({ projectId, initialMemo }: { projectId
   const [memo, setMemo] = useState(initialMemo ?? "");
   const [savedMemo, setSavedMemo] = useState(initialMemo ?? "");
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const globalPending = useGlobalPending();
   const dirty = memo !== savedMemo;
   const hasMemo = memo.trim().length > 0;
@@ -21,7 +22,12 @@ export function ProjectSummaryMemoEditor({ projectId, initialMemo }: { projectId
     fd.set("id", projectId);
     fd.set("memo", memo);
     startTransition(async () => {
-      await globalPending.run(() => updateProjectMemo(fd));
+      const result = await globalPending.run(() => updateProjectMemo(fd));
+      if (result?.error) {
+        setError(`저장하지 못했습니다: ${result.error}`);
+        return;
+      }
+      setError(null);
       setSavedMemo(memo);
     });
   }
@@ -46,6 +52,7 @@ export function ProjectSummaryMemoEditor({ projectId, initialMemo }: { projectId
         placeholder="이 프로젝트에 대한 메모를 남겨주세요"
         className="w-full resize-y rounded-lg border border-slate-300 px-2 py-1.5 text-sm text-slate-700 print:hidden"
       />
+      {error && <p className="text-sm text-red-600 print:hidden">{error}</p>}
       {hasMemo && (
         <p className="hidden whitespace-pre-wrap text-sm text-slate-700 print:block print:text-[10px]">{memo}</p>
       )}

@@ -23,7 +23,8 @@ export async function GET(req: NextRequest) {
       const { data: signed } = await supabase.storage.from("backups").createSignedUrl(fileName, 60 * 60 * 24);
       await sendEmail({
         to: emailTo,
-        subject: `[IM테크 회계 관리 시스템] ${new Date().toLocaleDateString("ko-KR")} 자동 백업 완료`,
+        // 한국 날짜로 — 서버는 UTC라 일요일 오전 6시(한국) 백업이 토요일 날짜로 나왔음
+        subject: `[IM테크 회계 관리 시스템] ${new Date().toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} 자동 백업 완료`,
         html: `
           <p>오늘의 자동 백업이 완료되었습니다.</p>
           <p>파일명: ${fileName}<br/>크기: ${sizeMb.toFixed(2)}MB</p>

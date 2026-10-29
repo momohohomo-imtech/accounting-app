@@ -5,7 +5,7 @@ import { fieldClass, labelClass } from "@/components/ui/field";
 import { Button } from "@/components/ui/Button";
 
 export function ReportMemoField() {
-  const { memo, setMemo, dirty, isPending, save } = useMemoEditor();
+  const { memo, setMemo, dirty, isPending, save, error } = useMemoEditor();
   const hasMemo = memo.trim().length > 0;
 
   return (
@@ -19,6 +19,7 @@ export function ReportMemoField() {
         className={`${fieldClass} print:hidden`}
       />
       {hasMemo && <p className="hidden text-xs whitespace-pre-wrap text-slate-700 print:block">{memo}</p>}
+      {error && <p className="text-sm text-red-600 print:hidden">{error}</p>}
       <Button type="button" variant="secondary" size="sm" className="print:hidden" onClick={save} disabled={isPending || !dirty}>
         {isPending ? "저장 중..." : "메모 저장"}
       </Button>

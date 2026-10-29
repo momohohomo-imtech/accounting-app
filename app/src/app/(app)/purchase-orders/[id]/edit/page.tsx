@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { PurchaseOrderForm } from "@/components/PurchaseOrderForm";
 import { PurchaseOrderPrintView } from "@/components/PurchaseOrderPrintView";
+import { fetchAllData } from "@/lib/supabaseFetchAll";
 
 export default async function EditPurchaseOrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -11,9 +12,18 @@ export default async function EditPurchaseOrderPage({ params }: { params: Promis
     await Promise.all([
       supabase.from("purchase_orders").select("*, clients(name), projects(name, project_code)").eq("id", id).single(),
       supabase.from("purchase_order_items").select("*").eq("purchase_order_id", id).order("sort_order", { ascending: true }),
-      supabase.from("clients").select("id, name").order("name"),
-      supabase.from("sites").select("id, name, clients(name)").order("name"),
-      supabase.from("projects").select("id, name, site_id, status, year, project_code").order("name"),
+      fetchAllData((from, to) => supabase.from("clients").select("id, name").order("name").order("id").range(from, to)),
+      fetchAllData((from, to) =>
+        supabase.from("sites").select("id, name, clients(name)").order("name").order("id").range(from, to)
+      ),
+      fetchAllData((from, to) =>
+        supabase
+          .from("projects")
+          .select("id, name, site_id, status, year, project_code")
+          .order("name")
+          .order("id")
+          .range(from, to)
+      ),
     ]);
 
   if (!purchaseOrder) notFound();

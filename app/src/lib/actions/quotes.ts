@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import { profileToCompanyInfo, type CompanyProfileRow, type QuoteCompanyInfo } from "@/lib/companyProfile";
 
 export type QuoteItemInput = {
@@ -34,7 +35,10 @@ async function saveItems(
   quoteId: string,
   items: QuoteItemInput[]
 ): Promise<{ error?: string }> {
-  await supabase.from("quote_items").delete().eq("quote_id", quoteId);
+  // 새 품목을 먼저 넣고 예전 품목을 지움 — 넣기가 실패해도 예전 품목은 그대로 남게(예전엔 먼저 지워서, 넣기가 실패하면
+  // 품목이 빈 문서가 됐음).
+  const { data: oldItems, error: oldError } = await supabase.from("quote_items").select("id").eq("quote_id", quoteId);
+  if (oldError) return { error: oldError.message };
   const rows = items
     .filter((it) => it.item_name || it.amount)
     .map((it, i) => ({
@@ -54,6 +58,11 @@ async function saveItems(
   if (rows.length > 0) {
     const { error } = await supabase.from("quote_items").insert(rows);
     if (error) return { error: error.message };
+  }
+  const oldIds = (oldItems ?? []).map((r) => r.id as string);
+  if (oldIds.length > 0) {
+    const { error } = await supabase.from("quote_items").delete().in("id", oldIds);
+    if (error) return { error: `새 품목은 저장됐지만 예전 품목을 지우지 못했습니다(한 번 더 저장하면 정리됩니다): ${error.message}` };
   }
   return {};
 }
@@ -151,14 +160,25 @@ export async function deleteQuoteRecord(formData: FormData) {
 // 기존 프로젝트의 매입 내역 + 대행구매 내역을 그대로 견적 품목 초안으로 불러오기.
 export async function fetchProjectPurchaseItems(projectId: string): Promise<QuoteItemInput[]> {
   const supabase = await createClient();
-  const [{ data: transactions }, { data: agencyPurchases }] = await Promise.all([
-    supabase
-      .from("transactions")
-      .select("item_name, quantity, unit_price, purchase_amount, purchase_vat")
-      .eq("project_id", projectId)
-      .eq("type", "매입")
-      .order("trans_date", { ascending: true }),
-    supabase.from("project_agency_purchases").select("item_name, amount, memo").eq("project_id", projectId),
+  const [transactions, agencyPurchases] = await Promise.all([
+    fetchAllRows((from, to) =>
+      supabase
+        .from("transactions")
+        .select("item_name, quantity, unit_price, purchase_amount, purchase_vat")
+        .eq("project_id", projectId)
+        .eq("type", "매입")
+        .order("trans_date", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
+    fetchAllRows((from, to) =>
+      supabase
+        .from("project_agency_purchases")
+        .select("item_name, amount, memo")
+        .eq("project_id", projectId)
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
   ]);
 
   const fromTransactions = (transactions ?? []).map((t) => ({

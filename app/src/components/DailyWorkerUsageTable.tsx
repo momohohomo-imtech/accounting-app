@@ -13,6 +13,7 @@ type SortKey = "trans_date" | "client_name" | "amount";
 function NoteCell({ id, initialNote }: { id: string; initialNote: string }) {
   const [value, setValue] = useState(initialNote);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const pending = useGlobalPending();
 
   async function handleBlur() {
@@ -21,19 +22,25 @@ function NoteCell({ id, initialNote }: { id: string; initialNote: string }) {
     const fd = new FormData();
     fd.append("id", id);
     fd.append("note1", value);
-    await pending.run(() => updateTransactionNote(fd));
+    const result = await pending.run(() => updateTransactionNote(fd));
     setSaving(false);
+    setError(result?.error ? `저장하지 못했습니다: ${result.error}` : null);
   }
 
   return (
-    <input
-      value={value}
-      onChange={(e) => setValue(e.target.value)}
-      onBlur={handleBlur}
-      placeholder="비고 입력"
-      className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-sm hover:border-slate-200 focus:border-slate-400 focus:bg-white focus:outline-none"
-      title={saving ? "저장 중..." : undefined}
-    />
+    <div>
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={handleBlur}
+        placeholder="비고 입력"
+        className={`w-full rounded-lg border px-2 py-1 text-sm hover:border-slate-200 focus:border-slate-400 focus:bg-white focus:outline-none ${
+          error ? "border-red-400" : "border-transparent bg-transparent"
+        }`}
+        title={error ?? (saving ? "저장 중..." : undefined)}
+      />
+      {error && <p className="mt-0.5 text-xs text-red-600">{error}</p>}
+    </div>
   );
 }
 

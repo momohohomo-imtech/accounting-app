@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { deleteBlockReason, deleteErrorMessage, BANK_ACCOUNT_LINKS } from "@/lib/deleteGuard";
 
 function parseAccount(formData: FormData) {
   return {
@@ -53,8 +54,16 @@ export async function updateBankAccountMemo(formData: FormData) {
 export async function deleteBankAccountRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
+  const blocked = await deleteBlockReason(
+    supabase,
+    BANK_ACCOUNT_LINKS,
+    id,
+    "이 계좌에",
+    "계좌를 지우면 통장 거래가 같이 지워집니다 — 꼭 지워야 하면 통장 거래를 먼저 지워주세요."
+  );
+  if (blocked) return { error: blocked };
   const { error } = await supabase.from("bank_accounts").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: deleteErrorMessage(error) };
   revalidatePath("/bank");
 }
 
@@ -188,7 +197,15 @@ export async function promoteBankTransactionToLedger(formData: FormData) {
     .single();
   if (error || !inserted) return { error: error?.message ?? "매입/매출장 등록에 실패했습니다." };
 
-  await supabase.from("bank_transactions").update({ promoted_transaction_id: inserted.id }).eq("id", id);
+  const { error: linkError } = await supabase
+    .from("bank_transactions")
+    .update({ promoted_transaction_id: inserted.id })
+    .eq("id", id);
+  if (linkError) {
+    // 연결을 못 남기면 다시 올릴 때 장부에 두 번 들어가므로 방금 넣은 거래를 되돌림
+    await supabase.from("transactions").delete().eq("id", inserted.id);
+    return { error: `매입/매출장 등록을 취소했습니다(연결 저장 실패): ${linkError.message}` };
+  }
   revalidatePath("/bank");
   revalidatePath("/transactions");
 }

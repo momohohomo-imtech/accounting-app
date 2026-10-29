@@ -43,6 +43,13 @@
   `app/src/components/crud/CreatePanel.tsx`가 정석 예시. 서버 렌더링 폼(`<form action={서버액션}>`)이라 `run()`을
   못 쓰면 제출 버튼에서 `useFormStatus()`의 `pending`일 때 `PendingOverlay`를 띄울 것(`AccessListSubmitButton`).
 
+- **서버 액션은 실패를 `{ error }`로 돌려주고 화면에 보여 줄 것**(오류를 버리지 말 것 — 예전엔 직원·급여·메모 등에서 저장이
+  실패해도 된 것처럼 보였음). 폼은 실패하면 닫지 말고 입력한 내용을 그대로 둘 것(`form action`은 끝나면 입력칸을 비우므로
+  `onSubmit` + `preventDefault`, `MemoCreateForm` 예시). 체크칸처럼 바로 저장하는 칸은 실패하면 원래 값으로 되돌릴 것.
+- **지우면 다른 자료가 같이 지워지거나 연결이 끊기는 항목은 `lib/deleteGuard.ts`로 삭제를 막고 무엇이 몇 건인지 안내할 것**
+  (프로젝트·거래처·직원·일용직·계좌·현장·카테고리·결제수단·사무소). DB 규칙(on delete cascade·set null)을 새로 걸면 그 항목의
+  `*_LINKS`에도 넣을 것. 확인 조회가 실패하면 지우지 않음.
+
 - **휴대폰에서도 표·숫자가 읽히게 만들 것.** 휴대폰으로 많이 쓰는 앱이라, 새 표나
   숫자 칸도 예외 없이 적용. 넓은 표가 칸을 우겨넣거나 박스를 넘어가서 "어느 행인지
   따라가기 힘들다"는 문제가 있었음.
@@ -117,10 +124,16 @@
   );
   ```
   카테고리·결제수단·계좌처럼 몇십 행에서 늘지 않는 설정 목록이나, `.eq("id", …)`·
-  `.maybeSingle()`처럼 결과가 정해진 조회는 그냥 조회해도 됨.
+  `.maybeSingle()`처럼 결과가 정해진 조회는 그냥 조회해도 됨. 해마다 늘어나는 선택 목록(거래처·연도 무관 프로젝트·현장·메모)은
+  `fetchAllData`(기존 `{ data }` 모양 그대로) — 이름순처럼 겹칠 수 있는 정렬이면 끝에 `.order("id")`를 붙일 것.
   백업(`lib/backup.ts`)도 표마다 고유 칸 순으로 끝까지 읽음 — 예전엔 한 번에 `select`해서 백업 파일이 표마다 1,000줄에서
   잘렸음(복원은 다 지우고 파일 내용만 넣어서 나머지가 영구히 사라짐). 백업에 새 표를 넣으면 고유 칸(`id`, 없으면 `ORDER_KEY`)을
   확인하고, 복원은 `restoreBlockReason`(잘린·손상 파일 막기)을 거치게 둘 것.
+- **새 표를 만들면 백업·복원 목록에 같이 넣을 것**: `lib/backup.ts`의 `BACKUP_TABLES` + `supabase/096_atomic_restore.sql`의
+  `restore_allowed_tables()`(새 SQL에서 함수를 다시 만들어 목록 추가 — `restore.test.ts`가 앱 목록과 비교). 예전엔 공사 메모·일용직
+  사용내역 등이 빠져 있어 백업으로 못 되살렸고, 복원 때 프로젝트·일용직을 지우면서 같이 지워졌음. 복원은 DB 함수
+  (`restore_stage`로 나눠 올리고 `restore_commit`으로 한 번에 — 하나라도 실패하면 전부 취소)로만 — 앱에서 표마다 지우고 넣지 말 것.
+  백업에 없는 표 중 바꾸는 표를 참조하는 표는 함수가 지금 자료를 보관했다 되돌림(예전 백업 복원 대비).
 
 - **금액 입력칸은 `@/components/ui/MoneyInput`을 쓸 것**(`type="number"` 대신). 입력하는 동안 천 단위
   쉼표("1,234,567")가 보이고, 폼으로 제출되는 값(`name`)은 숨은 칸에 쉼표 없는 숫자로 들어감.
@@ -130,7 +143,8 @@
 - **금액 계산을 바꾸면 `npm test`(app 폴더)로 자동 검사를 돌릴 것.** 부가세 분리(`vatBasis`),
   외상 잔액(`credit`), 종합소득세(`tax`), 견적 금액·한글 금액(`quoteCalc`·`numberToKorean`),
   예상 미수액·프로젝트 받은 돈(`expectedReceivable`), 이익 예상(`projectProfit` — 대시보드·보고서 공통), 엑셀 거래 읽기(`transactionExcel`), 작업일지 집계(`workLogSummary`), 출장일지 합계·보고서 작업일수 나눔·출장 투입 인원(`tripLog`), 보고서 출장 현황(`tripOverview`), 매입장 한 결제 묶기(`paymentGroup`), 장부 점검(`ledgerCheck`), 거래 수정 이력 표시·일괄 변경 접기(`transactionHistory`), 백업
-  끝까지 담기·복원 막기(`backup`), 백업 상태(`backupStatus`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
+  끝까지 담기(`backup`), 복원 막기·표 목록·나눠 올리기(`restore`), 백업 상태(`backupStatus`), 삭제 막기(`deleteGuard`), 급여 중복
+  확인(`payrollDuplicates`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
   (vitest는 npm 설치 오류로 못 씀 — 새 테스트 라이브러리를 넣지 말 것)

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { nowKst } from "@/lib/kstDate";
+import { PROJECT_LINKS, deleteBlockReason, deleteErrorMessage } from "@/lib/deleteGuard";
 
 function parse(formData: FormData) {
   const estimated = formData.get("contract_amount_estimated") === "on";
@@ -117,7 +118,8 @@ export async function updateProjectMemo(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
   const memo = String(formData.get("memo") ?? "") || null;
-  await supabase.from("projects").update({ memo }).eq("id", id);
+  const { error } = await supabase.from("projects").update({ memo }).eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/projects");
   revalidatePath("/reports");
 }
@@ -126,7 +128,8 @@ export async function updateProjectSettlementFinalized(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
   const settlementFinalized = formData.get("settlement_finalized") === "on";
-  await supabase.from("projects").update({ settlement_finalized: settlementFinalized }).eq("id", id);
+  const { error } = await supabase.from("projects").update({ settlement_finalized: settlementFinalized }).eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/projects");
   revalidatePath("/reports");
 }
@@ -137,20 +140,36 @@ export async function updateProjectContractAmountFlag(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
   const field = String(formData.get("field"));
-  if (field !== "contract_amount_estimated" && field !== "contract_amount_minimum") return;
+  if (field !== "contract_amount_estimated" && field !== "contract_amount_minimum") return { error: "잘못된 항목입니다." };
   const checked = formData.get("checked") === "on";
   const other = field === "contract_amount_estimated" ? "contract_amount_minimum" : "contract_amount_estimated";
   const update: Record<string, boolean> = { [field]: checked };
   if (checked) update[other] = false;
-  await supabase.from("projects").update(update).eq("id", id);
+  const { error } = await supabase.from("projects").update(update).eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/projects");
   revalidatePath("/reports");
 }
 
+// 거래·작업일지·대행구매·공사 메모 등이 연결된 프로젝트는 막음 — 지우면 대행구매·공사 메모 등은 같이 지워지고 거래는
+// 프로젝트 연결이 끊겨 손익에서 빠졌음(작업일지가 있으면 DB가 막는데 예전엔 오류를 화면에 안 보여서 그냥 안 지워졌음).
 export async function deleteProjectRecord(formData: FormData) {
-  const supabase = await createClient();
-  const id = String(formData.get("id"));
-  await supabase.from("projects").delete().eq("id", id);
-  revalidatePath("/projects");
-  revalidatePath("/reports");
+  try {
+    const supabase = await createClient();
+    const id = String(formData.get("id"));
+    const blocked = await deleteBlockReason(
+      supabase,
+      PROJECT_LINKS,
+      id,
+      "이 프로젝트에",
+      "다른 프로젝트로 옮기거나 먼저 지운 뒤 삭제해주세요."
+    );
+    if (blocked) return { error: blocked };
+    const { error } = await supabase.from("projects").delete().eq("id", id);
+    if (error) return { error: deleteErrorMessage(error) };
+    revalidatePath("/projects");
+    revalidatePath("/reports");
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }
