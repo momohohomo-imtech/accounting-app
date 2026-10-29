@@ -15,6 +15,13 @@ function triggerDownload(buffer: ExcelJS.Buffer, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+export type XlsxSheet = {
+  name: string;
+  headers: string[];
+  rows: (string | number)[][];
+  leadingRows?: (string | number)[][];
+};
+
 export async function downloadXlsx(
   filename: string,
   headers: string[],
@@ -22,7 +29,17 @@ export async function downloadXlsx(
   sheetName = "Sheet1",
   leadingRows: (string | number)[][] = []
 ) {
+  await downloadXlsxSheets(filename, [{ name: sheetName, headers, rows, leadingRows }]);
+}
+
+// 시트 여러 개짜리 엑셀(통합 보고서 — 프로젝트별·매입내역·대행구매·받은 돈 내역). 시트마다 downloadXlsx와 같은 모양.
+export async function downloadXlsxSheets(filename: string, sheets: XlsxSheet[]) {
   const wb = new ExcelJS.Workbook();
+  for (const sheet of sheets) addSheet(wb, sheet);
+  triggerDownload(await wb.xlsx.writeBuffer(), filename);
+}
+
+function addSheet(wb: ExcelJS.Workbook, { name: sheetName, headers, rows, leadingRows = [] }: XlsxSheet) {
   const ws = wb.addWorksheet(sheetName, { views: [{ state: "frozen", ySplit: leadingRows.length + 1 }] });
 
   leadingRows.forEach((r, i) => {
@@ -54,8 +71,6 @@ export async function downloadXlsx(
     });
     ws.getColumn(i).width = Math.min(Math.max(maxLen + 2, 10), 40);
   }
-
-  triggerDownload(await wb.xlsx.writeBuffer(), filename);
 }
 
 export async function downloadToolChecklistXlsx(

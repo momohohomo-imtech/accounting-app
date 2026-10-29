@@ -12,8 +12,14 @@ import { QuotesSection } from "@/components/sections/QuotesSection";
 import { PurchaseOrdersSection } from "@/components/sections/PurchaseOrdersSection";
 import { YearFilter } from "@/components/YearFilter";
 import { ProjectProfitReport } from "@/components/ProjectProfitReport";
+import { ProjectsCombinedReport } from "@/components/ProjectsCombinedReport";
 import { LinkButton } from "@/components/ui/Button";
-import { PROJECT_STATUS_OPTIONS, PROJECT_STATUS_AWAITING_PAYMENT, PROJECT_STATUS_MERGED } from "@/lib/projectStatus";
+import {
+  PROJECT_STATUS_OPTIONS,
+  PROJECT_STATUS_AWAITING_PAYMENT,
+  PROJECT_STATUS_MERGED,
+  projectStatusLabel,
+} from "@/lib/projectStatus";
 import { formatWon } from "@/lib/format";
 import { ProjectListExportButtons } from "@/components/ProjectListExportButtons";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
@@ -25,6 +31,7 @@ import { purchaseCostOf } from "@/lib/vatBasis";
 import { groupProjectProfit } from "@/lib/projectProfit";
 import { expectedReceivableByStatus, receivableOf, receivedSalesByProject } from "@/lib/expectedReceivable";
 import { nowKst } from "@/lib/kstDate";
+import { listTotals, listUnits } from "@/lib/projectListTotals";
 
 const TABS = [
   { key: "list", label: "프로젝트" },
@@ -81,10 +88,12 @@ export default async function ProjectsPage({
     status?: string;
     report?: string;
     own?: string;
+    // 통합 보고서에서 연 프로젝트 보고서 — 닫으면 통합 보고서로 돌아감.
+    back?: string;
     suppliers?: string;
   }>;
 }) {
-  const { tab, year, site_id, status, report, own, suppliers } = await searchParams;
+  const { tab, year, site_id, status, report, own, back, suppliers } = await searchParams;
   const active = tab ?? "list";
 
   return (
@@ -97,11 +106,21 @@ export default async function ProjectsPage({
       {active === "quotes" && <QuotesSection suppliersOpen={suppliers === "1"} />}
       {active === "purchase_orders" && <PurchaseOrdersSection />}
       {active === "list" && (
-        <ProjectListSection year={year} siteId={site_id} status={status} report={report} ownOnly={own === "1"} />
+        <ProjectListSection
+          year={year}
+          siteId={site_id}
+          status={status}
+          report={report}
+          ownOnly={own === "1"}
+          backToCombined={back === COMBINED_REPORT}
+        />
       )}
     </div>
   );
 }
+
+// report=combined — 지금 필터(연도·현장·상태)의 프로젝트 전부를 합친 통합 보고서(그 밖의 값은 프로젝트 id).
+const COMBINED_REPORT = "combined";
 
 async function ProjectListSection({
   year,
@@ -109,6 +128,7 @@ async function ProjectListSection({
   status,
   report,
   ownOnly,
+  backToCombined,
 }: {
   year?: string;
   siteId?: string;
@@ -116,6 +136,7 @@ async function ProjectListSection({
   report?: string;
   // 보고서를 귀속 하위 없이 그 프로젝트만(묶음을 펼친 어미 줄의 "보고서").
   ownOnly: boolean;
+  backToCombined: boolean;
 }) {
   const supabase = await createClient();
   const today = nowKst();
@@ -514,27 +535,18 @@ async function ProjectListSection({
   const listHref = `/projects?tab=list&year=${selectedYear}${siteId ? `&site_id=${siteId}` : ""}${status ? `&status=${encodeURIComponent(status)}` : ""}`;
 
   // 하단 합계 — 그 해 프로젝트만(다른 해 하위는 묶음 표시용으로만 가져온 것 — 그 해 목록에서 셈, 여기서도 세면 두 해에 두 번
-  // 들어감). 발주액·수주예상액·총 매입은 줄마다 자기 값의 합, 이익금은 묶음이면 그 해 프로젝트끼리의 묶음 이익금(발주액 없는
-  // 하위의 매입까지 빠지게, groupProjectProfit), 아니면 자기 이익금.
+  // 들어감). 발주액·수주예상액·총 매입은 줄마다 자기 값의 합, 이익금·미수 금액은 묶음이면 그 해 프로젝트끼리의 묶음 기준(발주액
+  // 없는 하위의 매입까지 빠지게), 아니면 자기 것 — 통합 보고서와 같은 계산(lib/projectListTotals.ts, 필터 없으면 미수 금액
+  // 합계 = 대시보드 수금 예정액).
   const footerRows = tableRows.filter((p) => p.year === selectedYear);
   const otherYearChildCount = tableRows.length - footerRows.length;
   const broughtInChildCount = footerRows.filter((p) => !p.inFilter).length;
-  const filteredQuoteSum = footerRows.reduce((sum, p) => sum + (p.quote_amount ?? 0), 0);
-  const filteredContractSum = footerRows.reduce((sum, p) => sum + p.contractAmountExpected, 0);
-  const filteredProfitSum = footerRows.reduce((sum, p) => {
-    if (inGroup(p)) return sum;
-    if (!groupSummaries[p.id]) return sum + (p.profit ?? 0);
-    const members = footerRows.filter((m) => m.id === p.id || groupTopOf.get(m.id) === p.id);
-    return sum + (groupProjectProfit(members, purchaseByProject, agencyByProject).profit ?? 0);
-  }, 0);
-  const filteredPurchaseSum = footerRows.reduce((sum, p) => sum + p.totalPurchase, 0);
-  // 미수 금액 합계 — 묶음은 그 해 프로젝트끼리의 묶음 미수 금액, 아니면 자기 것(필터 없으면 대시보드 수금 예정액과 같음).
-  const filteredReceivableSum = footerRows.reduce((sum, p) => {
-    if (inGroup(p)) return sum;
-    if (!groupSummaries[p.id]) return sum + (p.receivable ?? 0);
-    const members = footerRows.filter((m) => m.id === p.id || groupTopOf.get(m.id) === p.id);
-    return sum + (receivableOf(members, agencyByProject, receivedByProject)?.amount ?? 0);
-  }, 0);
+  const footerTotals = listTotals(
+    listUnits(footerRows, groupTopOf),
+    purchaseByProject,
+    agencyByProject,
+    receivedByProject
+  );
   // 공사완료 예상 미수액 — 완료 수금대기(귀속 하위는 어미 상태)의 미수 금액(예전엔 받은 돈을 빼지 않은 수주예상액 합계였음).
   // 대시보드 "공사 완료 · 수금 대기"와 같은 계산.
   const awaitingReceivable = expectedReceivableByStatus(
@@ -579,7 +591,14 @@ async function ProjectListSection({
             statusOptions={PROJECT_STATUS_OPTIONS}
             selectedStatuses={statusList}
           />
-          <ProjectListExportButtons year={selectedYear} rows={exportRows} />
+          <div className="flex flex-wrap items-center gap-2">
+            {footerRows.length > 0 && (
+              <LinkButton href={`${listHref}&report=${COMBINED_REPORT}`} scroll={false} variant="secondary" size="sm">
+                통합 보고서
+              </LinkButton>
+            )}
+            <ProjectListExportButtons year={selectedYear} rows={exportRows} />
+          </div>
         </div>
 
         <div className="print:hidden">
@@ -628,19 +647,19 @@ async function ProjectListSection({
               )}
             </span>
             <span>
-              발주액 <span className="tabular-nums font-semibold text-slate-900">{formatWon(filteredQuoteSum)}</span>
+              발주액 <span className="tabular-nums font-semibold text-slate-900">{formatWon(footerTotals.quote)}</span>
             </span>
             <span>
-              수주예상액 <span className="tabular-nums font-semibold text-slate-900">{formatWon(filteredContractSum)}</span>
+              수주예상액 <span className="tabular-nums font-semibold text-slate-900">{formatWon(footerTotals.contractExpected)}</span>
             </span>
             <span>
-              미수 금액 <span className="tabular-nums font-semibold text-slate-900">{formatWon(filteredReceivableSum)}</span>
+              미수 금액 <span className="tabular-nums font-semibold text-slate-900">{formatWon(footerTotals.receivable)}</span>
             </span>
             <span>
-              이익금 <span className="tabular-nums font-semibold text-slate-900">{formatWon(filteredProfitSum)}</span>
+              이익금 <span className="tabular-nums font-semibold text-slate-900">{formatWon(footerTotals.profit)}</span>
             </span>
             <span>
-              총 매입 <span className="tabular-nums font-semibold text-slate-900">{formatWon(filteredPurchaseSum)}</span>
+              총 매입 <span className="tabular-nums font-semibold text-slate-900">{formatWon(footerTotals.purchase + footerTotals.agency)}</span>
             </span>
           </div>
         </div>
@@ -650,13 +669,37 @@ async function ProjectListSection({
         <div
           className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-brand-ink/50 p-4 py-10 print:static print:bg-transparent print:p-0"
         >
-          <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
-            <ProjectProfitReport
-              projectId={report}
-              ownOnly={ownOnly}
-              closeHref={listHref}
-            />
-          </div>
+          {report === COMBINED_REPORT ? (
+            // 통합 보고서는 프로젝트별 표 칸이 많아 더 넓게(PC 1280에서도 표가 상자에 맞게).
+            <div className="w-full max-w-6xl rounded-2xl bg-white p-4 shadow-xl sm:p-6 print:max-w-none print:rounded-none print:p-0 print:shadow-none">
+              <ProjectsCombinedReport
+                year={selectedYear}
+                siteLabel={siteId ? (siteLabelMap.get(siteId) ?? null) : null}
+                statusLabels={statusList.map((s) => projectStatusLabel(s))}
+                projects={footerRows.map((p) => ({
+                  id: p.id,
+                  project_code: p.project_code,
+                  name: p.name,
+                  status: p.status,
+                  parent_project_id: p.parent_project_id,
+                  quote_amount: p.quote_amount,
+                  site_name: p.site_name,
+                }))}
+                topOf={groupTopOf}
+                broughtInCount={broughtInChildCount}
+                otherYearCount={otherYearChildCount}
+                listHref={listHref}
+              />
+            </div>
+          ) : (
+            <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
+              <ProjectProfitReport
+                projectId={report}
+                ownOnly={ownOnly}
+                closeHref={backToCombined ? `${listHref}&report=${COMBINED_REPORT}` : listHref}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
