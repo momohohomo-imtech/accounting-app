@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-const TABLES = [
+// 백업할 표 — 앱이 쓰는 표는 전부(새 표를 만들면 여기와 supabase/096의 restore_allowed_tables()에 같이 넣을 것 — 예전엔
+// 공사 메모·일용직 사용내역 등이 빠져 있어 백업으로 되살릴 수 없었고, 복원 때 프로젝트를 지우면서 같이 지워졌음).
+// 계정(users)·백업 기록(backups)·거래 수정 이력(transaction_history)은 담지 않음.
+export const BACKUP_TABLES = [
   "clients",
   "sites",
   "projects",
@@ -13,6 +16,7 @@ const TABLES = [
   "payroll",
   "daily_worker_offices",
   "daily_workers",
+  "daily_worker_usage_logs",
   "access_lists",
   "access_list_workers",
   "bank_accounts",
@@ -24,18 +28,31 @@ const TABLES = [
   "attachments",
   "quotes",
   "quote_items",
-  // 견적서 공급자 목록 — 백업 파일에만 담고 복구(restore.ts)는 건드리지 않음: 설정값이라 복구해도 지금 값을 그대로
-  // 두는 게 맞고, SQL 089 실행 전이나 이 표가 없던 예전 백업으로 복구할 때 표를 지우다 복구가 멈추는 일도 없음.
+  // 견적서 공급자 목록 — 설정값이라 백업 파일에만 담고 복원(lib/restore.ts)은 건드리지 않음.
   "company_profiles",
-  // 출장일지(새 방식, 090) — 위 company_profiles와 같은 이유로 백업 파일에만 담고 복구는 건드리지 않음.
   "trip_logs",
   "trip_log_days",
+  "construction_memos",
+  "construction_stages",
+  "quality_checklist_items",
+  "tools",
+  "tool_checklists",
+  "tool_checklist_items",
+  "purchase_orders",
+  "purchase_order_items",
+  "know_how_notes",
+  "vat_prepayment_notices",
+  "half_year_settlements",
+  "work_log_summary_checks",
+  "dashboard_page_memo",
+  "transactions_page_memo",
+  "projects_page_memo",
 ];
 
 // 표마다 겹치지 않게 나눠 받을 고유 칸(대부분 id).
-const ORDER_KEY: Record<string, string> = { trip_logs: "project_id" };
+const ORDER_KEY: Record<string, string[]> = { trip_logs: ["project_id"], vat_prepayment_notices: ["year", "month"] };
 const PAGE_SIZE = 1000;
-// SQL 실행 전이라 아직 없는 표(089·090 등)만 건너뜀 — 다른 오류는 백업 실패로(일부만 담긴 백업을 남기지 않게).
+// SQL 실행 전이라 아직 없는 표만 건너뜀 — 다른 오류는 백업 실패로(일부만 담긴 백업을 남기지 않게).
 const MISSING_TABLE = new Set(["PGRST205", "42P01"]);
 
 // 표 하나를 끝까지 — PostgREST는 한 번에 1,000줄까지만 돌려줘서, 예전처럼 한 번에 select하면 거래처럼 1,000줄이 넘는 표가
@@ -43,11 +60,9 @@ const MISSING_TABLE = new Set(["PGRST205", "42P01"]);
 async function readAllRows(supabase: SupabaseClient, table: string) {
   const rows: Record<string, unknown>[] = [];
   for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await supabase
-      .from(table)
-      .select("*")
-      .order(ORDER_KEY[table] ?? "id", { ascending: true })
-      .range(from, from + PAGE_SIZE - 1);
+    let query = supabase.from(table).select("*");
+    for (const key of ORDER_KEY[table] ?? ["id"]) query = query.order(key, { ascending: true });
+    const { data, error } = await query.range(from, from + PAGE_SIZE - 1);
     if (error) {
       if (from === 0 && MISSING_TABLE.has(error.code ?? "")) return null;
       throw new Error(`${table} 백업 실패: ${error.message}`);
@@ -60,7 +75,7 @@ async function readAllRows(supabase: SupabaseClient, table: string) {
 export async function runBackup(supabase: SupabaseClient, backupType: "manual" | "auto") {
   const dump: Record<string, unknown> = {};
   const rowCounts: Record<string, number> = {};
-  for (const table of TABLES) {
+  for (const table of BACKUP_TABLES) {
     const rows = await readAllRows(supabase, table);
     dump[table] = rows ?? [];
     if (rows) rowCounts[table] = rows.length;

@@ -11,7 +11,7 @@ import { BankTransactionFilter } from "@/components/BankTransactionFilter";
 import { BankAccountsPopup } from "@/components/BankAccountsPopup";
 import { BankAccountMemo } from "@/components/BankAccountMemo";
 import { BankEntryPopup } from "@/components/BankEntryPopup";
-import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { fetchAllRows, fetchAllData } from "@/lib/supabaseFetchAll";
 import { nowKst } from "@/lib/kstDate";
 import { stickyHeadWrapClass } from "@/components/ui/Table";
 
@@ -87,7 +87,7 @@ export default async function BankPage({
   };
 
   const [{ data: clients }, transactions, allTx, { data: firstTx }, { data: rawNames }] = await Promise.all([
-    supabase.from("clients").select("id, name").order("name"),
+    fetchAllData((from, to) => supabase.from("clients").select("id, name").order("name").order("id").range(from, to)),
     fetchAllRows<BankTxRow>((from, to) => {
       let q = supabase
         .from("bank_transactions")

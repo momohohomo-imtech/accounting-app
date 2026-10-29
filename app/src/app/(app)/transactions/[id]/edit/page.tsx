@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { fetchAllRawClientNames } from "@/lib/supabaseFetchAll";
+import { fetchAllRawClientNames, fetchAllData } from "@/lib/supabaseFetchAll";
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { TransactionForm } from "@/components/TransactionForm";
@@ -12,9 +12,25 @@ export default async function EditTransactionPage({ params }: { params: Promise<
   const supabase = await createClient();
   const [{ data: clients }, { data: sites }, { data: projects }, { data: paymentMethods }, { data: expenseCategories }, { data: tx }, { data: rawClientRows }] =
     await Promise.all([
-      supabase.from("clients").select("id, name, default_item_name, default_category_id").order("name"),
-      supabase.from("sites").select("id, name, clients(name)").order("name"),
-      supabase.from("projects").select("id, name, site_id, status, year, project_code").order("name"),
+      fetchAllData((from, to) =>
+        supabase
+          .from("clients")
+          .select("id, name, default_item_name, default_category_id")
+          .order("name")
+          .order("id")
+          .range(from, to)
+      ),
+      fetchAllData((from, to) =>
+        supabase.from("sites").select("id, name, clients(name)").order("name").order("id").range(from, to)
+      ),
+      fetchAllData((from, to) =>
+        supabase
+          .from("projects")
+          .select("id, name, site_id, status, year, project_code")
+          .order("name")
+          .order("id")
+          .range(from, to)
+      ),
       supabase.from("payment_methods").select("*").order("sort_order"),
       supabase.from("expense_categories").select("*").order("sort_order"),
       supabase.from("transactions").select("*").eq("id", id).single(),

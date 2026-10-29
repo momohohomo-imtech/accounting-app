@@ -5,6 +5,10 @@ import { AccountPanel } from "@/components/AccountPanel";
 import { getAccounts } from "@/lib/actions/accounts";
 import { backupStatus, type BackupRecord } from "@/lib/backupStatus";
 
+// 이 화면의 서버 액션(지금 백업·복원)이 쓸 수 있는 시간 — 복원은 백업 파일을 나눠 올리고, 직전 상태를 한 번 더 백업한 뒤
+// 한 번에 바꿔서 기본 제한(설정에 따라 10~15초)을 넘을 수 있음. 넘어도 DB는 한 번에 바뀌거나 그대로라 반만 바뀌지는 않음.
+export const maxDuration = 60;
+
 export default async function BackupsPage() {
   const supabase = await createClient();
   const {

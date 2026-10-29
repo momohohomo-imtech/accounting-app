@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { deleteBlockReason, deleteErrorMessage, SITE_LINKS } from "@/lib/deleteGuard";
 
 function parse(formData: FormData) {
   return {
@@ -30,8 +31,10 @@ export async function updateSiteRecord(formData: FormData) {
 export async function deleteSiteRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
+  const blocked = await deleteBlockReason(supabase, SITE_LINKS, id, "이 현장에", "다른 현장으로 옮기거나 먼저 지운 뒤 삭제해주세요.");
+  if (blocked) return { error: blocked };
   const { error } = await supabase.from("sites").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: deleteErrorMessage(error) };
   revalidatePath("/projects");
 }
 

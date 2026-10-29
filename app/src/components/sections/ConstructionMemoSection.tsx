@@ -8,7 +8,7 @@ import {
   updateConstructionMemo,
   deleteConstructionMemo,
 } from "@/lib/actions/constructionMemos";
-import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { fetchAllRows, fetchAllData } from "@/lib/supabaseFetchAll";
 import { nowKst } from "@/lib/kstDate";
 
 type MemoRow = {
@@ -46,8 +46,17 @@ export async function ConstructionMemoSection({
   const [{ data: projectsRaw }, { data: sitesRaw }, memosRaw] = await Promise.all([
     // status/year/project_code는 ProjectPicker가 "완료 프로젝트 보기" 토글에 씀 —
     // 메모 추가 팝업에서 완료 프로젝트도 고를 수 있어야 해서 필요함.
-    supabase.from("projects").select("id, name, site_id, status, year, project_code").order("name"),
-    supabase.from("sites").select("id, name, clients(name)").order("name"),
+    fetchAllData((from, to) =>
+      supabase
+        .from("projects")
+        .select("id, name, site_id, status, year, project_code")
+        .order("name")
+        .order("id")
+        .range(from, to)
+    ),
+    fetchAllData((from, to) =>
+      supabase.from("sites").select("id, name, clients(name)").order("name").order("id").range(from, to)
+    ),
     fetchAllRows<MemoRawRow>((from, to) =>
       supabase
         .from("construction_memos")

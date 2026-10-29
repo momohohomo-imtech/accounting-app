@@ -13,7 +13,7 @@ import { KnowHowSection } from "@/components/KnowHowSection";
 import { createKnowHowNote, updateKnowHowNote, deleteKnowHowNote } from "@/lib/actions/knowHow";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { groupToolsBySortOrder, toolGroupLabel } from "@/lib/tools";
-import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { fetchAllRows, fetchAllData } from "@/lib/supabaseFetchAll";
 import { nowKst } from "@/lib/kstDate";
 
 const toolFields: FieldConfig[] = [
@@ -77,8 +77,17 @@ export async function ToolListSection({
   const [{ data: tools }, { data: sites }, { data: projects }, checklists, items, { data: knowHowNotes }] =
     await Promise.all([
       supabase.from("tools").select("*").order("sort_order").order("position").order("name"),
-      supabase.from("sites").select("id, name, clients(name)").order("name"),
-      supabase.from("projects").select("id, name, site_id, status, year, project_code").order("name"),
+      fetchAllData((from, to) =>
+        supabase.from("sites").select("id, name, clients(name)").order("name").order("id").range(from, to)
+      ),
+      fetchAllData((from, to) =>
+        supabase
+          .from("projects")
+          .select("id, name, site_id, status, year, project_code")
+          .order("name")
+          .order("id")
+          .range(from, to)
+      ),
       fetchAllRows<{
         id: string;
         title: string;

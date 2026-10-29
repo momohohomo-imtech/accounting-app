@@ -60,7 +60,8 @@ export function RestoreBackupButton({ fileName }: { fileName: string }) {
                   이 백업의 데이터로 <b>완전히 대체</b>됩니다. 이후에 입력된 내용은 전부 사라지며 되돌릴 수 없습니다.
                 </p>
                 <p className="text-xs text-slate-500">
-                  (안전을 위해 복구를 시작하기 직전, 지금 상태의 백업을 자동으로 하나 더 만들어둡니다.)
+                  (안전을 위해 복구를 시작하기 직전, 지금 상태의 백업을 자동으로 하나 더 만들어둡니다. 복구는 한 번에 처리돼서,
+                  중간에 문제가 생기면 아무것도 바뀌지 않고 지금 상태 그대로 남습니다.)
                 </p>
                 <div>
                   <label className={labelClass}>계속하려면 아래에 &quot;복구&quot;라고 입력하세요</label>

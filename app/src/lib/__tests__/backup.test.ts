@@ -1,74 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { runBackup } from "@/lib/backup";
-import { restoreBlockReason, restoreFromBackup } from "@/lib/restore";
-
-// 가짜 Supabase(실제 자료 아님) — PostgREST처럼 한 번에 1,000줄까지만 돌려줌. 백업 파일·백업 기록·복원으로 넣은 줄을 모음.
-type Row = Record<string, unknown>;
-function fakeSupabase(tables: Record<string, Row[]>, opts: { missing?: string[]; noRowCountsColumn?: boolean } = {}) {
-  const uploads: { name: string; json: string }[] = [];
-  const records: Row[] = [];
-  const inserts: { table: string; count: number }[] = [];
-  const client = {
-    from(table: string) {
-      return {
-        select() {
-          return {
-            order(key: string) {
-              return {
-                range(from: number, to: number) {
-                  if (opts.missing?.includes(table)) {
-                    return Promise.resolve({ data: null, error: { code: "PGRST205", message: `no table ${table}` } });
-                  }
-                  const sorted = [...(tables[table] ?? [])].sort((a, b) => String(a[key]).localeCompare(String(b[key])));
-                  return Promise.resolve({ data: sorted.slice(from, Math.min(to + 1, from + 1000)), error: null });
-                },
-              };
-            },
-          };
-        },
-        insert(rows: Row | Row[]) {
-          const list = Array.isArray(rows) ? rows : [rows];
-          if (table === "backups") {
-            if (opts.noRowCountsColumn && list.some((r) => "row_counts" in r)) {
-              return Promise.resolve({ error: { code: "PGRST204", message: "no row_counts column" } });
-            }
-            records.push(...list);
-            return Promise.resolve({ error: null });
-          }
-          inserts.push({ table, count: list.length });
-          tables[table] = [...(tables[table] ?? []), ...list];
-          return Promise.resolve({ error: null });
-        },
-        delete() {
-          return {
-            not() {
-              tables[table] = [];
-              return Promise.resolve({ error: null });
-            },
-          };
-        },
-        update() {
-          return { eq: () => Promise.resolve({ error: null }) };
-        },
-      };
-    },
-    storage: {
-      from() {
-        return {
-          upload(name: string, json: string) {
-            uploads.push({ name, json });
-            return Promise.resolve({ error: null });
-          },
-        };
-      },
-    },
-  };
-  return { supabase: client as unknown as SupabaseClient, uploads, records, inserts, tables };
-}
-
-const txRows = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `t${String(i).padStart(5, "0")}`, purchase_amount: 1000 }));
+import { BACKUP_TABLES, runBackup } from "@/lib/backup";
+import { fakeSupabase, txRows, type Row } from "./fakeBackupSupabase";
 
 test("백업: 1,000줄이 넘는 표도 끝까지 담고, 표별 줄 수를 파일과 기록에 남김", async () => {
   const fake = fakeSupabase({ transactions: txRows(2500), clients: [{ id: "c1" }] });
@@ -92,31 +25,16 @@ test("백업: SQL 실행 전이라 없는 표는 건너뛰고, 줄 수 칸이 �
   assert.equal("row_counts" in fake.records[0], false);
 });
 
-test("복원 막기: 예전 방식 백업은 1,000줄 이상인 표가 있으면 잘린 것으로 보고 막음", () => {
-  assert.match(restoreBlockReason({ transactions: txRows(1000) }) ?? "", /transactions/);
-  assert.equal(restoreBlockReason({ transactions: txRows(999) }), null);
-  // 새 방식은 줄 수가 기록과 같으면 통과, 다르면(파일 손상) 막음
-  const meta = (n: number) => ({ complete: true, row_counts: { transactions: n } });
-  assert.equal(restoreBlockReason({ transactions: txRows(2500), __meta: meta(2500) }), null);
-  assert.match(restoreBlockReason({ transactions: txRows(2400), __meta: meta(2500) }) ?? "", /손상/);
-});
-
-test("복원: 막힌 백업은 아무것도 지우지 않고, 새 방식 백업은 500줄씩 나눠 끝까지 넣음", async () => {
-  const blocked = fakeSupabase({ transactions: txRows(1500) });
-  await assert.rejects(() => restoreFromBackup(blocked.supabase, { transactions: txRows(1000) }));
-  assert.equal(blocked.tables.transactions.length, 1500);
-  assert.equal(blocked.uploads.length, 0);
-
-  const fake = fakeSupabase({ transactions: txRows(10) });
-  await restoreFromBackup(fake.supabase, {
-    transactions: txRows(2300),
-    __meta: { complete: true, row_counts: { transactions: 2300 } },
-  });
-  assert.equal(fake.tables.transactions.length, 2300);
-  assert.deepEqual(
-    fake.inserts.filter((i) => i.table === "transactions").map((i) => i.count),
-    [500, 500, 500, 500, 300]
-  );
-  // 복원 직전 안전용 백업(지금 상태 10줄)도 남김
-  assert.equal(JSON.parse(fake.uploads[0].json).transactions.length, 10);
+test("백업: 공사 메모·일용직 사용내역·발주서 등 앱이 쓰는 표를 전부 담고, 고유 칸이 둘인 표도 끝까지", async () => {
+  for (const t of ["construction_memos", "daily_worker_usage_logs", "quality_checklist_items", "tools", "tool_checklists",
+    "tool_checklist_items", "purchase_orders", "purchase_order_items", "know_how_notes", "vat_prepayment_notices",
+    "half_year_settlements", "work_log_summary_checks", "dashboard_page_memo", "transactions_page_memo", "projects_page_memo"]) {
+    assert.ok(BACKUP_TABLES.includes(t), `${t} 백업 대상`);
+  }
+  // 예정고지액은 (연도, 월)이 고유 — 1,000줄이 넘어도 겹치거나 빠지지 않게 두 칸으로 정렬해서 나눠 받음
+  const notices = Array.from({ length: 1500 }, (_, i) => ({ year: 2000 + Math.floor(i / 2), month: i % 2 ? 10 : 4, amount: i }));
+  const fake = fakeSupabase({ vat_prepayment_notices: notices });
+  await runBackup(fake.supabase, "manual");
+  const dump = JSON.parse(fake.uploads[0].json);
+  assert.equal(new Set(dump.vat_prepayment_notices.map((r: Row) => `${r.year}-${r.month}`)).size, 1500);
 });

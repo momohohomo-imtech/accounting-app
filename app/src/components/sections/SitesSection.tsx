@@ -5,12 +5,20 @@ import { createSiteRecord, updateSiteRecord, deleteSiteRecord } from "@/lib/acti
 import type { FieldConfig } from "@/components/crud/types";
 import { ClientsSection } from "@/components/sections/ClientsSection";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
+import { fetchAllData } from "@/lib/supabaseFetchAll";
 
 export async function SitesSection() {
   const supabase = await createClient();
   const [{ data: sites }, { data: clients }] = await Promise.all([
-    supabase.from("sites").select("*, clients(name)").order("created_at", { ascending: false }),
-    supabase.from("clients").select("id, name").order("name"),
+    fetchAllData((from, to) =>
+      supabase
+        .from("sites")
+        .select("*, clients(name)")
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to)
+    ),
+    fetchAllData((from, to) => supabase.from("clients").select("id, name").order("name").order("id").range(from, to)),
   ]);
 
   const fields: FieldConfig[] = [

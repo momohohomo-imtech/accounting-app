@@ -4,12 +4,21 @@ import { MemoCreateForm } from "@/components/MemoCreateForm";
 import { MemoCard } from "@/components/MemoCard";
 import { Pill } from "@/components/ui/Pill";
 import { MEMO_CATEGORIES, MEMO_UNCATEGORIZED } from "@/lib/memoCategories";
+import { fetchAllData } from "@/lib/supabaseFetchAll";
 
 export default async function MemosPage({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
   const { category } = await searchParams;
   const supabase = await createClient();
   const [{ data: memos }, { error: categoryColumnError }] = await Promise.all([
-    supabase.from("memos").select("*").order("sort_order").order("created_at", { ascending: false }),
+    fetchAllData((from, to) =>
+      supabase
+        .from("memos")
+        .select("*")
+        .order("sort_order")
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to)
+    ),
     // 구분 칸(085 SQL)이 있는지 — 실행 전이면 구분 탭·선택칸 없이 예전처럼 보여준다.
     supabase.from("memos").select("category").limit(1),
   ]);

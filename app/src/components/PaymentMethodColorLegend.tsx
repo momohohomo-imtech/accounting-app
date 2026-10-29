@@ -17,6 +17,7 @@ function PaymentMethodRow({ method }: { method: PaymentMethod }) {
   const [textColor, setTextColor] = useState<string | null>(method.text_color);
   const [backgroundColor, setBackgroundColor] = useState<string | null>(method.background_color);
   const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function save() {
     setPending(true);
@@ -24,8 +25,13 @@ function PaymentMethodRow({ method }: { method: PaymentMethod }) {
     fd.append("id", method.id);
     fd.append("text_color", textColor ?? "");
     fd.append("background_color", backgroundColor ?? "");
-    await globalPending.run(() => updatePaymentMethodColor(fd));
+    const result = await globalPending.run(() => updatePaymentMethodColor(fd));
     setPending(false);
+    if (result?.error) {
+      setError(`저장하지 못했습니다: ${result.error}`);
+      return;
+    }
+    setError(null);
     setEditing(false);
     router.refresh();
   }
@@ -58,6 +64,7 @@ function PaymentMethodRow({ method }: { method: PaymentMethod }) {
             onChange={setBackgroundColor}
             colors={PAYMENT_METHOD_COLORS}
           />
+          {error && <p className="text-xs text-red-600">{error}</p>}
           <Button type="button" size="xs" disabled={pending} onClick={save}>
             저장
           </Button>

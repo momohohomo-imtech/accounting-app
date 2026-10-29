@@ -393,7 +393,8 @@ export async function updateTransactionNote(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
   const note1 = String(formData.get("note1") ?? "") || null;
-  await supabase.from("transactions").update({ note1 }).eq("id", id);
+  const { error } = await supabase.from("transactions").update({ note1 }).eq("id", id);
+  if (error) return { error: error.message };
   revalidatePath("/daily-workers");
   revalidatePath("/transactions");
 }

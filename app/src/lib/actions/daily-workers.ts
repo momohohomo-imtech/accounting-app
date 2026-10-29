@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { deleteBlockReason, deleteErrorMessage, DAILY_WORKER_LINKS } from "@/lib/deleteGuard";
 
 function parse(formData: FormData) {
   return {
@@ -40,7 +41,15 @@ export async function updateDailyWorkerRecord(formData: FormData) {
 export async function deleteDailyWorkerRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
+  const blocked = await deleteBlockReason(
+    supabase,
+    DAILY_WORKER_LINKS,
+    id,
+    "이 일용직에게",
+    "그만둔 일용직은 지우지 말고 상태를 \"종료\"로 바꿔 두세요(지우면 사용내역이 같이 지워짐)."
+  );
+  if (blocked) return { error: blocked };
   const { error } = await supabase.from("daily_workers").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: deleteErrorMessage(error) };
   revalidatePath("/daily-workers");
 }

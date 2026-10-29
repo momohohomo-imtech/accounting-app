@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { deleteBlockReason, deleteErrorMessage, CATEGORY_LINKS } from "@/lib/deleteGuard";
 
 function parse(formData: FormData) {
   return {
@@ -38,8 +39,10 @@ export async function updateExpenseCategoryRecord(formData: FormData) {
 export async function deleteExpenseCategoryRecord(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id"));
+  const blocked = await deleteBlockReason(supabase, CATEGORY_LINKS, id, "이 카테고리에", "다른 카테고리로 바꾼 뒤 삭제해주세요.");
+  if (blocked) return { error: blocked };
   const { error } = await supabase.from("expense_categories").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: deleteErrorMessage(error) };
   revalidateAll();
 }
 

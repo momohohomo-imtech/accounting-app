@@ -27,7 +27,10 @@ async function saveItems(
   purchaseOrderId: string,
   items: PurchaseOrderItemInput[]
 ): Promise<{ error?: string }> {
-  await supabase.from("purchase_order_items").delete().eq("purchase_order_id", purchaseOrderId);
+  // 새 품목을 먼저 넣고 예전 품목을 지움 — 넣기가 실패해도 예전 품목은 그대로 남게(예전엔 먼저 지워서, 넣기가 실패하면
+  // 품목이 빈 문서가 됐음).
+  const { data: oldItems, error: oldError } = await supabase.from("purchase_order_items").select("id").eq("purchase_order_id", purchaseOrderId);
+  if (oldError) return { error: oldError.message };
   const rows = items
     .filter((it) => it.item_name || it.amount)
     .map((it, i) => ({
@@ -42,6 +45,11 @@ async function saveItems(
   if (rows.length > 0) {
     const { error } = await supabase.from("purchase_order_items").insert(rows);
     if (error) return { error: error.message };
+  }
+  const oldIds = (oldItems ?? []).map((r) => r.id as string);
+  if (oldIds.length > 0) {
+    const { error } = await supabase.from("purchase_order_items").delete().in("id", oldIds);
+    if (error) return { error: `새 품목은 저장됐지만 예전 품목을 지우지 못했습니다(한 번 더 저장하면 정리됩니다): ${error.message}` };
   }
   return {};
 }

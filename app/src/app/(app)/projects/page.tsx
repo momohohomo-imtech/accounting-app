@@ -20,7 +20,7 @@ import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { PageMemo } from "@/components/PageMemo";
 import { YearEndCheckSection } from "@/components/sections/YearEndCheckSection";
 import { updateProjectsPageMemo } from "@/lib/actions/projectsPageMemo";
-import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
+import { fetchAllRows, fetchAllCreditPayments, fetchAllData } from "@/lib/supabaseFetchAll";
 import { purchaseCostOf } from "@/lib/vatBasis";
 import { groupProjectProfit } from "@/lib/projectProfit";
 import { expectedReceivableByStatus, receivableOf, receivedSalesByProject } from "@/lib/expectedReceivable";
@@ -136,10 +136,18 @@ async function ProjectListSection({
 
   const [{ data: sites }, { data: allProjects }, { data: projects }, { data: allYears }, { data: pageMemo }] =
     await Promise.all([
-      supabase.from("sites").select("id, name, clients(name)").order("name"),
-      supabase.from("projects").select("id, name, year, site_id, parent_project_id, quote_amount"),
+      fetchAllData((from, to) =>
+        supabase.from("sites").select("id, name, clients(name)").order("name").order("id").range(from, to)
+      ),
+      fetchAllData((from, to) =>
+        supabase
+          .from("projects")
+          .select("id, name, year, site_id, parent_project_id, quote_amount")
+          .order("id")
+          .range(from, to)
+      ),
       projectsQuery,
-      supabase.from("projects").select("year"),
+      fetchAllData((from, to) => supabase.from("projects").select("year").order("id").range(from, to)),
       supabase.from("projects_page_memo").select("content").maybeSingle(),
     ]);
 

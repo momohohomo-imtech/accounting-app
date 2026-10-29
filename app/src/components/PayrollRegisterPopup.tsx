@@ -11,7 +11,7 @@ export function PayrollRegisterPopup({
   action,
 }: {
   employees: EmployeeOption[];
-  action: (formData: FormData) => void | Promise<void>;
+  action: (formData: FormData) => unknown;
 }) {
   const [open, setOpen] = useState(false);
   useEscapeKey(open, () => setOpen(false));
@@ -31,10 +31,8 @@ export function PayrollRegisterPopup({
               </div>
               <PayrollForm
                 employees={employees}
-                action={async (fd) => {
-                  await action(fd);
-                  setOpen(false);
-                }}
+                action={action}
+                onDone={() => setOpen(false)}
                 onCancel={() => setOpen(false)}
               />
             </div>

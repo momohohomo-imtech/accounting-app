@@ -3,11 +3,14 @@ import { CreatePanel } from "@/components/crud/CreatePanel";
 import { EntityTable } from "@/components/crud/EntityTable";
 import { createClientRecord, updateClientRecord, deleteClientRecord } from "@/lib/actions/clients";
 import type { FieldConfig } from "@/components/crud/types";
+import { fetchAllData } from "@/lib/supabaseFetchAll";
 
 export async function ClientsSection({ showHeading = true }: { showHeading?: boolean } = {}) {
   const supabase = await createClient();
   const [{ data: clients }, { data: categories }] = await Promise.all([
-    supabase.from("clients").select("*").order("created_at", { ascending: false }),
+    fetchAllData((from, to) =>
+      supabase.from("clients").select("*").order("created_at", { ascending: false }).order("id").range(from, to)
+    ),
     supabase.from("expense_categories").select("id, name").order("sort_order"),
   ]);
 

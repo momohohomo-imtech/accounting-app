@@ -24,7 +24,7 @@ import { formatWon } from "@/lib/format";
 import { monthRange } from "@/lib/dateRange";
 import { isLedgerVisible } from "@/lib/credit";
 import type { CreditPayment, Transaction } from "@/lib/types";
-import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { fetchAllRows, fetchAllData } from "@/lib/supabaseFetchAll";
 import { hasPaymentGroupColumn } from "@/lib/paymentGroup";
 import { LedgerCheckSection } from "@/components/sections/LedgerCheckSection";
 import { getCurrentRole } from "@/lib/currentRole";
@@ -253,10 +253,17 @@ async function TransactionListSection({
     pageMemo,
   ] = await Promise.all([
     loadLedgerTransactions(start, end, type ?? "", project_id ?? "", payment_method_id ?? ""),
-    supabase.from("projects").select("id, name, year, site_id, sites(name, clients(name))").order("name"),
+    fetchAllData((from, to) =>
+      supabase
+        .from("projects")
+        .select("id, name, year, site_id, sites(name, clients(name))")
+        .order("name")
+        .order("id")
+        .range(from, to)
+    ),
     supabase.from("transactions").select("trans_date").order("trans_date", { ascending: false }).limit(1),
-    supabase.from("clients").select("id, name").order("name"),
-    supabase.from("projects").select("id, name").order("name"),
+    fetchAllData((from, to) => supabase.from("clients").select("id, name").order("name").order("id").range(from, to)),
+    fetchAllData((from, to) => supabase.from("projects").select("id, name").order("name").order("id").range(from, to)),
     supabase.from("payment_methods").select("id, name, text_color, background_color").order("sort_order"),
     supabase.from("expense_categories").select("id, name").order("sort_order"),
     readOnly ? Promise.resolve(null) : loadPageMemo(),

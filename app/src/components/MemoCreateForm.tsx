@@ -11,11 +11,12 @@ export function MemoCreateForm({
   hasCategory,
   defaultCategory,
 }: {
-  createAction: (formData: FormData) => void;
+  createAction: (formData: FormData) => unknown;
   hasCategory: boolean;
   defaultCategory?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const pending = useGlobalPending();
 
   if (!open) {
@@ -28,9 +29,17 @@ export function MemoCreateForm({
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      {/* onSubmit(form action 아님) — 저장이 실패해도 입력한 글이 지워지지 않게 */}
       <form
-        action={async (fd) => {
-          await pending.run(() => Promise.resolve(createAction(fd)));
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const fd = new FormData(e.currentTarget);
+          const result = await pending.run(() => Promise.resolve(createAction(fd)));
+          if (result && typeof result === "object" && "error" in result && result.error) {
+            setError(`저장하지 못했습니다: ${String(result.error)}`);
+            return;
+          }
+          setError(null);
           setOpen(false);
         }}
         className="space-y-3"
@@ -44,11 +53,20 @@ export function MemoCreateForm({
           <label className={labelClass}>내용</label>
           <textarea name="content" rows={5} className={fieldClass} />
         </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
         <div className="flex items-center gap-2">
           <Button type="submit" size="sm">
             저장
           </Button>
-          <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(false)}>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              setOpen(false);
+              setError(null);
+            }}
+          >
             취소
           </Button>
         </div>

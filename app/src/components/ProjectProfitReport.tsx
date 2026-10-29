@@ -20,7 +20,7 @@ import { ReportPrintChart } from "@/components/ReportPrintChart";
 import { ReportChartProvider } from "@/components/ReportChartProvider";
 import { ReportChartToggle } from "@/components/ReportChartToggle";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
-import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { fetchAllRows, fetchAllData } from "@/lib/supabaseFetchAll";
 import { purchaseCostOf } from "@/lib/vatBasis";
 import { unsettledCreditPurchase } from "@/lib/projectProfit";
 import { billedSalesByProject, projectReceipts, receivableOf, receivedSalesByProject } from "@/lib/expectedReceivable";
@@ -153,7 +153,7 @@ export async function ProjectProfitReport({
       .in("project_id", groupIds)
       .order("created_at", { ascending: true }),
     supabase.from("expense_categories").select("id, name, project_only, color").order("sort_order"),
-    supabase.from("clients").select("name").order("name"),
+    fetchAllData((from, to) => supabase.from("clients").select("name").order("name").order("id").range(from, to)),
     supabase
       .from("attachments")
       .select("id, file_name, mime_type, file_size, memo, storage_path")

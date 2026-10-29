@@ -17,7 +17,7 @@ import { TripLogList } from "@/components/TripLogList";
 import { monthRange, monthRangeLabel } from "@/lib/dateRange";
 import { cx } from "@/lib/cx";
 import type { WorkLog } from "@/lib/types";
-import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { fetchAllRows, fetchAllData } from "@/lib/supabaseFetchAll";
 import { nowKst } from "@/lib/kstDate";
 import { loadTripProjectDocs } from "@/lib/tripLogDocs";
 
@@ -153,7 +153,9 @@ async function WorkLogCalendarSection({
     fetchAllRows<{ log_date: string }>((from, to) =>
       supabase.from("work_logs").select("log_date").order("log_date", { ascending: true }).range(from, to)
     ),
-    supabase.from("sites").select("id, name, color").order("name"),
+    fetchAllData((from, to) =>
+      supabase.from("sites").select("id, name, color").order("name").order("id").range(from, to)
+    ),
     // 새 출장일지(090)에서 출장으로 체크된 날짜 — 표가 없으면(090 실행 전) 비어 있음.
     supabase.from("trip_log_days").select("work_date").gte("work_date", monthStart).lte("work_date", monthEnd),
   ]);

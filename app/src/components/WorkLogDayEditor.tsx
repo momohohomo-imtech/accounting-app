@@ -4,6 +4,7 @@ import { WorkLogForm } from "@/components/WorkLogForm";
 import { AttachmentList } from "@/components/AttachmentList";
 import { EscapeCloseLink } from "@/components/EscapeCloseLink";
 import { tripDayToInput, type TripDayRow } from "@/lib/tripLog";
+import { fetchAllData } from "@/lib/supabaseFetchAll";
 
 export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string; closeHref: string }) {
   const supabase = await createClient();
@@ -16,8 +17,17 @@ export async function WorkLogDayEditor({ dateKey, closeHref }: { dateKey: string
   const [{ data: logs }, { data: sites }, { data: projects }, { data: monthLogs }, { data: tripDays }, { data: attachmentRows }] =
     await Promise.all([
       supabase.from("work_logs").select("*").eq("log_date", dateKey).order("sort_order", { ascending: true }),
-      supabase.from("sites").select("id, name, color").order("name"),
-      supabase.from("projects").select("id, name, site_id, year, project_code, status").order("year", { ascending: false }),
+      fetchAllData((from, to) =>
+        supabase.from("sites").select("id, name, color").order("name").order("id").range(from, to)
+      ),
+      fetchAllData((from, to) =>
+        supabase
+          .from("projects")
+          .select("id, name, site_id, year, project_code, status")
+          .order("year", { ascending: false })
+          .order("id")
+          .range(from, to)
+      ),
       supabase.from("work_logs").select("title").gte("log_date", monthStart).lte("log_date", monthEnd),
       // 이 날짜에 출장으로 체크된 프로젝트(090 실행 전이면 비어 있음).
       supabase

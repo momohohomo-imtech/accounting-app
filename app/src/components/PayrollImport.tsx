@@ -114,24 +114,34 @@ export function PayrollImport({ employees }: { employees: EmployeeRef[] }) {
     setSaving(true);
     setError(null);
     try {
-      await pending.run(() =>
-        bulkImportPayroll(
-          rows.map((r) => ({
-            employee_id: r.employeeId,
-            pay_month: payMonth,
-            amount: r.amount,
-            bonus: r.bonus,
-            national_pension: r.national_pension,
-            health_insurance: r.health_insurance,
-            long_term_care_insurance: r.long_term_care_insurance,
-            employment_insurance: r.employment_insurance,
-            employment_insurance_refund: r.employment_insurance_refund,
-            income_tax: r.income_tax,
-            local_income_tax: r.local_income_tax,
-            rural_tax: r.rural_tax,
-          }))
-        )
-      );
+      const payload = rows.map((r) => ({
+        employee_id: r.employeeId,
+        pay_month: payMonth,
+        amount: r.amount,
+        bonus: r.bonus,
+        national_pension: r.national_pension,
+        health_insurance: r.health_insurance,
+        long_term_care_insurance: r.long_term_care_insurance,
+        employment_insurance: r.employment_insurance,
+        employment_insurance_refund: r.employment_insurance_refund,
+        income_tax: r.income_tax,
+        local_income_tax: r.local_income_tax,
+        rural_tax: r.rural_tax,
+      }));
+      let result = await pending.run(() => bulkImportPayroll(payload));
+      // 같은 직원·같은 달 급여가 이미 있으면 확인 — 같은 대장을 두 번 올리면 그 달 급여가 두 번 잡힘
+      if (result.duplicates?.length) {
+        const ok = await confirm(
+          `${payMonth.slice(0, 7)} 급여가 이미 등록된 직원이 있습니다: ${result.duplicates.join(", ")}. ` +
+            "상여금처럼 따로 지급한 것이 아니라면 같은 대장을 두 번 올린 것일 수 있습니다. 그래도 등록하시겠습니까?"
+        );
+        if (!ok) return;
+        result = await pending.run(() => bulkImportPayroll(payload, { allowDuplicates: true }));
+      }
+      if (result.error) {
+        setError(`저장하지 못했습니다: ${result.error}`);
+        return;
+      }
       setRows(null);
       setPayMonth("");
     } catch {

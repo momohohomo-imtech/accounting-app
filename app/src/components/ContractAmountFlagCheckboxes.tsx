@@ -20,9 +20,11 @@ export function ContractAmountFlagCheckboxes({
   const [estimated, setEstimated] = useState(initialEstimated);
   const [minimum, setMinimum] = useState(initialMinimum);
   const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const globalPending = useGlobalPending();
 
   async function toggle(field: Field, checked: boolean) {
+    const before = { estimated, minimum };
     if (field === "contract_amount_estimated") {
       setEstimated(checked);
       if (checked) setMinimum(false);
@@ -35,8 +37,16 @@ export function ContractAmountFlagCheckboxes({
     fd.set("id", projectId);
     fd.set("field", field);
     if (checked) fd.set("checked", "on");
-    await globalPending.run(() => updateProjectContractAmountFlag(fd));
+    const result = await globalPending.run(() => updateProjectContractAmountFlag(fd));
     setPending(false);
+    if (result?.error) {
+      // 저장 안 됐으면 체크도 되돌림
+      setEstimated(before.estimated);
+      setMinimum(before.minimum);
+      setError(`저장하지 못했습니다: ${result.error}`);
+      return;
+    }
+    setError(null);
     router.refresh();
   }
 
@@ -62,6 +72,7 @@ export function ContractAmountFlagCheckboxes({
         />
         최소금액 산정액 (체크시 녹색으로 표시)
       </label>
+      {error && <p className="w-full text-sm text-red-600">{error}</p>}
     </div>
   );
 }
