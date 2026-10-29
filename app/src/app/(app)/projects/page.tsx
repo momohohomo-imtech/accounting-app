@@ -20,7 +20,7 @@ import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { PageMemo } from "@/components/PageMemo";
 import { YearEndCheckSection } from "@/components/sections/YearEndCheckSection";
 import { updateProjectsPageMemo } from "@/lib/actions/projectsPageMemo";
-import { fetchAllRows, fetchAllCreditPayments, fetchAllData } from "@/lib/supabaseFetchAll";
+import { fetchAllRowsIn, fetchAllCreditPayments, fetchAllData } from "@/lib/supabaseFetchAll";
 import { purchaseCostOf } from "@/lib/vatBasis";
 import { groupProjectProfit } from "@/lib/projectProfit";
 import { expectedReceivableByStatus, receivableOf, receivedSalesByProject } from "@/lib/expectedReceivable";
@@ -202,11 +202,9 @@ async function ProjectListSection({
   // 어미+귀속 하위는 목록에서 한 묶음(접힌 요약 줄)이라, 상태·현장 필터에 안 걸린 하위도 어미와 함께 보이게 가져옴.
   const hiddenChildIds = projectIds.filter((id) => !displayedIds.has(id));
   const hiddenChildrenPromise = hiddenChildIds.length
-    ? supabase
-        .from("projects")
-        .select("*, sites(name)")
-        .in("id", hiddenChildIds)
-        .then((r) => r.data ?? [])
+    ? fetchAllRowsIn(hiddenChildIds, (ids, from, to) =>
+        supabase.from("projects").select("*, sites(name)").in("id", ids).order("id", { ascending: true }).range(from, to)
+      )
     : Promise.resolve([]);
   type ProjectTxRow = {
     id: string;
@@ -219,22 +217,23 @@ async function ProjectListSection({
     purchase_vat: number;
     expense_categories: { name: string } | { name: string }[] | null;
   };
-  // 프로젝트에 붙은 거래 전부(매입은 이익·총 매입, 매출은 미수 금액의 받은 돈).
+  // 프로젝트에 붙은 거래 전부(매입은 이익·총 매입, 매출은 미수 금액의 받은 돈). 프로젝트가 수백 개여도 요청 주소가 너무
+  // 길어지지 않게 나눠 조회(fetchAllRowsIn).
   const [projectTxRows, { data: agencyRows }, creditPayments] = projectIds.length
     ? await Promise.all([
-        fetchAllRows<ProjectTxRow>((from, to) =>
+        fetchAllRowsIn<ProjectTxRow>(projectIds, (ids, from, to) =>
           supabase
             .from("transactions")
             .select("id, type, payment_type, sales_amount, sales_vat, project_id, purchase_amount, purchase_vat, expense_categories(*)")
-            .in("project_id", projectIds)
+            .in("project_id", ids)
             .order("id", { ascending: true })
             .range(from, to)
         ),
-        fetchAllRows<{ project_id: string; amount: number }>((from, to) =>
+        fetchAllRowsIn<{ project_id: string; amount: number }>(projectIds, (ids, from, to) =>
           supabase
             .from("project_agency_purchases")
             .select("project_id, amount")
-            .in("project_id", projectIds)
+            .in("project_id", ids)
             .order("id", { ascending: true })
             .range(from, to)
         ).then((data) => ({ data })),

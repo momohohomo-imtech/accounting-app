@@ -3,7 +3,6 @@ import { formatWon, moneyClass } from "@/lib/format";
 import { taxEstimate } from "@/lib/tax";
 import { loadProjectTxAndAgency } from "@/lib/projectTxLoad";
 import {
-  expectedRevenueOf,
   projectBasedProfit,
   secondHalfOutlook,
   unbilledInvoiceVat,
@@ -44,7 +43,9 @@ export async function loadProfitOutlook(
   const combinedTax = combinedProfit != null ? taxEstimate(combinedProfit) : null;
 
   return {
-    expectedRevenue: expectedRevenueOf(yearProjects, agencyByProject),
+    // 예상 매출액 = 이익 예상에 쓰는 매출(발주액 − 대행구매액, 실제 발행분이 더 크면 그 금액, 발주액 없으면 실제 매출 + 프로젝트
+    // 없는 매출) — 예상 이익과 같은 기준이라 프로젝트 목록 수주예상액 합계와는 그만큼 다를 수 있음.
+    expectedRevenue: estimate.revenue,
     hasProjectsWithProfit: estimate.quoteTotal > 0,
     profitEstimate: estimate.profit,
     profitTax,
@@ -133,8 +134,8 @@ export function ProfitCalculationDetail({ year, o }: { year: number; o: ProfitOu
           (나)를 원장 그대로 &quot;하반기 매출-매입&quot;에 합산하면 매입만 반영되고 매출은 누락된 불완전한
           수치가 섞여 전체 손익이 왜곡됩니다. 따라서 (나)에 해당하는 거래는 &quot;하반기 매출-매입&quot;
           계산에서 제외하고, 대신 &quot;세금계산서 미발행분 예상 이익&quot;에서 &quot;발주액 − 하반기
-          매입 − 대행구매액&quot;으로 별도 추정합니다. 이 방식으로 (나) 프로젝트의 매입은 어느 한쪽에서
-          정확히 한 번만 반영됩니다.
+          매입 − 대행구매액&quot;으로 별도 추정합니다(하반기에 실제로 발행한 세금계산서가 남은 발주액보다 많으면 실제
+          발행 금액 기준). 이 방식으로 (나) 프로젝트의 매입은 어느 한쪽에서 정확히 한 번만 반영됩니다.
         </p>
         <p>
           (나) 프로젝트에 상반기(1~6월)에 이미 발행한 기성금이 있으면, 해당 매출은 상반기 확정 이익(세무사

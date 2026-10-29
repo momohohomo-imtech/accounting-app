@@ -6,7 +6,7 @@ import {
   unsettledCreditPurchase,
   projectBasedProfit,
   secondHalfOutlook,
-  expectedRevenueOf,
+  groupRevenue,
   countedQuote,
   unbilledInvoiceVat,
   unbilledRemainingByGroup,
@@ -51,6 +51,21 @@ test("하반기 미발행 예상 이익: 상반기에 끊은 기성금은 상반
   assert.equal(unbilledH2Profit(50_000_000, 20_000_000, 8_000_000, 2_000_000), 20_000_000);
   // 상반기 기성금이 없으면 예전과 같음
   assert.equal(unbilledH2Profit(50_000_000, 0, 8_000_000, 2_000_000), 40_000_000);
+});
+
+test("하반기 미발행 예상 이익: 발주액보다 계산서를 더 끊으면 실제 금액, 하반기 전에 이미 더 끊었으면 하반기 매입만", () => {
+  // 발주 2,000만(남은 2,000만)인데 하반기에 2,500만 발행 → 매출 2,500만 − 하반기 매입 200만
+  assert.equal(unbilledH2Profit(20_000_000, 0, 2_000_000, 0, 25_000_000), 23_000_000);
+  // 남은 발주액보다 적게 끊었으면 그대로 남은 발주액 기준
+  assert.equal(unbilledH2Profit(20_000_000, 0, 2_000_000, 0, 5_000_000), 18_000_000);
+  // 발주 1,000만인데 상반기에 1,200만 발행 → 하반기 매출 없음, 하반기 매입 100만만(예전엔 −300만)
+  assert.equal(unbilledH2Profit(10_000_000, 12_000_000, 1_000_000, 0), -1_000_000);
+});
+
+test("묶음 매출: 발주액 − 대행구매, 실제로 더 끊었으면 실제 금액, 발주액 없으면 실제 매출(대행구매를 또 빼지 않음)", () => {
+  assert.equal(groupRevenue(20_000_000, 2_000_000, 5_000_000), 18_000_000);
+  assert.equal(groupRevenue(20_000_000, 2_000_000, 25_000_000), 25_000_000);
+  assert.equal(groupRevenue(0, 3_000_000, 5_000_000), 5_000_000);
 });
 
 test("외상 미정산 매입: 완납 전 외상만 거래 전체 금액(공급가)으로, 불공제 카테고리는 부가세 포함", () => {
@@ -159,7 +174,7 @@ test("검토중 프로젝트: 발주액은 어디에도 안 넣고, 이미 쓴 �
   // 하반기 예상: 검토중 매입 100만만 반영
   assert.equal(h2Of(ps, txs).h2EstimatedProfit, 36_000_000);
   // 예상 매출액(발주액 − 대행구매)에도 안 들어감
-  assert.equal(expectedRevenueOf(ps, AG), 165_000_000);
+  assert.equal(est.revenue, 165_000_000);
 });
 
 test("프로젝트 기준: 발주액 없는 묶음은 실제 매출로, 귀속 하위 매출은 어미 발주액에 포함된 것으로 봄", () => {
@@ -179,6 +194,31 @@ test("프로젝트 기준: 발주액 없는 묶음은 실제 매출로, 귀속 �
   assert.equal(est.generalExpense, 70_000_000);
   assert.equal(est.payrollCost, 8_000_000);
   assert.equal(est.profit, 38_000_000);
+});
+
+test("프로젝트 기준: 프로젝트 없이 등록한 매출도 더하고(매입은 원래 일반경비), 발주액보다 더 끊은 계산서는 실제 금액", () => {
+  const ps = [PA, PB];
+  // 프로젝트 없는 매출 330만(공급가 300만) → 이익·예상 매출액 300만 증가(예전엔 매입만 빠지고 매출은 빠졌음)
+  const withGeneral = [...baseTx(), sale("2026-10-22", 3_300_000)];
+  const est = projectBasedProfit(ps, ofProjects(withGeneral, ps), inYear(withGeneral), AG);
+  assert.equal(est.generalSales, 3_000_000);
+  // 기본: A 3,500만 + B 8,000만 − 일반 매입 7,000만 − 인건비 800만 = 3,700만
+  assert.equal(est.profit, 37_000_000 + 3_000_000);
+  assert.equal(est.revenue, 165_000_000 + 3_000_000);
+  // 수금완료 B(발주 8,000만)에 계산서를 9,900만(공급가 9,000만)까지 끊음 → B 매출 9,000만으로
+  const over = [...baseTx(), sale("2026-10-25", 11_000_000, "PB")];
+  const estOver = projectBasedProfit(ps, ofProjects(over, ps), inYear(over), AG);
+  assert.equal(estOver.profit, 37_000_000 + 10_000_000);
+  assert.equal(estOver.revenue, 175_000_000);
+});
+
+test("하반기 예상: 발주액보다 더 끊은 계산서는 실제 금액으로(미발행 묶음 매출은 하반기 장부에서 빠지므로)", () => {
+  const awaiting: OutlookProject = { id: "PW", name: "수금대기 W", status: "done_awaiting_payment", quote_amount: 20_000_000 };
+  const txs = [...baseTx(), buy("2026-10-10", 2_200_000, "PW"), sale("2026-10-28", 27_500_000, "PW", "credit")];
+  const h2 = h2Of([PA, PB, awaiting], txs);
+  // A 3,500만 + W(2,500만 − 200만) 2,300만 = 5,800만
+  assert.equal(h2.unbilledPendingProfit, 58_000_000);
+  assert.equal(h2.h2EstimatedProfit, 10_000_000 + 58_000_000 - 8_000_000);
 });
 
 test("프로젝트 기준: 외상 미정산 매입도 비용으로(세금계산서 기준)", () => {
@@ -280,9 +320,9 @@ test("검토중 어미의 귀속 하위 발주액도 합계에서 뺌(이미 쓴
   const est = projectBasedProfit(ps, ofProjects(txs, ps), inYear(txs), new Map());
   assert.equal(est.quoteTotal, 0);
   assert.equal(est.profit, -1_000_000);
-  assert.equal(expectedRevenueOf(ps, new Map()), 0);
+  assert.equal(est.revenue, 0);
   // 진행중 어미면 하위 발주액까지 예상 매출액
-  assert.equal(expectedRevenueOf([{ ...reviewRoot, status: "ongoing" }, child], new Map()), 25_000_000);
+  assert.equal(projectBasedProfit([{ ...reviewRoot, status: "ongoing" }, child], [], [], new Map()).revenue, 25_000_000);
 });
 
 test("연말 점검: 미발행 묶음마다 남은 발행 예정액·발행한 매출·마지막 발행일(어미 + 귀속 하위)", () => {

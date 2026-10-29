@@ -23,6 +23,26 @@ export async function fetchAllRows<T>(
   return all;
 }
 
+// .in("칸", 목록)은 목록이 요청 주소(URL)에 그대로 들어가서, 프로젝트·외상 거래가 수백 개면 주소가 너무 길어 요청이 거절될 수
+// 있음(화면이 안 열림) — 목록을 IN_CHUNK개씩 나눠 조회해 합침(같은 값은 한 번만). 나눈 조회마다 fetchAllRows로 끝까지 —
+// 합친 순서는 조각 순서라, 순서가 필요하면 받은 뒤 정렬할 것.
+export const IN_CHUNK = 100;
+
+export async function fetchAllRowsIn<T>(
+  values: string[],
+  buildQuery: (
+    chunk: string[],
+    from: number,
+    to: number
+  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>
+): Promise<T[]> {
+  const unique = Array.from(new Set(values));
+  const chunks: string[][] = [];
+  for (let i = 0; i < unique.length; i += IN_CHUNK) chunks.push(unique.slice(i, i + IN_CHUNK));
+  const parts = await Promise.all(chunks.map((chunk) => fetchAllRows<T>((from, to) => buildQuery(chunk, from, to))));
+  return parts.flat();
+}
+
 // 해마다 늘어나는 목록(거래처·프로젝트·현장·메모)을 끝까지 — 선택칸·보고서가 1,000줄에서 조용히 잘리지 않게. 기존
 // 호출부의 `{ data }` 모양 그대로 돌려줌. 이름순처럼 겹칠 수 있는 정렬이면 마지막에 id 정렬을 붙여 페이지가 겹치거나
 // 빠지지 않게 할 것.

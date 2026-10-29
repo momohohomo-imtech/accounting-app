@@ -386,7 +386,7 @@ export default async function DashboardPage({
             href="/projects"
             className="col-span-2 rounded-lg transition hover:ring-2 hover:ring-slate-200 xl:col-span-1"
           >
-            <Stat label={`${selectedYear}년 예상 매출액`} sub="발주액에서 대행구매액 차감 · 공급가액 기준">
+            <Stat label={`${selectedYear}년 예상 매출액`} sub="발주액에서 대행구매액 차감(발주액 미입력 시 실제 매출) · 공급가액 기준">
               <Money value={o.expectedRevenue} />
             </Stat>
           </Link>
@@ -520,11 +520,15 @@ export default async function DashboardPage({
                 하반기 예상 이익 = 하반기 매출−매입 + 세금계산서 미발행분 예상 이익 − 인건비 · 연간 예상 이익 = 상반기 확정 이익 +
                 하반기 예상 이익
                 {o.hasProjectsWithProfit &&
-                  " · 프로젝트 기준 예상 이익 = 프로젝트 총이익(발주액 기준, 발주액이 없으면 실제 매출 · 매입은 전부 반영) − 일반경비 − 직원급여·상여·4대보험 (추가 지출 발생 시 즉시 반영)"}
+                  " · 프로젝트 기준 예상 이익 = 프로젝트 총이익(발주액 − 대행구매액, 발행 세금계산서가 더 많거나 발주액이 없으면 실제 매출 · 매입은 전부 반영) + 프로젝트 미지정 매출 − 일반경비 − 직원급여·상여·4대보험 (추가 지출 발생 시 즉시 반영)"}
               </p>
               <p>
                 매출·매입은 세금계산서(거래일) 기준으로 외상 미정산분 포함 · 검토중 프로젝트의 발주액은 미반영 · 귀속 연도가 해당
                 연도인 프로젝트 기준 — 다음 해에 세금계산서를 발행할 프로젝트는 귀속 연도를 다음 해로 변경
+              </p>
+              <p>
+                예상 매출액 = 예상 이익 산정에 쓴 매출(발주액 − 대행구매액, 발행 세금계산서가 더 많거나 발주액이 없으면 실제 매출,
+                검토중 제외) + 프로젝트 미지정 매출 · 공급가액 기준
               </p>
               <p>
                 예상 종합소득세 = 이익에서 본인 기본공제 150만원을 차감한 과세표준에 종합소득세율 적용 + 지방소득세 10% · 그 밖의
@@ -686,7 +690,7 @@ export default async function DashboardPage({
             <Stat label={`${selectedYear}년 매출·매입 차액`}>
               <Money value={yearProfit} />
             </Stat>
-            <Stat label={`${selectedYear}년 예상 매출액 (발주액 − 대행구매액)`}>
+            <Stat label={`${selectedYear}년 예상 매출액`}>
               <Money value={o.expectedRevenue} />
             </Stat>
             <Stat label={`당월(${today.month}월) 매출`}>
