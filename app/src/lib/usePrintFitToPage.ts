@@ -17,7 +17,8 @@ import { useEffect, useRef } from "react";
 // 반입반출증처럼 품목 수에 따라 페이지가 늘어나는 양식)을 렌더링할 때 쓴다 — 켜져
 // 있으면 전체 내용을 무조건 1페이지 높이로 욱여넣으려 하므로, 의도한 페이지 나눔을
 // 깨버린다.
-export function usePrintFitToPage<T extends HTMLElement>(pageHeightMm = 270, disabled = false) {
+// maxScale: 늘 이 배율 이하로 인쇄(엑셀이 저장해 둔 인쇄 배율을 그대로 쓰는 양식 — 출입신청서 81%), 넘치면 그보다 더 줄임.
+export function usePrintFitToPage<T extends HTMLElement>(pageHeightMm = 270, disabled = false, maxScale = 1) {
   const ref = useRef<T | null>(null);
 
   useEffect(() => {
@@ -29,10 +30,8 @@ export function usePrintFitToPage<T extends HTMLElement>(pageHeightMm = 270, dis
       el.style.removeProperty("zoom");
       const pageHeightPx = (pageHeightMm / 25.4) * 96;
       const contentHeight = el.scrollHeight;
-      if (contentHeight > pageHeightPx) {
-        const scale = pageHeightPx / contentHeight;
-        el.style.setProperty("zoom", String(scale));
-      }
+      const scale = Math.min(maxScale, pageHeightPx / contentHeight);
+      if (scale < 1) el.style.setProperty("zoom", String(scale));
     }
     function afterPrint() {
       if (!el) return;
@@ -50,7 +49,7 @@ export function usePrintFitToPage<T extends HTMLElement>(pageHeightMm = 270, dis
       // — 이펙트가 재실행/언마운트될 때마다 항상 같이 지워서 이 잔존 배율을 없앰.
       el.style.removeProperty("zoom");
     };
-  }, [pageHeightMm, disabled]);
+  }, [pageHeightMm, disabled, maxScale]);
 
   return ref;
 }
