@@ -1,9 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { BACKUP_TABLES, runBackup } from "@/lib/backup";
 
-// 복원할 표 — supabase/096의 restore_allowed_tables()와 같게(restore.test.ts가 비교함). 견적서 공급자(company_profiles)는
-// 설정값이라 백업 파일에만 담고 복원하지 않음.
-export const RESTORE_TABLES = BACKUP_TABLES.filter((t) => t !== "company_profiles");
+// 복원할 표 — SQL의 restore_allowed_tables()(가장 최근에 다시 만든 097)와 같게(restore.test.ts가 비교함). 견적서 공급자
+// (company_profiles)는 설정값이라, 신고 끝난 해 잠금(locked_years)은 잠그기 전 백업으로 복원해도 잠금이 풀리지 않게 — 둘 다
+// 백업 파일에만 담고 복원하지 않음.
+const BACKUP_ONLY_TABLES = ["company_profiles", "locked_years"];
+export const RESTORE_TABLES = BACKUP_TABLES.filter((t) => !BACKUP_ONLY_TABLES.includes(t));
 // 표별 줄 수(__meta)가 없는 예전 방식 백업은 그때 복원하던 표만 바꿈 — 나머지 표는 지금 자료 그대로(복원 함수가 지켜 줌).
 const LEGACY_RESTORE_TABLES = [
   "clients",

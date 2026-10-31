@@ -49,10 +49,17 @@ export const BACKUP_TABLES = [
   "dashboard_page_memo",
   "transactions_page_memo",
   "projects_page_memo",
+  // 097 SQL — 통장 잔액 확인 기록, 신고 끝난 해 잠금(잠금은 백업 파일에만 담고 복원하지 않음 — lib/restore.ts).
+  "bank_balance_checks",
+  "locked_years",
 ];
 
 // 표마다 겹치지 않게 나눠 받을 고유 칸(대부분 id).
-const ORDER_KEY: Record<string, string[]> = { trip_logs: ["project_id"], vat_prepayment_notices: ["year", "month"] };
+const ORDER_KEY: Record<string, string[]> = {
+  trip_logs: ["project_id"],
+  vat_prepayment_notices: ["year", "month"],
+  locked_years: ["year"],
+};
 const PAGE_SIZE = 1000;
 // SQL 실행 전이라 아직 없는 표만 건너뜀 — 다른 오류는 백업 실패로(일부만 담긴 백업을 남기지 않게).
 const MISSING_TABLE = new Set(["PGRST205", "42P01"]);
