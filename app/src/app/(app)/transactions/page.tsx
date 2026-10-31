@@ -28,6 +28,7 @@ import { fetchAllRows, fetchAllData, fetchAllRowsIn } from "@/lib/supabaseFetchA
 import { hasPaymentGroupColumn } from "@/lib/paymentGroup";
 import { LedgerCheckSection } from "@/components/sections/LedgerCheckSection";
 import { getCurrentRole } from "@/lib/currentRole";
+import { isYearLocked, loadLockedYears, type LockedYear } from "@/lib/yearLock";
 import { nowKst } from "@/lib/kstDate";
 
 const TABS = [
@@ -252,6 +253,7 @@ async function TransactionListSection({
     { data: importPaymentMethods },
     { data: importExpenseCategories },
     pageMemo,
+    locks,
   ] = await Promise.all([
     loadLedgerTransactions(start, end, type ?? "", project_id ?? "", payment_method_id ?? ""),
     fetchAllData((from, to) =>
@@ -268,7 +270,15 @@ async function TransactionListSection({
     supabase.from("payment_methods").select("id, name, text_color, background_color").order("sort_order"),
     supabase.from("expense_categories").select("id, name").order("sort_order"),
     readOnly ? Promise.resolve(null) : loadPageMemo(),
+    // 신고 끝난 해 잠금(097 SQL) — 실행 전이면 안내 없음.
+    loadLockedYears(() =>
+      supabase
+        .from("locked_years")
+        .select("year, locked_at, memo")
+        .then(({ data, error }) => ({ data: data as LockedYear[] | null, error }))
+    ),
   ]);
+  const yearLocked = isYearLocked(locks.years, selectedYear);
 
   // 092 SQL 실행 전에는 거래에 묶음 번호 칸이 없음 → 묶기 버튼을 숨김(거래가 없으면 고를 것도 없어서 상관없음).
   const groupingReady = hasPaymentGroupColumn(transactions);
@@ -340,6 +350,12 @@ async function TransactionListSection({
           </div>
         )}
       </div>
+      {yearLocked && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {selectedYear}년은 신고가 끝나 잠긴 해입니다 — 거래를 추가·삭제하거나 날짜·금액·거래처·카테고리·세금계산서·외상 여부를 바꿀
+          수 없습니다(프로젝트·결제수단·품목·메모·외상 정산은 가능).
+        </p>
+      )}
 
       <p className="text-sm text-slate-600">
         필터된 전체 금액{" "}

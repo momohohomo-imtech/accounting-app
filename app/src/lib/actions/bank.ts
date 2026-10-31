@@ -347,3 +347,35 @@ export async function deleteBankTransactionRecord(formData: FormData) {
   revalidatePath("/bank");
   revalidatePath("/transactions");
 }
+
+// 통장 잔액 확인 기록(097 SQL) — 한 계좌에 하루 한 번(같은 날 다시 적으면 고쳐 씀). 비교 계산은 lib/bankReconcile.ts.
+export async function saveBankBalanceCheck(formData: FormData) {
+  const bankAccountId = String(formData.get("bank_account_id") ?? "");
+  const checkDate = String(formData.get("check_date") ?? "");
+  const rawBalance = String(formData.get("actual_balance") ?? "").trim();
+  if (!bankAccountId) return { error: "계좌를 찾을 수 없습니다." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(checkDate)) return { error: "확인한 날짜를 입력해주세요." };
+  if (rawBalance === "" || !Number.isFinite(Number(rawBalance))) return { error: "통장 잔액을 입력해주세요." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("bank_balance_checks").upsert(
+    {
+      bank_account_id: bankAccountId,
+      check_date: checkDate,
+      actual_balance: Number(rawBalance),
+      memo: String(formData.get("memo") ?? "").trim() || null,
+    },
+    { onConflict: "bank_account_id,check_date" }
+  );
+  if (error) return { error: error.message };
+  revalidatePath("/bank");
+}
+
+export async function deleteBankBalanceCheck(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { error: "잘못된 항목입니다." };
+  const supabase = await createClient();
+  const { error } = await supabase.from("bank_balance_checks").delete().eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/bank");
+}

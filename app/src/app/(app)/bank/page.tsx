@@ -14,6 +14,8 @@ import { BankEntryPopup } from "@/components/BankEntryPopup";
 import { fetchAllRows, fetchAllData } from "@/lib/supabaseFetchAll";
 import { nowKst } from "@/lib/kstDate";
 import { stickyHeadWrapClass } from "@/components/ui/Table";
+import { BankBalanceCheckPopup } from "@/components/BankBalanceCheckPopup";
+import { balanceAsOf, loadBalanceChecks, reconcileChecks, type BalanceCheck } from "@/lib/bankReconcile";
 
 const accountFields: FieldConfig[] = [
   { name: "bank_name", label: "은행명", required: true },
@@ -36,7 +38,7 @@ export default async function BankPage({
 }) {
   const { year, period, deposit, withdrawal, excludeAccounts } = await searchParams;
   const supabase = await createClient();
-  const { year: currentYear, month: currentMonth } = nowKst();
+  const { year: currentYear, month: currentMonth, day: currentDay } = nowKst();
   const selectedYear = year ? Number(year) : currentYear;
   // period 파라미터가 아예 없으면(맨 처음 들어왔을 때) 이번 달을 기본값으로 —
   // "전체 기간"을 직접 고른 경우엔 "all"이 명시적으로 붙어있어서 이 기본값과 구분된다.
@@ -86,7 +88,7 @@ export default async function BankPage({
     clients?: { name: string } | null;
   };
 
-  const [{ data: clients }, transactions, allTx, { data: firstTx }, { data: rawNames }] = await Promise.all([
+  const [{ data: clients }, transactions, allTx, { data: firstTx }, { data: rawNames }, balanceChecks] = await Promise.all([
     fetchAllData((from, to) => supabase.from("clients").select("id, name").order("name").order("id").range(from, to)),
     fetchAllRows<BankTxRow>((from, to) => {
       let q = supabase
@@ -102,10 +104,11 @@ export default async function BankPage({
       if (excludedSet.size > 0) q = q.in("bank_account_id", includedAccountIds);
       return q;
     }),
-    fetchAllRows<{ bank_account_id: string; direction: string; amount: number }>((from, to) =>
+    // 계좌 잔액(시작 잔액 + 입금 − 출금) — 거래일은 잔액 맞추기(그 날까지의 잔액)에 씀.
+    fetchAllRows<{ bank_account_id: string; trans_date: string; direction: string; amount: number }>((from, to) =>
       supabase
         .from("bank_transactions")
-        .select("bank_account_id, direction, amount")
+        .select("bank_account_id, trans_date, direction, amount")
         .order("id", { ascending: true })
         .range(from, to)
     ),
@@ -118,7 +121,25 @@ export default async function BankPage({
         .order("id", { ascending: true })
         .range(from, to)
     ).then((data) => ({ data })),
+    // 통장 잔액 확인 기록(097 SQL) — 실행 전이면 잔액 맞추기를 숨김.
+    loadBalanceChecks((from, to) =>
+      supabase
+        .from("bank_balance_checks")
+        .select("id, bank_account_id, check_date, actual_balance, memo")
+        .order("check_date", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to)
+        .then(({ data, error }) => ({ data: data as BalanceCheck[] | null, error }))
+    ),
   ]);
+  const todayKey = `${currentYear}-${pad(currentMonth)}-${pad(currentDay)}`;
+  const checksByAccount = balanceChecks.ready
+    ? reconcileChecks(
+        (accounts ?? []).map((a) => ({ id: a.id, opening_balance: a.opening_balance })),
+        allTx,
+        balanceChecks.checks
+      )
+    : null;
 
   // 자동완성 목록 = 등록된 거래처 이름 + 예전에 수기로 직접 입력했던 이름들(등록 안 된 것 포함).
   const nameSuggestions = Array.from(
@@ -175,6 +196,15 @@ export default async function BankPage({
                 <p className={`mt-2 tabular-nums text-2xl font-bold ${balance < 0 ? "text-red-600" : "text-slate-900"}`}>
                   {formatWon(balance)}
                 </p>
+                {checksByAccount && (
+                  <BankBalanceCheckPopup
+                    accountId={a.id}
+                    accountName={a.nickname ?? a.bank_name}
+                    appBalanceToday={balanceAsOf(a.opening_balance, allTx, a.id, todayKey)}
+                    today={todayKey}
+                    rows={checksByAccount.get(a.id) ?? []}
+                  />
+                )}
                 <BankAccountMemo accountId={a.id} initialMemo={a.memo ?? ""} />
               </div>
             );

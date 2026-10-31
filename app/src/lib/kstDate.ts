@@ -6,7 +6,10 @@ export function nowKst() {
 }
 
 // 저장된 시각(UTC, ISO 문자열) → 한국 시각 "YYYY-MM-DD HH:MM" — 등록 시각·수정 이력 표시용.
-export function kstDateTime(iso: string) {
-  const d = new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString();
+// 값이 비었거나 날짜가 아니면 빈 글자(화면 전체가 오류로 멈추지 않게).
+export function kstDateTime(iso: string | null | undefined) {
+  const t = iso ? new Date(iso).getTime() : NaN;
+  if (!Number.isFinite(t)) return "";
+  const d = new Date(t + 9 * 3600_000).toISOString();
   return `${d.slice(0, 10)} ${d.slice(11, 16)}`;
 }

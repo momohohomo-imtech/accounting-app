@@ -8,6 +8,10 @@ import { DuplicateCandidatesTable, type DuplicateGroup } from "@/components/Dupl
 import { UncategorizedPurchasesTable, type UncategorizedRow } from "@/components/UncategorizedPurchasesTable";
 import { TransactionHistoryTable } from "@/components/TransactionHistoryTable";
 import { loadTransactionHistory } from "@/lib/transactionHistoryLoad";
+import { loadLockedYears, type LockedYear } from "@/lib/yearLock";
+import { getCurrentRole } from "@/lib/currentRole";
+import { YearLockPanel } from "@/components/YearLockPanel";
+import { HometaxReconcilePanel } from "@/components/HometaxReconcilePanel";
 
 type CheckTx = LedgerCheckRow & {
   payment_type: string;
@@ -20,7 +24,7 @@ type CheckTx = LedgerCheckRow & {
 // 카테고리 지정으로(계산은 lib/ledgerCheck.ts). 외상 정산 전 거래도 포함(장부 표시와 상관없이 등록된 거래 전부).
 export async function LedgerCheckSection({ year, years }: { year: number; years: number[] }) {
   const supabase = await createClient();
-  const [rows, { data: categories }, history] = await Promise.all([
+  const [rows, { data: categories }, history, locks, role] = await Promise.all([
     fetchAllRows<CheckTx>((from, to) =>
       supabase
         .from("transactions")
@@ -34,6 +38,14 @@ export async function LedgerCheckSection({ year, years }: { year: number; years:
     supabase.from("expense_categories").select("*").order("sort_order"),
     // 최근 수정·삭제 이력(094 SQL) — 연도와 상관없이 최근 100줄(한꺼번에 바뀐 묶음은 한 줄).
     loadTransactionHistory(supabase, { limit: 100 }),
+    // 신고 끝난 해 잠금(097 SQL) — 실행 전이면 칸을 숨김.
+    loadLockedYears(() =>
+      supabase
+        .from("locked_years")
+        .select("year, locked_at, memo")
+        .then(({ data, error }) => ({ data: data as LockedYear[] | null, error }))
+    ),
+    getCurrentRole(),
   ]);
 
   const duplicateGroups: DuplicateGroup[] = findDuplicateCandidates(rows).map((g) => ({
@@ -119,6 +131,37 @@ export async function LedgerCheckSection({ year, years }: { year: number; years:
           <p className="text-sm text-red-600">수정 이력을 불러오지 못했어요({history.message}). 잠시 뒤 새로고침해 주세요.</p>
         )}
       </CollapsibleSection>
+      <CollapsibleSection
+        title={
+          <span>
+            홈택스 세금계산서 대조 <span className="text-sm font-normal text-slate-500">홈택스 목록 엑셀과 매출·매입 맞춰 보기</span>
+          </span>
+        }
+      >
+        <HometaxReconcilePanel year={year} />
+      </CollapsibleSection>
+      {locks.ready && (
+        <CollapsibleSection
+          title={
+            <span>
+              신고 끝난 해 잠금{" "}
+              <span className="text-sm font-normal text-slate-500">
+                {locks.error
+                  ? "불러오지 못함"
+                  : locks.years.length > 0
+                    ? `잠긴 해 ${locks.years.map((y) => y.year).join("·")}`
+                    : "잠긴 해 없음"}
+              </span>
+            </span>
+          }
+        >
+          {locks.error ? (
+            <p className="text-sm text-red-600">잠긴 해를 불러오지 못했어요({locks.error}). 잠시 뒤 새로고침해 주세요.</p>
+          ) : (
+            <YearLockPanel year={year} lockedYears={locks.years} isAdmin={role === "admin"} />
+          )}
+        </CollapsibleSection>
+      )}
     </div>
   );
 }

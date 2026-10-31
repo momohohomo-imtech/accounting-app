@@ -42,6 +42,10 @@ import { nowKst, kstDateTime } from "@/lib/kstDate";
 import { PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
 import { getCurrentRole } from "@/lib/currentRole";
 import { backupStatus, AUTO_BACKUP_STALE_DAYS, type BackupRecord } from "@/lib/backupStatus";
+import { receivableAging } from "@/lib/receivableAging";
+import { tasksForMonth, tasksSummary } from "@/lib/annualTasks";
+import { one } from "@/lib/relations";
+import { ReceivableAgingTable } from "@/components/ReceivableAgingTable";
 
 // 수금 예정액 상태 칸 — 상태 목록은 프로젝트 목록 미수 금액·보고서 남은 금액과 같은 RECEIVABLE_STATUSES.
 // 외상 거래 — 잔액(remainingBalance)·오래된 미수금(거래일·거래처)에 쓰는 칸만.
@@ -253,6 +257,24 @@ export default async function DashboardPage({
   const creditReceivable = creditTx.filter((t) => t.type === "매출").reduce((s, t) => s + remainingBalance(t, payments), 0);
   const creditPayable = creditTx.filter((t) => t.type === "매입").reduce((s, t) => s + remainingBalance(t, payments), 0);
   const creditReceivableCount = creditTx.filter((t) => t.type === "매출" && remainingBalance(t, payments) > 0).length;
+  // 오래된 외상매출금 — 세금계산서(거래일)부터 오늘까지 지난 날(lib/receivableAging.ts), 잔액은 외상매출금 합계와 같은 기준.
+  const todayKey = `${today.year}-${mm}-${String(today.day).padStart(2, "0")}`;
+  const aging = receivableAging(
+    creditTx
+      .filter((t) => t.type === "매출")
+      .map((t) => ({
+        id: t.id,
+        trans_date: t.trans_date,
+        client: one(t.clients)?.name ?? t.client_name_raw ?? "거래처 미지정",
+        item: t.item_name,
+        amount: remainingBalance(t, payments),
+      })),
+    todayKey
+  );
+  const over60Amount = aging.over60.reduce((s, it) => s + it.amount, 0);
+  // 이번 달 신고·납부 일정(lib/annualTasks.ts), 1~5월엔 전년도 신고 자료 바로가기.
+  const monthTasks = tasksForMonth(today.year, today.month);
+  const showPrevYearFiling = today.month <= 5 && selectedYear === today.year;
   const creditPayableCount = creditTx.filter((t) => t.type === "매입" && remainingBalance(t, payments) > 0).length;
 
   const yearSales = yearTx.reduce((s, t) => s + t.sales_amount + t.sales_vat, 0);
@@ -476,6 +498,54 @@ export default async function DashboardPage({
 
       {/* 자세한 내용은 한 카드 안의 접힘 목록 — 접힌 줄 오른쪽에 핵심 숫자 한 줄. */}
       <Card padding="none" className="divide-y divide-slate-100">
+        <FoldRow title={`이번 달(${today.month}월) 신고·납부 일정`} summary={tasksSummary(monthTasks)}>
+          <ul className="space-y-1 text-xs text-slate-700">
+            {monthTasks.map((t) => (
+              <li key={`${t.day}-${t.short}`} className="flex gap-2">
+                <span className="w-9 shrink-0 tabular-nums text-slate-500">{t.day}일</span>
+                <span className="min-w-0">
+                  {t.href ? (
+                    <Link href={t.href} className="underline decoration-slate-300 underline-offset-2 hover:text-slate-900">
+                      {t.title}
+                    </Link>
+                  ) : (
+                    t.title
+                  )}
+                  {t.detail && <span className="text-slate-400"> · {t.detail}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <Footnote>
+            <p>마감일이 주말·공휴일이면 다음 영업일 · 세무사 대리 신고 항목 포함 · 개인사업자(일반과세자) 기준 일정</p>
+          </Footnote>
+        </FoldRow>
+
+        {showPrevYearFiling && (
+          <FoldRow
+            title={`전년도(${today.year - 1}년) 신고 자료`}
+            summary={`5월 31일 종합소득세 신고 기한 · ${today.year - 1}년 대시보드·매입매출장·보고서`}
+          >
+            <div className="flex flex-wrap gap-2 text-xs">
+              <Link href={`/dashboard?year=${today.year - 1}`} className="rounded-lg border border-slate-200 px-3 py-1.5 hover:bg-slate-50">
+                {today.year - 1}년 대시보드
+              </Link>
+              <Link
+                href={`/transactions?year=${today.year - 1}&month=all`}
+                className="rounded-lg border border-slate-200 px-3 py-1.5 hover:bg-slate-50"
+              >
+                {today.year - 1}년 매입매출장
+              </Link>
+              <Link href={`/reports?year=${today.year - 1}`} className="rounded-lg border border-slate-200 px-3 py-1.5 hover:bg-slate-50">
+                {today.year - 1}년 보고서
+              </Link>
+            </div>
+            <Footnote>
+              <p>1~5월에만 표시 · 신고가 끝나면 매입매출 → 장부 점검에서 전년도 잠금 가능</p>
+            </Footnote>
+          </FoldRow>
+        )}
+
         <FoldRow
           title="손익 및 세액 상세"
           summary={
@@ -680,7 +750,14 @@ export default async function DashboardPage({
 
         <FoldRow
           title="수금·지급 예정 상세"
-          summary={`수금 대기 ${awaitingPayment.count}건 ${formatWon(awaitingPayment.amount)} · 외상매출금 ${formatWon(creditReceivable)}`}
+          summary={
+            <>
+              {`수금 대기 ${awaitingPayment.count}건 ${formatWon(awaitingPayment.amount)} · 외상매출금 ${formatWon(creditReceivable)}`}
+              {aging.over60.length > 0 && (
+                <span className="font-semibold text-amber-600">{` · 60일 경과 ${aging.over60.length}건 ${formatWon(over60Amount)}`}</span>
+              )}
+            </>
+          }
         >
           <p className="text-[11px] text-slate-400">외상 거래는 정산 등록 전까지 매입매출장 합계에서 제외됩니다.</p>
           <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-4">
@@ -713,6 +790,24 @@ export default async function DashboardPage({
             </p>
             <p>외상매출금 = 세금계산서 발행 후 입금 대기분 · 공사 완료·수금 대기 금액은 기수령 기성금 제외</p>
           </Footnote>
+          {aging.items.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs font-semibold text-slate-700">외상매출금 경과 기간(세금계산서 일자 기준)</p>
+              <div className="mt-1.5 grid grid-cols-2 gap-2 lg:grid-cols-4">
+                {aging.buckets.map((b) => (
+                  <Stat key={b.key} label={b.label} sub={`${b.count}건`}>
+                    <Money value={b.amount} className={b.key === "over90" && b.amount > 0 ? "text-red-600" : undefined} />
+                  </Stat>
+                ))}
+              </div>
+              {aging.over60.length > 0 && (
+                <div className="mt-2">
+                  <p className="mb-1 text-[11px] text-slate-500">60일 경과 외상매출금(입금 확인 필요)</p>
+                  <ReceivableAgingTable items={aging.over60} />
+                </div>
+              )}
+            </div>
+          )}
         </FoldRow>
 
         <FoldRow title="매출·매입 실적" summary={`${selectedYear}년 매출 ${formatWon(yearSales)} · 매입 ${formatWon(yearPurchase)}`}>
