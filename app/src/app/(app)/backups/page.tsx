@@ -28,17 +28,21 @@ export default async function BackupsPage() {
   const status = backupStatus((backups ?? []) as BackupRecord[], new Date().toISOString());
   const hasRowCounts = (backups ?? []).some((b) => "row_counts" in b);
 
-  const withLinks = await Promise.all(
-    (backups ?? []).map(async (b) => {
-      if (!b.storage_url) return { ...b, signedUrl: null };
-      try {
-        const { data } = await supabase.storage.from("backups").createSignedUrl(b.storage_url, 3600);
-        return { ...b, signedUrl: data?.signedUrl ?? null };
-      } catch {
-        return { ...b, signedUrl: null };
-      }
-    })
-  );
+  // 내려받기 주소를 한 번에(백업마다 따로 요청하지 않게).
+  const paths = (backups ?? []).map((b) => b.storage_url).filter((p): p is string => Boolean(p));
+  const signedByPath = new Map<string, string>();
+  if (paths.length > 0) {
+    try {
+      const { data } = await supabase.storage.from("backups").createSignedUrls(paths, 3600);
+      for (const d of data ?? []) if (d.path && d.signedUrl && !d.error) signedByPath.set(d.path, d.signedUrl);
+    } catch {
+      // 주소를 못 만들면 내려받기 칸만 비움
+    }
+  }
+  const withLinks = (backups ?? []).map((b) => ({
+    ...b,
+    signedUrl: b.storage_url ? (signedByPath.get(b.storage_url) ?? null) : null,
+  }));
 
   return (
     <div className="space-y-6">
@@ -61,6 +65,11 @@ export default async function BackupsPage() {
           {hasRowCounts
             ? "백업은 표마다 모든 줄을 끝까지 담습니다(거래 = 백업에 담긴 거래 수). 거래 칸이 \"-\"인 예전 방식 백업은 표마다 1,000줄까지만 담겨, 1,000줄 이상인 표가 있으면 복원이 막힙니다."
             : "백업은 표마다 모든 줄을 끝까지 담습니다. 백업에 담긴 거래 수는 Supabase에서 095 SQL을 실행한 뒤 만든 백업부터 표시됩니다."}
+        </p>
+        <p className="mb-3 text-xs text-slate-500">
+          자동 백업은 최근 8주 것은 모두, 그 전 1년은 달마다 첫 백업 1개만 남기고 오래된 것은 자동으로 정리합니다(직접 만든 백업과
+          복원 직전 백업은 지우지 않음). 새 백업은 압축 파일(.json.gz)로 저장됩니다 — 복원은 그대로 되고, 내려받은 파일은 반디집·
+          7-Zip 등으로 풀면 JSON입니다.
         </p>
         <div className="overflow-x-auto">
           <BackupsTable backups={withLinks} />

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { runBackup } from "@/lib/backup";
+import { decodeBackupFile, runBackup } from "@/lib/backup";
 import { restoreFromBackup } from "@/lib/restore";
 
 export async function createManualBackup(): Promise<{ error?: string; fileName?: string }> {
@@ -42,7 +42,8 @@ export async function restoreBackup(formData: FormData): Promise<{ error?: strin
   try {
     const { data, error: downloadError } = await supabase.storage.from("backups").download(fileName);
     if (downloadError || !data) throw new Error(downloadError?.message ?? "백업 파일을 불러올 수 없습니다.");
-    const dump = JSON.parse(await data.text());
+    // 압축 백업(.json.gz)과 예전 백업(.json) 둘 다 읽음.
+    const dump = JSON.parse(decodeBackupFile(new Uint8Array(await data.arrayBuffer())));
     await restoreFromBackup(supabase, dump);
     revalidatePath("/backups");
     return { success: true };

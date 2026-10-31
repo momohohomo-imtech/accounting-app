@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BACKUP_TABLES, runBackup } from "@/lib/backup";
+import { gzipSync } from "node:zlib";
+import { BACKUP_TABLES, decodeBackupFile, runBackup } from "@/lib/backup";
 import { fakeSupabase, txRows, type Row } from "./fakeBackupSupabase";
 
 test("백업: 1,000줄이 넘는 표도 끝까지 담고, 표별 줄 수를 파일과 기록에 남김", async () => {
@@ -37,4 +38,29 @@ test("백업: 공사 메모·일용직 사용내역·발주서 등 앱이 쓰는
   await runBackup(fake.supabase, "manual");
   const dump = JSON.parse(fake.uploads[0].json);
   assert.equal(new Set(dump.vat_prepayment_notices.map((r: Row) => `${r.year}-${r.month}`)).size, 1500);
+});
+
+test("백업 파일: 압축(.json.gz)으로 올리고, 압축본·예전 JSON(들여쓰기) 둘 다 읽음", async () => {
+  const fake = fakeSupabase({ transactions: txRows(2000, { note1: "가짜 메모 ".repeat(5) }) });
+  const { fileName, sizeMb } = await runBackup(fake.supabase, "auto");
+  assert.match(fileName, /^backup-.*\.json\.gz$/);
+  assert.equal(fake.uploads[0].contentType, "application/gzip");
+  const plainBytes = new TextEncoder().encode(fake.uploads[0].json).byteLength;
+  assert.ok(fake.uploads[0].bytes * 5 < plainBytes, `압축: ${fake.uploads[0].bytes} < ${plainBytes}/5`);
+  assert.equal(Number(fake.records[0].file_size_mb), Number(sizeMb.toFixed(3)));
+  assert.equal(JSON.parse(fake.uploads[0].json).transactions.length, 2000);
+  // 예전 백업(들여쓰기 JSON)과 압축본을 같은 함수로
+  const dump = { clients: [{ id: "c1", name: "가짜 거래처" }] };
+  const legacy = new TextEncoder().encode(JSON.stringify(dump, null, 2));
+  assert.deepEqual(JSON.parse(decodeBackupFile(legacy)), dump);
+  assert.deepEqual(JSON.parse(decodeBackupFile(gzipSync(Buffer.from(JSON.stringify(dump))))), dump);
+});
+
+test("백업: 표를 몇 개씩 동시에 읽어도 표 순서·내용은 그대로", async () => {
+  const tables = Object.fromEntries(BACKUP_TABLES.map((t, i) => [t, txRows(i % 3 === 0 ? 1200 : 2)]));
+  const fake = fakeSupabase(tables);
+  const { rowCounts } = await runBackup(fake.supabase, "manual");
+  const dump = JSON.parse(fake.uploads[0].json);
+  assert.deepEqual(Object.keys(dump).filter((k) => k !== "__meta"), BACKUP_TABLES);
+  for (const [i, t] of BACKUP_TABLES.entries()) assert.equal(rowCounts[t], i % 3 === 0 ? 1200 : 2, t);
 });

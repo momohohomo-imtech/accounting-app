@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { uploadAttachment, deleteAttachment } from "@/lib/actions/attachments";
+import { deleteAttachment, prepareAttachmentUpload, saveUploadedAttachment } from "@/lib/actions/attachments";
+import { uploadToSignedUrl } from "@/lib/supabase/signedUpload";
+import { storageUploadErrorMessage } from "@/lib/fileUpload";
 import { formatFileSize } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { inlineFieldClass } from "@/components/ui/field";
@@ -102,15 +104,48 @@ export function AttachmentList({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleUpload(formData: FormData) {
-    setPending(true);
-    setError(null);
-    const result = await globalPending.run(() => uploadAttachment(formData));
-    setPending(false);
-    if (result?.error) {
-      setError(result.error);
+  // 파일은 브라우저에서 저장소로 바로 올림(서버 한도 4.5MB를 안 거침) — 순서와 이유는 actions/attachments.ts 맨 위.
+  async function uploadFile(file: File, memo: string): Promise<string | null> {
+    const target = { projectId: projectId ?? null, workDate: workDate ?? null };
+    const prepared = await prepareAttachmentUpload({ ...target, fileName: file.name });
+    if (prepared.error !== undefined) return prepared.error;
+    let uploadError: string | null;
+    try {
+      ({ error: uploadError } = await uploadToSignedUrl("project-files", prepared.path, prepared.token, file));
+    } catch (err) {
+      uploadError = err instanceof Error ? err.message : "인터넷 연결을 확인해 주세요.";
+    }
+    if (uploadError) return storageUploadErrorMessage(uploadError, file.size);
+    const saved = await saveUploadedAttachment({
+      ...target,
+      path: prepared.path,
+      fileName: file.name,
+      mimeType: file.type || null,
+      size: file.size,
+      memo: memo.trim() || null,
+    });
+    return saved?.error ?? null;
+  }
+
+  // onSubmit(form action 아님) — 올리기가 실패해도 고른 파일·메모가 지워지지 않게.
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    const file = fd.get("file");
+    if (!(file instanceof File) || file.size === 0) {
+      setError("파일을 선택해주세요.");
       return;
     }
+    setPending(true);
+    setError(null);
+    const uploadError = await globalPending.run(() => uploadFile(file, String(fd.get("memo") ?? "")));
+    setPending(false);
+    if (uploadError) {
+      setError(uploadError);
+      return;
+    }
+    form.reset();
     router.refresh();
   }
 
@@ -128,9 +163,7 @@ export function AttachmentList({
         <p className="mb-2 text-sm text-slate-400">첨부된 파일이 없습니다.</p>
       )}
 
-      <form action={handleUpload} className="flex flex-wrap items-end gap-2 print:hidden">
-        {projectId && <input type="hidden" name="project_id" value={projectId} />}
-        {workDate && <input type="hidden" name="work_date" value={workDate} />}
+      <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-2 print:hidden">
         <input name="file" type="file" required className="text-xs" />
         <input name="memo" placeholder="메모 (선택)" className={`${inlineFieldClass} w-40`} />
         <Button type="submit" size="xs" disabled={pending}>

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { remainingBalance } from "@/lib/credit";
+import { fetchAllRowsIn } from "@/lib/supabaseFetchAll";
 import type { CreditPayment, Transaction } from "@/lib/types";
 
 // 거래가 바뀌면 금액이 보이는 모든 화면을 새로 그리게 한다.
@@ -412,19 +413,34 @@ export async function settleCreditTransactions(formData: FormData) {
   if (ids.length === 0) return { error: "정산할 거래를 선택해주세요." };
   if (!paidDate) return { error: "정산일을 입력해주세요." };
 
-  const [{ data: txs, error: txError }, { data: payments, error: payError }, { data: paymentMethod }] =
-    await Promise.all([
-      supabase.from("transactions").select("*").in("id", ids),
-      supabase.from("credit_payments").select("*").in("transaction_id", ids),
+  // 한 번에 고른 외상이 많아도 요청 주소가 너무 길어지지 않게 나눠 조회(fetchAllRowsIn).
+  let txs: Transaction[];
+  let payments: CreditPayment[];
+  let paymentMethod: { name: string } | null;
+  try {
+    [txs, payments, { data: paymentMethod }] = await Promise.all([
+      fetchAllRowsIn<Transaction>(ids, (chunk, from, to) =>
+        supabase.from("transactions").select("*").in("id", chunk).order("id", { ascending: true }).range(from, to)
+      ),
+      fetchAllRowsIn<CreditPayment>(ids, (chunk, from, to) =>
+        supabase
+          .from("credit_payments")
+          .select("*")
+          .in("transaction_id", chunk)
+          .order("id", { ascending: true })
+          .range(from, to)
+      ),
       paymentMethodId
         ? supabase.from("payment_methods").select("name").eq("id", paymentMethodId).single()
         : Promise.resolve({ data: null }),
     ]);
-  if (txError || payError) return { error: (txError ?? payError)!.message };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "외상 거래를 불러오지 못했습니다." };
+  }
 
-  const existingPayments = (payments ?? []) as CreditPayment[];
+  const existingPayments = payments;
   // 이미 완납된 건(중복 제출 등)은 다시 정산하지 않는다 — 메모에 정산일이 두 번 붙는 것 방지.
-  const targetTxs = ((txs ?? []) as Transaction[]).filter(
+  const targetTxs = txs.filter(
     (tx) => !(existingPayments.some((p) => p.transaction_id === tx.id) && remainingBalance(tx, existingPayments) === 0)
   );
   if (targetTxs.length === 0) return { error: "선택한 거래는 이미 정산됐습니다." };

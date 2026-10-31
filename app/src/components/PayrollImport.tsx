@@ -9,6 +9,7 @@ import { bulkImportPayroll } from "@/lib/actions/employees";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { MoneyInput } from "@/components/ui/MoneyInput";
+import { postFileToApi } from "@/lib/postFileToApi";
 
 type EmployeeRef = { id: string; employee_no: string | null; name: string };
 
@@ -71,12 +72,10 @@ export function PayrollImport({ employees }: { employees: EmployeeRef[] }) {
     setError(null);
     setRows(null);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/payroll-ocr", { method: "POST", body: fd });
-      const json = await res.json();
-      if (json.error) {
-        setError(json.error);
+      // 큰 사진은 줄여서 보내고, 서버 한도(4.5MB)를 넘는 PDF·엑셀은 보내기 전에 안내 — lib/postFileToApi.ts.
+      const { json, error: uploadError } = await postFileToApi("/api/payroll-ocr", file, { downscaleImages: true });
+      if (uploadError || !json) {
+        setError(uploadError ?? "표를 인식하지 못했습니다.");
         return;
       }
       const extracted = json.extracted as { pay_month?: string; rows?: ParsedRow[] } | null;

@@ -1,4 +1,6 @@
+import { gunzipSync, gzipSync } from "node:zlib";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { backupsToPrune, type RetentionRecord } from "@/lib/backupRetention";
 
 // 백업할 표 — 앱이 쓰는 표는 전부(새 표를 만들면 여기와 supabase/096의 restore_allowed_tables()에 같이 넣을 것 — 예전엔
 // 공사 메모·일용직 사용내역 등이 빠져 있어 백업으로 되살릴 수 없었고, 복원 때 프로젝트를 지우면서 같이 지워졌음).
@@ -72,23 +74,52 @@ async function readAllRows(supabase: SupabaseClient, table: string) {
   }
 }
 
+// 백업 파일은 압축(.json.gz, 사용자 결정 10/31) — JSON은 칸 이름이 줄마다 반복돼 압축하면 1/10 안팎으로 줄어듦(저장 공간·
+// Supabase 한 파일 한도 50MB·내려받기). 예전 백업(.json, 들여쓰기)도 복원은 그대로 됨 — 읽을 때 압축 여부를 앞 2바이트로 봄.
+export function encodeBackupFile(dump: Record<string, unknown>): Buffer {
+  return gzipSync(Buffer.from(JSON.stringify(dump), "utf8"));
+}
+
+export function decodeBackupFile(bytes: Uint8Array): string {
+  const buf = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const gzipped = buf.length >= 2 && buf[0] === 0x1f && buf[1] === 0x8b;
+  return (gzipped ? gunzipSync(buf) : buf).toString("utf8");
+}
+
+// 표를 몇 개씩 동시에 읽음 — 자료가 해마다 늘어도 자동 백업이 서버 시간 제한(60초) 안에 끝나게. 결과 순서는 표 순서 그대로.
+const READ_CONCURRENCY = 4;
+
+async function readAllTables(supabase: SupabaseClient) {
+  const results: (Record<string, unknown>[] | null)[] = new Array(BACKUP_TABLES.length);
+  let next = 0;
+  async function worker() {
+    while (next < BACKUP_TABLES.length) {
+      const i = next++;
+      results[i] = await readAllRows(supabase, BACKUP_TABLES[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(READ_CONCURRENCY, BACKUP_TABLES.length) }, worker));
+  return results;
+}
+
 export async function runBackup(supabase: SupabaseClient, backupType: "manual" | "auto") {
   const dump: Record<string, unknown> = {};
   const rowCounts: Record<string, number> = {};
-  for (const table of BACKUP_TABLES) {
-    const rows = await readAllRows(supabase, table);
+  const tables = await readAllTables(supabase);
+  BACKUP_TABLES.forEach((table, i) => {
+    const rows = tables[i];
     dump[table] = rows ?? [];
     if (rows) rowCounts[table] = rows.length;
-  }
+  });
   // 끝까지 담은 새 방식 백업 표시 + 표별 줄 수 — 복원할 때 예전(1,000줄 제한) 백업과 구별하고, 파일이 잘렸는지 확인.
   dump.__meta = { complete: true, created_at: new Date().toISOString(), row_counts: rowCounts };
 
-  const json = JSON.stringify(dump, null, 2);
-  const fileName = `backup-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
-  const sizeMb = new Blob([json]).size / (1024 * 1024);
+  const body = encodeBackupFile(dump);
+  const fileName = `backup-${new Date().toISOString().replace(/[:.]/g, "-")}.json.gz`;
+  const sizeMb = body.length / (1024 * 1024);
 
-  const { error } = await supabase.storage.from("backups").upload(fileName, json, {
-    contentType: "application/json",
+  const { error } = await supabase.storage.from("backups").upload(fileName, body, {
+    contentType: "application/gzip",
   });
   if (error) throw new Error(`백업 업로드 실패: ${error.message}`);
 
@@ -103,5 +134,37 @@ export async function runBackup(supabase: SupabaseClient, backupType: "manual" |
   if (recordError?.code === "PGRST204") ({ error: recordError } = await supabase.from("backups").insert(record));
   if (recordError) throw new Error(`백업 기록 실패: ${recordError.message}`);
 
-  return { fileName, json, sizeMb, rowCounts };
+  return { fileName, sizeMb, rowCounts };
+}
+
+// 오래된 자동 백업 정리(기준: lib/backupRetention.ts) — 자동 백업이 성공한 뒤에만 부름(백업이 실패하는 동안 지우지 않게).
+// 파일을 먼저 지우고, 성공해야 기록을 지움(실패하면 다음 주에 다시 시도).
+const PRUNE_CHUNK = 100;
+
+export async function pruneAutoBackups(supabase: SupabaseClient, nowIso: string) {
+  const { data, error } = await supabase
+    .from("backups")
+    .select("id, backup_type, created_at, file_name, storage_url")
+    .eq("backup_type", "auto")
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: true });
+  if (error) throw new Error(`백업 목록을 읽지 못했습니다: ${error.message}`);
+  const targets = backupsToPrune((data ?? []) as RetentionRecord[], nowIso);
+  for (let i = 0; i < targets.length; i += PRUNE_CHUNK) {
+    const part = targets.slice(i, i + PRUNE_CHUNK);
+    const paths = part.map((t) => t.storage_url || t.file_name).filter((p): p is string => Boolean(p));
+    if (paths.length > 0) {
+      const { error: removeError } = await supabase.storage.from("backups").remove(paths);
+      if (removeError) throw new Error(`오래된 백업 파일을 지우지 못했습니다: ${removeError.message}`);
+    }
+    const { error: deleteError } = await supabase
+      .from("backups")
+      .delete()
+      .in(
+        "id",
+        part.map((t) => t.id)
+      );
+    if (deleteError) throw new Error(`오래된 백업 기록을 지우지 못했습니다: ${deleteError.message}`);
+  }
+  return { deleted: targets.length };
 }

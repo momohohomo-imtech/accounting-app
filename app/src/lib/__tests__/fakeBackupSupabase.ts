@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { decodeBackupFile } from "@/lib/backup";
 
 // 백업·복원 검사용 가짜 Supabase(실제 자료 아님) — PostgREST처럼 한 번에 1,000줄까지만 돌려주고, 복원 함수(096)는
 // 올린 줄을 모았다가 확정 때 표를 통째로 바꿈. 백업 파일·백업 기록·함수 호출을 모아 둠.
@@ -11,7 +12,8 @@ type Opts = {
 };
 
 export function fakeSupabase(tables: Record<string, Row[]>, opts: Opts = {}) {
-  const uploads: { name: string; json: string }[] = [];
+  // 올린 백업 파일 — json은 압축을 푼 내용, bytes는 실제로 올린 크기.
+  const uploads: { name: string; json: string; bytes: number; contentType?: string }[] = [];
   const records: Row[] = [];
   const calls: { fn: string; args: Record<string, unknown> }[] = [];
   const staged = new Map<string, { table: string; rows: Row[] }[]>();
@@ -74,8 +76,9 @@ export function fakeSupabase(tables: Record<string, Row[]>, opts: Opts = {}) {
     storage: {
       from() {
         return {
-          upload(name: string, json: string) {
-            uploads.push({ name, json });
+          upload(name: string, body: Uint8Array | string, options?: { contentType?: string }) {
+            const bytes = typeof body === "string" ? new TextEncoder().encode(body) : body;
+            uploads.push({ name, json: decodeBackupFile(bytes), bytes: bytes.byteLength, contentType: options?.contentType });
             return Promise.resolve({ error: null });
           },
         };

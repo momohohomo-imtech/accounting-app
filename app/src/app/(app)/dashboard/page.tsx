@@ -5,11 +5,19 @@ import { formatWon, formatDate, moneyClass } from "@/lib/format";
 import { remainingBalance, isLedgerVisible } from "@/lib/credit";
 import type { ExpenseCategory, Transaction } from "@/lib/types";
 import { vatOf, salesSupplyOf, purchaseCostOf } from "@/lib/vatBasis";
-import { taxEstimate, taxRateLabel, incomeTaxInstallment, interimPrepayment, vatPrepaymentNotice } from "@/lib/tax";
+import {
+  INCOME_TAX_BRACKETS_SINCE,
+  taxEstimate,
+  taxRateLabel,
+  incomeTaxInstallment,
+  interimPrepayment,
+  vatPrepaymentNotice,
+} from "@/lib/tax";
 import {
   estimateOwnerInsurance,
+  estimatedRatesNote,
+  insuranceRatesFor,
   ownerHealthSettlement,
-  OWNER_INSURANCE_RATES,
 } from "@/lib/ownerSocialInsurance";
 import { loadProfitOutlook, ProfitCalculationDetail } from "@/components/sections/ProfitOutlook";
 import { HalfYearSettlementInput } from "@/components/sections/HalfYearSettlementInput";
@@ -36,6 +44,25 @@ import { getCurrentRole } from "@/lib/currentRole";
 import { backupStatus, AUTO_BACKUP_STALE_DAYS, type BackupRecord } from "@/lib/backupStatus";
 
 // 수금 예정액 상태 칸 — 상태 목록은 프로젝트 목록 미수 금액·보고서 남은 금액과 같은 RECEIVABLE_STATUSES.
+// 외상 거래 — 잔액(remainingBalance)·오래된 미수금(거래일·거래처)에 쓰는 칸만.
+const DASHBOARD_CREDIT_COLUMNS =
+  "id, type, payment_type, trans_date, client_id, client_name_raw, project_id, item_name, sales_amount, sales_vat, purchase_amount, purchase_vat, clients(name)";
+type DashboardCreditTx = Pick<
+  Transaction,
+  | "id"
+  | "type"
+  | "payment_type"
+  | "trans_date"
+  | "client_id"
+  | "client_name_raw"
+  | "project_id"
+  | "item_name"
+  | "sales_amount"
+  | "sales_vat"
+  | "purchase_amount"
+  | "purchase_vat"
+> & { clients: { name: string } | { name: string }[] | null };
+
 const RECEIVABLE_STATUS_LABEL: Record<string, string> = {
   ongoing: "진행중",
   done: "공사 완료",
@@ -153,8 +180,14 @@ export default async function DashboardPage({
         .order("id", { ascending: true })
         .range(from, to)
     ).then((data) => ({ data })),
-    fetchAllRows<Transaction>((from, to) =>
-      supabase.from("transactions").select("*").eq("payment_type", "credit").order("id", { ascending: true }).range(from, to)
+    // 외상 잔액·오래된 미수금에 쓰는 칸만(영수증 인식 원문 등은 빼고) — 외상 거래는 정산이 끝나도 계속 쌓여서.
+    fetchAllRows<DashboardCreditTx>((from, to) =>
+      supabase
+        .from("transactions")
+        .select(DASHBOARD_CREDIT_COLUMNS)
+        .eq("payment_type", "credit")
+        .order("id", { ascending: true })
+        .range(from, to)
     ),
     creditPaymentsPromise,
     supabase.from("projects").select("id, status").eq("status", "ongoing"),
@@ -286,7 +319,10 @@ export default async function DashboardPage({
   const businessMonths = 12 - businessStartMonth + 1;
 
   const insuranceBaseProfit = o.combinedProfit ?? o.profitEstimate;
-  const ownerInsurance = estimateOwnerInsurance(insuranceBaseProfit, businessMonths);
+  // 내년 보험료는 내년 요율로, 올해분 건강보험 정산은 올해 요율로(lib/ownerSocialInsurance.ts — 정해지지 않은 요율은 최근 값으로 추정).
+  const nextYearRates = insuranceRatesFor(selectedYear + 1);
+  const ratesNote = estimatedRatesNote(nextYearRates);
+  const ownerInsurance = estimateOwnerInsurance(insuranceBaseProfit, businessMonths, nextYearRates);
   // 이익이 0 이하이면 이익 기준 보험료가 0원으로 계산되지만 실제로는 공단 최저 보험료가 붙음 — 0원 대신 안내만 표시.
   const hasOwnerIncome = insuranceBaseProfit > 0;
   const NO_INCOME_NOTE = "이익 없음 — 공단 최저 보험료 적용";
@@ -318,7 +354,7 @@ export default async function DashboardPage({
     installment: incomeTaxInstallment(nextYearTax.incomeTax),
     healthSettlement:
       ownerHealthPaidMonthly != null && hasOwnerIncome
-        ? ownerHealthSettlement(insuranceBaseProfit, businessMonths, ownerHealthPaidMonthly)
+        ? ownerHealthSettlement(insuranceBaseProfit, businessMonths, ownerHealthPaidMonthly, insuranceRatesFor(selectedYear))
         : null,
     interim: interimPrepayment(nextYearTax.incomeTax),
   };
@@ -531,7 +567,8 @@ export default async function DashboardPage({
                 검토중 제외) + 프로젝트 미지정 매출 · 공급가액 기준
               </p>
               <p>
-                예상 종합소득세 = 이익에서 본인 기본공제 150만원을 차감한 과세표준에 종합소득세율 적용 + 지방소득세 10% · 그 밖의
+                예상 종합소득세 = 이익에서 본인 기본공제 150만원을 차감한 과세표준에 종합소득세율({INCOME_TAX_BRACKETS_SINCE}년
+                귀속분부터 적용되는 현행 세율) 적용 + 지방소득세 10% · 그 밖의
                 공제와 매입장 외 경비는 세무사 신고 시 반영되므로 실제 세액과 차이 발생 가능
               </p>
               <p>
@@ -541,10 +578,10 @@ export default async function DashboardPage({
               <p>
                 {selectedYear + 1}년 국민연금·건강보험료 = {o.combinedProfit != null ? "연간" : "프로젝트 기준"} 예상 이익으로 추정한
                 대표자 본인 부담분(당해 이익은 이듬해 5월 종합소득세 신고 후 반영) · 국민연금{" "}
-                {OWNER_INSURANCE_RATES.pensionRate * 100}%(기준소득월액 상한 {formatWon(OWNER_INSURANCE_RATES.pensionMonthlyCap)}) ·
-                건강보험 {(OWNER_INSURANCE_RATES.healthRate * 100).toFixed(2)}% + 장기요양보험료(건강보험료의{" "}
-                {(OWNER_INSURANCE_RATES.longTermCareOfHealth * 100).toFixed(2)}%) · {OWNER_INSURANCE_RATES.year}년 요율 기준(장기요양은
-                2026년 요율 적용, 2027년분은 10월 이후 확정) · 직원 4대보험 제외
+                {Number((nextYearRates.pensionRate * 100).toFixed(1))}%(기준소득월액 상한{" "}
+                {formatWon(nextYearRates.pensionMonthlyCap)}) · 건강보험 {(nextYearRates.healthRate * 100).toFixed(2)}% +
+                장기요양보험료(건강보험료의 {(nextYearRates.longTermCareOfHealth * 100).toFixed(2)}%) · {nextYearRates.year}년 요율
+                기준{ratesNote ? `(${ratesNote})` : ""} · 직원 4대보험 제외
               </p>
             </DetailToggle>
             <DetailToggle label="산출 내역">

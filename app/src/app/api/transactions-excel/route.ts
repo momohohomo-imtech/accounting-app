@@ -30,8 +30,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  const formData = await req.formData();
-  const file = formData.get("file");
+  // 보낸 양식이 깨졌거나 중간에 끊기면 formData()가 실패함 — 500 오류 화면 대신 알아볼 수 있는 문구로.
+  let file: FormDataEntryValue | null;
+  try {
+    file = (await req.formData()).get("file");
+  } catch {
+    return NextResponse.json({ error: "보낸 파일을 읽지 못했습니다. 다시 시도해 주세요." }, { status: 400 });
+  }
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "파일이 없습니다." }, { status: 400 });
   }

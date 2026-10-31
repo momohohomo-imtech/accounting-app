@@ -9,6 +9,7 @@ import { bulkImportTransactions, type BulkTransactionInput } from "@/lib/actions
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { MoneyInput } from "@/components/ui/MoneyInput";
+import { postFileToApi } from "@/lib/postFileToApi";
 
 type Option = { id: string; name: string };
 
@@ -61,12 +62,10 @@ export function TransactionBulkImport({
     setRows(null);
     setSavedCount(null);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/transactions-excel", { method: "POST", body: fd });
-      const json = await res.json();
-      if (json.error) {
-        setError(json.error);
+      // 서버 한도(4.5MB)를 넘는 엑셀은 보내기 전에 안내 — lib/postFileToApi.ts.
+      const { json, error: uploadError } = await postFileToApi("/api/transactions-excel", file);
+      if (uploadError || !json) {
+        setError(uploadError ?? "표를 인식하지 못했습니다.");
         return;
       }
       const parsed = json.rows as ParsedRow[] | null;
