@@ -13,6 +13,7 @@ import { useEscapeKey } from "@/lib/useEscapeKey";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { formatThousands, parseNumericInput } from "@/lib/numberInput";
+import { postFileToApi } from "@/lib/postFileToApi";
 
 type Option = { id: string; name: string };
 type ClientOption = Option & { default_item_name?: string | null; default_category_id?: string | null };
@@ -217,12 +218,14 @@ export function TransactionForm({
     }
   }
 
-  async function ocrOneFile(file: File): Promise<Record<string, unknown> | null> {
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await fetch("/api/ocr", { method: "POST", body: fd });
-    const json = await res.json();
-    return json.extracted ?? null;
+  // 큰 사진은 줄여서 보내고(서버 한도 4.5MB), 실패하면 그 이유(크기·인식 오류)를 돌려줌 — lib/postFileToApi.ts.
+  async function ocrOneFile(file: File): Promise<{ extracted: Record<string, unknown> | null; error: string | null }> {
+    const { json, error } = await postFileToApi("/api/ocr", file, { downscaleImages: true });
+    const extracted = json?.extracted;
+    return {
+      extracted: extracted && typeof extracted === "object" ? (extracted as Record<string, unknown>) : null,
+      error,
+    };
   }
 
   async function handleImageOrPdfFiles(files: File[]) {
@@ -233,10 +236,16 @@ export function TransactionForm({
     setError(null);
     try {
       const results = await Promise.all(files.map((f) => ocrOneFile(f)));
-      const valid = results.filter((r): r is NonNullable<typeof r> => r !== null);
+      const valid = results.map((r) => r.extracted).filter((r): r is NonNullable<typeof r> => r !== null);
+      const failures = results.filter((r) => r.extracted === null);
+      const firstError = failures.find((r) => r.error)?.error ?? null;
       if (valid.length === 0) {
-        setError("인식된 항목이 없습니다.");
+        setError(firstError ?? "인식된 항목이 없습니다.");
         return;
+      }
+      // 여러 장 중 일부만 실패하면 인식된 것은 채우고 몇 장이 빠졌는지 알림.
+      if (failures.length > 0) {
+        setError(`${files.length}장 중 ${failures.length}장은 인식하지 못했습니다${firstError ? `: ${firstError}` : "."}`);
       }
       setOcrExtracted(valid[0]);
       const updated = [...latest.current.lineItems];
@@ -275,12 +284,9 @@ export function TransactionForm({
     setOcrLoading(true);
     setError(null);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/transactions-excel", { method: "POST", body: fd });
-      const json = await res.json();
-      if (json.error) {
-        setError(json.error);
+      const { json, error: uploadError } = await postFileToApi("/api/transactions-excel", file);
+      if (uploadError || !json) {
+        setError(uploadError ?? "엑셀을 읽지 못했습니다.");
         return;
       }
       type ExcelRow = {

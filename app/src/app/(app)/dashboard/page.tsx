@@ -5,11 +5,19 @@ import { formatWon, formatDate, moneyClass } from "@/lib/format";
 import { remainingBalance, isLedgerVisible } from "@/lib/credit";
 import type { ExpenseCategory, Transaction } from "@/lib/types";
 import { vatOf, salesSupplyOf, purchaseCostOf } from "@/lib/vatBasis";
-import { taxEstimate, taxRateLabel, incomeTaxInstallment, interimPrepayment, vatPrepaymentNotice } from "@/lib/tax";
+import {
+  INCOME_TAX_BRACKETS_SINCE,
+  taxEstimate,
+  taxRateLabel,
+  incomeTaxInstallment,
+  interimPrepayment,
+  vatPrepaymentNotice,
+} from "@/lib/tax";
 import {
   estimateOwnerInsurance,
+  estimatedRatesNote,
+  insuranceRatesFor,
   ownerHealthSettlement,
-  OWNER_INSURANCE_RATES,
 } from "@/lib/ownerSocialInsurance";
 import { loadProfitOutlook, ProfitCalculationDetail } from "@/components/sections/ProfitOutlook";
 import { HalfYearSettlementInput } from "@/components/sections/HalfYearSettlementInput";
@@ -34,8 +42,31 @@ import { nowKst, kstDateTime } from "@/lib/kstDate";
 import { PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
 import { getCurrentRole } from "@/lib/currentRole";
 import { backupStatus, AUTO_BACKUP_STALE_DAYS, type BackupRecord } from "@/lib/backupStatus";
+import { receivableAging } from "@/lib/receivableAging";
+import { tasksForMonth, tasksSummary } from "@/lib/annualTasks";
+import { one } from "@/lib/relations";
+import { ReceivableAgingTable } from "@/components/ReceivableAgingTable";
 
 // 수금 예정액 상태 칸 — 상태 목록은 프로젝트 목록 미수 금액·보고서 남은 금액과 같은 RECEIVABLE_STATUSES.
+// 외상 거래 — 잔액(remainingBalance)·오래된 미수금(거래일·거래처)에 쓰는 칸만.
+const DASHBOARD_CREDIT_COLUMNS =
+  "id, type, payment_type, trans_date, client_id, client_name_raw, project_id, item_name, sales_amount, sales_vat, purchase_amount, purchase_vat, clients(name)";
+type DashboardCreditTx = Pick<
+  Transaction,
+  | "id"
+  | "type"
+  | "payment_type"
+  | "trans_date"
+  | "client_id"
+  | "client_name_raw"
+  | "project_id"
+  | "item_name"
+  | "sales_amount"
+  | "sales_vat"
+  | "purchase_amount"
+  | "purchase_vat"
+> & { clients: { name: string } | { name: string }[] | null };
+
 const RECEIVABLE_STATUS_LABEL: Record<string, string> = {
   ongoing: "진행중",
   done: "공사 완료",
@@ -153,8 +184,14 @@ export default async function DashboardPage({
         .order("id", { ascending: true })
         .range(from, to)
     ).then((data) => ({ data })),
-    fetchAllRows<Transaction>((from, to) =>
-      supabase.from("transactions").select("*").eq("payment_type", "credit").order("id", { ascending: true }).range(from, to)
+    // 외상 잔액·오래된 미수금에 쓰는 칸만(영수증 인식 원문 등은 빼고) — 외상 거래는 정산이 끝나도 계속 쌓여서.
+    fetchAllRows<DashboardCreditTx>((from, to) =>
+      supabase
+        .from("transactions")
+        .select(DASHBOARD_CREDIT_COLUMNS)
+        .eq("payment_type", "credit")
+        .order("id", { ascending: true })
+        .range(from, to)
     ),
     creditPaymentsPromise,
     supabase.from("projects").select("id, status").eq("status", "ongoing"),
@@ -220,6 +257,24 @@ export default async function DashboardPage({
   const creditReceivable = creditTx.filter((t) => t.type === "매출").reduce((s, t) => s + remainingBalance(t, payments), 0);
   const creditPayable = creditTx.filter((t) => t.type === "매입").reduce((s, t) => s + remainingBalance(t, payments), 0);
   const creditReceivableCount = creditTx.filter((t) => t.type === "매출" && remainingBalance(t, payments) > 0).length;
+  // 오래된 외상매출금 — 세금계산서(거래일)부터 오늘까지 지난 날(lib/receivableAging.ts), 잔액은 외상매출금 합계와 같은 기준.
+  const todayKey = `${today.year}-${mm}-${String(today.day).padStart(2, "0")}`;
+  const aging = receivableAging(
+    creditTx
+      .filter((t) => t.type === "매출")
+      .map((t) => ({
+        id: t.id,
+        trans_date: t.trans_date,
+        client: one(t.clients)?.name ?? t.client_name_raw ?? "거래처 미지정",
+        item: t.item_name,
+        amount: remainingBalance(t, payments),
+      })),
+    todayKey
+  );
+  const over60Amount = aging.over60.reduce((s, it) => s + it.amount, 0);
+  // 이번 달 신고·납부 일정(lib/annualTasks.ts), 1~5월엔 전년도 신고 자료 바로가기.
+  const monthTasks = tasksForMonth(today.year, today.month);
+  const showPrevYearFiling = today.month <= 5 && selectedYear === today.year;
   const creditPayableCount = creditTx.filter((t) => t.type === "매입" && remainingBalance(t, payments) > 0).length;
 
   const yearSales = yearTx.reduce((s, t) => s + t.sales_amount + t.sales_vat, 0);
@@ -286,7 +341,10 @@ export default async function DashboardPage({
   const businessMonths = 12 - businessStartMonth + 1;
 
   const insuranceBaseProfit = o.combinedProfit ?? o.profitEstimate;
-  const ownerInsurance = estimateOwnerInsurance(insuranceBaseProfit, businessMonths);
+  // 내년 보험료는 내년 요율로, 올해분 건강보험 정산은 올해 요율로(lib/ownerSocialInsurance.ts — 정해지지 않은 요율은 최근 값으로 추정).
+  const nextYearRates = insuranceRatesFor(selectedYear + 1);
+  const ratesNote = estimatedRatesNote(nextYearRates);
+  const ownerInsurance = estimateOwnerInsurance(insuranceBaseProfit, businessMonths, nextYearRates);
   // 이익이 0 이하이면 이익 기준 보험료가 0원으로 계산되지만 실제로는 공단 최저 보험료가 붙음 — 0원 대신 안내만 표시.
   const hasOwnerIncome = insuranceBaseProfit > 0;
   const NO_INCOME_NOTE = "이익 없음 — 공단 최저 보험료 적용";
@@ -318,7 +376,7 @@ export default async function DashboardPage({
     installment: incomeTaxInstallment(nextYearTax.incomeTax),
     healthSettlement:
       ownerHealthPaidMonthly != null && hasOwnerIncome
-        ? ownerHealthSettlement(insuranceBaseProfit, businessMonths, ownerHealthPaidMonthly)
+        ? ownerHealthSettlement(insuranceBaseProfit, businessMonths, ownerHealthPaidMonthly, insuranceRatesFor(selectedYear))
         : null,
     interim: interimPrepayment(nextYearTax.incomeTax),
   };
@@ -440,6 +498,54 @@ export default async function DashboardPage({
 
       {/* 자세한 내용은 한 카드 안의 접힘 목록 — 접힌 줄 오른쪽에 핵심 숫자 한 줄. */}
       <Card padding="none" className="divide-y divide-slate-100">
+        <FoldRow title={`이번 달(${today.month}월) 신고·납부 일정`} summary={tasksSummary(monthTasks)}>
+          <ul className="space-y-1 text-xs text-slate-700">
+            {monthTasks.map((t) => (
+              <li key={`${t.day}-${t.short}`} className="flex gap-2">
+                <span className="w-9 shrink-0 tabular-nums text-slate-500">{t.day}일</span>
+                <span className="min-w-0">
+                  {t.href ? (
+                    <Link href={t.href} className="underline decoration-slate-300 underline-offset-2 hover:text-slate-900">
+                      {t.title}
+                    </Link>
+                  ) : (
+                    t.title
+                  )}
+                  {t.detail && <span className="text-slate-400"> · {t.detail}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <Footnote>
+            <p>마감일이 주말·공휴일이면 다음 영업일 · 세무사 대리 신고 항목 포함 · 개인사업자(일반과세자) 기준 일정</p>
+          </Footnote>
+        </FoldRow>
+
+        {showPrevYearFiling && (
+          <FoldRow
+            title={`전년도(${today.year - 1}년) 신고 자료`}
+            summary={`5월 31일 종합소득세 신고 기한 · ${today.year - 1}년 대시보드·매입매출장·보고서`}
+          >
+            <div className="flex flex-wrap gap-2 text-xs">
+              <Link href={`/dashboard?year=${today.year - 1}`} className="rounded-lg border border-slate-200 px-3 py-1.5 hover:bg-slate-50">
+                {today.year - 1}년 대시보드
+              </Link>
+              <Link
+                href={`/transactions?year=${today.year - 1}&month=all`}
+                className="rounded-lg border border-slate-200 px-3 py-1.5 hover:bg-slate-50"
+              >
+                {today.year - 1}년 매입매출장
+              </Link>
+              <Link href={`/reports?year=${today.year - 1}`} className="rounded-lg border border-slate-200 px-3 py-1.5 hover:bg-slate-50">
+                {today.year - 1}년 보고서
+              </Link>
+            </div>
+            <Footnote>
+              <p>1~5월에만 표시 · 신고가 끝나면 매입매출 → 장부 점검에서 전년도 잠금 가능</p>
+            </Footnote>
+          </FoldRow>
+        )}
+
         <FoldRow
           title="손익 및 세액 상세"
           summary={
@@ -531,7 +637,8 @@ export default async function DashboardPage({
                 검토중 제외) + 프로젝트 미지정 매출 · 공급가액 기준
               </p>
               <p>
-                예상 종합소득세 = 이익에서 본인 기본공제 150만원을 차감한 과세표준에 종합소득세율 적용 + 지방소득세 10% · 그 밖의
+                예상 종합소득세 = 이익에서 본인 기본공제 150만원을 차감한 과세표준에 종합소득세율({INCOME_TAX_BRACKETS_SINCE}년
+                귀속분부터 적용되는 현행 세율) 적용 + 지방소득세 10% · 그 밖의
                 공제와 매입장 외 경비는 세무사 신고 시 반영되므로 실제 세액과 차이 발생 가능
               </p>
               <p>
@@ -541,10 +648,10 @@ export default async function DashboardPage({
               <p>
                 {selectedYear + 1}년 국민연금·건강보험료 = {o.combinedProfit != null ? "연간" : "프로젝트 기준"} 예상 이익으로 추정한
                 대표자 본인 부담분(당해 이익은 이듬해 5월 종합소득세 신고 후 반영) · 국민연금{" "}
-                {OWNER_INSURANCE_RATES.pensionRate * 100}%(기준소득월액 상한 {formatWon(OWNER_INSURANCE_RATES.pensionMonthlyCap)}) ·
-                건강보험 {(OWNER_INSURANCE_RATES.healthRate * 100).toFixed(2)}% + 장기요양보험료(건강보험료의{" "}
-                {(OWNER_INSURANCE_RATES.longTermCareOfHealth * 100).toFixed(2)}%) · {OWNER_INSURANCE_RATES.year}년 요율 기준(장기요양은
-                2026년 요율 적용, 2027년분은 10월 이후 확정) · 직원 4대보험 제외
+                {Number((nextYearRates.pensionRate * 100).toFixed(1))}%(기준소득월액 상한{" "}
+                {formatWon(nextYearRates.pensionMonthlyCap)}) · 건강보험 {(nextYearRates.healthRate * 100).toFixed(2)}% +
+                장기요양보험료(건강보험료의 {(nextYearRates.longTermCareOfHealth * 100).toFixed(2)}%) · {nextYearRates.year}년 요율
+                기준{ratesNote ? `(${ratesNote})` : ""} · 직원 4대보험 제외
               </p>
             </DetailToggle>
             <DetailToggle label="산출 내역">
@@ -643,7 +750,14 @@ export default async function DashboardPage({
 
         <FoldRow
           title="수금·지급 예정 상세"
-          summary={`수금 대기 ${awaitingPayment.count}건 ${formatWon(awaitingPayment.amount)} · 외상매출금 ${formatWon(creditReceivable)}`}
+          summary={
+            <>
+              {`수금 대기 ${awaitingPayment.count}건 ${formatWon(awaitingPayment.amount)} · 외상매출금 ${formatWon(creditReceivable)}`}
+              {aging.over60.length > 0 && (
+                <span className="font-semibold text-amber-600">{` · 60일 경과 ${aging.over60.length}건 ${formatWon(over60Amount)}`}</span>
+              )}
+            </>
+          }
         >
           <p className="text-[11px] text-slate-400">외상 거래는 정산 등록 전까지 매입매출장 합계에서 제외됩니다.</p>
           <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-4">
@@ -676,6 +790,24 @@ export default async function DashboardPage({
             </p>
             <p>외상매출금 = 세금계산서 발행 후 입금 대기분 · 공사 완료·수금 대기 금액은 기수령 기성금 제외</p>
           </Footnote>
+          {aging.items.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs font-semibold text-slate-700">외상매출금 경과 기간(세금계산서 일자 기준)</p>
+              <div className="mt-1.5 grid grid-cols-2 gap-2 lg:grid-cols-4">
+                {aging.buckets.map((b) => (
+                  <Stat key={b.key} label={b.label} sub={`${b.count}건`}>
+                    <Money value={b.amount} className={b.key === "over90" && b.amount > 0 ? "text-red-600" : undefined} />
+                  </Stat>
+                ))}
+              </div>
+              {aging.over60.length > 0 && (
+                <div className="mt-2">
+                  <p className="mb-1 text-[11px] text-slate-500">60일 경과 외상매출금(입금 확인 필요)</p>
+                  <ReceivableAgingTable items={aging.over60} />
+                </div>
+              )}
+            </div>
+          )}
         </FoldRow>
 
         <FoldRow title="매출·매입 실적" summary={`${selectedYear}년 매출 ${formatWon(yearSales)} · 매입 ${formatWon(yearPurchase)}`}>

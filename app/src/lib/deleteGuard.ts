@@ -33,7 +33,11 @@ export const DAILY_WORKER_LINKS: LinkedRef[] = [
   { table: "daily_worker_usage_logs", column: "daily_worker_id", label: "사용내역" },
   { table: "access_list_workers", column: "daily_worker_id", label: "출입 명단" },
 ];
-export const BANK_ACCOUNT_LINKS: LinkedRef[] = [{ table: "bank_transactions", column: "bank_account_id", label: "통장 거래" }];
+export const BANK_ACCOUNT_LINKS: LinkedRef[] = [
+  { table: "bank_transactions", column: "bank_account_id", label: "통장 거래" },
+  // 097 SQL(지우면 같이 지워짐) — 실행 전이면 0건으로
+  { table: "bank_balance_checks", column: "bank_account_id", label: "잔액 확인 기록" },
+];
 export const SITE_LINKS: LinkedRef[] = [
   { table: "projects", column: "site_id", label: "프로젝트" },
   { table: "work_logs", column: "site_id", label: "작업일지" },

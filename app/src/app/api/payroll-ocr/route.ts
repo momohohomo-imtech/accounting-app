@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { extractJson, generateGeminiText, geminiErrorMessage, geminiModel } from "@/lib/gemini";
 import ExcelJS from "exceljs";
+
+// 제미나이 응답을 기다리는 시간(lib/gemini.ts의 시도 시간·재시도와 맞춤).
+export const maxDuration = 60;
 
 function cellToString(v: unknown): string {
   if (v == null) return "";
@@ -35,8 +38,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "GEMINI_API_KEY가 설정되지 않았습니다." }, { status: 500 });
   }
 
-  const formData = await req.formData();
-  const file = formData.get("file");
+  // 보낸 양식이 깨졌거나 중간에 끊기면 formData()가 실패함 — 500 오류 화면 대신 알아볼 수 있는 문구로.
+  let file: FormDataEntryValue | null;
+  try {
+    file = (await req.formData()).get("file");
+  } catch {
+    return NextResponse.json({ error: "보낸 파일을 읽지 못했습니다. 다시 시도해 주세요." }, { status: 400 });
+  }
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "파일이 없습니다." }, { status: 400 });
   }
@@ -53,8 +61,7 @@ export async function POST(req: NextRequest) {
 
   const bytes = isExcel ? "" : Buffer.from(await file.arrayBuffer()).toString("base64");
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL ?? "gemini-3.6-flash" });
+  const model = geminiModel();
 
   const prompt = `이 ${isExcel ? "CSV로 변환한 표" : "파일"}은 한국 급여대장 또는 상여대장 표야. 직원별 행을 전부 읽어서 아래 JSON 형식으로만 답해줘. 다른 설명 없이 JSON만 출력해.
 
@@ -82,17 +89,11 @@ export async function POST(req: NextRequest) {
 }`;
 
   try {
-    const result = isExcel
-      ? await model.generateContent(`${prompt}\n\nCSV:\n${csv}`)
-      : await model.generateContent([
-          prompt,
-          { inlineData: { data: bytes, mimeType: file.type || "application/pdf" } },
-        ]);
-    const text = result.response.text();
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
-    return NextResponse.json({ extracted: parsed, raw: text });
+    const text = isExcel
+      ? await generateGeminiText({ apiKey, model, prompt: `${prompt}\n\nCSV:\n${csv}` })
+      : await generateGeminiText({ apiKey, model, prompt, file: { data: bytes, mimeType: file.type || "application/pdf" } });
+    return NextResponse.json({ extracted: extractJson(text), raw: text });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "인식 실패" }, { status: 500 });
+    return NextResponse.json({ error: geminiErrorMessage(err, model) }, { status: 502 });
   }
 }

@@ -1,14 +1,42 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatWon } from "@/lib/format";
 import { remainingBalance, transactionTotal } from "@/lib/credit";
-import type { PaymentMethod, Transaction } from "@/lib/types";
+import type { ExpenseCategory, PaymentMethod, Transaction } from "@/lib/types";
+import { one } from "@/lib/relations";
 import { CreditSettlementGroup } from "@/components/CreditSettlementGroup";
 import { CreditHistoryToggle, type VendorHistoryGroup, type VendorHistoryItem } from "@/components/CreditHistoryToggle";
 import { PrintButton } from "@/components/PrintButton";
 import { Card } from "@/components/ui/Card";
-import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
+import { fetchAllRows, fetchAllCreditPayments, fetchAllRowsIn } from "@/lib/supabaseFetchAll";
 import { hasPaymentGroupColumn } from "@/lib/paymentGroup";
 import { supplyOf } from "@/lib/vatBasis";
+
+// 거래처별 이력에 쓰는 칸(외상 정산 판단·금액·부가세 제외 금액·표시).
+const VENDOR_HISTORY_COLUMNS =
+  "id, type, trans_date, payment_type, client_id, client_name_raw, item_name, needs_classification, sales_amount, sales_vat, purchase_amount, purchase_vat, tax_invoice_issued, clients(name), projects(name), payment_methods(name), expense_categories(*)";
+const RAW_NAME_CHUNK = 30;
+type NameRel = { name: string } | { name: string }[] | null;
+type VendorHistoryTx = Pick<
+  Transaction,
+  | "id"
+  | "type"
+  | "trans_date"
+  | "payment_type"
+  | "client_id"
+  | "client_name_raw"
+  | "item_name"
+  | "needs_classification"
+  | "sales_amount"
+  | "sales_vat"
+  | "purchase_amount"
+  | "purchase_vat"
+  | "tax_invoice_issued"
+> & {
+  clients: NameRel;
+  projects: NameRel;
+  payment_methods: NameRel;
+  expense_categories: ExpenseCategory | ExpenseCategory[] | null;
+};
 
 export async function CreditSection() {
   const supabase = await createClient();
@@ -72,38 +100,41 @@ export async function CreditSection() {
     new Set(txs.filter((t) => !t.client_id).map((t) => t.client_name_raw).filter((n): n is string => Boolean(n)))
   );
 
+  // 외상 거래처가 수백 곳이 돼도 요청 주소가 너무 길어지지 않게 나눠 조회(fetchAllRowsIn — 한글 이름은 더 작게), 이력에 쓰는
+  // 칸만(영수증 인식 원문 등은 빼고). 나눠 받은 순서가 섞이므로 날짜 내림차순으로 다시 정렬.
   const [vendorAllTxById, vendorAllTxByName] = await Promise.all([
-    vendorClientIds.length
-      ? fetchAllRows<Transaction>((from, to) =>
-          supabase
-            .from("transactions")
-            .select("*, clients(name), projects(name), payment_methods(name), expense_categories(*)")
-            .in("client_id", vendorClientIds)
-            .order("trans_date", { ascending: false })
-            .order("id", { ascending: true })
-            .range(from, to)
-        )
-      : Promise.resolve([] as Transaction[]),
-    vendorRawNames.length
-      ? fetchAllRows<Transaction>((from, to) =>
-          supabase
-            .from("transactions")
-            .select("*, clients(name), projects(name), payment_methods(name), expense_categories(*)")
-            .is("client_id", null)
-            .in("client_name_raw", vendorRawNames)
-            .order("trans_date", { ascending: false })
-            .order("id", { ascending: true })
-            .range(from, to)
-        )
-      : Promise.resolve([] as Transaction[]),
+    fetchAllRowsIn<VendorHistoryTx>(vendorClientIds, (ids, from, to) =>
+      supabase
+        .from("transactions")
+        .select(VENDOR_HISTORY_COLUMNS)
+        .in("client_id", ids)
+        .order("trans_date", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
+    fetchAllRowsIn<VendorHistoryTx>(
+      vendorRawNames,
+      (names, from, to) =>
+        supabase
+          .from("transactions")
+          .select(VENDOR_HISTORY_COLUMNS)
+          .is("client_id", null)
+          .in("client_name_raw", names)
+          .order("trans_date", { ascending: false })
+          .order("id", { ascending: true })
+          .range(from, to),
+      RAW_NAME_CHUNK
+    ),
   ]);
-  const vendorAllTx = [...vendorAllTxById, ...vendorAllTxByName];
+  const vendorAllTx = [...vendorAllTxById, ...vendorAllTxByName].sort(
+    (a, b) => b.trans_date.localeCompare(a.trans_date) || a.id.localeCompare(b.id)
+  );
 
   const vendorGroupMap = new Map<string, VendorHistoryGroup>();
   for (const tx of vendorAllTx) {
     const key = tx.client_id ?? `raw:${tx.client_name_raw}`;
     if (!vendorGroupMap.has(key)) {
-      vendorGroupMap.set(key, { key, label: tx.clients?.name ?? tx.client_name_raw ?? "거래처", items: [] });
+      vendorGroupMap.set(key, { key, label: one(tx.clients)?.name ?? tx.client_name_raw ?? "거래처", items: [] });
     }
     let status: VendorHistoryItem["status"];
     if (tx.payment_type === "credit") {
@@ -117,12 +148,12 @@ export async function CreditSection() {
       id: tx.id,
       trans_date: tx.trans_date,
       item_name: tx.item_name,
-      project_name: tx.projects?.name ?? null,
+      project_name: one(tx.projects)?.name ?? null,
       needs_classification: tx.needs_classification,
       amount: transactionTotal(tx),
       vatExcludedAmount: supplyOf(tx),
       status,
-      methodName: tx.payment_methods?.name ?? null,
+      methodName: one(tx.payment_methods)?.name ?? null,
       taxInvoiceIssued: Boolean(tx.tax_invoice_issued),
     });
   }

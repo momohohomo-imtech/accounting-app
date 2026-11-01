@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { fetchAllRows, IN_CHUNK } from "@/lib/supabaseFetchAll";
 import { resolveWorkLogTitles, SPECIAL_TITLES, type WorkLogTitleRow } from "@/lib/workLogSummary";
 import { inputToTripDayFields } from "@/lib/tripLog";
 
@@ -195,8 +195,10 @@ export async function renameWorkLogTitle(formData: FormData) {
   const { error } = siteId ? await base.eq("site_id", siteId) : await base.is("site_id", null);
   if (error) return { error: error.message };
 
-  if (projectNamedIds.length > 0) {
-    const { error: namedError } = await supabase.from("work_logs").update({ title: newTitle }).in("id", projectNamedIds);
+  // 한 현장의 1년치 줄이 수백 개여도 요청 주소가 너무 길어지지 않게 100개씩 나눠 고침.
+  for (let i = 0; i < projectNamedIds.length; i += IN_CHUNK) {
+    const ids = projectNamedIds.slice(i, i + IN_CHUNK);
+    const { error: namedError } = await supabase.from("work_logs").update({ title: newTitle }).in("id", ids);
     if (namedError) return { error: namedError.message };
   }
 

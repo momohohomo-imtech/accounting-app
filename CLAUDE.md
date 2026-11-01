@@ -22,7 +22,8 @@
   `SiteProfitReport`, `PurchaseItemSearchTable`, `VatQuarterTable`, `TripLogList`,
   `TripOverviewReport`, `ProjectTripDetailTable`, `YearEndCheckTable`, `DuplicateCandidatesTable`,
   `UncategorizedPurchasesTable`, `TransactionHistoryTable`, `ProjectReceiptsTable`, 통합 보고서의 `ProjectsCombinedTable`·
-  `CombinedCategorySection`·`CombinedAgencyTable`)에
+  `CombinedCategorySection`·`CombinedAgencyTable`, `BankBalanceCheckPopup`(통장 잔액 확인 기록), `YearLockPanel`(잠긴 해),
+  `ReceivableAgingTable`(오래된 외상매출금), `HometaxReconcilePanel`(홈택스 대조 결과))에
   이 패턴이 적용돼 있음 — 새 표를 추가할 때 이 목록도 같이 업데이트할 것.
   (예외: `DailyWorkerUsageStatementTable`은 세무사 제출용 사용내역서 문서라
   근로자별 연속일 소계 순서가 고정돼야 해서 임의 정렬을 지원하지 않음 —
@@ -130,7 +131,8 @@
   );
   ```
   카테고리·결제수단·계좌처럼 몇십 행에서 늘지 않는 설정 목록이나, `.eq("id", …)`·
-  `.maybeSingle()`처럼 결과가 정해진 조회는 그냥 조회해도 됨. 해마다 늘어나는 선택 목록(거래처·연도 무관 프로젝트·현장·메모)은
+  `.maybeSingle()`처럼 결과가 정해진 조회는 그냥 조회해도 됨(직접 입력 거래처명 자동완성 `fetchAllRawClientNames`는 최근 3년만 —
+  해마다 읽는 양이 끝없이 늘지 않게). 해마다 늘어나는 선택 목록(거래처·연도 무관 프로젝트·현장·메모)은
   `fetchAllData`(기존 `{ data }` 모양 그대로) — 이름순처럼 겹칠 수 있는 정렬이면 끝에 `.order("id")`를 붙일 것.
   `.in("칸", 목록)`에 그 해 프로젝트 전부·외상 거래 전부처럼 수백 개가 될 수 있는 목록을 넣을 때는 `fetchAllRowsIn`(100개씩 나눠
   조회해 합침) — 목록이 요청 주소에 그대로 들어가 너무 길면 요청이 거절돼 화면이 안 열림.
@@ -141,7 +143,16 @@
   `restore_allowed_tables()`(새 SQL에서 함수를 다시 만들어 목록 추가 — `restore.test.ts`가 앱 목록과 비교). 예전엔 공사 메모·일용직
   사용내역 등이 빠져 있어 백업으로 못 되살렸고, 복원 때 프로젝트·일용직을 지우면서 같이 지워졌음. 복원은 DB 함수
   (`restore_stage`로 나눠 올리고 `restore_commit`으로 한 번에 — 하나라도 실패하면 전부 취소)로만 — 앱에서 표마다 지우고 넣지 말 것.
-  백업에 없는 표 중 바꾸는 표를 참조하는 표는 함수가 지금 자료를 보관했다 되돌림(예전 백업 복원 대비).
+  백업에 없는 표 중 바꾸는 표를 참조하는 표는 함수가 지금 자료를 보관했다 되돌림(예전 백업 복원 대비). 백업에만 담고 복원하지
+  않는 표는 `lib/restore.ts`의 `BACKUP_ONLY_TABLES`(견적서 공급자·신고 끝난 해 잠금 — 잠그기 전 백업으로 복원해도 잠금이 안 풀리게).
+  백업 파일은 압축(.json.gz — `encodeBackupFile`/`decodeBackupFile`, 예전 .json 백업도 복원됨), 자동 백업은 크론이 성공한 뒤에만
+  `pruneAutoBackups`로 정리(사용자 결정 10/31: 최근 8주 전부 + 그 전 1년은 달마다 첫 백업 1개, 직접 만든 백업·복원 직전 백업은 안
+  지움, 최근 자동 백업 8개는 늘 남김 — `lib/backupRetention.ts`).
+- **파일은 서버(Vercel)로 4.5MB 넘게 보내지 말 것**(10/31): 서버 액션·API 요청 본문이 4.5MB를 넘으면 앱 코드에 닿기 전에 거절됨
+  (next.config의 bodySizeLimit과 상관없음 — 휴대폰 사진 첨부·영수증 인식이 "오류"로만 실패했던 원인). 첨부파일은 서명된 올리기
+  주소로 브라우저에서 저장소로 바로(`actions/attachments.ts`의 `prepareAttachmentUpload` → `lib/supabase/signedUpload.ts` →
+  `saveUploadedAttachment`), 인식용 파일(영수증·급여대장·엑셀)은 `lib/postFileToApi.ts`(큰 사진은 줄여서, 한도 넘는 PDF·엑셀은
+  보내기 전에 안내, 413 등도 문구로). 파일을 받는 화면을 새로 만들 때도 이 둘 중 하나로.
 
 - **금액 입력칸은 `@/components/ui/MoneyInput`을 쓸 것**(`type="number"` 대신). 입력하는 동안 천 단위
   쉼표("1,234,567")가 보이고, 폼으로 제출되는 값(`name`)은 숨은 칸에 쉼표 없는 숫자로 들어감.
@@ -153,7 +164,10 @@
   예상 미수액·프로젝트 받은 돈(`expectedReceivable`), 이익 예상(`projectProfit` — 대시보드·보고서 공통), 프로젝트 목록 하단 합계·통합
   보고서(`projectListTotals`), 엑셀 거래 읽기(`transactionExcel`), 작업일지 집계(`workLogSummary`), 출장일지 합계·보고서 작업일수 나눔·출장 투입 인원(`tripLog`), 보고서 출장 현황(`tripOverview`), 매입장 한 결제 묶기(`paymentGroup`), 장부 점검(`ledgerCheck`), 거래 수정 이력 표시·일괄 변경 접기(`transactionHistory`), 백업
   끝까지 담기(`backup`), 복원 막기·표 목록·나눠 올리기(`restore`), 백업 상태(`backupStatus`), 삭제 막기(`deleteGuard`), 급여 중복
-  확인(`payrollDuplicates`), 긴 ID 목록 나눠 조회(`supabaseFetchAll`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
+  확인(`payrollDuplicates`), 긴 ID 목록 나눠 조회·자동완성 기간(`supabaseFetchAll`), 파일 올리기 규칙(`fileUpload`), 백업 자동
+  정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
+  해 잠금 불러오기(`yearLock`), 오래된 외상매출금(`receivableAging`), 이번 달 신고·납부 일정(`annualTasks`), 홈택스 세금계산서
+  대조(`hometaxReconcile`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
   (vitest는 npm 설치 오류로 못 씀 — 새 테스트 라이브러리를 넣지 말 것)
@@ -215,6 +229,20 @@
   - 연말 점검(프로젝트 목록, 10월부터)은 `unbilledRemainingByGroup`(1월 부가세 미발행 예상분과 같은 기준)으로 고르고, 귀속 연도
     옮기기는 `moveProjectsToNextYear` 하나로(지금 그 해인 프로젝트만 — 두 번 눌러도 두 해 뒤로 안 감). 어미 줄은 같은 묶음의 검토중
     하위도 같이 옮김(자기 상태로 따로 보이는 하위는 따로 고름).
+- **대표자 보험료 요율은 `lib/ownerSocialInsurance.ts`의 연도별 표**(`insuranceRatesFor(year)`): 국민연금 보험료율은 법정 일정(2033년
+  13%)으로 계산, 건강보험·장기요양·국민연금 상·하한은 해마다 정해지면 표에 한 줄씩(건강보험 8~9월, 장기요양 10~11월, 상·하한 3월
+  고시·7월 적용). 표에 없는 해는 가장 최근 값으로 추정하고 대시보드에 "미확정 — ○○년 요율 적용"으로 표시. 종합소득세율이
+  바뀌면 `lib/tax.ts`의 표와 `INCOME_TAX_BRACKETS_SINCE`를 같이.
+- **097 SQL**(10/31 사용자 결정 "셋 다 진행"): ① 프로젝트·견적·발주 번호는 한국 시각 연도, 1,000번째부터 4자리, 동시 생성 안전
+  ② 통장 잔액 확인 기록(`bank_balance_checks` — 앱 계산 잔액 = 시작 잔액 + 그 날까지 입금 − 출금, `lib/bankReconcile.ts`, 은행 화면
+  계좌 잔액과 같은 계산) ③ 신고 끝난 해 잠금(`locked_years` + 거래 트리거 — 잠근 해는 거래 추가·삭제와 신고 칸(날짜·구분·거래처·
+  카테고리·금액·부가세·세금계산서·외상 여부) 수정을 DB가 막음, 프로젝트·결제수단·품목·메모·묶음·외상 정산은 그대로, 복원 함수·SQL
+  편집기는 막지 않음). 거래 표에 신고에 들어가는 칸을 새로 만들면 트리거의 비교 칸에도 넣을 것. 잠그기·풀기는 관리자만(장부 점검
+  탭 `YearLockPanel`, 매입매출장에 잠김 안내). 표가 없으면(실행 전) 잔액 맞추기·잠금 칸은 숨김.
+- 대시보드 접힘 목록의 "이번 달 신고·납부 일정"은 `lib/annualTasks.ts`(세법·일정이 바뀌면 여기만), 오래된 외상매출금 경과 기간은
+  `lib/receivableAging.ts`(잔액은 `remainingBalance` — 외상매출금 합계와 같은 기준), 1~5월엔 전년도 신고 자료 바로가기.
+- **홈택스 세금계산서 대조**(장부 점검 탭)는 파일을 브라우저에서 읽고(exceljs, .xls는 .xlsx로 다시 저장 안내) 날짜·거래처·금액만
+  앱 서버 액션으로 보내 대조(`lib/hometaxReconcile.ts`) — 외부 서비스로 보내지 않음, 찾기만 하고 바꾸지 않음.
 - **백업 상태**(10/29 사용자 요청 "A"): 대시보드 접힘 목록 맨 아래 "백업" 줄 + 마지막 자동 백업 후 8일이 넘을 때만 맨 위 카드에
   경고 한 줄(`lib/backupStatus.ts`, 관리자·직원만 — 백업 기록은 그 두 역할만 읽음). 자동 백업 주기(vercel.json 크론)를 바꾸면
   `AUTO_BACKUP_STALE_DAYS`도 같이.
@@ -232,7 +260,9 @@
 - **앱에서 본 실제 데이터(거래처·금액·작업일지 내용·직원 정보 등)는 외부로 내보내지 말 것**(사용자 요청: 외부 반출 절대
   불가). 커밋 메시지·코드 주석·PR 설명·`HANDOFF.md`·외부 서비스에 실제 값을 적지 말고, 점검·테스트·예시는 가짜 데이터로.
 
-- **외부 AI(제미나이)는 영수증·급여대장 인식에만 쓸 것**(`/api/ocr`·`/api/payroll-ocr`). 사용자 요청으로 보고서 AI 질문은
+- **외부 AI(제미나이)는 영수증·급여대장 인식에만 쓸 것**(`/api/ocr`·`/api/payroll-ocr`). 호출은 `lib/gemini.ts` 하나로(@google/genai —
+  예전 @google/generative-ai는 지원 종료). 모델은 Vercel 환경변수 `GEMINI_MODEL`(없으면 `DEFAULT_GEMINI_MODEL`) — 구글이 모델을
+  종료하면 화면에 환경변수를 바꾸라는 안내가 뜸(`geminiErrorMessage`). 사용자 요청으로 보고서 AI 질문은
   없앴고, 엑셀 거래 일괄 등록은 머리글 이름으로 직접 읽음(`lib/transactionExcel.ts`). 거래처·금액 같은 회사 자료를 외부 AI로
   보내는 기능을 새로 붙이거나 되살리려면 먼저 사용자에게 물어볼 것.
 

@@ -20,7 +20,7 @@ import { ReportPrintChart } from "@/components/ReportPrintChart";
 import { ReportChartProvider } from "@/components/ReportChartProvider";
 import { ReportChartToggle } from "@/components/ReportChartToggle";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
-import { fetchAllRows, fetchAllData } from "@/lib/supabaseFetchAll";
+import { fetchAllRows, fetchAllData, fetchAllRowsIn } from "@/lib/supabaseFetchAll";
 import { purchaseCostOf } from "@/lib/vatBasis";
 import { unsettledCreditPurchase } from "@/lib/projectProfit";
 import { billedSalesByProject, projectReceipts, receivableOf, receivedSalesByProject } from "@/lib/expectedReceivable";
@@ -180,12 +180,13 @@ export async function ProjectProfitReport({
   // 외상(미완납)은 완납 전까지 장부에서 제외 — 대시보드·보고서와 동일한 기준.
   // 정산 이력은 회사 전체가 아니라 이 프로젝트의 외상 매입·매출 건 것만 가져온다(매출은 받은 돈 내역의 입금 상태용).
   const creditIds = [...purchaseRowsRaw, ...salesRowsRaw].filter((t) => t.payment_type === "credit").map((t) => t.id);
+  // 외상이 많은 프로젝트도 요청 주소가 너무 길어지지 않게 나눠 조회(fetchAllRowsIn).
   const creditPayments = creditIds.length
-    ? await fetchAllRows<CreditPayment>((from, to) =>
+    ? await fetchAllRowsIn<CreditPayment>(creditIds, (ids, from, to) =>
         supabase
           .from("credit_payments")
           .select("*")
-          .in("transaction_id", creditIds)
+          .in("transaction_id", ids)
           .order("id", { ascending: true })
           .range(from, to)
       )

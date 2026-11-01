@@ -1,5 +1,6 @@
 import type { createClient } from "@/lib/supabase/server";
 import type { CreditPayment } from "@/lib/types";
+import { nowKst } from "@/lib/kstDate";
 
 // Supabase/PostgREST는 .range()로 명시적으로 페이지를 나누지 않으면 한 번에 최대
 // 1000행까지만 돌려준다. 연간 데이터처럼 1000건을 넘길 수 있는 조회는 이 함수로
@@ -28,17 +29,19 @@ export async function fetchAllRows<T>(
 // 합친 순서는 조각 순서라, 순서가 필요하면 받은 뒤 정렬할 것.
 export const IN_CHUNK = 100;
 
+// chunkSize: 한글 이름처럼 값 하나가 주소에서 길어지는 목록은 더 작게(예: 30) — 한글은 주소에 글자당 9자로 들어감.
 export async function fetchAllRowsIn<T>(
   values: string[],
   buildQuery: (
     chunk: string[],
     from: number,
     to: number
-  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>
+  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  chunkSize = IN_CHUNK
 ): Promise<T[]> {
   const unique = Array.from(new Set(values));
   const chunks: string[][] = [];
-  for (let i = 0; i < unique.length; i += IN_CHUNK) chunks.push(unique.slice(i, i + IN_CHUNK));
+  for (let i = 0; i < unique.length; i += chunkSize) chunks.push(unique.slice(i, i + chunkSize));
   const parts = await Promise.all(chunks.map((chunk) => fetchAllRows<T>((from, to) => buildQuery(chunk, from, to))));
   return parts.flat();
 }
@@ -60,13 +63,23 @@ export function fetchAllCreditPayments(supabase: Awaited<ReturnType<typeof creat
 }
 
 // 거래 등록·수정 화면의 "직접 입력한 거래처명" 자동완성용 — 거래가 1000건을 넘어도 이름이 빠지지 않게.
-// 기존 호출부의 `{ data }` 형태를 그대로 쓰도록 감싸서 돌려준다.
+// 최근 3년 거래만(RAW_CLIENT_NAME_YEARS) — 전체를 읽으면 해마다 거래 화면을 열 때마다 읽는 양이 끝없이 늘어남.
+// 3년 넘게 안 쓴 이름은 목록에 안 나올 뿐 직접 입력은 그대로 됨. 기존 호출부의 `{ data }` 형태를 그대로 돌려준다.
+export const RAW_CLIENT_NAME_YEARS = 3;
+
+// 3년 전 그 달 1일부터(날짜를 그대로 빼면 2월 29일에 없는 날짜 "○○-02-29"가 돼 조회가 실패함).
+export function rawClientNameSince(today: { year: number; month: number }) {
+  return `${today.year - RAW_CLIENT_NAME_YEARS}-${String(today.month).padStart(2, "0")}-01`;
+}
+
 export function fetchAllRawClientNames(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const since = rawClientNameSince(nowKst());
   return fetchAllRows<{ client_name_raw: string | null }>((from, to) =>
     supabase
       .from("transactions")
       .select("client_name_raw")
       .not("client_name_raw", "is", null)
+      .gte("trans_date", since)
       .order("id", { ascending: true })
       .range(from, to)
   ).then((data) => ({ data }));

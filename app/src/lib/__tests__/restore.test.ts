@@ -7,7 +7,7 @@ import { fakeSupabase, txRows } from "./fakeBackupSupabase";
 
 const meta = (counts: Record<string, number>) => ({ complete: true, row_counts: counts });
 
-test("복원 표 목록이 SQL의 restore_allowed_tables()(가장 최근에 다시 만든 SQL)와 같음 — 회사 정보만 빼고 백업하는 표 전부", () => {
+test("복원 표 목록이 SQL의 restore_allowed_tables()(가장 최근에 다시 만든 SQL)와 같음 — 회사 정보·해 잠금만 빼고 백업하는 표 전부", () => {
   const dir = new URL("../../../../supabase/", import.meta.url);
   const latest = readdirSync(dir)
     .filter((f) => f.endsWith(".sql"))
@@ -22,7 +22,7 @@ test("복원 표 목록이 SQL의 restore_allowed_tables()(가장 최근에 다�
   assert.deepEqual([...sqlTables].sort(), [...RESTORE_TABLES].sort());
   assert.deepEqual(
     BACKUP_TABLES.filter((t) => !RESTORE_TABLES.includes(t)),
-    ["company_profiles"]
+    ["company_profiles", "locked_years"]
   );
 });
 

@@ -1,3 +1,5 @@
+// 종합소득세율 — 2023년 귀속분부터 적용(2022년 12월 세법 개정). 세법이 바뀌면 표와 아래 연도를 같이 고칠 것(대시보드 안내에 표시됨).
+export const INCOME_TAX_BRACKETS_SINCE = 2023;
 export const INCOME_TAX_BRACKETS = [
   { upTo: 14_000_000, rate: 0.06, deduction: 0 },
   { upTo: 50_000_000, rate: 0.15, deduction: 1_260_000 },

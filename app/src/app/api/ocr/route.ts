@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { extractJson, generateGeminiText, geminiErrorMessage, geminiModel } from "@/lib/gemini";
+
+// 제미나이 응답을 기다리는 시간(lib/gemini.ts의 시도 시간·재시도와 맞춤).
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -7,16 +10,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "GEMINI_API_KEY가 설정되지 않았습니다." }, { status: 500 });
   }
 
-  const formData = await req.formData();
-  const file = formData.get("file");
+  // 보낸 양식이 깨졌거나 중간에 끊기면 formData()가 실패함 — 500 오류 화면 대신 알아볼 수 있는 문구로.
+  let file: FormDataEntryValue | null;
+  try {
+    file = (await req.formData()).get("file");
+  } catch {
+    return NextResponse.json({ error: "보낸 파일을 읽지 못했습니다. 다시 시도해 주세요." }, { status: 400 });
+  }
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "이미지가 없습니다." }, { status: 400 });
   }
 
   const bytes = Buffer.from(await file.arrayBuffer()).toString("base64");
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL ?? "gemini-3.6-flash" });
+  const model = geminiModel();
 
   const prompt = `이 영수증/세금계산서 이미지에서 정보를 추출해서 아래 JSON 형식으로만 답해줘. 다른 설명은 하지마.
 {
@@ -31,15 +38,9 @@ export async function POST(req: NextRequest) {
 }`;
 
   try {
-    const result = await model.generateContent([
-      prompt,
-      { inlineData: { data: bytes, mimeType: file.type || "image/jpeg" } },
-    ]);
-    const text = result.response.text();
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
-    return NextResponse.json({ extracted: parsed, raw: text });
+    const text = await generateGeminiText({ apiKey, prompt, model, file: { data: bytes, mimeType: file.type || "image/jpeg" } });
+    return NextResponse.json({ extracted: extractJson(text), raw: text });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "OCR 처리 실패" }, { status: 500 });
+    return NextResponse.json({ error: geminiErrorMessage(err, model) }, { status: 502 });
   }
 }

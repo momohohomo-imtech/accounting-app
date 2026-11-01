@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { runBackup } from "@/lib/backup";
+import { pruneAutoBackups, runBackup } from "@/lib/backup";
 import { sendEmail } from "@/lib/email";
 
 export const maxDuration = 60;
@@ -17,6 +17,15 @@ export async function GET(req: NextRequest) {
     const supabase = createServiceClient();
     const { fileName, sizeMb } = await runBackup(supabase, "auto");
 
+    // 백업이 성공한 뒤에만 오래된 자동 백업 정리(8주 + 1년 월 1개 — lib/backupRetention.ts). 정리가 실패해도 백업은 성공.
+    let pruned = 0;
+    let pruneError: string | null = null;
+    try {
+      ({ deleted: pruned } = await pruneAutoBackups(supabase, new Date().toISOString()));
+    } catch (err) {
+      pruneError = err instanceof Error ? err.message : "오래된 백업 정리 실패";
+    }
+
     const emailTo = process.env.BACKUP_EMAIL_TO;
     let emailed = false;
     if (emailTo) {
@@ -27,14 +36,16 @@ export async function GET(req: NextRequest) {
         subject: `[IM테크 회계 관리 시스템] ${new Date().toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} 자동 백업 완료`,
         html: `
           <p>오늘의 자동 백업이 완료되었습니다.</p>
-          <p>파일명: ${fileName}<br/>크기: ${sizeMb.toFixed(2)}MB</p>
+          <p>파일명: ${fileName}<br/>크기: ${sizeMb.toFixed(2)}MB(압축 파일)</p>
+          ${pruned > 0 ? `<p>오래된 자동 백업 ${pruned}개를 정리했습니다(최근 8주는 전부, 그 전 1년은 달마다 1개 보관).</p>` : ""}
+          ${pruneError ? `<p>오래된 자동 백업 정리 실패: ${pruneError}</p>` : ""}
           ${signed?.signedUrl ? `<p><a href="${signed.signedUrl}">백업 파일 다운로드 (24시간 유효)</a></p>` : ""}
         `,
       });
       emailed = true;
     }
 
-    return NextResponse.json({ ok: true, fileName, sizeMb, emailed });
+    return NextResponse.json({ ok: true, fileName, sizeMb, emailed, pruned, pruneError });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "백업 실패" }, { status: 500 });
   }
