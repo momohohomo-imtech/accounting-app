@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { inlineFieldClass } from "@/components/ui/field";
+import { statusFilterCookieValue } from "@/lib/projectStatusFilter";
 
 export function YearFilter({
   basePath,
@@ -12,6 +13,7 @@ export function YearFilter({
   statusOptions,
   selectedStatuses,
   extraParams,
+  rememberStatusCookie,
 }: {
   basePath: string;
   years: number[];
@@ -23,6 +25,8 @@ export function YearFilter({
   selectedStatuses?: string[];
   /** 주소에 함께 남길 값(예: 탭 { tab: "check" }). */
   extraParams?: Record<string, string>;
+  /** 상태 체크를 이 이름의 쿠키에 저장(다음에 열 때 그 상태만 — 프로젝트 목록, lib/projectStatusFilter.ts). */
+  rememberStatusCookie?: string;
 }) {
   const router = useRouter();
   const statuses = selectedStatuses ?? [];
@@ -74,6 +78,10 @@ export function YearFilter({
                     const next = e.target.checked
                       ? [...statuses, s.value]
                       : statuses.filter((v) => v !== s.value);
+                    // 화면을 다시 불러오기 전에 저장 — 서버가 새 쿠키를 받아 다음 방문부터 그 상태만 조회(1년 보관).
+                    if (rememberStatusCookie) {
+                      document.cookie = `${rememberStatusCookie}=${statusFilterCookieValue(next)}; path=/; max-age=31536000; samesite=lax`;
+                    }
                     navigate(selectedYear, selectedSiteId ?? "", next);
                   }}
                   className="h-3.5 w-3.5"

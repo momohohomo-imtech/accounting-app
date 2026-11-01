@@ -37,6 +37,7 @@ type SortKey =
   | "project"
   | "category"
   | "item_name"
+  | "memo"
   | "payment_method"
   | "tax_invoice"
   | "amount";
@@ -48,10 +49,21 @@ const ALL_COLUMNS: { key: SortKey; label: string }[] = [
   { key: "project", label: "프로젝트" },
   { key: "category", label: "카테고리" },
   { key: "item_name", label: "품목" },
+  { key: "memo", label: "메모" },
   { key: "payment_method", label: "결제방식" },
   { key: "tax_invoice", label: "세금계산서" },
   { key: "amount", label: "금액" },
 ];
+
+// 메모 칸(사용자 요청 11/1) — 메모1·메모2를 이어서, 표에는 앞 6글자만(누르면 전체, PC는 마우스를 올려도 전체).
+const MEMO_PREVIEW_CHARS = 6;
+function memoText(t: Pick<Transaction, "note1" | "note2">) {
+  return [t.note1, t.note2].map((n) => n?.trim()).filter(Boolean).join(" / ");
+}
+function memoPreview(memo: string) {
+  const chars = [...memo];
+  return chars.length > MEMO_PREVIEW_CHARS ? `${chars.slice(0, MEMO_PREVIEW_CHARS).join("")}…` : memo;
+}
 
 function sortValue(t: Transaction, key: SortKey): string | number {
   switch (key) {
@@ -67,6 +79,8 @@ function sortValue(t: Transaction, key: SortKey): string | number {
       return t.expense_categories?.name ?? "";
     case "item_name":
       return t.item_name ?? "";
+    case "memo":
+      return memoText(t);
     case "payment_method":
       return t.payment_methods?.name ?? "";
     case "tax_invoice":
@@ -95,6 +109,9 @@ function groupHead(lines: Transaction[]): Transaction {
     tax_invoice_issued: lines.some((l) => l.tax_invoice_issued),
     needs_classification: lines.every((l) => l.needs_classification),
     item_name: summaryLabel(lines.map((l) => l.item_name ?? "-"), "건"),
+    // 묶음 줄의 메모 = 줄마다 다른 메모를 한 번씩(펼치면 줄마다 자기 메모).
+    note1: Array.from(new Set(lines.map((l) => memoText(l)).filter(Boolean))).join(" / ") || null,
+    note2: null,
     clients: {
       ...first.clients,
       name: summaryLabel(lines.map((l) => l.clients?.name ?? l.client_name_raw ?? "-"), "곳"),
@@ -119,6 +136,7 @@ export function TransactionTable({
   showProject = true,
   showCategory = true,
   showItem = true,
+  showMemo = true,
   groupingReady = false,
   paidDateById = {},
   readOnly = false,
@@ -132,6 +150,7 @@ export function TransactionTable({
   showProject?: boolean;
   showCategory?: boolean;
   showItem?: boolean;
+  showMemo?: boolean;
   // 092 SQL 실행 후에만 "한 결제로 묶기·묶음 풀기" 버튼을 보여 줌.
   groupingReady?: boolean;
   // 외상 거래의 정산일(마지막 정산 이력) — 외상 정산 묶음 줄에 "MM-DD 정산"으로.
@@ -143,7 +162,8 @@ export function TransactionTable({
     (c) =>
       (c.key !== "project" || showProject) &&
       (c.key !== "category" || showCategory) &&
-      (c.key !== "item_name" || showItem)
+      (c.key !== "item_name" || showItem) &&
+      (c.key !== "memo" || showMemo)
   );
   function editHrefFor(id: string) {
     const p = new URLSearchParams({
@@ -157,6 +177,8 @@ export function TransactionTable({
   }
 
   const [sortKey, setSortKey] = useState<SortKey>("trans_date");
+  // 전체를 펼쳐 본 메모(거래 id) — 휴대폰은 마우스를 올려 볼 수 없어서 눌러서 펼침.
+  const [openMemos, setOpenMemos] = useState<Set<string>>(new Set());
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // 펼친 묶음(payment_group_id).
@@ -473,6 +495,37 @@ export function TransactionTable({
     );
   }
 
+  function memoCell(t: Transaction) {
+    const memo = memoText(t);
+    const open = openMemos.has(t.id);
+    return (
+      <Td className="pr-4 print:whitespace-normal" title={memo || undefined}>
+        {memo ? (
+          <button
+            type="button"
+            onClick={() =>
+              setOpenMemos((prev) => {
+                const next = new Set(prev);
+                if (next.has(t.id)) next.delete(t.id);
+                else next.add(t.id);
+                return next;
+              })
+            }
+            aria-expanded={open}
+            className="text-left text-slate-600 transition-colors hover:text-slate-900"
+          >
+            <span className={cx("print:hidden", open ? "block max-w-[14rem] whitespace-normal break-words" : "whitespace-nowrap")}>
+              {open ? memo : memoPreview(memo)}
+            </span>
+            <span className="hidden print:inline">{memo}</span>
+          </button>
+        ) : (
+          <span className="text-slate-300">-</span>
+        )}
+      </Td>
+    );
+  }
+
   // 거래 한 줄(묶음 한 줄 포함)의 날짜~금액 칸. 묶음 줄은 lead(펼치기 버튼)·firstDate(날짜가 여럿이면 처음 날짜 — "처음~마지막"
   // 으로 표시)·typeExtra("N건 묶음")·methodExtra("MM-DD 정산")를 넘김.
   function mainCells(
@@ -515,6 +568,7 @@ export function TransactionTable({
         {showProject && projectCell(t)}
         {showCategory && categoryCell(t)}
         {showItem && itemCell(t)}
+        {showMemo && memoCell(t)}
         <Td className="whitespace-nowrap pr-4">
           {t.payment_methods ? (
             <span
@@ -550,6 +604,7 @@ export function TransactionTable({
         {showProject && projectCell(t)}
         {showCategory && categoryCell(t)}
         {showItem && itemCell(t)}
+        {showMemo && memoCell(t)}
         <Td className="pr-4" />
         <Td className="pr-4" />
         <Td className="whitespace-nowrap pr-4 text-right text-slate-700">{formatWon(transactionTotal(t))}</Td>
@@ -747,7 +802,7 @@ export function TransactionTable({
 
       {/* xl:min-w-0 — 휴대폰·좁은 화면은 칸을 안 우겨넣고 옆으로 넘기지만(1020px), 가로 1280 노트북에선 상자(약 930px)보다
           조금 넓어서 맨 오른쪽 수정·삭제가 가려졌음 → 1280부터는 상자 폭에 맞춰 긴 글자를 줄바꿈 */}
-      <Table stickyHeader className="sticky-col-table min-w-[1020px] xl:min-w-0">
+      <Table stickyHeader className={cx("sticky-col-table xl:min-w-0", showMemo ? "min-w-[1100px]" : "min-w-[1020px]")}>
         <THead>
           {!readOnly && (
             <th className="w-8 pb-2 pr-2">

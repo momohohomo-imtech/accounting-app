@@ -6,10 +6,12 @@ export function TransactionColumnToggles({
   showProject,
   showCategory,
   showItem,
+  showMemo,
 }: {
   showProject: boolean;
   showCategory: boolean;
   showItem: boolean;
+  showMemo: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -33,6 +35,10 @@ export function TransactionColumnToggles({
       <label className="flex items-center gap-1.5 text-xs text-slate-600">
         <input type="checkbox" checked={showItem} onChange={(e) => setParam("showItem", e.target.checked)} className="h-3.5 w-3.5" />
         품목
+      </label>
+      <label className="flex items-center gap-1.5 text-xs text-slate-600">
+        <input type="checkbox" checked={showMemo} onChange={(e) => setParam("showMemo", e.target.checked)} className="h-3.5 w-3.5" />
+        메모
       </label>
     </div>
   );

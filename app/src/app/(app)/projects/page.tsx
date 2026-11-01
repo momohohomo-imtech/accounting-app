@@ -1,4 +1,6 @@
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { effectiveStatusParam, PROJECT_STATUS_FILTER_COOKIE } from "@/lib/projectStatusFilter";
 import { one } from "@/lib/relations";
 import { isLedgerVisible } from "@/lib/credit";
 import type { CreditPayment } from "@/lib/types";
@@ -95,6 +97,9 @@ export default async function ProjectsPage({
 }) {
   const { tab, year, site_id, status, report, own, back, suppliers } = await searchParams;
   const active = tab ?? "list";
+  // 상태 체크는 주소에 없으면 이 기기에 저장된 체크로(사용자 요청 11/1 — 열 때마다 전부 불러오지 않게, lib/projectStatusFilter.ts).
+  const savedStatus = (await cookies()).get(PROJECT_STATUS_FILTER_COOKIE)?.value;
+  const effectiveStatus = effectiveStatusParam(status, savedStatus) || undefined;
 
   return (
     <div className="space-y-6">
@@ -109,7 +114,7 @@ export default async function ProjectsPage({
         <ProjectListSection
           year={year}
           siteId={site_id}
-          status={status}
+          status={effectiveStatus}
           report={report}
           ownOnly={own === "1"}
           backToCombined={back === COMBINED_REPORT}
@@ -590,6 +595,7 @@ async function ProjectListSection({
             selectedSiteId={siteId}
             statusOptions={PROJECT_STATUS_OPTIONS}
             selectedStatuses={statusList}
+            rememberStatusCookie={PROJECT_STATUS_FILTER_COOKIE}
           />
           <div className="flex flex-wrap items-center gap-2">
             {footerRows.length > 0 && (
