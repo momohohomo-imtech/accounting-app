@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { fieldClass, inlineFieldClass, labelClass } from "@/components/ui/field";
+import { compareProjectCodeDesc } from "@/lib/projectCode";
 
 export type SiteOption = { id: string; name: string; client_name: string | null };
 export type ProjectOption = {
@@ -65,11 +66,14 @@ export function ProjectPicker({
     const siteIds = new Set(completedProjects.filter((p) => p.year === Number(year)).map((p) => p.site_id));
     return sites.filter((s) => siteIds.has(s.id));
   }, [completedProjects, sites, year]);
+  // 완료 프로젝트는 프로젝트 번호 순, 최근 번호가 위로(사용자 요청 11/1 — 예전엔 이름순이라 최근 것을 찾기 어려웠음).
   const projectsForSite = useMemo(
     () =>
       !year || !siteId
         ? []
-        : completedProjects.filter((p) => p.year === Number(year) && p.site_id === siteId),
+        : completedProjects
+            .filter((p) => p.year === Number(year) && p.site_id === siteId)
+            .sort((a, b) => compareProjectCodeDesc(a.project_code, b.project_code) || a.name.localeCompare(b.name, "ko")),
     [completedProjects, year, siteId]
   );
 

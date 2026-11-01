@@ -167,7 +167,7 @@
   확인(`payrollDuplicates`), 긴 ID 목록 나눠 조회·자동완성 기간(`supabaseFetchAll`), 파일 올리기 규칙(`fileUpload`), 백업 자동
   정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
   해 잠금 불러오기(`yearLock`), 오래된 외상매출금(`receivableAging`), 이번 달 신고·납부 일정(`annualTasks`), 홈택스 세금계산서
-  대조(`hometaxReconcile`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
+  대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
   (vitest는 npm 설치 오류로 못 씀 — 새 테스트 라이브러리를 넣지 말 것)
@@ -243,6 +243,10 @@
   `lib/receivableAging.ts`(잔액은 `remainingBalance` — 외상매출금 합계와 같은 기준), 1~5월엔 전년도 신고 자료 바로가기.
 - **홈택스 세금계산서 대조**(장부 점검 탭)는 파일을 브라우저에서 읽고(exceljs, .xls는 .xlsx로 다시 저장 안내) 날짜·거래처·금액만
   앱 서버 액션으로 보내 대조(`lib/hometaxReconcile.ts`) — 외부 서비스로 보내지 않음, 찾기만 하고 바꾸지 않음.
+- **11/1 사용자 요청**: 매입매출장 "메모" 칸은 메모1·메모2를 이어 앞 6글자만(누르면 전체, PC는 마우스를 올려도 전체 — 다른 칸처럼
+  체크로 숨김, 주소 `showMemo=0`). 거래 등록·견적서의 완료 프로젝트 선택 목록은 프로젝트 번호 순·최근이 위(`compareProjectCodeDesc` —
+  번호를 글자로 비교하면 "2026-1000"이 "2026-999"보다 앞에 옴). 프로젝트 목록 상태 체크(검토중~기타)는 바꿀 때 이 기기 쿠키에
+  저장되고, 주소에 상태가 없으면 서버가 저장된 상태만 조회(`lib/projectStatusFilter.ts`, 전부 끄면 "all" = 전체, 주소의 상태가 먼저).
 - **백업 상태**(10/29 사용자 요청 "A"): 대시보드 접힘 목록 맨 아래 "백업" 줄 + 마지막 자동 백업 후 8일이 넘을 때만 맨 위 카드에
   경고 한 줄(`lib/backupStatus.ts`, 관리자·직원만 — 백업 기록은 그 두 역할만 읽음). 자동 백업 주기(vercel.json 크론)를 바꾸면
   `AUTO_BACKUP_STALE_DAYS`도 같이.

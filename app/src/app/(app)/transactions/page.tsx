@@ -56,9 +56,10 @@ export default async function TransactionsPage({
     showProject?: string;
     showCategory?: string;
     showItem?: string;
+    showMemo?: string;
   }>;
 }) {
-  const { tab, year, month, type, project_id, payment_method_id, editTx, showProject, showCategory, showItem } =
+  const { tab, year, month, type, project_id, payment_method_id, editTx, showProject, showCategory, showItem, showMemo } =
     await searchParams;
   // 세무사 계정은 매입매출장(매입매출 목록)만 — 다른 탭·등록·수정 없이 읽기만(사용자 요청 10/28, 미들웨어에서도 막음).
   const ledgerOnly = (await getCurrentRole()) === "tax_agent";
@@ -118,6 +119,7 @@ export default async function TransactionsPage({
           showProject={showProject}
           showCategory={showCategory}
           showItem={showItem}
+          showMemo={showMemo}
           readOnly={ledgerOnly}
         />
       )}
@@ -219,6 +221,7 @@ async function TransactionListSection({
   showProject,
   showCategory,
   showItem,
+  showMemo,
   readOnly = false,
 }: {
   year?: string;
@@ -229,6 +232,7 @@ async function TransactionListSection({
   showProject?: string;
   showCategory?: string;
   showItem?: string;
+  showMemo?: string;
   // 세무사 계정 — 장부만(메모·엑셀 일괄 등록·체크·수정·삭제 없이).
   readOnly?: boolean;
 }) {
@@ -236,6 +240,8 @@ async function TransactionListSection({
     showProject: showProject !== "0",
     showCategory: showCategory !== "0",
     showItem: showItem !== "0",
+    // 메모 앞 6글자(사용자 요청 11/1) — 다른 칸처럼 기본은 보이고 체크를 끄면 숨김.
+    showMemo: showMemo !== "0",
   };
   const supabase = await createClient();
   const { year: currentYear, month: currentMonth } = nowKst();
