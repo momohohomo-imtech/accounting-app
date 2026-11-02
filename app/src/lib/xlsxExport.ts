@@ -4,6 +4,15 @@ import { WEEKDAY_LABELS } from "@/lib/calendar";
 import { workLogColorExcelArgb } from "@/lib/workLogColors";
 import { siteColorExcelArgb } from "@/lib/siteColor";
 import { formatPermitQuantity } from "@/lib/koreanNumber";
+import { formatAmount, UNIT_LABEL, type ChartColumn, type ScheduledStep, type SequenceUnit } from "@/lib/workSequence";
+import {
+  chunkForRows,
+  MEMO_LINE_HEIGHT,
+  MEMO_MAX_LINES_PER_ROW,
+  MEMO_VALUE_WIDTH,
+  wrappedLineCount,
+  type MemoField,
+} from "@/lib/memoExport";
 
 function triggerDownload(buffer: ExcelJS.Buffer, filename: string) {
   const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -71,6 +80,161 @@ function addSheet(wb: ExcelJS.Workbook, { name: sheetName, headers, rows, leadin
     });
     ws.getColumn(i).width = Math.min(Math.max(maxLen + 2, 10), 40);
   }
+}
+
+// 메모 한 장(공사 메모·품질관리 노하우·공구 메모) — "항목 | 내용" 두 칸짜리 문서(lib/memoExport.ts). 내용 칸은 줄바꿈해서 다 보이게
+// 줄 높이를 글자 수로 정하고, 한 칸에 다 안 들어가는 긴 내용은 행 여러 개로 나눠 항목 칸을 세로로 합침. A4 세로 폭에 맞춰 인쇄.
+export async function downloadMemoXlsx(filename: string, title: string, fields: MemoField[]) {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("메모", {
+    pageSetup: { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+  });
+  ws.getColumn(1).width = 12;
+  ws.getColumn(2).width = MEMO_VALUE_WIDTH + 2;
+  const border = { style: "thin" as const, color: { argb: "FF94A3B8" } };
+  const box = { top: border, left: border, bottom: border, right: border };
+
+  const titleRow = ws.addRow([title]);
+  titleRow.font = { bold: true, size: 14 };
+  titleRow.height = 26;
+  titleRow.alignment = { vertical: "middle" };
+  ws.mergeCells(titleRow.number, 1, titleRow.number, 2);
+
+  for (const [label, value] of fields) {
+    const chunks = chunkForRows(value, MEMO_VALUE_WIDTH, MEMO_MAX_LINES_PER_ROW);
+    const first = ws.rowCount + 1;
+    chunks.forEach((chunk, i) => {
+      const row = ws.addRow([i === 0 ? label : "", chunk]);
+      row.height = Math.max(20, wrappedLineCount(chunk, MEMO_VALUE_WIDTH) * MEMO_LINE_HEIGHT + 5);
+      const labelCell = row.getCell(1);
+      labelCell.font = { bold: true, color: { argb: "FF334155" } };
+      labelCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } };
+      labelCell.alignment = { vertical: "top", horizontal: "center" };
+      labelCell.border = box;
+      const valueCell = row.getCell(2);
+      valueCell.alignment = { vertical: "top", wrapText: true };
+      valueCell.border = box;
+    });
+    if (chunks.length > 1) ws.mergeCells(first, 1, first + chunks.length - 1, 1);
+  }
+
+  triggerDownload(await wb.xlsx.writeBuffer(), filename);
+}
+
+export type WorkSequenceExport = {
+  title: string;
+  projectLabel: string;
+  unit: SequenceUnit;
+  startLabel: string;
+  rangeLabel: string;
+  doneLabel: string;
+  steps: { content: string; detail: string; duration: number; overlap: number; range: string; done: boolean; done_date: string | null }[];
+  schedule: ScheduledStep[];
+  columns: ChartColumn[];
+};
+
+// 공사 작업 순서표(사용자 요청 11/2 "엑셀 + 인쇄") — 1장 "작업 순서"(순서표 정보 + 단계 표), 2장 "흐름 차트"(칸 하나 = 하루 또는 한 시간,
+// 작업 칸은 남색·완료는 녹색·앞 작업과 겹치는 칸은 주황). 칸은 400개까지(그 뒤는 잘림 안내).
+const WORK_SEQUENCE_MAX_COLUMNS = 400;
+export async function downloadWorkSequenceXlsx(filename: string, data: WorkSequenceExport) {
+  const wb = new ExcelJS.Workbook();
+  const border = { style: "thin" as const, color: { argb: "FF94A3B8" } };
+  const box = { top: border, left: border, bottom: border, right: border };
+  const unitLabel = UNIT_LABEL[data.unit];
+
+  const ws = wb.addWorksheet("작업 순서", {
+    pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+  });
+  const titleRow = ws.addRow([data.title]);
+  titleRow.font = { bold: true, size: 14 };
+  titleRow.height = 24;
+  ws.mergeCells(titleRow.number, 1, titleRow.number, 8);
+  for (const [label, value] of [
+    ["프로젝트", data.projectLabel],
+    ["단위", data.unit === "day" ? "일(날짜, 토·일 포함)" : "시간"],
+    ["시작", data.startLabel],
+    ["전체 일정", data.rangeLabel],
+    ["완료", data.doneLabel],
+  ]) {
+    const row = ws.addRow([label, value]);
+    row.getCell(1).font = { bold: true, color: { argb: "FF334155" } };
+    ws.mergeCells(row.number, 2, row.number, 8);
+  }
+  ws.addRow([]);
+  const header = ws.addRow(["순번", "작업 내용", "세부 설명·주의사항", `기간(${unitLabel})`, `앞 작업과 겹침(${unitLabel})`, "일정", "완료", "완료일"]);
+  header.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  header.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E293B" } };
+  header.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+  header.height = 30;
+  header.eachCell((cell) => (cell.border = box));
+  data.steps.forEach((s, i) => {
+    const row = ws.addRow([
+      i + 1,
+      s.content,
+      s.detail,
+      s.duration,
+      i === 0 ? "-" : data.schedule[i]?.overlap ?? s.overlap,
+      s.range,
+      s.done ? "완료" : "",
+      s.done ? s.done_date ?? "" : "",
+    ]);
+    const lines = Math.max(wrappedLineCount(s.content, 24), wrappedLineCount(s.detail || " ", 40));
+    row.height = Math.max(20, Math.min(400, lines * MEMO_LINE_HEIGHT + 5));
+    row.eachCell({ includeEmpty: true }, (cell, col) => {
+      cell.border = box;
+      cell.alignment = { vertical: "top", wrapText: col === 2 || col === 3, horizontal: col === 1 || col >= 4 ? "center" : undefined };
+    });
+  });
+  [6, 26, 42, 10, 14, 24, 8, 12].forEach((w, i) => (ws.getColumn(i + 1).width = w));
+
+  // 2장: 흐름 차트
+  const chart = wb.addWorksheet("흐름 차트", {
+    views: [{ state: "frozen", xSplit: 2, ySplit: 2 }],
+    pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+  });
+  const cols = data.columns.slice(0, WORK_SEQUENCE_MAX_COLUMNS);
+  const top = chart.addRow(["순번", "작업 내용", ...cols.map((c) => c.sub)]);
+  const second = chart.addRow(["", "", ...cols.map((c) => c.label)]);
+  for (const row of [top, second]) {
+    row.font = { bold: true, size: 9, color: { argb: "FF334155" } };
+    row.alignment = { horizontal: "center", vertical: "middle" };
+    row.eachCell({ includeEmpty: true }, (cell, col) => {
+      cell.border = box;
+      const c = cols[col - 3];
+      if (c?.weekend) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFE4E6" } };
+    });
+  }
+  chart.mergeCells(1, 1, 2, 1);
+  chart.mergeCells(1, 2, 2, 2);
+  const fill = (argb: string) => ({ type: "pattern" as const, pattern: "solid" as const, fgColor: { argb } });
+  data.steps.forEach((s, i) => {
+    const sch = data.schedule[i];
+    const row = chart.addRow([i + 1, `${s.content} (${formatAmount(sch.end - sch.start, data.unit)})`]);
+    row.height = 18;
+    row.getCell(1).alignment = { horizontal: "center" };
+    for (let c = 0; c < cols.length; c++) {
+      const cell = row.getCell(c + 3);
+      cell.border = box;
+      // 칸 [c, c+1)이 단계 [start, end)와 겹치면 칠함 — 앞 작업과 겹치는 부분 [start, start+overlap)은 주황
+      if (c + 1 <= sch.start || c >= sch.end) {
+        if (cols[c].weekend) cell.fill = fill("FFFFF1F2");
+        continue;
+      }
+      const inOverlap = sch.overlap > 0 && c < sch.start + sch.overlap;
+      cell.fill = fill(inOverlap ? "FFFBBF24" : s.done ? "FF10B981" : "FF1E3A5F");
+    }
+  });
+  if (data.columns.length > cols.length) {
+    chart.addRow([]);
+    chart.addRow(["", `칸이 ${data.columns.length}개라 앞 ${cols.length}칸만 그렸습니다.`]);
+  }
+  chart.addRow([]);
+  chart.addRow(["", `칸 하나 = ${data.unit === "day" ? "하루" : "한 시간"} · 남색 작업 · 녹색 완료 · 주황 앞 작업과 겹침`]);
+  chart.getColumn(1).width = 6;
+  chart.getColumn(2).width = 30;
+  for (let c = 0; c < cols.length; c++) chart.getColumn(c + 3).width = data.unit === "day" ? 6 : 4;
+
+  triggerDownload(await wb.xlsx.writeBuffer(), filename);
 }
 
 export async function downloadToolChecklistXlsx(

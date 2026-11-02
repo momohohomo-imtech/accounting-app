@@ -16,6 +16,7 @@ export const PROJECT_LINKS: LinkedRef[] = [
   { table: "quotes", column: "project_id", label: "견적서" },
   { table: "purchase_orders", column: "project_id", label: "발주서" },
   { table: "tool_checklists", column: "project_id", label: "공구 명세서" },
+  { table: "work_sequences", column: "project_id", label: "공사 작업 순서표" },
   { table: "projects", column: "parent_project_id", label: "하위 프로젝트" },
 ];
 export const CLIENT_LINKS: LinkedRef[] = [

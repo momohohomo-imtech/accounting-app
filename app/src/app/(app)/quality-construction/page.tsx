@@ -5,10 +5,13 @@ import { updateProjectsPageMemo } from "@/lib/actions/projectsPageMemo";
 import { QualityChecklistSection } from "@/components/sections/QualityChecklistSection";
 import { ConstructionMemoSection } from "@/components/sections/ConstructionMemoSection";
 import { ToolListSection } from "@/components/sections/ToolListSection";
+import { WorkSequenceSection } from "@/components/sections/WorkSequenceSection";
 
 const TABS = [
   { key: "tools", label: "공구리스트" },
   { key: "construction", label: "공사 메모" },
+  // 사용자 요청 11/2 — 프로젝트별 작업 순서·흐름 차트(098 SQL)
+  { key: "sequence", label: "공사 작업 순서" },
   { key: "quality", label: "품질관리" },
 ];
 
@@ -28,6 +31,7 @@ export default async function QualityConstructionPage({
     historyYear?: string;
     historyMonth?: string;
     historySite?: string;
+    seq?: string;
   }>;
 }) {
   const {
@@ -43,6 +47,7 @@ export default async function QualityConstructionPage({
     historyYear,
     historyMonth,
     historySite,
+    seq,
   } = await searchParams;
   const active = tab ?? "tools";
   // 프로젝트·현장 페이지 메모장과 같은 메모 한 장 — 어느 쪽에서 고쳐도 같이 바뀜(사용자 요청).
@@ -62,6 +67,7 @@ export default async function QualityConstructionPage({
       </div>
       {active === "quality" && <QualityChecklistSection projectId={project_id} />}
       {active === "construction" && <ConstructionMemoSection year={year} siteId={site_id} month={month} />}
+      {active === "sequence" && <WorkSequenceSection seq={seq} />}
       {active === "tools" && (
         <ToolListSection
           copyFrom={copyFrom}

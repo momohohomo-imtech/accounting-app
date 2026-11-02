@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/Button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
-import { formatDate } from "@/lib/format";
+import { kstDate, knowHowFields, knowHowFileName } from "@/lib/memoExport";
+import { downloadMemoXlsx } from "@/lib/xlsxExport";
 
 type Note = { id: string; title: string; content: string | null; memo: string | null; created_at: string };
 type ActionResult = { error?: string } | void;
@@ -81,11 +82,14 @@ function NoteForm({
 function KnowHowItem({
   note,
   itemLabel,
+  sectionTitle,
   updateAction,
   deleteAction,
 }: {
   note: Note;
   itemLabel: string;
+  /** 엑셀 제목·파일 이름(예: "품질관리 노하우") */
+  sectionTitle: string;
   updateAction: Action;
   deleteAction: Action;
 }) {
@@ -108,17 +112,29 @@ function KnowHowItem({
 
   return (
     <div className="rounded-lg border border-slate-200">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
-      >
-        <span className="font-medium text-slate-800">{note.title}</span>
-        <span className="flex shrink-0 items-center gap-2 text-xs text-slate-400">
-          {formatDate(note.created_at)}
-          <span>{open ? "▲" : "▼"}</span>
-        </span>
-      </button>
+      {/* 제목 줄 — 누르면 펼침, 오른쪽 "엑셀"은 이 항목 하나만 내려받기(사용자 요청 11/2, 펼치지 않아도 바로) */}
+      <div className="flex items-center gap-2 pr-2 hover:bg-slate-50">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2 text-left text-sm"
+        >
+          <span className="font-medium text-slate-800">{note.title}</span>
+          <span className="flex shrink-0 items-center gap-2 text-xs text-slate-400">
+            {kstDate(note.created_at)}
+            <span>{open ? "▲" : "▼"}</span>
+          </span>
+        </button>
+        <Button
+          variant="secondary"
+          size="xs"
+          type="button"
+          title={`이 ${itemLabel}만 엑셀로 내려받기`}
+          onClick={() => downloadMemoXlsx(knowHowFileName(sectionTitle, note), sectionTitle, knowHowFields(note))}
+        >
+          엑셀
+        </Button>
+      </div>
       {open && (
         <div className="border-t border-slate-100 px-3 py-3">
           {editing ? (
@@ -186,7 +202,14 @@ export function KnowHowSection({
 
       <div className="space-y-2">
         {notes.map((n) => (
-          <KnowHowItem key={n.id} note={n} itemLabel={itemLabel} updateAction={updateAction} deleteAction={deleteAction} />
+          <KnowHowItem
+            key={n.id}
+            note={n}
+            itemLabel={itemLabel}
+            sectionTitle={title}
+            updateAction={updateAction}
+            deleteAction={deleteAction}
+          />
         ))}
         {notes.length === 0 && !adding && (
           <p className="py-6 text-center text-sm text-slate-400">등록된 {itemLabel}가 없습니다.</p>
