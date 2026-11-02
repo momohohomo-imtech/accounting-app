@@ -1,13 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { formatDate } from "@/lib/format";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { PrintButton } from "@/components/PrintButton";
 import { useEscapeKey } from "@/lib/useEscapeKey";
+import { PopupCloseLink } from "@/components/PopupCloseLink";
+import { closePopup } from "@/lib/popupNavigation";
 
 type EmployeeInfo = {
   name: string;
@@ -25,7 +26,7 @@ export function EmployeeCertificate({ employee, closeHref }: { employee: Employe
   const [representativeName, setRepresentativeName] = useState("");
   const [purpose, setPurpose] = useState("제출용");
   const [submitTo, setSubmitTo] = useState("");
-  useEscapeKey(true, () => router.push(closeHref, { scroll: false }));
+  useEscapeKey(true, () => closePopup(router, closeHref));
 
   const today = new Date();
   const todayLabel = `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`;
@@ -36,9 +37,9 @@ export function EmployeeCertificate({ employee, closeHref }: { employee: Employe
         <h2 className="text-lg font-semibold text-slate-900">재직증명서</h2>
         <div className="flex items-center gap-2">
           <PrintButton />
-          <Link href={closeHref} className="text-sm text-slate-500 hover:text-slate-800">
+          <PopupCloseLink href={closeHref} className="text-sm text-slate-500 hover:text-slate-800">
             닫기
-          </Link>
+          </PopupCloseLink>
         </div>
       </div>
 

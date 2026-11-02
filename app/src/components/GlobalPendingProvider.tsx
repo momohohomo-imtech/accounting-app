@@ -1,6 +1,9 @@
 "use client";
 
 import { createContext, useContext, useState, type ReactNode } from "react";
+import { useEscapeKey } from "@/lib/useEscapeKey";
+
+const ignoreEscape = () => {};
 
 type Pending = {
   /** fn이 끝날 때까지 화면 전체를 클릭 못 하게 막고 "처리 중..." 표시를 띄움. */
@@ -20,6 +23,8 @@ export function useGlobalPending() {
 // count로 관리해서 여러 동작이 겹쳐도(드물게) 전부 끝나야 풀림.
 export function GlobalPendingProvider({ children }: { children: ReactNode }) {
   const [count, setCount] = useState(0);
+  // 처리 중에는 ESC로 아래 팝업이 닫히지 않게(저장 도중 팝업이 닫히면 실패 안내를 못 봄) — 맨 위에서 ESC를 받고 아무것도 안 함.
+  useEscapeKey(count > 0, ignoreEscape);
 
   async function run<T>(fn: () => Promise<T>): Promise<T> {
     setCount((c) => c + 1);

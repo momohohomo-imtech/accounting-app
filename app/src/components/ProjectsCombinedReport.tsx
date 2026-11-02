@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { isLedgerVisible } from "@/lib/credit";
@@ -34,6 +33,7 @@ import {
   type CombinedUnitRow,
 } from "@/components/ProjectsCombinedReportTables";
 import { ProjectsCombinedReportActions } from "@/components/ProjectsCombinedReportActions";
+import { PopupCloseLink } from "@/components/PopupCloseLink";
 
 export type CombinedReportProject = {
   id: string;
@@ -392,9 +392,9 @@ export async function ProjectsCombinedReport({
               r.paidDate ? formatDate(r.paidDate) : "",
             ])}
           />
-          <Link href={listHref} scroll={false} className="text-sm text-slate-500 hover:text-slate-800">
+          <PopupCloseLink href={listHref} className="text-sm text-slate-500 hover:text-slate-800">
             닫기
-          </Link>
+          </PopupCloseLink>
         </div>
       </div>
 

@@ -109,7 +109,7 @@ export async function saveDayWorkLogs(formData: FormData): Promise<{ redirectTo:
   revalidatePath("/worklogs");
   // 커스텀 확인 팝업(비동기) 도입 이후로는 네이티브 <form action>을 통해 호출되지 않고
   // 클라이언트에서 직접 호출하므로, 여기서 redirect()를 던지면 깨짐 — 경로만 반환하고
-  // 이동은 호출한 쪽(WorkLogForm)에서 router.push로 처리.
+  // 이동은 호출한 쪽(WorkLogForm)에서 처리(날짜 팝업을 닫는 closePopup — 뒤로가기 기록을 안 쌓음).
   return { redirectTo: `/worklogs?year=${Number(year)}&month=${Number(month)}`, error: null };
 }
 

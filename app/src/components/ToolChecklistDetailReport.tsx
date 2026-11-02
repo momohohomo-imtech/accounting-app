@@ -11,6 +11,8 @@ import { usePrintFitToPage } from "@/lib/usePrintFitToPage";
 import { downloadToolChecklistXlsx, downloadAccessPassFormXlsx } from "@/lib/xlsxExport";
 import { AccessPassPermitTable } from "@/components/AccessPassPermitTable";
 import { DongheeAccessPassPermitTable, ROW_COUNT as DONGHEE_ROW_COUNT } from "@/components/DongheeAccessPassPermitTable";
+import { PopupCloseLink } from "@/components/PopupCloseLink";
+import { closePopup } from "@/lib/popupNavigation";
 
 type FormMode = "none" | "kia" | "donghee";
 
@@ -50,7 +52,7 @@ export function ToolChecklistDetailReport({
   // 동희 반입반출증은 품목 수에 따라 여러 페이지로 늘어나는 게 정상이라, 전체를
   // 억지로 1페이지에 욱여넣는 이 훅을 꺼야 함(아래 dongheePages 참고).
   const printRef = usePrintFitToPage<HTMLDivElement>(270, formMode === "donghee");
-  useEscapeKey(true, () => router.push(closeHref, { scroll: false }));
+  useEscapeKey(true, () => closePopup(router, closeHref));
 
   // 마스터 목록 패딩용 항목(이 명세서에 실제로 안 담긴 것)은 제외 — 그렇지 않으면
   // 반입반출증용 공구가 마스터 어딘가에만 있어도 이 명세서와 무관하게 옵션이 뜸.
@@ -165,14 +167,14 @@ export function ToolChecklistDetailReport({
                   수정
                 </button>
               )}
-              <Link href={copyHref} className="text-sm text-slate-500 hover:text-slate-800">
+              <Link href={copyHref} replace className="text-sm text-slate-500 hover:text-slate-800">
                 복사해서 새로 만들기
               </Link>
             </>
           )}
-          <Link href={closeHref} className="text-sm text-slate-500 hover:text-slate-800">
+          <PopupCloseLink href={closeHref} className="text-sm text-slate-500 hover:text-slate-800">
             닫기
-          </Link>
+          </PopupCloseLink>
         </div>
       </div>
 

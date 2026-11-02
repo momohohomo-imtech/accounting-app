@@ -9,6 +9,8 @@ import { resolveCategoryColor } from "@/lib/categoryColor";
 import { paymentMethodColorStyle } from "@/lib/paymentMethodColors";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 import { projectStatusLabel } from "@/lib/projectStatus";
+import { PopupCloseLink } from "@/components/PopupCloseLink";
+import { closePopup } from "@/lib/popupNavigation";
 
 type VendorRow = {
   id: string;
@@ -63,7 +65,7 @@ export function VendorDetailReport({
   const [showPayment, setShowPayment] = useState(false);
   const [paymentFilter, setPaymentFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  useEscapeKey(true, () => router.push(closeHref, { scroll: false }));
+  useEscapeKey(true, () => closePopup(router, closeHref));
   const [showItem, setShowItem] = useState(true);
 
   const hasAgency = rows.some((r) => r.kind === "대행구매");
@@ -209,9 +211,9 @@ export function VendorDetailReport({
             </select>
           )}
           <VendorReportActions vendorName={vendorName} year={year} headers={exportHeaders} rows={exportRows} totals={totals} />
-          <Link href={closeHref} className="text-sm text-slate-500 hover:text-slate-800">
+          <PopupCloseLink href={closeHref} className="text-sm text-slate-500 hover:text-slate-800">
             닫기
-          </Link>
+          </PopupCloseLink>
         </div>
       </div>
 

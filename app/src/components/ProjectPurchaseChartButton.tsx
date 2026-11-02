@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { formatWon } from "@/lib/format";
 import { autoSiteColorHex } from "@/lib/siteColor";
 import { ModalPortal } from "@/components/ModalPortal";
 import { ModalPrintButton } from "@/components/ModalPrintButton";
 import { HANDLING_FEE_PCT } from "@/lib/handlingFee";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 
 export type CategoryAmount = { name: string; amount: number };
 
@@ -151,14 +152,7 @@ export function ProjectPurchaseChartButton({
   const [open, setOpen] = useState(false);
   const [chartType, setChartType] = useState<"pie" | "bar">("pie");
 
-  useEffect(() => {
-    if (!open) return;
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open]);
+  useEscapeKey(open, () => setOpen(false));
 
   const total = data.reduce((s, d) => s + d.amount, 0);
   const topCategory = data[0];
