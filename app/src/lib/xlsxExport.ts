@@ -128,9 +128,24 @@ export type WorkSequenceExport = {
   startLabel: string;
   rangeLabel: string;
   doneLabel: string;
-  steps: { content: string; detail: string; duration: number; overlap: number; range: string; done: boolean; done_date: string | null }[];
+  steps: {
+    content: string;
+    detail: string;
+    duration: number;
+    overlap: number;
+    range: string;
+    done: boolean;
+    done_date: string | null;
+    /** 앞 작업 글자("바로 앞"·"처음부터"·"2번 뒤") */
+    after: string;
+    /** 진행 상태 글자("2일 지남"·"진행 중"…) */
+    status: string;
+    overdue: boolean;
+  }[];
   schedule: ScheduledStep[];
   columns: ChartColumn[];
+  /** 오늘(지금) 칸 위치(0부터) — 차트 머리글에 표시, 차트 밖이면 null */
+  todayColumn: number | null;
 };
 
 // 공사 작업 순서표(사용자 요청 11/2 "엑셀 + 인쇄") — 1장 "작업 순서"(순서표 정보 + 단계 표), 2장 "흐름 차트"(칸 하나 = 하루 또는 한 시간,
@@ -148,7 +163,7 @@ export async function downloadWorkSequenceXlsx(filename: string, data: WorkSeque
   const titleRow = ws.addRow([data.title]);
   titleRow.font = { bold: true, size: 14 };
   titleRow.height = 24;
-  ws.mergeCells(titleRow.number, 1, titleRow.number, 8);
+  ws.mergeCells(titleRow.number, 1, titleRow.number, 10);
   for (const [label, value] of [
     ["프로젝트", data.projectLabel],
     ["단위", data.unit === "day" ? "일(날짜, 토·일 포함)" : "시간"],
@@ -158,23 +173,37 @@ export async function downloadWorkSequenceXlsx(filename: string, data: WorkSeque
   ]) {
     const row = ws.addRow([label, value]);
     row.getCell(1).font = { bold: true, color: { argb: "FF334155" } };
-    ws.mergeCells(row.number, 2, row.number, 8);
+    ws.mergeCells(row.number, 2, row.number, 10);
   }
   ws.addRow([]);
-  const header = ws.addRow(["순번", "작업 내용", "세부 설명·주의사항", `기간(${unitLabel})`, `앞 작업과 겹침(${unitLabel})`, "일정", "완료", "완료일"]);
+  const header = ws.addRow([
+    "순번",
+    "작업 내용",
+    "세부 설명·주의사항",
+    "앞 작업",
+    `기간(${unitLabel})`,
+    `앞 작업과 겹침(${unitLabel})`,
+    "일정",
+    "상태",
+    "완료",
+    "완료일",
+  ]);
   header.font = { bold: true, color: { argb: "FFFFFFFF" } };
   header.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E293B" } };
   header.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
   header.height = 30;
   header.eachCell((cell) => (cell.border = box));
   data.steps.forEach((s, i) => {
+    const sch = data.schedule[i];
     const row = ws.addRow([
       i + 1,
       s.content,
       s.detail,
+      s.after,
       s.duration,
-      i === 0 ? "-" : data.schedule[i]?.overlap ?? s.overlap,
+      i === 0 || sch?.predecessor === null ? "-" : sch?.overlap ?? s.overlap,
       s.range,
+      s.status,
       s.done ? "완료" : "",
       s.done ? s.done_date ?? "" : "",
     ]);
@@ -184,8 +213,9 @@ export async function downloadWorkSequenceXlsx(filename: string, data: WorkSeque
       cell.border = box;
       cell.alignment = { vertical: "top", wrapText: col === 2 || col === 3, horizontal: col === 1 || col >= 4 ? "center" : undefined };
     });
+    if (s.overdue) row.getCell(8).font = { bold: true, color: { argb: "FFDC2626" } };
   });
-  [6, 26, 42, 10, 14, 24, 8, 12].forEach((w, i) => (ws.getColumn(i + 1).width = w));
+  [6, 26, 42, 10, 10, 14, 24, 14, 8, 12].forEach((w, i) => (ws.getColumn(i + 1).width = w));
 
   // 2장: 흐름 차트
   const chart = wb.addWorksheet("흐름 차트", {
@@ -193,7 +223,7 @@ export async function downloadWorkSequenceXlsx(filename: string, data: WorkSeque
     pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
   });
   const cols = data.columns.slice(0, WORK_SEQUENCE_MAX_COLUMNS);
-  const top = chart.addRow(["순번", "작업 내용", ...cols.map((c) => c.sub)]);
+  const top = chart.addRow(["순번", "작업 내용", ...cols.map((c, i) => (i === data.todayColumn ? "오늘" : c.sub))]);
   const second = chart.addRow(["", "", ...cols.map((c) => c.label)]);
   for (const row of [top, second]) {
     row.font = { bold: true, size: 9, color: { argb: "FF334155" } };
@@ -201,7 +231,10 @@ export async function downloadWorkSequenceXlsx(filename: string, data: WorkSeque
     row.eachCell({ includeEmpty: true }, (cell, col) => {
       cell.border = box;
       const c = cols[col - 3];
-      if (c?.weekend) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFE4E6" } };
+      if (col - 3 === data.todayColumn) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFCA5A5" } };
+        cell.font = { bold: true, size: 9, color: { argb: "FF7F1D1D" } };
+      } else if (c?.weekend) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFE4E6" } };
     });
   }
   chart.mergeCells(1, 1, 2, 1);
@@ -221,7 +254,7 @@ export async function downloadWorkSequenceXlsx(filename: string, data: WorkSeque
         continue;
       }
       const inOverlap = sch.overlap > 0 && c < sch.start + sch.overlap;
-      cell.fill = fill(inOverlap ? "FFFBBF24" : s.done ? "FF10B981" : "FF1E3A5F");
+      cell.fill = fill(inOverlap ? "FFFBBF24" : s.done ? "FF10B981" : s.overdue ? "FFEF4444" : "FF1E3A5F");
     }
   });
   if (data.columns.length > cols.length) {
@@ -229,7 +262,7 @@ export async function downloadWorkSequenceXlsx(filename: string, data: WorkSeque
     chart.addRow(["", `칸이 ${data.columns.length}개라 앞 ${cols.length}칸만 그렸습니다.`]);
   }
   chart.addRow([]);
-  chart.addRow(["", `칸 하나 = ${data.unit === "day" ? "하루" : "한 시간"} · 남색 작업 · 녹색 완료 · 주황 앞 작업과 겹침`]);
+  chart.addRow(["", `칸 하나 = ${data.unit === "day" ? "하루" : "한 시간"} · 남색 작업 · 녹색 완료 · 빨강 계획보다 늦음 · 주황 앞 작업과 겹침`]);
   chart.getColumn(1).width = 6;
   chart.getColumn(2).width = 30;
   for (let c = 0; c < cols.length; c++) chart.getColumn(c + 3).width = data.unit === "day" ? 6 : 4;

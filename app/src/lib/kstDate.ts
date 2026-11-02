@@ -5,6 +5,12 @@ export function nowKst() {
   return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
 }
 
+/** 한국 시각 지금 — { date: "YYYY-MM-DD", time: "HH:MM" } (공사 작업 순서 진행 상태·오늘 선) */
+export function nowKstParts() {
+  const iso = new Date(Date.now() + 9 * 3600_000).toISOString();
+  return { date: iso.slice(0, 10), time: iso.slice(11, 16) };
+}
+
 // 저장된 시각(UTC, ISO 문자열) → 한국 시각 "YYYY-MM-DD HH:MM" — 등록 시각·수정 이력 표시용.
 // 값이 비었거나 날짜가 아니면 빈 글자(화면 전체가 오류로 멈추지 않게).
 export function kstDateTime(iso: string | null | undefined) {
