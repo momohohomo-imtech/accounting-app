@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { EMPTY_TRIP_DAY_INPUT, inputToTripDayFields, type TripDayInput } from "@/lib/tripLog";
+import { closePopup } from "@/lib/popupNavigation";
 
 type Row = { title: string | null; site_id: string | null; project_id: string | null } | null;
 type SiteOption = { id: string; name: string; color: string | null };
@@ -99,7 +100,8 @@ export function WorkLogForm({
           setError(result.error ?? "저장 중 오류가 발생했습니다.");
           return;
         }
-        router.push(result.redirectTo, { scroll: false });
+        // 날짜 팝업(?day=)을 닫고 달력으로 — 뒤로가기 기록을 쌓지 않음(lib/popupNavigation.ts)
+        closePopup(router, result.redirectTo);
       }}
       className="space-y-4"
     >

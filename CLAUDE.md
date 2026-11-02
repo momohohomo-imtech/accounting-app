@@ -45,6 +45,16 @@
   `app/src/components/crud/CreatePanel.tsx`가 정석 예시. 서버 렌더링 폼(`<form action={서버액션}>`)이라 `run()`을
   못 쓰면 제출 버튼에서 `useFormStatus()`의 `pending`일 때 `PendingOverlay`를 띄울 것(`AccessListSubmitButton`).
 
+- **팝업은 ESC로 닫히고, 닫을 때 뒤로가기 기록을 쌓지 말 것**(사용자 요청 11/1 "모든 팝업창은 esc누르면 닫게", "뒤로가기로 이전 팝업
+  창으로 갈 수 없게"). 새 팝업도 예외 없이:
+  - 화면을 덮는 팝업·확인창은 `lib/useEscapeKey.ts`의 `useEscapeKey(열림, 닫기)` — 겹친 팝업은 맨 위 하나만 닫힘(`lib/escapeStack.ts`),
+    한글 조합 중 ESC·저장 중("처리 중...")에는 안 닫힘. `keydown` 리스너를 따로 붙이지 말 것(순서가 꼬여 아래 팝업까지 닫힘).
+  - 주소(?…)로 연 팝업을 닫을 땐 `router.push(닫은 주소)`·`<Link href={closeHref}>` 대신 `lib/popupNavigation.ts`의
+    `closePopup(router, href)`·`PopupCloseLink`·`EscapeCloseLink` — 같은 화면의 팝업 없는 지난 기록으로 뒤로 가고, 없으면 replace.
+    예전엔 닫을 때마다 기록이 쌓여 뒤로가기로 닫은 팝업이 다시 열렸음. 저장 후 닫기도 이것으로 — 저장 서버 액션은 `revalidatePath`를
+    부를 것(그래야 뒤로 가도 Next.js가 캐시를 비워 새 자료로 그림).
+  - 팝업을 여는 링크는 push(휴대폰 뒤로가기로 팝업이 닫히게). 팝업 위에 팝업을 겹쳐 여는 링크(보고서 팝업 → 거래 수정)도 push — 위
+    팝업의 닫은 주소 = 아래 팝업 주소. 팝업 안에서 다른 팝업·화면으로 "바꿔" 가는 링크는 `replace`(작업일지 날짜 팝업 → 출장일지).
 - **서버 액션은 실패를 `{ error }`로 돌려주고 화면에 보여 줄 것**(오류를 버리지 말 것 — 예전엔 직원·급여·메모 등에서 저장이
   실패해도 된 것처럼 보였음). 폼은 실패하면 닫지 말고 입력한 내용을 그대로 둘 것(`form action`은 끝나면 입력칸을 비우므로
   `onSubmit` + `preventDefault`, `MemoCreateForm` 예시). 체크칸처럼 바로 저장하는 칸은 실패하면 원래 값으로 되돌릴 것.
@@ -167,7 +177,7 @@
   확인(`payrollDuplicates`), 긴 ID 목록 나눠 조회·자동완성 기간(`supabaseFetchAll`), 파일 올리기 규칙(`fileUpload`), 백업 자동
   정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
   해 잠금 불러오기(`yearLock`), 오래된 외상매출금(`receivableAging`), 이번 달 신고·납부 일정(`annualTasks`), 홈택스 세금계산서
-  대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
+  대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
   (vitest는 npm 설치 오류로 못 씀 — 새 테스트 라이브러리를 넣지 말 것)

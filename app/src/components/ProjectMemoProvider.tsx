@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { updateProjectMemo } from "@/lib/actions/projects";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { closePopup } from "@/lib/popupNavigation";
 
 type MemoCtx = {
   memo: string;
@@ -63,13 +64,14 @@ export function ProjectMemoProvider({
     });
   };
 
+  // 닫을 때 뒤로가기 기록을 쌓지 않음(lib/popupNavigation.ts) — 메모를 고쳤으면 저장한 뒤 닫음.
   const close = () => {
     if (!dirty) {
-      router.push(closeHref, { scroll: false });
+      closePopup(router, closeHref);
       return;
     }
     startTransition(async () => {
-      if (await persist()) router.push(closeHref, { scroll: false });
+      if (await persist()) closePopup(router, closeHref);
     });
   };
 

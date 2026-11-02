@@ -14,6 +14,7 @@ import {
 import { TripLogPopup } from "@/components/TripLogPopup";
 import { TripLogBlankFormPopup } from "@/components/TripLogBlankFormPopup";
 import { Button } from "@/components/ui/Button";
+import { closePopup as closeUrlPopup } from "@/lib/popupNavigation";
 
 type Row = { doc: TripProjectDoc; totals: TripTotals; latest: string };
 type SortKey = "project" | "site" | "client" | "period" | "latest" | "days" | "staff" | "helper" | "people" | "equipment";
@@ -88,11 +89,12 @@ export function TripLogList({ docs, openProjectId }: { docs: TripProjectDoc[]; o
 
   function closePopup() {
     setOpenId(null);
-    // 작업일지 팝업의 링크(?open=프로젝트)로 열었으면 주소에서 빼서, 새로고침해도 다시 열리지 않게.
+    // 작업일지 팝업의 링크(?open=프로젝트)로 열었으면 주소에서 빼서, 새로고침해도 다시 열리지 않게 — 뒤로가기 기록은 안 쌓음
+    // (lib/popupNavigation.ts).
     if (searchParams.get("open")) {
       const params = new URLSearchParams(searchParams.toString());
       params.delete("open");
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+      closeUrlPopup(router, `${pathname}?${params.toString()}`);
     }
   }
 

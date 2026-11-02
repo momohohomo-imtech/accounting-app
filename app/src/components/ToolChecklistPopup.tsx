@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cx } from "@/lib/cx";
 import { ToolChecklistDetailReport } from "@/components/ToolChecklistDetailReport";
 import { ToolChecklistCreateForm } from "@/components/ToolChecklistCreateForm";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 
 type ReportProps = Omit<ComponentProps<typeof ToolChecklistDetailReport>, "onEdit">;
 type FormProps = Omit<ComponentProps<typeof ToolChecklistCreateForm>, "onSaved" | "onCancel" | "hasSource">;
@@ -39,6 +40,8 @@ export function ToolChecklistPopup({
     if (legacyId) params.set("checklist", legacyId);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }
+  // 수정 화면에서 ESC = 수정 취소(보기 화면으로) — 보기 화면의 ESC는 ToolChecklistDetailReport가 팝업을 닫음.
+  useEscapeKey(editing && Boolean(form), backToView);
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-brand-ink/50 p-4 py-10 print:static print:overflow-visible print:bg-transparent print:p-0">

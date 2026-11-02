@@ -74,6 +74,7 @@ export async function TransactionEditPopup({ editTx, redirectTo }: { editTx?: st
           groupingReady={groupingReady}
           action={updateTransactionRecord}
           redirectTo={redirectTo}
+          asPopup
         />
         <TransactionHistoryList transactionIds={group ? group.map((t) => t.id) : [tx.id]} />
       </div>

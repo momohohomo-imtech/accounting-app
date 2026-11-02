@@ -14,6 +14,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { formatThousands, parseNumericInput } from "@/lib/numberInput";
 import { postFileToApi } from "@/lib/postFileToApi";
+import { closePopup } from "@/lib/popupNavigation";
 
 type Option = { id: string; name: string };
 type ClientOption = Option & { default_item_name?: string | null; default_category_id?: string | null };
@@ -66,6 +67,7 @@ export function TransactionForm({
   groupingReady = false,
   action,
   redirectTo = "/transactions",
+  asPopup = false,
 }: {
   clients: ClientOption[];
   rawClientNames?: string[];
@@ -82,6 +84,8 @@ export function TransactionForm({
   groupingReady?: boolean;
   action: (formData: FormData) => Promise<{ error?: string } | void>;
   redirectTo?: string;
+  /** 주소로 연 수정 팝업(TransactionEditPopup) 안 — 저장·취소 때 팝업을 닫되 뒤로가기 기록을 쌓지 않음(lib/popupNavigation.ts). */
+  asPopup?: boolean;
 }) {
   const isGroupEdit = Boolean(initial && initialGroup && initialGroup.length > 1);
   const router = useRouter();
@@ -480,6 +484,15 @@ export function TransactionForm({
       }
     }
 
+    leaveAfterSave();
+  }
+
+  // 저장 뒤 — 팝업이면 닫기(저장 동작이 revalidatePath를 불러서 뒤로 가도 새 자료로 그려짐), 화면이면 목록으로 이동.
+  function leaveAfterSave() {
+    if (asPopup) {
+      closePopup(router, redirectTo);
+      return;
+    }
     router.push(redirectTo, { scroll: false });
     router.refresh();
   }
@@ -822,7 +835,7 @@ export function TransactionForm({
         </button>
         <button
           type="button"
-          onClick={() => router.push(redirectTo, { scroll: false })}
+          onClick={() => (asPopup ? closePopup(router, redirectTo) : router.push(redirectTo, { scroll: false }))}
           className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
         >
           {initial ? "수정 취소" : "취소"}

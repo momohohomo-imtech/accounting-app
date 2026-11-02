@@ -1,12 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useState } from "react";
 import { formatWon, formatDate } from "@/lib/format";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { PrintButton } from "@/components/PrintButton";
 import { EscapeCloseLink } from "@/components/EscapeCloseLink";
+import { PopupCloseLink } from "@/components/PopupCloseLink";
 
 type PayslipData = {
   payMonth: string;
@@ -46,9 +46,9 @@ export function PayslipCertificate({ data, closeHref }: { data: PayslipData; clo
         </h2>
         <div className="flex items-center gap-2">
           <PrintButton />
-          <Link href={closeHref} className="text-sm text-slate-500 hover:text-slate-800">
+          <PopupCloseLink href={closeHref} className="text-sm text-slate-500 hover:text-slate-800">
             닫기
-          </Link>
+          </PopupCloseLink>
         </div>
       </div>
 

@@ -15,6 +15,8 @@ import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { updateAgencyPurchase } from "@/lib/actions/projectAgencyPurchases";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { categoryReportHref } from "@/lib/reportLinks";
+import { PopupCloseLink } from "@/components/PopupCloseLink";
+import { closePopup } from "@/lib/popupNavigation";
 
 type Category = { id: string; name: string; project_only: boolean; color: string | null };
 
@@ -213,7 +215,7 @@ export function CategoryDetailReport({
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [statusFilter, setStatusFilter] = useState("");
-  useEscapeKey(true, () => router.push(closeHref, { scroll: false }));
+  useEscapeKey(true, () => closePopup(router, closeHref));
 
   const multi = categoryNames.length > 1;
   const titleName = multi ? `선택한 카테고리 ${categoryNames.length}개` : categoryNames[0];
@@ -323,9 +325,9 @@ export function CategoryDetailReport({
             agencyTotal={agencyTotal}
             categoryTotals={multi ? categoryTotals : undefined}
           />
-          <Link href={closeHref} className="text-sm text-slate-500 hover:text-slate-800">
+          <PopupCloseLink href={closeHref} className="text-sm text-slate-500 hover:text-slate-800">
             닫기
-          </Link>
+          </PopupCloseLink>
         </div>
       </div>
 
