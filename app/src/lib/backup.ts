@@ -52,6 +52,9 @@ export const BACKUP_TABLES = [
   // 097 SQL — 통장 잔액 확인 기록, 신고 끝난 해 잠금(잠금은 백업 파일에만 담고 복원하지 않음 — lib/restore.ts).
   "bank_balance_checks",
   "locked_years",
+  // 098 SQL — 공사 작업 순서(순서표·단계)
+  "work_sequences",
+  "work_sequence_steps",
 ];
 
 // 표마다 겹치지 않게 나눠 받을 고유 칸(대부분 id).

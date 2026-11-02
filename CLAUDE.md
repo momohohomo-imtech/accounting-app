@@ -23,7 +23,8 @@
   `TripOverviewReport`, `ProjectTripDetailTable`, `YearEndCheckTable`, `DuplicateCandidatesTable`,
   `UncategorizedPurchasesTable`, `TransactionHistoryTable`, `ProjectReceiptsTable`, 통합 보고서의 `ProjectsCombinedTable`·
   `CombinedCategorySection`·`CombinedAgencyTable`, `BankBalanceCheckPopup`(통장 잔액 확인 기록), `YearLockPanel`(잠긴 해),
-  `ReceivableAgingTable`(오래된 외상매출금), `HometaxReconcilePanel`(홈택스 대조 결과))에
+  `ReceivableAgingTable`(오래된 외상매출금), `HometaxReconcilePanel`(홈택스 대조 결과), `ConstructionMemoList`(공사 메모),
+  `WorkSequenceList`(공사 작업 순서표))에
   이 패턴이 적용돼 있음 — 새 표를 추가할 때 이 목록도 같이 업데이트할 것.
   (예외: `DailyWorkerUsageStatementTable`은 세무사 제출용 사용내역서 문서라
   근로자별 연속일 소계 순서가 고정돼야 해서 임의 정렬을 지원하지 않음 —
@@ -177,7 +178,8 @@
   확인(`payrollDuplicates`), 긴 ID 목록 나눠 조회·자동완성 기간(`supabaseFetchAll`), 파일 올리기 규칙(`fileUpload`), 백업 자동
   정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
   해 잠금 불러오기(`yearLock`), 오래된 외상매출금(`receivableAging`), 이번 달 신고·납부 일정(`annualTasks`), 홈택스 세금계산서
-  대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
+  대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`), 메모 한 장 엑셀(`memoExport`), 공사 작업 순서
+  일정(`workSequence`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
   (vitest는 npm 설치 오류로 못 씀 — 새 테스트 라이브러리를 넣지 말 것)
@@ -257,6 +259,15 @@
   체크로 숨김, 주소 `showMemo=0`). 거래 등록·견적서의 완료 프로젝트 선택 목록은 프로젝트 번호 순·최근이 위(`compareProjectCodeDesc` —
   번호를 글자로 비교하면 "2026-1000"이 "2026-999"보다 앞에 옴). 프로젝트 목록 상태 체크(검토중~기타)는 바꿀 때 이 기기 쿠키에
   저장되고, 주소에 상태가 없으면 서버가 저장된 상태만 조회(`lib/projectStatusFilter.ts`, 전부 끄면 "all" = 전체, 주소의 상태가 먼저).
+- **11/2 사용자 요청**: 공사 메모는 메모 하나 = 한 줄 표(`ConstructionMemoList` — 내용은 한 줄 말줄임, 누르면 그 줄만 전체, 날짜는
+  한국 시각). 공사 메모·품질관리 노하우·공구 메모는 항목마다 "엑셀"로 그 메모 하나만(`downloadMemoXlsx` + `lib/memoExport.ts` 항목 —
+  "항목 | 내용" 두 칸, 긴 내용은 행을 나눠 다 보이게).
+- **공사 작업 순서**(공사 관리 탭, 098 SQL `work_sequences`·`work_sequence_steps`, 11/2 사용자 결정): 순서표 = 프로젝트·제목·단위(순서표마다
+  일 또는 시간)·시작일(시간이면 시작 시각), 단계 = 순번(숫자를 고치면 그 줄이 내용째 이동 — 공용 `SeqInput`)·작업 내용·세부 설명·
+  주의사항·기간·앞 작업과 겹침·완료·완료일. 단계 날짜는 저장하지 않고 `lib/workSequence.ts`로만 계산(시작 = 앞 단계 끝 − 겹침, 겹침은 앞
+  단계 기간까지만, 토·일 포함 달력 그대로 — 사용자 결정 "기간+겹침 → 날짜 자동"). 흐름 차트(`WorkSequenceChart`)에서 겹침 −/+.
+  저장은 `saveWorkSequence` 하나로(화면에서 만든 id로 순서표·단계를 upsert한 뒤 지운 단계 정리 — 다시 눌러도 두 번 안 들어감),
+  엑셀(`downloadWorkSequenceXlsx` — 2장 흐름 차트)·인쇄(팝업만 가로 A4). 프로젝트를 지우면 같이 지워지는 표라 `PROJECT_LINKS`에 있음.
 - **백업 상태**(10/29 사용자 요청 "A"): 대시보드 접힘 목록 맨 아래 "백업" 줄 + 마지막 자동 백업 후 8일이 넘을 때만 맨 위 카드에
   경고 한 줄(`lib/backupStatus.ts`, 관리자·직원만 — 백업 기록은 그 두 역할만 읽음). 자동 백업 주기(vercel.json 크론)를 바꾸면
   `AUTO_BACKUP_STALE_DAYS`도 같이.
