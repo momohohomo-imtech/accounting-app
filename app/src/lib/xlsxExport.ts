@@ -4,6 +4,14 @@ import { WEEKDAY_LABELS } from "@/lib/calendar";
 import { workLogColorExcelArgb } from "@/lib/workLogColors";
 import { siteColorExcelArgb } from "@/lib/siteColor";
 import { formatPermitQuantity } from "@/lib/koreanNumber";
+import {
+  chunkForRows,
+  MEMO_LINE_HEIGHT,
+  MEMO_MAX_LINES_PER_ROW,
+  MEMO_VALUE_WIDTH,
+  wrappedLineCount,
+  type MemoField,
+} from "@/lib/memoExport";
 
 function triggerDownload(buffer: ExcelJS.Buffer, filename: string) {
   const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -71,6 +79,45 @@ function addSheet(wb: ExcelJS.Workbook, { name: sheetName, headers, rows, leadin
     });
     ws.getColumn(i).width = Math.min(Math.max(maxLen + 2, 10), 40);
   }
+}
+
+// 메모 한 장(공사 메모·품질관리 노하우·공구 메모) — "항목 | 내용" 두 칸짜리 문서(lib/memoExport.ts). 내용 칸은 줄바꿈해서 다 보이게
+// 줄 높이를 글자 수로 정하고, 한 칸에 다 안 들어가는 긴 내용은 행 여러 개로 나눠 항목 칸을 세로로 합침. A4 세로 폭에 맞춰 인쇄.
+export async function downloadMemoXlsx(filename: string, title: string, fields: MemoField[]) {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("메모", {
+    pageSetup: { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+  });
+  ws.getColumn(1).width = 12;
+  ws.getColumn(2).width = MEMO_VALUE_WIDTH + 2;
+  const border = { style: "thin" as const, color: { argb: "FF94A3B8" } };
+  const box = { top: border, left: border, bottom: border, right: border };
+
+  const titleRow = ws.addRow([title]);
+  titleRow.font = { bold: true, size: 14 };
+  titleRow.height = 26;
+  titleRow.alignment = { vertical: "middle" };
+  ws.mergeCells(titleRow.number, 1, titleRow.number, 2);
+
+  for (const [label, value] of fields) {
+    const chunks = chunkForRows(value, MEMO_VALUE_WIDTH, MEMO_MAX_LINES_PER_ROW);
+    const first = ws.rowCount + 1;
+    chunks.forEach((chunk, i) => {
+      const row = ws.addRow([i === 0 ? label : "", chunk]);
+      row.height = Math.max(20, wrappedLineCount(chunk, MEMO_VALUE_WIDTH) * MEMO_LINE_HEIGHT + 5);
+      const labelCell = row.getCell(1);
+      labelCell.font = { bold: true, color: { argb: "FF334155" } };
+      labelCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } };
+      labelCell.alignment = { vertical: "top", horizontal: "center" };
+      labelCell.border = box;
+      const valueCell = row.getCell(2);
+      valueCell.alignment = { vertical: "top", wrapText: true };
+      valueCell.border = box;
+    });
+    if (chunks.length > 1) ws.mergeCells(first, 1, first + chunks.length - 1, 1);
+  }
+
+  triggerDownload(await wb.xlsx.writeBuffer(), filename);
 }
 
 export async function downloadToolChecklistXlsx(
