@@ -67,7 +67,7 @@ export default async function QualityConstructionPage({
       </div>
       {active === "quality" && <QualityChecklistSection projectId={project_id} />}
       {active === "construction" && <ConstructionMemoSection year={year} siteId={site_id} month={month} />}
-      {active === "sequence" && <WorkSequenceSection seq={seq} />}
+      {active === "sequence" && <WorkSequenceSection seq={seq} copyFrom={copyFrom} />}
       {active === "tools" && (
         <ToolListSection
           copyFrom={copyFrom}
