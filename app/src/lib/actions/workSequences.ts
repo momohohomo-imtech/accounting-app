@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/fileUpload";
-import { normalizeAmount, type SequenceUnit } from "@/lib/workSequence";
+import { normalizeAmount, parseTeams, teamNameProblem, type SequenceUnit, type WorkTeam } from "@/lib/workSequence";
 
-// 공사 작업 순서표 저장·삭제(098·099 SQL, 사용자 요청 11/2). 순서표 한 장(머리 + 단계 전부)을 한 번에 저장 — 단계 id는 화면에서 미리
+// 공사 작업 순서표 저장·삭제(098·099·100 SQL, 사용자 요청 11/2). 순서표 한 장(머리 + 단계 전부)을 한 번에 저장 — 단계 id는 화면에서 미리
 // 만든 것을 그대로 써서, 저장 도중 실패해 다시 눌러도 단계가 두 번 들어가지 않음. 날짜는 저장하지 않음(lib/workSequence.ts가 계산).
 
 export type WorkSequenceStepInput = {
@@ -20,6 +20,8 @@ export type WorkSequenceStepInput = {
   after_step_id: string | null;
   /** 순서표 시작에 같이 시작("처음부터") — 099 SQL */
   after_start: boolean;
+  /** 맡은 팀(이 순서표 팀 목록의 id, 없으면 팀 미정) — 100 SQL */
+  team_id?: string | null;
 };
 
 export type WorkSequenceInput = {
@@ -32,6 +34,10 @@ export type WorkSequenceInput = {
   steps: WorkSequenceStepInput[];
   /** 099 SQL을 실행해서 앞 작업 칸이 있음(화면이 확인해서 넘김) — 없으면 앞 작업은 저장하지 않음 */
   with_dependency?: boolean;
+  /** 이 순서표의 팀 목록(이름·색) — 100 SQL */
+  teams?: WorkTeam[];
+  /** 100 SQL을 실행해서 팀 칸이 있음(화면이 확인해서 넘김) — 없으면 팀은 저장하지 않음 */
+  with_teams?: boolean;
 };
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
@@ -44,7 +50,9 @@ function dbError(error: { code?: string; message: string }) {
     return "공사 작업 순서 표가 아직 없습니다 — Supabase SQL Editor에서 098 SQL을 먼저 실행해주세요.";
   }
   if (MISSING_COLUMN.has(error.code ?? "")) {
-    return "앞 작업 칸이 아직 없습니다 — Supabase SQL Editor에서 099 SQL을 실행해주세요.";
+    return /team/.test(error.message)
+      ? "팀 칸이 아직 없습니다 — Supabase SQL Editor에서 100 SQL을 실행해주세요."
+      : "앞 작업 칸이 아직 없습니다 — Supabase SQL Editor에서 099 SQL을 실행해주세요.";
   }
   return error.message;
 }
@@ -65,6 +73,15 @@ export async function saveWorkSequence(input: WorkSequenceInput): Promise<{ erro
   if (missing.length) return { error: `${missing.join(", ")}번 단계의 작업 내용을 입력해주세요.` };
   if (kept.some((s) => !isUuid(String(s.id ?? "")))) return { error: "잘못된 단계가 있습니다. 화면을 새로 고친 뒤 다시 시도해주세요." };
   const keptIds = new Set(kept.map((s) => s.id));
+  // 팀 목록 정리(이름·색·같은 id) — 단계의 팀은 이 목록에 있는 팀만(지운 팀을 가리키면 팀 미정). 이름이 비거나 같은 팀은 저장 전에
+  // 막음(조용히 빼면 그 팀 단계가 팀 미정으로 바뀌어 버림)
+  if (input.with_teams) {
+    const rawTeams = Array.isArray(input.teams) ? input.teams : [];
+    const problem = teamNameProblem(rawTeams.map((t) => ({ name: t?.name })));
+    if (problem) return { error: problem };
+  }
+  const teams = input.with_teams ? parseTeams(input.teams) : [];
+  const teamIds = new Set(teams.map((t) => t.id));
   const steps = kept.map((s, i) => ({
     id: s.id,
     sequence_id: input.id,
@@ -83,6 +100,7 @@ export async function saveWorkSequence(input: WorkSequenceInput): Promise<{ erro
           after_start: i > 0 && Boolean(s.after_start),
         }
       : {}),
+    ...(input.with_teams ? { team_id: s.team_id && teamIds.has(s.team_id) ? s.team_id : null } : {}),
   }));
   const stepIds = steps.map((s) => s.id);
 
@@ -104,6 +122,7 @@ export async function saveWorkSequence(input: WorkSequenceInput): Promise<{ erro
       unit,
       start_date: startDate,
       start_time: startTime,
+      ...(input.with_teams ? { teams } : {}),
       updated_at: new Date().toISOString(),
     },
     { onConflict: "id" }

@@ -6,14 +6,25 @@ import {
   chartColumns,
   daysBetween,
   formatAmount,
+  cleanTeamName,
+  nextTeamColor,
+  NO_TEAM_COLOR,
   normalizeAmount,
+  parseTeams,
   plannedRange,
   scheduleSteps,
   sequenceRangeLabel,
+  spanRangeLabel,
   statusLabel,
   stepRangeLabel,
   stepStatus,
   summarizeSequence,
+  TEAM_COLORS,
+  TEAM_MAX,
+  teamColor,
+  teamConflicts,
+  teamNameProblem,
+  tintHex,
   todayOffset,
   totalSpan,
   weekdayOf,
@@ -251,4 +262,102 @@ test("작업 순서: 목록 상태 요약 — 지연 N단계가 먼저, 다 끝�
   );
   assert.equal(summarizeSequence(steps, schedule, { ...daySeq, start_date: null }, { date: "2026-11-15", time: "09:00" }).label, "시작일 없음");
   assert.equal(summarizeSequence([], [], daySeq, { date: "2026-11-15", time: "09:00" }).label, "-");
+});
+
+test("작업 순서 팀: 팀 목록 정리 — 배열만, id·이름 없는 항목 빼기, 같은 id는 처음 것, 이상한 색은 새 색", () => {
+  assert.deepEqual(parseTeams(null), []);
+  assert.deepEqual(parseTeams({ id: "a" }), []);
+  assert.deepEqual(
+    parseTeams([
+      { id: "a", name: "  설비팀 ", color: "orange" },
+      { id: "", name: "이름만" },
+      { id: "b", name: "   " },
+      { id: "a", name: "같은 id", color: "blue" },
+      { id: "c", name: "전기팀", color: "red" },
+      "글자",
+      { id: "d", name: "도장   팀", color: "yellow" },
+    ]),
+    [
+      { id: "a", name: "설비팀", color: "orange" },
+      { id: "c", name: "전기팀", color: "blue" },
+      { id: "d", name: "도장 팀", color: "yellow" },
+    ]
+  );
+  // 이름은 20자까지, 팀은 TEAM_MAX개까지
+  assert.equal(cleanTeamName("가".repeat(30)).length, 20);
+  const many = Array.from({ length: TEAM_MAX + 5 }, (_, i) => ({ id: `t${i}`, name: `팀${i}`, color: "blue" }));
+  assert.equal(parseTeams(many).length, TEAM_MAX);
+});
+
+test("작업 순서 팀: 새 팀 색 — 안 쓴 색 중 순서상 첫째, 다 쓰면 가장 적게 쓴 색", () => {
+  assert.equal(nextTeamColor([]), "blue");
+  assert.equal(nextTeamColor([{ color: "blue" }, { color: "aqua" }]), "orange");
+  const all = TEAM_COLORS.map((c) => ({ color: c.key }));
+  assert.equal(nextTeamColor(all), "blue");
+  assert.equal(nextTeamColor([...all, { color: "blue" }, { color: "orange" }]), "aqua");
+  // 빨강은 "계획보다 늦음" 전용이라 팀 색에 없음
+  assert.ok(!TEAM_COLORS.some((c) => (c.key as string) === "red"));
+  assert.equal(new Set(TEAM_COLORS.map((c) => c.hex)).size, TEAM_COLORS.length);
+  assert.deepEqual(teamColor(null), NO_TEAM_COLOR);
+  assert.equal(teamColor("yellow").ink, "#0b0b0b");
+});
+
+test("작업 순서 팀: 옅은 색(완료 막대) — 흰색과 섞기", () => {
+  assert.equal(tintHex("#2a78d6", 1), "#2a78d6");
+  assert.equal(tintHex("#000000", 0.25), "#bfbfbf");
+  assert.equal(tintHex("#ffffff", 0.5), "#ffffff");
+  assert.equal(tintHex("이상한 값", 0.5), "이상한 값");
+});
+
+test("작업 순서 팀: 같은 팀 일정 겹침 — 맞닿기만 하면 아님, 다른 팀·완료·팀 미정은 빼기", () => {
+  // 1번(t1, 2일) → 2번(t1, 바로 뒤) → 3번(t1, 1번 뒤 겹침 1일) · 4번(t2, 1번 뒤 겹침 1일) · 5번(팀 미정, 처음부터)
+  const steps = [
+    { team_id: "t1", done: false },
+    { team_id: "t1", done: false },
+    { team_id: "t1", done: false },
+    { team_id: "t2", done: false },
+    { team_id: null, done: false },
+  ];
+  const schedule = scheduleSteps([
+    { duration: 2, overlap: 0 },
+    { duration: 2, overlap: 0 },
+    { duration: 2, overlap: 1, after: 0 },
+    { duration: 2, overlap: 1, after: 0 },
+    { duration: 3, overlap: 0, after: "start" },
+  ]);
+  assert.deepEqual(
+    schedule.map((s) => [s.start, s.end]),
+    [
+      [0, 2],
+      [2, 4],
+      [1, 3],
+      [1, 3],
+      [0, 3],
+    ]
+  );
+  assert.deepEqual(teamConflicts(steps, schedule), [
+    { teamId: "t1", a: 0, b: 2, start: 1, end: 2 },
+    { teamId: "t1", a: 1, b: 2, start: 2, end: 3 },
+  ]);
+  // 완료한 단계는 빼고 셈
+  const doneFirst = steps.map((s, i) => (i === 0 ? { ...s, done: true } : s));
+  assert.deepEqual(teamConflicts(doneFirst, schedule), [{ teamId: "t1", a: 1, b: 2, start: 2, end: 3 }]);
+  // 팀이 없으면 알림 없음
+  assert.deepEqual(teamConflicts(steps.map((s) => ({ ...s, team_id: null })), schedule), []);
+});
+
+test("작업 순서 팀: 겹치는 구간 글자 — 일은 날짜, 시간은 시각", () => {
+  const day = { unit: "day" as const, start_date: "2026-11-02", start_time: null };
+  assert.equal(spanRangeLabel(1, 2, day), "11-03");
+  assert.equal(spanRangeLabel(2, 4, day), "11-04~11-05");
+  const hour = { unit: "hour" as const, start_date: "2026-11-02", start_time: "08:00" };
+  assert.equal(spanRangeLabel(1, 2.5, hour), "11-02 09:00~10:30");
+  assert.equal(spanRangeLabel(0, 1, { unit: "day", start_date: null, start_time: null }), "1일째");
+});
+
+test("작업 순서 팀: 저장 전 이름 확인 — 빈 이름·같은 이름(공백 정리 후)", () => {
+  assert.equal(teamNameProblem([{ name: "설비팀" }, { name: "전기팀" }]), null);
+  assert.equal(teamNameProblem([{ name: "설비팀" }, { name: "  " }]), "이름이 빈 팀이 있습니다. 팀 이름을 입력해주세요.");
+  assert.equal(teamNameProblem([{ name: "설비팀" }, { name: " 설비팀 " }]), '"설비팀" 팀이 두 개 있습니다. 팀 이름을 다르게 해주세요.');
+  assert.equal(teamNameProblem(Array.from({ length: TEAM_MAX + 1 }, (_, i) => ({ name: `팀${i}` }))), `팀은 ${TEAM_MAX}개까지 만들 수 있습니다.`);
 });
