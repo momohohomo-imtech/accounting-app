@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ModalPortal } from "@/components/ModalPortal";
 import { ModalPrintButton } from "@/components/ModalPrintButton";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { fieldClass, inlineFieldClass, labelClass } from "@/components/ui/field";
 import { SeqInput } from "@/components/ui/SeqInput";
 import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components/ProjectPicker";
-import { WorkSequenceChart } from "@/components/WorkSequenceChart";
+import { chartLegendTeams, WorkSequenceChart } from "@/components/WorkSequenceChart";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { useEscapeKey } from "@/lib/useEscapeKey";
@@ -21,20 +21,33 @@ import { downloadWorkSequenceXlsx } from "@/lib/xlsxExport";
 import { saveWorkSequence, setWorkSequenceStepDone } from "@/lib/actions/workSequences";
 import {
   chartColumns,
+  cleanTeamName,
   doneCount,
   formatAmount,
+  NO_TEAM_COLOR,
+  NO_TEAM_LABEL,
+  nextTeamColor,
   normalizeAmount,
   scheduleSteps,
   sequenceRangeLabel,
+  spanRangeLabel,
   statusLabel,
   stepRangeLabel,
   stepStatus,
+  TEAM_COLORS,
+  TEAM_MAX,
+  TEAM_NAME_MAX,
+  teamColor,
+  teamConflicts,
+  teamNameProblem,
   todayOffset,
   totalSpan,
   UNIT_LABEL,
   type SequenceUnit,
   type StepAfter,
+  type TeamColorKey,
   type Today,
+  type WorkTeam,
 } from "@/lib/workSequence";
 
 export type WorkSequenceStepData = {
@@ -49,6 +62,8 @@ export type WorkSequenceStepData = {
   after_step_id: string | null;
   /** 처음부터(순서표 시작에 같이 시작) — 099 SQL */
   after_start: boolean;
+  /** 맡은 팀(이 순서표 팀 목록의 id, 없으면 팀 미정) — 100 SQL */
+  team_id: string | null;
 };
 
 export type WorkSequenceData = {
@@ -58,6 +73,8 @@ export type WorkSequenceData = {
   unit: SequenceUnit;
   start_date: string | null;
   start_time: string | null;
+  /** 이 순서표의 팀 목록(이름·색) — 100 SQL */
+  teams: WorkTeam[];
   steps: WorkSequenceStepData[];
 };
 
@@ -81,7 +98,11 @@ const emptyStep = (): WorkSequenceStepData => ({
   done_date: null,
   after_step_id: null,
   after_start: false,
+  team_id: null,
 });
+
+/** 팀별 보기에서 "팀 미정" 단계 고르기 */
+const NO_TEAM_FOCUS = "__none__";
 
 /** 새로 쓰기·복사 — 순서표·단계 id를 새로 만들고(앞 작업 연결은 새 id로 옮김), 복사면 완료 체크·완료일은 비움. */
 function freshCopy(initial: WorkSequenceData): WorkSequenceData {
@@ -101,14 +122,18 @@ function freshCopy(initial: WorkSequenceData): WorkSequenceData {
 
 // 공사 작업 순서표 팝업(주소 ?tab=sequence&seq=…, 사용자 요청 11/2) — 프로젝트·제목·단위(일/시간)·시작, 단계 표(순번을 고치면 그 줄이
 // 내용째 그 자리로 옮겨감 · 완료 · 작업 내용 · 세부 설명·주의사항 · 앞 작업 · 기간 · 겹침 · 일정(자동)·진행 상태 · 완료일), 흐름 차트
-// (겹침 −/+, 오늘 선, 늦은 단계 빨강). 완료 체크·완료일은 저장된 단계면 바로 저장(현장에서 체크만 — 실패하면 되돌림), 나머지는
-// "저장"을 눌러야 저장 — 저장 안 하고 닫으면 물어봄. "복사"는 저장된 내용으로 새 순서표(완료·시작일·프로젝트는 비움).
-// 인쇄는 이 팝업만(가로 A4), 엑셀은 지금 화면 내용 그대로.
+// (겹침 −/+, 오늘 선, 늦은 단계 빨간 테두리). 완료 체크·완료일은 저장된 단계면 바로 저장(현장에서 체크만 — 실패하면 되돌림),
+// 나머지는 "저장"을 눌러야 저장 — 저장 안 하고 닫으면 물어봄. "복사"는 저장된 내용으로 새 순서표(완료·시작일·프로젝트는 비움).
+// 팀(100 SQL, 사용자 결정 11/2 "순서표마다"): 순서표 위 팀 목록(이름·색 — 색은 정해진 순서로 자동, 다른 순서표에서 쓴 이름은
+// 골라 쓰기·그때 색), 단계마다 팀, 차트 색 = 팀, 팀별 보기(그 팀만 진하게 — 인쇄·엑셀은 그 팀 단계만), 같은 팀 일정 겹침 알림
+// (완료 단계 빼고, 저장은 막지 않음). 인쇄는 이 팝업만(가로 A4), 엑셀은 지금 화면 내용 그대로.
 export function WorkSequenceEditor({
   initial,
   isNew,
   copyOfTitle,
   dependencyReady,
+  teamsReady,
+  knownTeams,
   sites,
   projects,
   projectLabels,
@@ -122,6 +147,10 @@ export function WorkSequenceEditor({
   copyOfTitle: string | null;
   /** 099 SQL 실행 뒤(앞 작업 칸이 있음) — 아니면 앞 작업 칸을 숨기고 저장하지 않음 */
   dependencyReady: boolean;
+  /** 100 SQL 실행 뒤(팀 칸이 있음) — 아니면 팀 칸을 숨기고 저장하지 않음 */
+  teamsReady: boolean;
+  /** 다른 순서표에서 쓴 팀 이름·색(팀 추가할 때 골라 쓰기) */
+  knownTeams: { name: string; color: TeamColorKey }[];
   sites: SiteOption[];
   projects: ProjectOption[];
   /** 프로젝트 id → "현장 · 프로젝트"(엑셀·인쇄 머리) */
@@ -143,6 +172,11 @@ export function WorkSequenceEditor({
   // 한국 시각 지금 — 진행 상태·오늘 선 기준(기기 시간대와 상관없이)
   const [today] = useState<Today>(nowKstParts);
   const dirty = !saved || JSON.stringify(data) !== JSON.stringify(saved);
+  // 팀: 팀별 보기(팀 id·NO_TEAM_FOCUS, null = 전체), 고치는 중인 팀, 새 팀 이름 칸
+  const [focusRaw, setFocus] = useState<string | null>(null);
+  const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
+  const [newTeamName, setNewTeamName] = useState("");
+  const [teamError, setTeamError] = useState<string | null>(null);
 
   const seqStart = { unit: data.unit, start_date: data.start_date, start_time: data.start_time };
   const indexById = useMemo(() => new Map(data.steps.map((s, i) => [s.id, i])), [data.steps]);
@@ -164,6 +198,27 @@ export function WorkSequenceEditor({
   const amountStep = data.unit === "day" ? 1 : 0.5;
   const savedStepIds = new Set(saved?.steps.map((s) => s.id) ?? []);
 
+  // 팀(100 SQL 실행 전엔 없음) — 목록에 없는 팀을 가리키면 팀 미정
+  const teams = teamsReady ? data.teams : [];
+  const teamById = new Map(teams.map((t) => [t.id, t]));
+  const teamOf = (s: WorkSequenceStepData) => (s.team_id ? teamById.get(s.team_id) ?? null : null);
+  const stepTeamIds = data.steps.map((s) => teamOf(s)?.id ?? null);
+  const conflicts = teamConflicts(
+    data.steps.map((s, i) => ({ team_id: stepTeamIds[i], done: s.done })),
+    schedule
+  );
+  const conflictPartners = new Map<number, number[]>();
+  for (const c of conflicts) {
+    conflictPartners.set(c.a, [...(conflictPartners.get(c.a) ?? []), c.b]);
+    conflictPartners.set(c.b, [...(conflictPartners.get(c.b) ?? []), c.a]);
+  }
+  const focus = focusRaw && (focusRaw === NO_TEAM_FOCUS || teamById.has(focusRaw)) ? focusRaw : null;
+  const focusMask = focus === null ? null : stepTeamIds.map((id) => (focus === NO_TEAM_FOCUS ? id === null : id === focus));
+  const focusName = focus === null ? null : focus === NO_TEAM_FOCUS ? NO_TEAM_LABEL : teamById.get(focus)!.name;
+  const inFocus = (i: number) => !focusMask || focusMask[i];
+  const editingTeam = editingTeamId ? teamById.get(editingTeamId) ?? null : null;
+  const teamStepCount = (id: string) => stepTeamIds.filter((t) => t === id).length;
+
   function update(patch: Partial<WorkSequenceData>) {
     setData((d) => ({ ...d, ...patch }));
   }
@@ -184,6 +239,37 @@ export function WorkSequenceEditor({
   }
   function setOverlap(index: number, value: number) {
     updateStep(index, { overlap: normalizeAmount(value, data.unit, "overlap") });
+  }
+  function addTeam() {
+    const name = cleanTeamName(newTeamName);
+    if (!name) return;
+    if (data.teams.some((t) => cleanTeamName(t.name) === name)) {
+      setTeamError(`"${name}" 팀이 이미 있습니다.`);
+      return;
+    }
+    if (data.teams.length >= TEAM_MAX) {
+      setTeamError(`팀은 ${TEAM_MAX}개까지 만들 수 있습니다.`);
+      return;
+    }
+    // 다른 순서표에서 쓴 팀이면 그때 색(이 순서표에서 안 쓴 색일 때), 아니면 순서대로 다음 색
+    const known = knownTeams.find((k) => k.name === name);
+    const color = known && !data.teams.some((t) => t.color === known.color) ? known.color : nextTeamColor(data.teams);
+    update({ teams: [...data.teams, { id: newId(), name, color }] });
+    setNewTeamName("");
+    setTeamError(null);
+  }
+  function patchTeam(id: string, patch: Partial<WorkTeam>) {
+    setData((d) => ({ ...d, teams: d.teams.map((t) => (t.id === id ? { ...t, ...patch } : t)) }));
+  }
+  async function removeTeam(team: WorkTeam) {
+    const n = teamStepCount(team.id);
+    if (n > 0 && !(await confirm(`"${team.name}" 팀을 지울까요? 이 팀의 ${n}개 단계는 팀 미정이 됩니다(저장해야 반영됩니다).`))) return;
+    setData((d) => ({
+      ...d,
+      teams: d.teams.filter((t) => t.id !== team.id),
+      steps: d.steps.map((s) => (s.team_id === team.id ? { ...s, team_id: null } : s)),
+    }));
+    setEditingTeamId(null);
   }
   function changeAfter(index: number, value: string) {
     if (value === "start") updateStep(index, { after_step_id: null, after_start: true });
@@ -226,7 +312,14 @@ export function WorkSequenceEditor({
 
   async function save() {
     setError(null);
-    const result = await pending.run(() => saveWorkSequence({ ...data, with_dependency: dependencyReady }));
+    const teamProblem = teamsReady ? teamNameProblem(data.teams) : null;
+    if (teamProblem) {
+      setError(teamProblem);
+      return;
+    }
+    const result = await pending.run(() =>
+      saveWorkSequence({ ...data, with_dependency: dependencyReady, with_teams: teamsReady })
+    );
     if (result?.error) {
       setError(result.error);
       return;
@@ -263,22 +356,40 @@ export function WorkSequenceEditor({
     return p === i - 1 ? "바로 앞" : `${p + 1}번 뒤`;
   };
 
+  const conflictText = (i: number) =>
+    conflictPartners.has(i) ? `같은 팀 ${conflictPartners.get(i)!.map((n) => n + 1).join("·")}번과 겹침` : "";
+
   function downloadExcel() {
-    downloadWorkSequenceXlsx(memoFileName(["공사작업순서", projectLabel.split(" · ").pop(), data.title]), {
-      title: data.title || "공사 작업 순서",
+    // 팀별 보기로 팀을 고르면 그 팀 단계만(순번·일정은 전체 순서표 그대로)
+    const picked = data.steps.map((s, i) => ({ s, i })).filter(({ i }) => inFocus(i));
+    const pickedDone = picked.filter(({ s }) => s.done).length;
+    const pickedLate = picked.filter(({ i }) => statuses[i].state === "overdue").length;
+    const pickedDoneLabel = `${pickedDone}/${picked.length}단계 완료`;
+    downloadWorkSequenceXlsx(memoFileName(["공사작업순서", projectLabel.split(" · ").pop(), data.title, focusName]), {
+      title: `${data.title || "공사 작업 순서"}${focusName ? ` — ${focusName} 일정` : ""}`,
       projectLabel,
       unit: data.unit,
       startLabel,
       rangeLabel: `${rangeLabel} (${formatAmount(total, data.unit)})`,
-      doneLabel: lateCount ? `${doneLabel} · 지연 ${lateCount}단계` : doneLabel,
-      steps: data.steps.map((s, i) => ({
-        ...s,
-        range: stepRangeLabel(schedule[i], seqStart),
-        after: afterLabel(i),
-        status: statusLabel(statuses[i]) || (s.done ? "완료" : ""),
-        overdue: statuses[i].state === "overdue",
-      })),
-      schedule,
+      doneLabel: pickedLate ? `${pickedDoneLabel} · 지연 ${pickedLate}단계` : pickedDoneLabel,
+      withTeams: teamsReady && teams.length > 0,
+      legendTeams: chartLegendTeams(
+        teams,
+        picked.map(({ i }) => stepTeamIds[i])
+      ),
+      steps: picked.map(({ s, i }) => {
+        const team = teamOf(s);
+        return {
+          ...s,
+          no: i + 1,
+          team: team ? { name: team.name, color: team.color } : null,
+          range: stepRangeLabel(schedule[i], seqStart),
+          after: afterLabel(i),
+          status: [statusLabel(statuses[i]) || (s.done ? "완료" : ""), conflictText(i)].filter(Boolean).join(" · "),
+          overdue: statuses[i].state === "overdue",
+        };
+      }),
+      schedule: picked.map(({ i }) => schedule[i]),
       columns,
       todayColumn: todayAt === null ? null : Math.min(columns.length - 1, Math.floor(todayAt)),
     });
@@ -316,13 +427,16 @@ export function WorkSequenceEditor({
           </div>
           {copyOfTitle && isNew && !saved && (
             <p className="rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-800 print:hidden">
-              단계·기간·겹침·앞 작업을 그대로 가져왔습니다. 프로젝트와 시작일을 정하고 저장해 주세요(완료 체크는 비움).
+              단계·기간·겹침·앞 작업·팀을 그대로 가져왔습니다. 프로젝트와 시작일을 정하고 저장해 주세요(완료 체크는 비움).
             </p>
           )}
 
           {/* 인쇄 머리(화면에서는 입력칸이 대신함) */}
           <div className="hidden space-y-1 print:block">
-            <p className="text-xl font-bold">{data.title}</p>
+            <p className="text-xl font-bold">
+              {data.title}
+              {focusName && ` — ${focusName} 일정`}
+            </p>
             <p className="text-sm">
               {projectLabel} · 단위 {data.unit === "day" ? "일(토·일 포함)" : "시간"} · 시작 {startLabel} · 전체 {rangeLabel} · {doneLabel}
               {lateCount > 0 && ` · 지연 ${lateCount}단계`} · {today.date} 기준
@@ -393,20 +507,137 @@ export function WorkSequenceEditor({
                   {data.steps.length > 0 && ` (${formatAmount(total, data.unit)})`} · {doneLabel}
                 </span>
                 {lateCount > 0 && <span className="ml-1.5 font-semibold text-red-600">· 지연 {lateCount}단계</span>}
+                {conflicts.length > 0 && (
+                  <span className="ml-1.5 font-semibold text-amber-700 print:hidden">· 같은 팀 일정 겹침 {conflicts.length}건</span>
+                )}
               </h3>
               <p className="text-xs text-slate-500 print:hidden">
                 순번 숫자를 고치고 Enter를 누르면 그 단계가 그 자리로 옮겨가고 일정도 다시 계산됩니다.
                 {saved && " 완료 체크는 바로 저장됩니다."}
               </p>
             </div>
+            {teamsReady && (
+              <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 print:hidden">
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  <span className="mr-1 font-semibold text-slate-700">팀</span>
+                  {data.teams.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setEditingTeamId(editingTeamId === t.id ? null : t.id)}
+                      aria-label={`${t.name || "(이름 없음)"} 팀 고치기`}
+                      aria-expanded={editingTeamId === t.id}
+                      className={cx(
+                        "inline-flex items-center gap-1.5 rounded-full border bg-white px-2.5 py-1",
+                        editingTeamId === t.id ? "border-slate-800 font-semibold text-slate-900" : "border-slate-200 text-slate-700 hover:border-slate-400"
+                      )}
+                    >
+                      <span className="h-2.5 w-2.5 rounded-sm" style={{ background: teamColor(t.color).hex }} aria-hidden />
+                      {t.name || "(이름 없음)"}
+                      <span className="text-slate-400">{teamStepCount(t.id)}</span>
+                    </button>
+                  ))}
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      addTeam();
+                    }}
+                    className="inline-flex items-center gap-1"
+                  >
+                    <input
+                      list="work-sequence-known-teams"
+                      value={newTeamName}
+                      onChange={(e) => {
+                        setNewTeamName(e.target.value);
+                        setTeamError(null);
+                      }}
+                      placeholder="새 팀 이름"
+                      maxLength={TEAM_NAME_MAX}
+                      aria-label="새 팀 이름"
+                      className={`${inlineFieldClass} w-32`}
+                    />
+                    <datalist id="work-sequence-known-teams">
+                      {knownTeams
+                        .filter((k) => !data.teams.some((t) => t.name === k.name))
+                        .map((k) => (
+                          <option key={k.name} value={k.name} />
+                        ))}
+                    </datalist>
+                    <Button type="submit" variant="secondary" size="xs" disabled={!cleanTeamName(newTeamName)}>
+                      + 팀 추가
+                    </Button>
+                  </form>
+                </div>
+                {teamError && <p className="text-xs text-red-600">{teamError}</p>}
+                {editingTeam && (
+                  <div className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-2.5">
+                    <div className="flex flex-col gap-1">
+                      <label className={labelClass} htmlFor="work-sequence-team-name">
+                        팀 이름
+                      </label>
+                      <input
+                        id="work-sequence-team-name"
+                        value={editingTeam.name}
+                        maxLength={TEAM_NAME_MAX}
+                        onChange={(e) => patchTeam(editingTeam.id, { name: e.target.value })}
+                        onBlur={(e) => patchTeam(editingTeam.id, { name: cleanTeamName(e.target.value) })}
+                        className={`${inlineFieldClass} w-40`}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className={labelClass}>색</span>
+                      <div className="flex flex-wrap gap-1.5 py-1">
+                        {TEAM_COLORS.map((c) => (
+                          <button
+                            key={c.key}
+                            type="button"
+                            onClick={() => patchTeam(editingTeam.id, { color: c.key })}
+                            aria-label={`색 ${c.label}`}
+                            aria-pressed={editingTeam.color === c.key}
+                            title={c.label}
+                            className={cx(
+                              "h-6 w-6 rounded-md",
+                              editingTeam.color === c.key ? "ring-2 ring-slate-900 ring-offset-2" : "hover:ring-2 hover:ring-slate-300"
+                            )}
+                            style={{ background: c.hex }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <Button type="button" variant="danger" size="xs" onClick={() => removeTeam(editingTeam)}>
+                        팀 지우기
+                      </Button>
+                      <Button type="button" variant="secondary" size="xs" onClick={() => setEditingTeamId(null)} aria-label="팀 고치기 닫기">
+                        닫기
+                      </Button>
+                    </div>
+                    {data.teams.some((t) => t.id !== editingTeam.id && t.color === editingTeam.color) && (
+                      <p className="w-full text-[11px] text-slate-500">
+                        &ldquo;{data.teams.find((t) => t.id !== editingTeam.id && t.color === editingTeam.color)!.name}&rdquo; 팀과 같은
+                        색입니다 — 차트에서는 팀 이름으로 구분됩니다.
+                      </p>
+                    )}
+                  </div>
+                )}
+                <p className="text-[11px] text-slate-500">
+                  팀을 만들고 단계마다 팀을 고르면 흐름 차트 막대가 팀 색으로 그려집니다.
+                  {dependencyReady && " 두 팀이 같이 하는 작업은 팀별로 단계를 나누고 앞 작업을 같은 단계로 고르면 같은 날 나란히 시작합니다."}
+                </p>
+              </div>
+            )}
             {/* 입력칸으로 된 표 — 휴대폰은 옆으로 넘김(고정 칸 없이). 완료 칸을 앞쪽에 둬서 휴대폰에서 넘기지 않고 체크 */}
             <div className="overflow-x-auto print:hidden">
-              <table className={cx("sticky-col-table w-full text-sm", dependencyReady ? "min-w-[1120px]" : "min-w-[980px]")}>
+              <table
+                className="sticky-col-table w-full text-sm"
+                style={{ minWidth: 980 + (dependencyReady ? 140 : 0) + (teamsReady ? 150 : 0) }}
+              >
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
                     <th className="w-12 pb-2 pr-2 font-medium">순번</th>
                     <th className="w-12 pb-2 pr-2 font-medium">완료</th>
                     <th className="pb-2 pr-2 font-medium">작업 내용</th>
+                    {teamsReady && <th className="w-36 pb-2 pr-2 font-medium">팀</th>}
                     <th className="pb-2 pr-2 font-medium">세부 설명·주의사항</th>
                     {dependencyReady && <th className="w-36 pb-2 pr-2 font-medium">앞 작업</th>}
                     <th className="w-24 pb-2 pr-2 font-medium">기간({unitLabel})</th>
@@ -456,6 +687,30 @@ export function WorkSequenceEditor({
                             className={`${fieldClass} min-w-0`}
                           />
                         </td>
+                        {teamsReady && (
+                          <td className="py-1.5 pr-2">
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className="h-3 w-3 shrink-0 rounded-sm"
+                                style={{ background: teamColor(teamOf(s)?.color ?? null).hex }}
+                                aria-hidden
+                              />
+                              <select
+                                value={teamOf(s)?.id ?? ""}
+                                onChange={(e) => updateStep(i, { team_id: e.target.value || null })}
+                                aria-label={`${i + 1}번 팀`}
+                                className={`${inlineFieldClass} w-28`}
+                              >
+                                <option value="">{NO_TEAM_LABEL}</option>
+                                {data.teams.map((t) => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.name || "(이름 없음)"}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </td>
+                        )}
                         <td className="py-1.5 pr-2">
                           <textarea
                             value={s.detail}
@@ -547,6 +802,7 @@ export function WorkSequenceEditor({
                               {label}
                             </p>
                           )}
+                          {conflictPartners.has(i) && <p className="text-[11px] font-semibold text-amber-700">{conflictText(i)}</p>}
                         </td>
                         <td className="py-1.5 pr-2">
                           {s.done ? (
@@ -576,7 +832,7 @@ export function WorkSequenceEditor({
                   })}
                   {data.steps.length === 0 && (
                     <tr>
-                      <td colSpan={dependencyReady ? 10 : 9} className="py-6 text-center text-sm text-slate-400">
+                      <td colSpan={9 + (dependencyReady ? 1 : 0) + (teamsReady ? 1 : 0)} className="py-6 text-center text-sm text-slate-400">
                         아래 &ldquo;+ 단계 추가&rdquo;로 작업 순서를 적어 주세요.
                       </td>
                     </tr>
@@ -594,7 +850,18 @@ export function WorkSequenceEditor({
             <table className="hidden w-full border-collapse text-[11px] print:table">
               <thead>
                 <tr>
-                  {["순번", "작업 내용", "세부 설명·주의사항", ...(dependencyReady ? ["앞 작업"] : []), "기간", "겹침", "일정", "상태", "완료"].map(
+                  {[
+                    "순번",
+                    "작업 내용",
+                    ...(teams.length > 0 ? ["팀"] : []),
+                    "세부 설명·주의사항",
+                    ...(dependencyReady ? ["앞 작업"] : []),
+                    "기간",
+                    "겹침",
+                    "일정",
+                    "상태",
+                    "완료",
+                  ].map(
                     (h) => (
                       <th key={h} className="border border-slate-400 bg-slate-100 px-1.5 py-1 text-left">
                         {h}
@@ -604,10 +871,23 @@ export function WorkSequenceEditor({
                 </tr>
               </thead>
               <tbody>
-                {data.steps.map((s, i) => (
+                {data.steps.map((s, i) =>
+                  !inFocus(i) ? null : (
                   <tr key={s.id}>
                     <td className="border border-slate-400 px-1.5 py-1 text-center">{i + 1}</td>
                     <td className="border border-slate-400 px-1.5 py-1">{s.content}</td>
+                    {teams.length > 0 && (
+                      <td className="border border-slate-400 px-1.5 py-1">
+                        {teamOf(s) ? (
+                          <span className="inline-flex items-center gap-1">
+                            <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: teamColor(teamOf(s)!.color).hex }} />
+                            {teamOf(s)!.name}
+                          </span>
+                        ) : (
+                          NO_TEAM_LABEL
+                        )}
+                      </td>
+                    )}
                     <td className="whitespace-pre-wrap border border-slate-400 px-1.5 py-1">{s.detail}</td>
                     {dependencyReady && <td className="border border-slate-400 px-1.5 py-1 text-center">{afterLabel(i)}</td>}
                     <td className="border border-slate-400 px-1.5 py-1 text-center">{formatAmount(schedule[i].end - schedule[i].start, data.unit)}</td>
@@ -616,28 +896,73 @@ export function WorkSequenceEditor({
                     </td>
                     <td className="border border-slate-400 px-1.5 py-1">{stepRangeLabel(schedule[i], seqStart)}</td>
                     <td className={cx("border border-slate-400 px-1.5 py-1", statuses[i].state === "overdue" && "font-semibold text-red-600")}>
-                      {statusLabel(statuses[i])}
+                      {[statusLabel(statuses[i]), conflictText(i)].filter(Boolean).join(" · ")}
                     </td>
                     <td className="border border-slate-400 px-1.5 py-1">{s.done ? `완료 ${s.done_date ?? ""}` : ""}</td>
                   </tr>
-                ))}
+                  )
+                )}
               </tbody>
             </table>
           </div>
 
           <div className="space-y-2 print:break-inside-avoid">
             <h3 className="text-sm font-semibold text-slate-900">
-              흐름 차트{" "}
+              흐름 차트{focusName && <span className="font-normal"> — {focusName}</span>}{" "}
               <span className="font-normal text-slate-500 print:hidden">
-                — 주황 = 앞 작업과 겹치는 {data.unit === "day" ? "날" : "시간"}, 왼쪽 −/+로 겹침을 바로 고칠 수 있음
+                — {teams.length > 0 ? "색 = 팀, " : ""}빗금 = 앞 작업과 겹치는 {data.unit === "day" ? "날" : "시간"}, 왼쪽 −/+로 겹침을
+                바로 고칠 수 있음
               </span>
             </h3>
+            {teams.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 text-xs print:hidden">
+                <span className="mr-1 font-semibold text-slate-700">팀별 보기</span>
+                <FocusChip active={focus === null} onClick={() => setFocus(null)}>
+                  전체
+                </FocusChip>
+                {teams.map((t) => (
+                  <FocusChip key={t.id} active={focus === t.id} color={teamColor(t.color).hex} onClick={() => setFocus(focus === t.id ? null : t.id)}>
+                    {t.name || "(이름 없음)"}
+                  </FocusChip>
+                ))}
+                {stepTeamIds.some((id) => id === null) && (
+                  <FocusChip
+                    active={focus === NO_TEAM_FOCUS}
+                    color={NO_TEAM_COLOR.hex}
+                    onClick={() => setFocus(focus === NO_TEAM_FOCUS ? null : NO_TEAM_FOCUS)}
+                  >
+                    {NO_TEAM_LABEL}
+                  </FocusChip>
+                )}
+                {focusName && <span className="text-slate-500">— {focusName} 단계만 진하게 · 인쇄·엑셀은 이 팀 단계만</span>}
+              </div>
+            )}
+            {conflicts.length > 0 && (
+              <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 print:hidden">
+                <p className="font-semibold">
+                  같은 팀 일정 겹침 {conflicts.length}건 — 같은 팀이 같은 {data.unit === "day" ? "날" : "시간"}에 두 작업입니다. 일손이
+                  되는지 확인해 주세요(저장은 됩니다).
+                </p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                  {conflicts.slice(0, 8).map((c) => (
+                    <li key={`${c.a}-${c.b}`}>
+                      {teamById.get(c.teamId)?.name}: {c.a + 1}번 {shortText(data.steps[c.a].content)} · {c.b + 1}번{" "}
+                      {shortText(data.steps[c.b].content)} ({spanRangeLabel(c.start, c.end, seqStart)})
+                    </li>
+                  ))}
+                  {conflicts.length > 8 && <li>외 {conflicts.length - 8}건</li>}
+                </ul>
+              </div>
+            )}
             <WorkSequenceChart
-              steps={data.steps}
+              steps={data.steps.map((s) => ({ content: s.content, done: s.done, team: teamOf(s) }))}
               schedule={schedule}
               seq={seqStart}
               statuses={statuses}
               todayAt={todayAt}
+              focus={focusMask}
+              teamConflictSteps={new Set(conflictPartners.keys())}
+              legendTeams={chartLegendTeams(teams, stepTeamIds)}
               onOverlapChange={setOverlap}
             />
           </div>
@@ -657,5 +982,34 @@ export function WorkSequenceEditor({
         </div>
       </div>
     </ModalPortal>
+  );
+}
+
+const shortText = (text: string) => (text.length > 12 ? `${text.slice(0, 12)}…` : text || "(내용 없음)");
+
+function FocusChip({
+  active,
+  color,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  color?: string;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cx(
+        "inline-flex items-center gap-1.5 rounded-full border bg-white px-2.5 py-1",
+        active ? "border-slate-800 font-semibold text-slate-900 ring-1 ring-slate-800" : "border-slate-200 text-slate-600 hover:border-slate-400"
+      )}
+    >
+      {color && <span className="h-2.5 w-2.5 rounded-sm" style={{ background: color }} aria-hidden />}
+      {children}
+    </button>
   );
 }

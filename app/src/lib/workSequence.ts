@@ -105,6 +105,12 @@ export type SequenceStart = { unit: SequenceUnit; start_date: string | null; sta
  * 시작일이 없으면 순서표 시작 기준 — 일: "1일째~3일째", 시간: "+0~+3시간".
  */
 export function stepRangeLabel(step: ScheduledStep, seq: SequenceStart): string {
+  return spanRangeLabel(step.start, step.end, seq);
+}
+
+/** 순서표 시작부터 [start, end) 구간의 일정 글자 — stepRangeLabel과 같은 모양(팀 일정 겹침 구간 등). */
+export function spanRangeLabel(start: number, end: number, seq: SequenceStart): string {
+  const step = { start, end };
   if (seq.unit === "day") {
     const first = Math.floor(step.start);
     const last = Math.max(first, Math.ceil(step.end) - 1);
@@ -124,8 +130,7 @@ const formatHours = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(
 /** 순서표 전체의 시작~끝 글자(목록·엑셀용) — 단계가 없으면 "-". */
 export function sequenceRangeLabel(schedule: ScheduledStep[], seq: SequenceStart): string {
   if (schedule.length === 0) return "-";
-  const whole = { start: 0, end: totalSpan(schedule), overlap: 0, overlapClamped: false, predecessor: null, afterInvalid: false };
-  return stepRangeLabel(whole, seq);
+  return spanRangeLabel(0, totalSpan(schedule), seq);
 }
 
 export type ChartColumn = { label: string; sub: string; weekend: boolean };
@@ -259,4 +264,138 @@ export function summarizeSequence(
   if (overdue > 0) return { label: `지연 ${overdue}단계`, tone: "late", rank: 100 + overdue };
   const started = statuses.some((st) => st.state !== "upcoming");
   return started ? { label: "진행 중", tone: "active", rank: 3 } : { label: "예정", tone: "upcoming", rank: 2 };
+}
+
+// ── 팀(사용자 결정 11/2 "순서표마다" + "같은 팀 일정 겹침 알림", 100 SQL) ──────────────────────────────────────────────
+// 흐름 차트에서 색 = 팀, 모양 = 상태(완료 옅게 + ✓, 늦음 빨간 테두리 + !, 앞 작업과 겹침 빗금). 팀 색은 정해진 순서로 자동(바꿀 수
+// 있음) — 이웃한 색끼리 색약에서도 구분되는 순서(색 구분 검사 통과). 빨강은 "계획보다 늦음" 전용이라 팀 색에서 뺌. 팀을 안 정한
+// 단계는 남색(예전 막대 색 — 팀을 안 쓰는 순서표는 예전 모습 그대로). 색만으로 확실히 구분되는 건 3~4팀까지라 막대·왼쪽 칸에 팀
+// 이름도 늘 같이 씀. 팀 목록은 순서표마다(work_sequences.teams), 단계는 그 목록의 팀 id(work_sequence_steps.team_id).
+
+export const TEAM_COLORS = [
+  { key: "blue", label: "파랑", hex: "#2a78d6", ink: "#ffffff" },
+  { key: "orange", label: "주황", hex: "#eb6834", ink: "#ffffff" },
+  { key: "aqua", label: "청록", hex: "#1baf7a", ink: "#ffffff" },
+  { key: "yellow", label: "노랑", hex: "#eda100", ink: "#0b0b0b" },
+  { key: "magenta", label: "분홍", hex: "#e87ba4", ink: "#ffffff" },
+  { key: "green", label: "초록", hex: "#008300", ink: "#ffffff" },
+  { key: "violet", label: "보라", hex: "#6250d6", ink: "#ffffff" },
+] as const;
+export type TeamColorKey = (typeof TEAM_COLORS)[number]["key"];
+export type TeamColor = { hex: string; ink: string; label: string };
+/** 팀 미정 = 예전 막대 색(brand-navy) */
+export const NO_TEAM_COLOR: TeamColor = { hex: "#0c3560", ink: "#ffffff", label: "남색" };
+export const NO_TEAM_LABEL = "팀 미정";
+export const TEAM_NAME_MAX = 20;
+export const TEAM_MAX = 30;
+
+export type WorkTeam = { id: string; name: string; color: TeamColorKey };
+
+export function isTeamColorKey(value: unknown): value is TeamColorKey {
+  return TEAM_COLORS.some((c) => c.key === value);
+}
+
+export function teamColor(key: TeamColorKey | null | undefined): TeamColor {
+  const c = TEAM_COLORS.find((x) => x.key === key);
+  return c ? { hex: c.hex, ink: c.ink, label: c.label } : NO_TEAM_COLOR;
+}
+
+/** 새 팀 색 — 아직 안 쓴 색 중 순서상 첫째. 7색을 다 쓰면 가장 적게 쓴 색(같으면 앞 순서) — 이때는 팀 이름으로 구분. */
+export function nextTeamColor(teams: { color: TeamColorKey }[]): TeamColorKey {
+  const used = new Map<TeamColorKey, number>();
+  for (const t of teams) used.set(t.color, (used.get(t.color) ?? 0) + 1);
+  let best: TeamColorKey = TEAM_COLORS[0].key;
+  let bestCount = Infinity;
+  for (const c of TEAM_COLORS) {
+    const n = used.get(c.key) ?? 0;
+    if (n < bestCount) {
+      best = c.key;
+      bestCount = n;
+    }
+  }
+  return best;
+}
+
+/** 팀 이름 정리 — 앞뒤 공백·연속 공백을 줄이고 TEAM_NAME_MAX자까지 */
+export function cleanTeamName(name: unknown): string {
+  return String(name ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, TEAM_NAME_MAX);
+}
+
+/**
+ * DB(jsonb)·화면에서 온 팀 목록 정리 — 배열이 아니면 빈 목록, id·이름이 없는 항목은 뺌, 같은 id는 처음 것만, 색이 이상하면 새 색,
+ * TEAM_MAX개까지. 이름이 같은 팀도 id가 다르면 그대로 둠(화면이 같은 이름을 막음).
+ */
+export function parseTeams(raw: unknown): WorkTeam[] {
+  if (!Array.isArray(raw)) return [];
+  const out: WorkTeam[] = [];
+  const ids = new Set<string>();
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const r = item as Record<string, unknown>;
+    const id = typeof r.id === "string" ? r.id.trim().slice(0, 64) : "";
+    const name = cleanTeamName(r.name);
+    if (!id || !name || ids.has(id)) continue;
+    ids.add(id);
+    out.push({ id, name, color: isTeamColorKey(r.color) ? r.color : nextTeamColor(out) });
+    if (out.length >= TEAM_MAX) break;
+  }
+  return out;
+}
+
+/** 색을 흰색과 섞은 색(#rrggbb) — share = 원래 색의 비율(0~1). 완료 막대(옅게)·엑셀 칸 색. */
+export function tintHex(hex: string, share: number): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const s = Math.min(1, Math.max(0, share));
+  const mix = (c: number) => Math.round(c * s + 255 * (1 - s));
+  const r = mix((n >> 16) & 255);
+  const g = mix((n >> 8) & 255);
+  const b = mix(n & 255);
+  return `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+}
+
+export type TeamConflict = {
+  teamId: string;
+  /** 단계 위치(0부터, a < b) */
+  a: number;
+  b: number;
+  /** 겹치는 구간(순서표 시작부터) */
+  start: number;
+  end: number;
+};
+
+/**
+ * 같은 팀 일정 겹침(사용자 요청 11/2 "같은 팀이 같은 날 두 작업이면 알림" — 일손 확인용, 저장은 막지 않음). 완료 체크한 단계와 팀
+ * 미정 단계는 빼고, 같은 팀 두 단계의 일정 [시작, 끝)이 겹치면 한 건. 끝과 시작이 맞닿기만 하면(앞 단계가 끝난 다음 시작) 겹침 아님.
+ */
+export function teamConflicts(steps: { team_id: string | null; done: boolean }[], schedule: ScheduledStep[]): TeamConflict[] {
+  const out: TeamConflict[] = [];
+  for (let a = 0; a < steps.length; a++) {
+    const ta = steps[a].team_id;
+    if (!ta || steps[a].done || !schedule[a]) continue;
+    for (let b = a + 1; b < steps.length; b++) {
+      if (steps[b].team_id !== ta || steps[b].done || !schedule[b]) continue;
+      const start = Math.max(schedule[a].start, schedule[b].start);
+      const end = Math.min(schedule[a].end, schedule[b].end);
+      if (end - start > 1e-9) out.push({ teamId: ta, a, b, start, end });
+    }
+  }
+  return out;
+}
+
+/** 저장 전 팀 이름 확인 — 빈 이름·같은 이름이면 안내 글자, 괜찮으면 null(화면·서버 같이 씀). */
+export function teamNameProblem(teams: { name: unknown }[]): string | null {
+  if (teams.length > TEAM_MAX) return `팀은 ${TEAM_MAX}개까지 만들 수 있습니다.`;
+  const names = teams.map((t) => cleanTeamName(t.name));
+  if (names.some((n) => !n)) return "이름이 빈 팀이 있습니다. 팀 이름을 입력해주세요.";
+  const seen = new Set<string>();
+  for (const n of names) {
+    if (seen.has(n)) return `"${n}" 팀이 두 개 있습니다. 팀 이름을 다르게 해주세요.`;
+    seen.add(n);
+  }
+  return null;
 }

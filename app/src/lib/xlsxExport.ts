@@ -4,7 +4,16 @@ import { WEEKDAY_LABELS } from "@/lib/calendar";
 import { workLogColorExcelArgb } from "@/lib/workLogColors";
 import { siteColorExcelArgb } from "@/lib/siteColor";
 import { formatPermitQuantity } from "@/lib/koreanNumber";
-import { formatAmount, UNIT_LABEL, type ChartColumn, type ScheduledStep, type SequenceUnit } from "@/lib/workSequence";
+import {
+  formatAmount,
+  teamColor,
+  tintHex,
+  UNIT_LABEL,
+  type ChartColumn,
+  type ScheduledStep,
+  type SequenceUnit,
+  type TeamColorKey,
+} from "@/lib/workSequence";
 import {
   chunkForRows,
   MEMO_LINE_HEIGHT,
@@ -128,7 +137,13 @@ export type WorkSequenceExport = {
   startLabel: string;
   rangeLabel: string;
   doneLabel: string;
+  /** 팀 칸·팀 색을 넣음(100 SQL 뒤 팀이 있는 순서표) */
+  withTeams: boolean;
+  /** 범례에 보일 팀(쓴 팀 + 팀 미정) */
+  legendTeams: { name: string; color: TeamColorKey | null }[];
   steps: {
+    /** 순서표 순번(팀별 보기로 일부만 담아도 원래 순번) */
+    no: number;
     content: string;
     detail: string;
     duration: number;
@@ -138,18 +153,24 @@ export type WorkSequenceExport = {
     done_date: string | null;
     /** 앞 작업 글자("바로 앞"·"처음부터"·"2번 뒤") */
     after: string;
-    /** 진행 상태 글자("2일 지남"·"진행 중"…) */
+    /** 진행 상태 글자("2일 지남"·"진행 중"·"같은 팀 5번과 겹침"…) */
     status: string;
     overdue: boolean;
+    /** 맡은 팀(없으면 팀 미정) */
+    team: { name: string; color: TeamColorKey } | null;
   }[];
+  /** steps와 같은 순서의 일정 */
   schedule: ScheduledStep[];
   columns: ChartColumn[];
   /** 오늘(지금) 칸 위치(0부터) — 차트 머리글에 표시, 차트 밖이면 null */
   todayColumn: number | null;
 };
 
-// 공사 작업 순서표(사용자 요청 11/2 "엑셀 + 인쇄") — 1장 "작업 순서"(순서표 정보 + 단계 표), 2장 "흐름 차트"(칸 하나 = 하루 또는 한 시간,
-// 작업 칸은 남색·완료는 녹색·앞 작업과 겹치는 칸은 주황). 칸은 400개까지(그 뒤는 잘림 안내).
+const argbOf = (hex: string) => `FF${hex.replace("#", "").toUpperCase()}`;
+
+// 공사 작업 순서표(사용자 요청 11/2 "엑셀 + 인쇄") — 1장 "작업 순서"(순서표 정보 + 단계 표), 2장 "흐름 차트"(칸 하나 = 하루 또는 한
+// 시간). 화면 차트와 같게 색 = 팀(팀 미정은 남색), 모양 = 상태: 완료는 옅은 칸, 계획보다 늦음은 빨간 굵은 테두리, 앞 작업과 겹치는 칸은
+// 빗금(사용자 결정 11/2 "팀별 색"). 칸은 400개까지(그 뒤는 잘림 안내).
 const WORK_SEQUENCE_MAX_COLUMNS = 400;
 export async function downloadWorkSequenceXlsx(filename: string, data: WorkSequenceExport) {
   const wb = new ExcelJS.Workbook();
@@ -157,13 +178,37 @@ export async function downloadWorkSequenceXlsx(filename: string, data: WorkSeque
   const box = { top: border, left: border, bottom: border, right: border };
   const unitLabel = UNIT_LABEL[data.unit];
 
+  // 1장: 작업 순서 — 칸 목록(팀 칸은 팀이 있을 때만)
+  type SheetCol = { header: string; width: number; value: (s: WorkSequenceExport["steps"][number], i: number) => string | number; center?: boolean; wrap?: boolean };
+  const sheetCols: SheetCol[] = [
+    { header: "순번", width: 6, value: (s) => s.no, center: true },
+    { header: "작업 내용", width: 26, value: (s) => s.content, wrap: true },
+    ...(data.withTeams ? [{ header: "팀", width: 12, value: (s: WorkSequenceExport["steps"][number]) => s.team?.name ?? "팀 미정", center: true }] : []),
+    { header: "세부 설명·주의사항", width: 42, value: (s) => s.detail, wrap: true },
+    { header: "앞 작업", width: 10, value: (s) => s.after, center: true },
+    { header: `기간(${unitLabel})`, width: 10, value: (s) => s.duration, center: true },
+    {
+      header: `앞 작업과 겹침(${unitLabel})`,
+      width: 14,
+      value: (s, i) => (s.no === 1 || data.schedule[i]?.predecessor === null ? "-" : data.schedule[i]?.overlap ?? s.overlap),
+      center: true,
+    },
+    { header: "일정", width: 24, value: (s) => s.range, center: true },
+    { header: "상태", width: 18, value: (s) => s.status, center: true, wrap: true },
+    { header: "완료", width: 8, value: (s) => (s.done ? "완료" : ""), center: true },
+    { header: "완료일", width: 12, value: (s) => (s.done ? s.done_date ?? "" : ""), center: true },
+  ];
+  const lastCol = sheetCols.length;
+  const teamCol = data.withTeams ? 3 : 0;
+  const statusCol = sheetCols.findIndex((c) => c.header === "상태") + 1;
+
   const ws = wb.addWorksheet("작업 순서", {
     pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
   });
   const titleRow = ws.addRow([data.title]);
   titleRow.font = { bold: true, size: 14 };
   titleRow.height = 24;
-  ws.mergeCells(titleRow.number, 1, titleRow.number, 10);
+  ws.mergeCells(titleRow.number, 1, titleRow.number, lastCol);
   for (const [label, value] of [
     ["프로젝트", data.projectLabel],
     ["단위", data.unit === "day" ? "일(날짜, 토·일 포함)" : "시간"],
@@ -173,49 +218,33 @@ export async function downloadWorkSequenceXlsx(filename: string, data: WorkSeque
   ]) {
     const row = ws.addRow([label, value]);
     row.getCell(1).font = { bold: true, color: { argb: "FF334155" } };
-    ws.mergeCells(row.number, 2, row.number, 10);
+    ws.mergeCells(row.number, 2, row.number, lastCol);
   }
   ws.addRow([]);
-  const header = ws.addRow([
-    "순번",
-    "작업 내용",
-    "세부 설명·주의사항",
-    "앞 작업",
-    `기간(${unitLabel})`,
-    `앞 작업과 겹침(${unitLabel})`,
-    "일정",
-    "상태",
-    "완료",
-    "완료일",
-  ]);
+  const header = ws.addRow(sheetCols.map((c) => c.header));
   header.font = { bold: true, color: { argb: "FFFFFFFF" } };
   header.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E293B" } };
   header.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
   header.height = 30;
   header.eachCell((cell) => (cell.border = box));
   data.steps.forEach((s, i) => {
-    const sch = data.schedule[i];
-    const row = ws.addRow([
-      i + 1,
-      s.content,
-      s.detail,
-      s.after,
-      s.duration,
-      i === 0 || sch?.predecessor === null ? "-" : sch?.overlap ?? s.overlap,
-      s.range,
-      s.status,
-      s.done ? "완료" : "",
-      s.done ? s.done_date ?? "" : "",
-    ]);
-    const lines = Math.max(wrappedLineCount(s.content, 24), wrappedLineCount(s.detail || " ", 40));
+    const row = ws.addRow(sheetCols.map((c) => c.value(s, i)));
+    const lines = Math.max(wrappedLineCount(s.content, 24), wrappedLineCount(s.detail || " ", 40), wrappedLineCount(s.status || " ", 16));
     row.height = Math.max(20, Math.min(400, lines * MEMO_LINE_HEIGHT + 5));
     row.eachCell({ includeEmpty: true }, (cell, col) => {
+      const spec = sheetCols[col - 1];
       cell.border = box;
-      cell.alignment = { vertical: "top", wrapText: col === 2 || col === 3, horizontal: col === 1 || col >= 4 ? "center" : undefined };
+      cell.alignment = { vertical: "top", wrapText: Boolean(spec?.wrap), horizontal: spec?.center ? "center" : undefined };
     });
-    if (s.overdue) row.getCell(8).font = { bold: true, color: { argb: "FFDC2626" } };
+    if (s.overdue) row.getCell(statusCol).font = { bold: true, color: { argb: "FFDC2626" } };
+    else if (/겹침/.test(s.status)) row.getCell(statusCol).font = { bold: true, color: { argb: "FFB45309" } };
+    if (teamCol) {
+      const color = teamColor(s.team?.color ?? null);
+      row.getCell(teamCol).fill = { type: "pattern", pattern: "solid", fgColor: { argb: argbOf(tintHex(color.hex, 0.3)) } };
+      row.getCell(teamCol).font = { bold: true, color: { argb: "FF0F172A" } };
+    }
   });
-  [6, 26, 42, 10, 10, 14, 24, 14, 8, 12].forEach((w, i) => (ws.getColumn(i + 1).width = w));
+  sheetCols.forEach((c, i) => (ws.getColumn(i + 1).width = c.width));
 
   // 2장: 흐름 차트
   const chart = wb.addWorksheet("흐름 차트", {
@@ -240,21 +269,39 @@ export async function downloadWorkSequenceXlsx(filename: string, data: WorkSeque
   chart.mergeCells(1, 1, 2, 1);
   chart.mergeCells(1, 2, 2, 2);
   const fill = (argb: string) => ({ type: "pattern" as const, pattern: "solid" as const, fgColor: { argb } });
+  const late = { style: "medium" as const, color: { argb: "FFD03B3B" } };
   data.steps.forEach((s, i) => {
     const sch = data.schedule[i];
-    const row = chart.addRow([i + 1, `${s.content} (${formatAmount(sch.end - sch.start, data.unit)})`]);
+    const mark = s.done ? "✓ " : s.overdue ? "! " : "";
+    const teamText = data.withTeams ? `[${s.team?.name ?? "팀 미정"}] ` : "";
+    const row = chart.addRow([s.no, `${mark}${teamText}${s.content} (${formatAmount(sch.end - sch.start, data.unit)})`]);
     row.height = 18;
     row.getCell(1).alignment = { horizontal: "center" };
+    if (s.overdue) row.getCell(2).font = { bold: true, color: { argb: "FFB91C1C" } };
+    const color = teamColor(s.team?.color ?? null);
+    const barArgb = argbOf(s.done ? tintHex(color.hex, 0.25) : color.hex);
+    const firstCol = Math.max(0, Math.floor(sch.start));
+    const lastBarCol = Math.min(cols.length - 1, Math.ceil(sch.end) - 1);
     for (let c = 0; c < cols.length; c++) {
       const cell = row.getCell(c + 3);
       cell.border = box;
-      // 칸 [c, c+1)이 단계 [start, end)와 겹치면 칠함 — 앞 작업과 겹치는 부분 [start, start+overlap)은 주황
+      // 칸 [c, c+1)이 단계 [start, end)와 겹치면 팀 색 — 앞 작업과 겹치는 부분 [start, start+overlap)은 빗금
       if (c + 1 <= sch.start || c >= sch.end) {
         if (cols[c].weekend) cell.fill = fill("FFFFF1F2");
         continue;
       }
       const inOverlap = sch.overlap > 0 && c < sch.start + sch.overlap;
-      cell.fill = fill(inOverlap ? "FFFBBF24" : s.done ? "FF10B981" : s.overdue ? "FFEF4444" : "FF1E3A5F");
+      cell.fill = inOverlap
+        ? { type: "pattern", pattern: "darkUp", fgColor: { argb: s.done ? "FF94A3B8" : "FFFFFFFF" }, bgColor: { argb: barArgb } }
+        : fill(barArgb);
+      if (s.overdue) {
+        cell.border = {
+          top: late,
+          bottom: late,
+          left: c === firstCol ? late : border,
+          right: c === lastBarCol ? late : border,
+        };
+      }
     }
   });
   if (data.columns.length > cols.length) {
@@ -262,9 +309,20 @@ export async function downloadWorkSequenceXlsx(filename: string, data: WorkSeque
     chart.addRow(["", `칸이 ${data.columns.length}개라 앞 ${cols.length}칸만 그렸습니다.`]);
   }
   chart.addRow([]);
-  chart.addRow(["", `칸 하나 = ${data.unit === "day" ? "하루" : "한 시간"} · 남색 작업 · 녹색 완료 · 빨강 계획보다 늦음 · 주황 앞 작업과 겹침`]);
+  chart.addRow([
+    "",
+    `칸 하나 = ${data.unit === "day" ? "하루" : "한 시간"} · 칸 색 = ${data.withTeams ? "팀(팀 미정은 남색)" : "작업"} · 옅은 칸·✓ = 완료 · 빨간 굵은 테두리·! = 계획보다 늦음 · 빗금 = 앞 작업과 겹침`,
+  ]);
+  if (data.withTeams && data.legendTeams.length > 0) {
+    for (const t of data.legendTeams) {
+      const color = teamColor(t.color);
+      const row = chart.addRow(["", t.name]);
+      row.getCell(2).fill = fill(argbOf(color.hex));
+      row.getCell(2).font = { bold: true, color: { argb: argbOf(color.ink) } };
+    }
+  }
   chart.getColumn(1).width = 6;
-  chart.getColumn(2).width = 30;
+  chart.getColumn(2).width = 34;
   for (let c = 0; c < cols.length; c++) chart.getColumn(c + 3).width = data.unit === "day" ? 6 : 4;
 
   triggerDownload(await wb.xlsx.writeBuffer(), filename);
