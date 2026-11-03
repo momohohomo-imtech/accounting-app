@@ -51,12 +51,15 @@ export async function getAccounts(): Promise<Account[]> {
         let suspended = Boolean(bannedUntil && new Date(bannedUntil).getTime() > Date.now());
         let resuspendAt: string | null = r.resuspend_at;
 
-        // 예약된 재정지 시각이 지났는데 아직 정지 안 됐으면 지금 정지시키고 예약을 지운다.
+        // 예약된 재정지 시각이 지났는데 아직 정지 안 됐으면 지금 정지시키고 예약을 지운다 — 정지가 된 뒤에만(예전엔 실패해도
+        // "정지됨"으로 보이고 예약까지 지워져 계정이 기한 없이 열려 있을 수 있었음). 실패하면 예약을 남겨 다음에 다시 시도.
         if (!suspended && resuspendAt && new Date(resuspendAt).getTime() <= Date.now()) {
-          await admin.auth.admin.updateUserById(r.id, { ban_duration: TAX_AGENT_SUSPEND_DURATION });
-          await admin.from("users").update({ resuspend_at: null }).eq("id", r.id);
-          suspended = true;
-          resuspendAt = null;
+          const { error: banError } = await admin.auth.admin.updateUserById(r.id, { ban_duration: TAX_AGENT_SUSPEND_DURATION });
+          if (!banError) {
+            await admin.from("users").update({ resuspend_at: null }).eq("id", r.id);
+            suspended = true;
+            resuspendAt = null;
+          }
         }
 
         return { id: r.id, email: r.email, name: r.name, role: r.role as Role, suspended, resuspendAt, authMissing: false };
@@ -267,8 +270,13 @@ export async function unsuspendAccount(formData: FormData): Promise<{ error?: st
     }
     const { error: scheduleError } = await admin.from("users").update({ resuspend_at: resuspendAt }).eq("id", userId);
     if (scheduleError) {
-      // 다시 정지할 시각을 못 남기면 그대로 열려 있게 되므로 바로 다시 정지
-      await admin.auth.admin.updateUserById(userId, { ban_duration: TAX_AGENT_SUSPEND_DURATION });
+      // 다시 정지할 시각을 못 남기면 그대로 열려 있게 되므로 바로 다시 정지 — 그것도 실패하면 열려 있다고 분명히 알림
+      const { error: rebanError } = await admin.auth.admin.updateUserById(userId, { ban_duration: TAX_AGENT_SUSPEND_DURATION });
+      if (rebanError) {
+        return {
+          error: `정지 해제 기록을 저장하지 못했고 다시 정지하는 것도 실패해 지금 이 계정은 열려 있습니다 — "비활성화"를 다시 눌러 주세요. (${scheduleError.message} / ${rebanError.message})`,
+        };
+      }
       return { error: `정지 해제 기록을 저장하지 못해 다시 정지해 두었습니다. 잠시 후 다시 시도해주세요. (${scheduleError.message})` };
     }
     revalidatePath("/backups");

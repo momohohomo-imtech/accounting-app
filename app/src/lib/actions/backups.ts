@@ -22,7 +22,10 @@ export async function deleteBackupRecord(formData: FormData): Promise<{ error?: 
   if (!id || !fileName) return { error: "잘못된 요청입니다." };
 
   const supabase = await createClient();
-  await supabase.storage.from("backups").remove([fileName]);
+  // 파일을 먼저 지우고, 지워졌을 때만 기록을 지움 — 예전엔 파일 삭제 실패를 버려서 기록만 사라지고 파일은 저장소에 남았음
+  // (이미 없는 파일은 오류가 아님).
+  const { error: removeError } = await supabase.storage.from("backups").remove([fileName]);
+  if (removeError) return { error: `백업 파일을 지우지 못했습니다: ${removeError.message}` };
   const { error } = await supabase.from("backups").delete().eq("id", id);
   if (error) return { error: error.message };
 
