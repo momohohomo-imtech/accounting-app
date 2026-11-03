@@ -1,18 +1,25 @@
-// 고정지출 — 지정한 거래처의 달 평균(사용자 요청 11/3 "지정한 거래처 혹은 매입처를 총매입액 ÷ 12로 달 평균", 사용자 결정: 지정은
-// DB(101 SQL clients.is_fixed_expense), 은행 거래는 빼고 매입 거래만 — 자동이체도 매입매출장에 직접 등록함). 검사: fixedExpense.test.ts.
+// 고정지출 — 지정한 거래처·카테고리의 달 평균(사용자 요청 11/3 "지정한 거래처 혹은 매입처를 총매입액 ÷ 12로 달 평균", 이어서 "카테고리에서도
+// 지정 — 급여·차량·숙박비·식비 등"). 사용자 결정: 지정은 DB(101 SQL clients.is_fixed_expense, 102 SQL expense_categories.is_fixed_expense),
+// 은행 거래는 빼고 매입 거래만(자동이체도 매입매출장에 직접 등록함). 검사: fixedExpense.test.ts.
 //  - 기간: 최근 12개월(지난달까지, 한국 시각) — 이번 달은 아직 덜 나가서 평균에서 빼고 "이번 달" 칸에만
-//  - 금액: 매입 합계(공급가액 + 부가세 = 실제로 나간 돈), 세금계산서(거래일) 기준 — 외상 미정산도 포함
+//  - 금액: 매입 합계(공급가액 + 부가세 = 실제로 나간 돈), 세금계산서(거래일) 기준 — 외상 미정산도 포함, 프로젝트에 걸린 매입도 포함
+//    (숙박비·식대는 늘 프로젝트에 붙어서 빼면 0원)
+//  - 한 거래는 한 번만: 지정 거래처에서 산 건 그 거래처 줄, 아니면 지정 카테고리 줄(사용자 결정 "거래처 줄 우선") — 합계가 겹치지 않음.
+//    급여는 이 앱 규칙대로 매입매출장 "직원급여/상여/4대보험" 카테고리 매입으로 셈(직원·급여 메뉴 기록은 안 셈 — 두 번 세지 않게)
 //  - 달 평균 = 12개월 합계 ÷ 12(원 단위 반올림) — 1년에 한 번 내는 것(보험 등)도 저절로 월 금액이 됨. 중간에 시작·끊긴 곳은
-//    "나온 달"(12달 중 매입이 있던 달 수)과 "낸 달 평균"(합계 ÷ 나온 달)을 같이 보여 줌(12로 나누면 실제 월 금액보다 작게 나와서)
-//  - 후보: 지정 안 한 거래처 중 12달 중 10달 이상 매입이 있던 곳(빠뜨린 고정지출 찾기)
-//  - 거래처 목록에 없는(직접 입력한 이름) 매입은 지정할 수 없어서 뺌 — 거래처로 등록하면 지정 가능
+//    "나온 달"(12달 중 매입이 있던 달 수)과 "낸 달 평균"(합계 ÷ 나온 달)을, 달마다 차이가 큰 곳(숙박비·식대·차량)을 위해 "가장 적은 달 ~
+//    가장 많은 달"을 같이 보여 줌
+//  - 후보: 지정 안 한 거래처·카테고리 중 12달 중 10달 이상(이미 다른 줄에 들어간 매입은 빼고 셈)
+//  - 직접 입력한 거래처명 매입은 거래처로는 지정할 수 없음(카테고리로는 잡힘) — 거래처로 등록하면 지정 가능
 
 export const FIXED_EXPENSE_MONTHS = 12;
 /** 후보로 보여 줄 최소 나온 달 수 */
 export const CANDIDATE_MIN_MONTHS = 10;
 
-export type FixedExpenseTx = { client_id: string | null; trans_date: string; amount: number };
-export type FixedExpenseClient = { id: string; name: string; fixed: boolean };
+export type FixedExpenseKind = "client" | "category";
+export type FixedExpenseTx = { client_id: string | null; category_id: string | null; trans_date: string; amount: number };
+/** 지정할 수 있는 거래처·카테고리 */
+export type FixedExpenseTarget = { id: string; name: string; fixed: boolean };
 
 export type FixedExpenseWindow = {
   /** 기간 첫날·마지막 날(YYYY-MM-DD) — 12달 전 1일 ~ 지난달 말일 */
@@ -39,7 +46,11 @@ export function fixedExpenseWindow(today: string): FixedExpenseWindow {
 }
 
 export type FixedExpenseRow = {
-  clientId: string;
+  kind: FixedExpenseKind;
+  /** 거래처 id 또는 카테고리 id */
+  id: string;
+  /** 화면용 고유 키("client:id"·"category:id") */
+  key: string;
   name: string;
   fixed: boolean;
   /** 12개월 합계 */
@@ -52,6 +63,9 @@ export type FixedExpenseRow = {
   activeAvg: number;
   /** 달마다 합계(window.months 순서) */
   perMonth: number[];
+  /** 가장 적은 달·가장 많은 달(매입 없는 달은 0) */
+  minMonth: number;
+  maxMonth: number;
   /** 마지막 매입일(이번 달 포함) */
   lastDate: string | null;
   /** 이번 달(진행 중) 매입 합계 */
@@ -60,76 +74,108 @@ export type FixedExpenseRow = {
 
 export type FixedExpenseReport = {
   window: FixedExpenseWindow;
-  /** 지정한 거래처(달 평균 큰 순) */
+  /** 지정한 거래처·카테고리(달 평균 큰 순) */
   rows: FixedExpenseRow[];
-  /** 지정 안 했지만 10달 이상 나온 거래처(달 평균 큰 순) */
+  /** 지정 안 했지만 10달 이상 나온 거래처·카테고리(달 평균 큰 순) */
   candidates: FixedExpenseRow[];
-  /** 지정 안 한 거래처 중 기간 안에 매입이 있던 곳(지정 고르기용, 12개월 합계 큰 순) */
-  others: FixedExpenseRow[];
-  /** 매달 기본으로 나가는 돈 = 지정 거래처 달 평균의 합(표의 합계 줄과 같게) */
+  /** 지정 고르기용 — 지정 안 한 거래처·카테고리 중 기간 안에 (다른 줄에 안 들어간) 매입이 있던 곳, 12개월 합계 큰 순 */
+  otherClients: FixedExpenseRow[];
+  otherCategories: FixedExpenseRow[];
+  /** 매달 기본으로 나가는 돈 = 지정 줄 달 평균의 합(표의 합계 줄과 같게) */
   totalMonthly: number;
-  /** 지정 거래처 12개월 합계 */
+  /** 그중 거래처 줄·카테고리 줄 */
+  clientMonthly: number;
+  categoryMonthly: number;
+  /** 지정 줄 12개월 합계 */
   totalYear: number;
-  /** 지정 거래처의 달마다 합계 */
+  /** 지정 줄의 달마다 합계 */
   perMonth: number[];
 };
 
 const byAvg = (a: FixedExpenseRow, b: FixedExpenseRow) => b.monthlyAvg - a.monthlyAvg || a.name.localeCompare(b.name, "ko");
+const byTotal = (a: FixedExpenseRow, b: FixedExpenseRow) => b.total - a.total || a.name.localeCompare(b.name, "ko");
 
-export function fixedExpenseReport(txs: FixedExpenseTx[], clients: FixedExpenseClient[], today: string): FixedExpenseReport {
+export function fixedExpenseReport(
+  txs: FixedExpenseTx[],
+  clients: FixedExpenseTarget[],
+  categories: FixedExpenseTarget[],
+  today: string
+): FixedExpenseReport {
   const window = fixedExpenseWindow(today);
   const monthIndex = new Map(window.months.map((m, i) => [m, i]));
   const clientById = new Map(clients.map((c) => [c.id, c]));
+  const categoryById = new Map(categories.map((c) => [c.id, c]));
   const rows = new Map<string, FixedExpenseRow>();
-  const rowOf = (c: FixedExpenseClient) => {
-    let row = rows.get(c.id);
+  const rowOf = (kind: FixedExpenseKind, target: FixedExpenseTarget) => {
+    const key = `${kind}:${target.id}`;
+    let row = rows.get(key);
     if (!row) {
       row = {
-        clientId: c.id,
-        name: c.name,
-        fixed: c.fixed,
+        kind,
+        id: target.id,
+        key,
+        name: target.name,
+        fixed: target.fixed,
         total: 0,
         monthlyAvg: 0,
         monthsWithSpend: 0,
         activeAvg: 0,
         perMonth: window.months.map(() => 0),
+        minMonth: 0,
+        maxMonth: 0,
         lastDate: null,
         thisMonth: 0,
       };
-      rows.set(c.id, row);
+      rows.set(key, row);
     }
     return row;
   };
-  for (const t of txs) {
-    const client = t.client_id ? clientById.get(t.client_id) : undefined;
-    if (!client || t.trans_date > today) continue;
-    const month = t.trans_date.slice(0, 7);
-    const idx = monthIndex.get(month);
-    if (idx === undefined && month !== window.thisMonth) continue;
-    const amount = Number(t.amount) || 0;
-    const row = rowOf(client);
+  const add = (row: FixedExpenseRow, t: FixedExpenseTx, idx: number | undefined, amount: number) => {
     if (idx !== undefined) {
       row.perMonth[idx] += amount;
       row.total += amount;
     } else row.thisMonth += amount;
     if (!row.lastDate || t.trans_date > row.lastDate) row.lastDate = t.trans_date;
+  };
+  for (const t of txs) {
+    if (t.trans_date > today) continue;
+    const month = t.trans_date.slice(0, 7);
+    const idx = monthIndex.get(month);
+    if (idx === undefined && month !== window.thisMonth) continue;
+    const amount = Number(t.amount) || 0;
+    const client = t.client_id ? clientById.get(t.client_id) : undefined;
+    const category = t.category_id ? categoryById.get(t.category_id) : undefined;
+    // 한 거래는 한 줄에만: 지정 거래처 → 지정 카테고리. 둘 다 아니면 후보·고르기용으로 거래처·카테고리 양쪽에(합계에는 안 들어감)
+    if (client?.fixed) add(rowOf("client", client), t, idx, amount);
+    else if (category?.fixed) add(rowOf("category", category), t, idx, amount);
+    else {
+      if (client) add(rowOf("client", client), t, idx, amount);
+      if (category) add(rowOf("category", category), t, idx, amount);
+    }
   }
-  // 지정했는데 기간 안에 매입이 없는 거래처도 표에 0으로
-  for (const c of clients) if (c.fixed) rowOf(c);
+  // 지정했는데 기간 안에 매입이 없는 곳도 표에 0으로
+  for (const c of clients) if (c.fixed) rowOf("client", c);
+  for (const c of categories) if (c.fixed) rowOf("category", c);
   for (const row of rows.values()) {
     row.monthsWithSpend = row.perMonth.filter((v) => Math.abs(v) > 0.5).length;
     row.monthlyAvg = Math.round(row.total / FIXED_EXPENSE_MONTHS);
     row.activeAvg = row.monthsWithSpend ? Math.round(row.total / row.monthsWithSpend) : 0;
+    row.minMonth = Math.min(...row.perMonth);
+    row.maxMonth = Math.max(...row.perMonth);
   }
   const all = [...rows.values()];
   const fixed = all.filter((r) => r.fixed).sort(byAvg);
   const notFixed = all.filter((r) => !r.fixed);
+  const sumAvg = (list: FixedExpenseRow[]) => list.reduce((sum, r) => sum + r.monthlyAvg, 0);
   return {
     window,
     rows: fixed,
     candidates: notFixed.filter((r) => r.monthsWithSpend >= CANDIDATE_MIN_MONTHS).sort(byAvg),
-    others: notFixed.filter((r) => r.total !== 0).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, "ko")),
-    totalMonthly: fixed.reduce((sum, r) => sum + r.monthlyAvg, 0),
+    otherClients: notFixed.filter((r) => r.kind === "client" && r.total !== 0).sort(byTotal),
+    otherCategories: notFixed.filter((r) => r.kind === "category" && r.total !== 0).sort(byTotal),
+    totalMonthly: sumAvg(fixed),
+    clientMonthly: sumAvg(fixed.filter((r) => r.kind === "client")),
+    categoryMonthly: sumAvg(fixed.filter((r) => r.kind === "category")),
     totalYear: fixed.reduce((sum, r) => sum + r.total, 0),
     perMonth: window.months.map((_, i) => fixed.reduce((sum, r) => sum + r.perMonth[i], 0)),
   };
