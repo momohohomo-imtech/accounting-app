@@ -6,15 +6,16 @@ import { backupStatus, type BackupRecord } from "@/lib/backupStatus";
 const auto = (iso: string, row_counts?: Record<string, number> | null): BackupRecord => ({ backup_type: "auto", created_at: iso, row_counts });
 const manual = (iso: string, row_counts?: Record<string, number> | null): BackupRecord => ({ backup_type: "manual", created_at: iso, row_counts });
 
-test("백업 상태: 마지막 자동 백업 후 지난 날은 한국 날짜로 세고, 8일까지는 정상·9일부터 멈춤", () => {
+test("백업 상태: 마지막 자동 백업 후 지난 날은 한국 날짜로 세고, 다음 일요일(7일)까지는 정상·월요일(8일)부터 멈춤", () => {
   const sunday = auto("2026-10-17T21:00:00Z"); // 한국 10/18(일) 06:00
-  // 한국 10/26(월) 08:59 = UTC 10/25 23:59 — UTC 날짜로 세면 7일이지만 한국 날짜로는 8일
+  // 한국 10/25(일) 23:59 = UTC 10/25 14:59 — 그 주 일요일 백업 전이라도 정상
+  const sun = backupStatus([sunday], "2026-10-25T14:59:00Z");
+  assert.equal(sun.daysSinceAuto, 7);
+  assert.equal(sun.autoStale, false);
+  // 한국 10/26(월) 08:59 = UTC 10/25 23:59 — UTC 날짜로 세면 7일이지만 한국 날짜로는 8일 → 일요일 백업이 빠졌으면 경고
   const mon = backupStatus([sunday], "2026-10-25T23:59:00Z");
   assert.equal(mon.daysSinceAuto, 8);
-  assert.equal(mon.autoStale, false);
-  const tue = backupStatus([sunday], "2026-10-26T15:00:00Z"); // 한국 10/27(화) 00:00
-  assert.equal(tue.daysSinceAuto, 9);
-  assert.equal(tue.autoStale, true);
+  assert.equal(mon.autoStale, true);
 });
 
 test("백업 상태: 수동 백업은 자동 백업 멈춤을 가리지 않고, 가장 최근 백업(수동 포함)으로 거래 수·방식을 봄", () => {

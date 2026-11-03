@@ -111,13 +111,17 @@ async function updateSessionInner(request: NextRequest) {
     if ((role === "tax_agent" || role === "viewer") && roleRow?.resuspend_at && new Date(roleRow.resuspend_at).getTime() <= Date.now()) {
       try {
         const admin = createAdminClient();
-        await withTimeout(
+        const { error: banError } = await withTimeout(
           admin.auth.admin.updateUserById(user.id, { ban_duration: TAX_AGENT_SUSPEND_DURATION }),
           "admin.updateUserById"
         );
-        await withTimeout(admin.from("users").update({ resuspend_at: null }).eq("id", user.id), "users.update(resuspend_at)");
+        // 정지가 된 뒤에만 예약을 지움 — 예전엔 정지가 실패해도 예약을 지워서, 다음 로그인부터 기한 없이 열려 있게 됐음.
+        // 실패하면 예약을 남겨 두어 다음 요청에서도 다시 정지를 시도하고 세션을 끊음.
+        if (!banError) {
+          await withTimeout(admin.from("users").update({ resuspend_at: null }).eq("id", user.id), "users.update(resuspend_at)");
+        }
       } catch {
-        // SUPABASE_SERVICE_ROLE_KEY 미설정·타임아웃 등으로 실패해도 아래에서 세션은 끊는다.
+        // SUPABASE_SERVICE_ROLE_KEY 미설정·타임아웃 등으로 실패해도 아래에서 세션은 끊는다(예약은 그대로 남음).
       }
       try {
         await withTimeout(supabase.auth.signOut(), "auth.signOut");

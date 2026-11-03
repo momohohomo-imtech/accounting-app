@@ -179,7 +179,7 @@
   정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
   해 잠금 불러오기(`yearLock`), 오래된 외상매출금(`receivableAging`), 이번 달 신고·납부 일정(`annualTasks`), 홈택스 세금계산서
   대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`), 메모 한 장 엑셀(`memoExport`), 공사 작업 순서
-  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`), 고정지출 달 평균(`fixedExpense`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
+  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`), 고정지출 달 평균(`fixedExpense`), 자동 백업 실행 기록(`autoBackupStatus`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
   (vitest는 npm 설치 오류로 못 씀 — 새 테스트 라이브러리를 넣지 말 것)
@@ -301,9 +301,15 @@
   카테고리로만(직원·급여 메뉴 기록은 안 셈). 직접 입력한 거래처명은 거래처로는 지정 불가(카테고리로는 잡힘, 거래처로 등록하면 가능).
   들쭉날쭉한 곳은 "가장 적은 달 ~ 가장 많은 달"을 같이, 지정 안 한 곳 중 거의 매달(나누는 달의 10/12 이상) 나왔거나 새로 시작해서 매달
   나온 곳은 후보(기본 접힘 — 11/3 사용자 요청), 고르기 목록은 달 평균 큰 순. 101·102 실행 전엔 그쪽 지정 없이 후보만.
-- **백업 상태**(10/29 사용자 요청 "A"): 대시보드 접힘 목록 맨 아래 "백업" 줄 + 마지막 자동 백업 후 8일이 넘을 때만 맨 위 카드에
-  경고 한 줄(`lib/backupStatus.ts`, 관리자·직원만 — 백업 기록은 그 두 역할만 읽음). 자동 백업 주기(vercel.json 크론)를 바꾸면
-  `AUTO_BACKUP_STALE_DAYS`도 같이.
+- **백업 상태**(10/29 사용자 요청 "A"): 대시보드 접힘 목록 맨 아래 "백업" 줄 + 마지막 자동 백업 후 7일이 넘을 때만(일요일 백업이
+  빠지면 월요일부터 — 11/3 8일에서 앞당김) 맨 위 카드에 경고 한 줄(`lib/backupStatus.ts`, 관리자·직원만 — 백업 기록은 그 두 역할만
+  읽음). 자동 백업 주기(vercel.json 크론)를 바꾸면 `AUTO_BACKUP_STALE_DAYS`·`nextAutoBackupAt`도 같이.
+- **자동 백업 점검**(11/3 사용자 "자동백업이 작동 안 하는 것 같아요" — 10/28부터 크론 주소가 CRON_SECRET을 요구했는데 운영에 값이
+  없으면 401로 조용히 막힘): 크론(`/api/cron/weekly-backup`)은 실행마다 시작·끝 기록을 백업 저장소 `_status/auto-backup.json` 한 파일에
+  덮어씀(`lib/autoBackupStatus.ts` — DB 변경 없음, 백업 목록·정리·복원은 backups 표만 보므로 이 파일은 안 건드림), 실패하면 메일
+  (BACKUP_EMAIL_TO·RESEND_API_KEY가 있을 때), 완료 메일이 실패해도 백업은 성공으로. 백업 화면 "자동 백업 점검" 칸(관리자·직원)이 마지막
+  자동 실행 결과(성공·실패 이유·"끝나지 않음" = 60초 시간 제한 의심)·마지막 자동 백업·다음 예정·서버 환경변수 있음/없음(CRON_SECRET·
+  SUPABASE_SERVICE_ROLE_KEY·메일 — 값은 안 보임)을 보여 줌. 크론 응답 형식·기록 위치를 바꾸면 이 칸도 같이.
 
 - **세무사(tax_agent) 계정은 매입매출장(매입매출 목록)만**(사용자 요청 10/28): 미들웨어(`lib/supabase/middleware.ts`)가
   `/transactions` 목록 외 경로·다른 탭·`editTx`를 목록으로 돌려보내고, 화면은 `getCurrentRole()`(`lib/currentRole.ts`)로 탭·
