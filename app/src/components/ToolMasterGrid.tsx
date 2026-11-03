@@ -24,6 +24,7 @@ export function ToolMasterGrid({ tools }: { tools: Tool[] }) {
   const router = useRouter();
   const pending = useGlobalPending();
   const [editing, setEditing] = useState<Tool | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
   const groups = groupToolsBySortOrder(tools);
 
   async function move(groupTools: Tool[], id: string, dir: -1 | 1) {
@@ -33,7 +34,13 @@ export function ToolMasterGrid({ tools }: { tools: Tool[] }) {
     const fd = new FormData();
     fd.append("id_a", groupTools[idx].id);
     fd.append("id_b", groupTools[swapIdx].id);
-    await pending.run(() => swapToolPosition(fd));
+    // 실패를 화면에 — 예전엔 결과를 버려서 순서가 안 바뀌어도 아무 표시가 없었음
+    const result = await pending.run(() => swapToolPosition(fd));
+    if (result?.error) {
+      setMoveError(result.error);
+      return;
+    }
+    setMoveError(null);
     router.refresh();
   }
 
@@ -43,6 +50,7 @@ export function ToolMasterGrid({ tools }: { tools: Tool[] }) {
 
   return (
     <div className="space-y-4">
+      {moveError && <p className="text-sm text-red-600">{moveError}</p>}
       {groups.map(([sortOrder, groupTools], groupIndex) => (
         <div
           key={sortOrder}

@@ -79,7 +79,10 @@ export async function deleteAttachment(formData: FormData) {
   const { data: row, error: fetchError } = await supabase.from("attachments").select("storage_path").eq("id", id).single();
   if (fetchError || !row) return { error: fetchError?.message ?? "파일을 찾을 수 없습니다." };
 
-  await supabase.storage.from(BUCKET).remove([row.storage_path]);
+  // 파일을 먼저 지우고, 지워졌을 때만 기록을 지움 — 예전엔 파일 삭제 실패를 버려서 기록만 사라지고 파일은 저장소에 남아
+  // 공간만 차지했음(이미 없는 파일은 오류가 아님, 백업 지우기와 같은 방식).
+  const { error: removeError } = await supabase.storage.from(BUCKET).remove([row.storage_path]);
+  if (removeError) return { error: `파일을 지우지 못했습니다: ${removeError.message}` };
   const { error } = await supabase.from("attachments").delete().eq("id", id);
   if (error) return { error: error.message };
 
