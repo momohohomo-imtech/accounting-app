@@ -2678,13 +2678,17 @@ DB 변경 없음. 일용직 관리 → 출입명단 → "출입신청서"(`Acces
 - 사용자에게 안내(앱 밖 설정): Vercel 함수 지역과 Supabase 지역이 같은지(다르면 화면마다 DB 왕복이 느려짐 — Supabase Settings →
   General의 Region을 보고 Vercel Settings → Functions의 Function Region을 같은 곳으로, 서울이면 icn1), Node.js 22 이상, 백업 메일(선택),
   첨부파일 원본은 Supabase 저장소에만 있음(주간 백업은 표 자료만 — 필요하면 첨부 일괄 내려받기 기능을 만들지 사용자에게 물음).
+- **결과(11/4)**: 사용자가 Vercel Node.js를 26으로 바꿈 → Node 26.13.0으로 검사 250개·빌드·실행(주요 화면 17개, 저장 액션, 영수증 인식
+  API가 제미나이 라이브러리를 불러오는지, 서버 엑셀 읽기, 자동 백업) 확인. `buffer-equal-constant-time`은 Node 26에서 불러오면 오류지만
+  jwa 2.0.1이 `crypto.timingSafeEqual`을 써서 안 불러옴. Supabase 지역 = 싱가포르(사용자 답) → `app/vercel.json`에 `regions: ["sin1"]`
+  (Vercel 함수도 싱가포르). Vercel 문서는 이 세션에서 못 열어 봄(접속 막힘) — 배포 뒤 Vercel 배포 화면에서 함수 지역이 sin1인지 확인.
 
 ### 열려 있는 것
 - **배포 후 바로(10/31 작업)**: Supabase에서 `097` SQL 실행(096 다음 — 번호 함수·통장 잔액 확인 표·신고 끝난 해 잠금, 실행 전엔
   잔액 맞추기·잠금 칸이 안 보이고 번호는 예전 방식, 나머지 그대로). 실행 뒤 장부 점검 탭에서 종합소득세 신고가 끝난 해(예: 2025년은
   2026년 5월 신고 뒤)를 잠글지 결정. 은행 화면 계좌 카드의 "잔액 맞추기"로 은행 앱 잔액을 한 번 적어 보기. 홈택스 실제 파일로
   대조해 보기(머리글 이름이 다르면 `parseHometaxSheet`에 이름 추가 — 가짜 파일로만 확인함). 휴대폰으로 영수증 사진·첨부 올려 보기.
-- 권장(사용자가 직접): Vercel 프로젝트 Settings → Node.js Version을 22 이상으로(20은 2026년 4월 지원 종료), GitHub 저장소
+- 권장(사용자가 직접): ~~Vercel Node.js Version 22 이상~~ → 11/4 26으로 바꿈(완료), GitHub 저장소
   Settings → Code security에서 Dependabot alerts 켜기(라이브러리 보안 경고를 메일로 받음). 첨부파일은 원본 그대로 저장돼
   Supabase 무료 요금제(저장 공간 1GB·한 파일 50MB)면 몇 년 뒤 저장 공간을 확인할 것(백업은 이제 자동 정리됨).
 - **배포 후 바로**: Supabase에서 `096` SQL 실행(복원 함수 — 실행 전엔 복원이 "096 SQL 먼저"로 막힘, 자료는 그대로), 백업 화면에서

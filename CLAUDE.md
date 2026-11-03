@@ -311,6 +311,12 @@
   자동 실행 결과(성공·실패 이유·"끝나지 않음" = 60초 시간 제한 의심)·마지막 자동 백업·다음 예정·서버 환경변수 있음/없음(CRON_SECRET·
   SUPABASE_SERVICE_ROLE_KEY·메일 — 값은 안 보임)을 보여 줌. 크론 응답 형식·기록 위치를 바꾸면 이 칸도 같이.
 
+- **서버 지역·Node 버전**(11/4 사용자 확인): Supabase가 싱가포르라 Vercel 함수도 `app/vercel.json`의 `regions: ["sin1"]`(싱가포르)로
+  고정 — 화면 하나에 DB 조회가 여러 번이라 둘이 멀면(예전 기본값 미국 iad1) 조회마다 왕복이 늘어 느려짐. 이 파일이 Vercel 화면의 Function
+  Region 설정보다 우선하니, Supabase 지역을 옮기면 여기도 같이 바꿀 것. Vercel Node.js는 26(사용자 설정) — 검사·빌드·실행을 Node 26으로 확인함.
+  Node 26엔 `SlowBuffer`가 없어 `buffer-equal-constant-time`(제미나이 라이브러리 안쪽 jws → jwa)을 불러오면 오류지만 jwa 2.0.1은
+  `crypto.timingSafeEqual`을 써서 그 파일을 안 불러옴 — 라이브러리를 올리거나 바꿀 때 Node 26에서 한 번 실행해 볼 것.
+
 - **세무사(tax_agent) 계정은 매입매출장(매입매출 목록)만**(사용자 요청 10/28): 미들웨어(`lib/supabase/middleware.ts`)가
   `/transactions` 목록 외 경로·다른 탭·`editTx`를 목록으로 돌려보내고, 화면은 `getCurrentRole()`(`lib/currentRole.ts`)로 탭·
   "+ 거래 등록"·메모·엑셀 일괄 등록·수정 팝업을 숨기고 표는 `TransactionTable`의 `readOnly`(체크칸·관리 칸 없음). 메뉴도 "매입매출"
