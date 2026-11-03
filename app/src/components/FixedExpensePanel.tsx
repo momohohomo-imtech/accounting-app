@@ -10,9 +10,10 @@ import { formatWon } from "@/lib/format";
 import { cx } from "@/lib/cx";
 import type { FixedExpenseKind, FixedExpenseReport, FixedExpenseRow } from "@/lib/fixedExpense";
 
-// 보고서 "고정지출" 칸(사용자 요청 11/3 — 지정한 거래처·카테고리의 최근 12개월 매입 ÷ 나온 달 = 달 평균("낸 달 평균", ÷12는 참고 칸),
-// 계산은 lib/fixedExpense.ts). 지정·해제는 거래처(101 SQL)·카테고리(102 SQL)에 저장, 은행 거래는 안 씀(사용자: 자동이체도 매입매출장에 직접
-// 등록). 한 거래는 한 줄에만(지정 거래처 → 지정 카테고리). 후보는 기본 접힘(사용자 요청 11/3). 표는 머리글로 정렬.
+// 보고서 "고정지출" 칸(사용자 요청 11/3 — 지정한 거래처·카테고리의 최근 12개월 매입 ÷ 12 = 달 평균, 중간에 새로 시작해서 매달 나온 곳은
+// 시작한 달부터("○월부터"), 낸 달 평균은 참고 칸 — 계산은 lib/fixedExpense.ts). 지정·해제는 거래처(101 SQL)·카테고리(102 SQL)에 저장, 은행
+// 거래는 안 씀(사용자: 자동이체도 매입매출장에 직접 등록). 한 거래는 한 줄에만(지정 거래처 → 지정 카테고리). 후보는 기본 접힘(사용자 요청
+// 11/3). 표는 머리글로 정렬.
 
 type SortKey =
   | "name"
@@ -20,7 +21,7 @@ type SortKey =
   | "monthlyAvg"
   | "total"
   | "monthsWithSpend"
-  | "avg12"
+  | "activeAvg"
   | "minMonth"
   | "lastDate"
   | "thisMonth";
@@ -64,6 +65,25 @@ function useSorted<K extends string>(rows: FixedExpenseRow[], initial: K, initia
 }
 
 const monthLabel = (ym: string) => `${ym.slice(2, 4)}.${ym.slice(5, 7)}`;
+/** 12달 기간 안에서는 달 이름이 겹치지 않아 "8월"로 충분 */
+const monthName = (ym: string) => `${Number(ym.slice(5, 7))}월`;
+
+/** 달 평균 + 중간에 새로 시작한 곳이면 "○월부터(N달)" */
+function AvgValue({ row }: { row: FixedExpenseRow }) {
+  return (
+    <>
+      <span className="whitespace-nowrap">{formatWon(row.monthlyAvg)}</span>
+      {row.since && (
+        <span
+          className="block whitespace-nowrap text-[11px] font-normal text-sky-700"
+          title={`${monthName(row.since)}에 새로 시작해서 그 뒤로 매달 나와 그 달부터 나눔(12달 합계 ÷ ${row.divisor})`}
+        >
+          {monthName(row.since)}부터({row.divisor}달)
+        </span>
+      )}
+    </>
+  );
+}
 
 function KindTag({ kind }: { kind: FixedExpenseKind }) {
   return (
@@ -198,9 +218,12 @@ export function FixedExpensePanel({
           )}
         </p>
         <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-          달 평균 = {period}(지난달까지 12개월) 매입 합계 ÷ 매입이 있던 달 수(1년에 한 번 내는 건 그 금액이 그대로 달 평균 — &quot;÷12
-          평균&quot; 칸 참고) · 부가세 포함·외상 포함(거래일 기준) · 한 거래는 한 번만(지정 거래처에서 산 건 거래처 줄, 나머지는 지정 카테고리 줄) ·
-          카테고리는 프로젝트에 걸린 매입도 포함 · 은행 거래는 넣지 않음 · 급여는 매입매출장 급여 카테고리 기준(직원·급여 메뉴 기록은 따로 안 셈)
+          기간 {period} — 지난달까지 12개월, 매달 1일에 한 달씩 넘어감(위에서 고른 연도와 상관없음). 달 평균 = 12달 매입 합계 ÷{" "}
+          {report.baseMonths}(1년에 한 번·가끔 나가는 것도 매달 몫으로 나눔) · 중간에 새로 시작해서 그 뒤로 매달 나온 곳(3달 이상)은 시작한
+          달부터 나눔(&quot;○월부터&quot;) ·{" "}
+          {report.recordsFrom && <>앱 기록이 {report.recordsFrom}부터라 {report.baseMonths}달로 나눔 · </>}
+          부가세 포함·외상 포함(거래일 기준) · 한 거래는 한 번만(지정 거래처에서 산 건 거래처 줄, 나머지는 지정 카테고리 줄) · 카테고리는
+          프로젝트에 걸린 매입도 포함 · 은행 거래는 넣지 않음 · 급여는 매입매출장 급여 카테고리 기준(직원·급여 메뉴 기록은 따로 안 셈)
         </p>
       </div>
 
@@ -222,7 +245,7 @@ export function FixedExpensePanel({
           {fixed.header("monthlyAvg", "달 평균", "pr-3 text-right")}
           {fixed.header("total", "12달 합계", "pr-3 text-right")}
           {fixed.header("monthsWithSpend", "나온 달", "pr-3 text-right")}
-          {fixed.header("avg12", "÷12 평균", "pr-3 text-right")}
+          {fixed.header("activeAvg", "낸 달 평균", "pr-3 text-right")}
           {fixed.header("minMonth", "달마다 범위", "pr-3 text-right")}
           {fixed.header("lastDate", "마지막 매입", "pr-3")}
           {fixed.header("thisMonth", "이번 달", "pr-3 text-right")}
@@ -237,13 +260,15 @@ export function FixedExpensePanel({
               <Td className="pr-3">
                 <KindTag kind={r.kind} />
               </Td>
-              <Td className="whitespace-nowrap pr-3 text-right font-semibold tabular-nums text-slate-900">{formatWon(r.monthlyAvg)}</Td>
+              <Td className="whitespace-nowrap pr-3 text-right font-semibold tabular-nums text-slate-900">
+                <AvgValue row={r} />
+              </Td>
               <Td className="whitespace-nowrap pr-3 text-right tabular-nums">{formatWon(r.total)}</Td>
-              <Td className={cx("whitespace-nowrap pr-3 text-right tabular-nums", r.monthsWithSpend < 12 && "text-amber-700")}>
+              <Td className={cx("whitespace-nowrap pr-3 text-right tabular-nums", r.monthsWithSpend < r.divisor && "text-amber-700")}>
                 {r.monthsWithSpend}/12
               </Td>
-              <Td className="whitespace-nowrap pr-3 text-right tabular-nums text-slate-500" title="참고: 12달 합계 ÷ 12(1년에 한 번 내는 것 등)">
-                {r.monthsWithSpend > 0 && r.monthsWithSpend < 12 ? formatWon(r.avg12) : "-"}
+              <Td className="whitespace-nowrap pr-3 text-right tabular-nums text-slate-500" title="참고: 12달 합계 ÷ 매입이 있던 달 수(나올 때 얼마씩 나오나)">
+                {r.monthsWithSpend > 0 && r.monthsWithSpend !== r.divisor ? formatWon(r.activeAvg) : "-"}
               </Td>
               {/* 금액이 크면 PC에서 "~" 뒤에서 줄바꿈(금액은 안 끊김) — 휴대폰은 표 칸이 한 줄(globals.css) */}
               <Td className="pr-3 text-right tabular-nums text-slate-500" title="가장 적은 달 ~ 가장 많은 달(매입 없는 달은 0원)">
@@ -333,7 +358,8 @@ export function FixedExpensePanel({
           <span>
             고정지출 후보 {report.candidates.length}곳{" "}
             <span className="font-normal text-slate-500">
-              — 지정 안 했지만 12달 중 10달 이상 매입이 있던 거래처·카테고리(빠뜨린 곳 찾기, 이미 위 표에 들어간 매입은 빼고 셈)
+              — 지정 안 했지만 거의 매달({report.candidateMinMonths}달 이상) 나왔거나 중간에 새로 시작해서 그 뒤로 매달 나온 거래처·카테고리(빠뜨린
+              곳 찾기, 이미 위 표에 들어간 매입은 빼고 셈)
             </span>
           </span>
         </button>
@@ -357,7 +383,9 @@ export function FixedExpensePanel({
                     <KindTag kind={r.kind} />
                   </Td>
                   <Td className="whitespace-nowrap pr-4 text-right tabular-nums">{r.monthsWithSpend}/12</Td>
-                  <Td className="whitespace-nowrap pr-4 text-right tabular-nums">{formatWon(r.monthlyAvg)}</Td>
+                  <Td className="whitespace-nowrap pr-4 text-right tabular-nums">
+                    <AvgValue row={r} />
+                  </Td>
                   <Td className="whitespace-nowrap pr-4 text-right tabular-nums">{formatWon(r.total)}</Td>
                   {canEdit && (
                     <Td className="whitespace-nowrap text-right print:hidden">
