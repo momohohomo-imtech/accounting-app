@@ -24,7 +24,7 @@
   `UncategorizedPurchasesTable`, `TransactionHistoryTable`, `ProjectReceiptsTable`, 통합 보고서의 `ProjectsCombinedTable`·
   `CombinedCategorySection`·`CombinedAgencyTable`, `BankBalanceCheckPopup`(통장 잔액 확인 기록), `YearLockPanel`(잠긴 해),
   `ReceivableAgingTable`(오래된 외상매출금), `HometaxReconcilePanel`(홈택스 대조 결과), `ConstructionMemoList`(공사 메모),
-  `WorkSequenceList`(공사 작업 순서표))에
+  `WorkSequenceList`(공사 작업 순서표), `FixedExpensePanel`(고정지출 지정 거래처·후보))에
   이 패턴이 적용돼 있음 — 새 표를 추가할 때 이 목록도 같이 업데이트할 것.
   (예외: `DailyWorkerUsageStatementTable`은 세무사 제출용 사용내역서 문서라
   근로자별 연속일 소계 순서가 고정돼야 해서 임의 정렬을 지원하지 않음 —
@@ -179,7 +179,7 @@
   정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
   해 잠금 불러오기(`yearLock`), 오래된 외상매출금(`receivableAging`), 이번 달 신고·납부 일정(`annualTasks`), 홈택스 세금계산서
   대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`), 메모 한 장 엑셀(`memoExport`), 공사 작업 순서
-  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
+  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`), 고정지출 달 평균(`fixedExpense`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
   (vitest는 npm 설치 오류로 못 씀 — 새 테스트 라이브러리를 넣지 말 것)
@@ -287,6 +287,12 @@
   (`lib/workSequenceOverview.ts`의 `teamSchedule` — 앞으로 2주, 팀 이름이 같으면 순서표가 달라도 한 팀·한 색, 같은 날 다른 순서표 작업과
   겹치면 알림 — 한 순서표 안 겹침은 순서표 화면 몫) ③ 오늘·이번 주 할 일(`buildAgenda` — 늦은 작업은 목록 "지연"과 같은 계획 기준,
   오늘·이번 주는 예상 일정 기준). 모아 보기는 탭 위 카드, 완료한 단계·시작일 없는 순서표는 빠짐.
+- **고정지출**(보고서 메뉴 "거래처·카테고리 집계" 안, 11/3 사용자 결정 "지정한 거래처의 총매입액 ÷ 12"): 지정한 거래처의 최근
+  12개월(지난달까지, 한국 시각) 매입 합계(공급가액 + 부가세, 거래일 기준 — 외상 미정산 포함) ÷ 12 = 달 평균, 지정 거래처 달 평균의 합 =
+  "매달 기본으로 나가는 돈" — `lib/fixedExpense.ts`로만 계산. 지정은 101 SQL `clients.is_fixed_expense`(`setClientFixedExpense`, 관리자·
+  직원만 — 바뀐 줄이 없으면 오류). 은행 거래는 넣지 않음(사용자: 자동이체도 매입매출장에 직접 등록 — 넣으면 두 번 셈). 직접 입력한
+  거래처명은 지정 불가(거래처로 등록하면 가능). 중간에 시작·끊긴 곳은 나온 달·낸 달 평균을 같이, 지정 안 한 곳 중 10달 이상 나온 곳은
+  후보. 101 실행 전엔 지정 없이 후보만.
 - **백업 상태**(10/29 사용자 요청 "A"): 대시보드 접힘 목록 맨 아래 "백업" 줄 + 마지막 자동 백업 후 8일이 넘을 때만 맨 위 카드에
   경고 한 줄(`lib/backupStatus.ts`, 관리자·직원만 — 백업 기록은 그 두 역할만 읽음). 자동 백업 주기(vercel.json 크론)를 바꾸면
   `AUTO_BACKUP_STALE_DAYS`도 같이.

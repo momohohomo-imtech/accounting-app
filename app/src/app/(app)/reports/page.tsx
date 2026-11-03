@@ -15,6 +15,10 @@ import { AutoPrint } from "@/components/AutoPrint";
 import { isLedgerVisible, remainingBalance } from "@/lib/credit";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import { VendorAggregateTable } from "@/components/VendorAggregateTable";
+import { FixedExpensePanel } from "@/components/FixedExpensePanel";
+import { fixedExpenseReport, fixedExpenseWindow } from "@/lib/fixedExpense";
+import { getCurrentRole } from "@/lib/currentRole";
+import { nowKstParts } from "@/lib/kstDate";
 import { PurchaseItemSearchTable } from "@/components/PurchaseItemSearchTable";
 import { VendorAgencyToggle } from "@/components/VendorAgencyToggle";
 import { ClassificationPendingTable } from "@/components/ClassificationPendingTable";
@@ -106,6 +110,40 @@ function one<T>(v: T | T[] | null): T | null {
   return Array.isArray(v) ? v[0] ?? null : v;
 }
 
+// 고정지출 칸(lib/fixedExpense.ts) — 선택 연도와 상관없이 최근 12개월(지난달까지) + 이번 달 매입, 거래처의 고정지출 표시(101 SQL).
+// 101 실행 전이면 표시 없이(지정 안 함) 계산해서 후보만 보여 줌.
+const MISSING_COLUMN = new Set(["PGRST204", "42703"]);
+async function loadFixedExpense(supabase: Awaited<ReturnType<typeof createClient>>, today: string) {
+  const win = fixedExpenseWindow(today);
+  const probe = await supabase.from("clients").select("is_fixed_expense").limit(1);
+  const ready = !(probe.error && MISSING_COLUMN.has(probe.error.code ?? ""));
+  const [clients, txs] = await Promise.all([
+    ready
+      ? fetchAllRows<{ id: string; name: string; is_fixed_expense: boolean | null }>((from, to) =>
+          supabase.from("clients").select("id, name, is_fixed_expense").order("id").range(from, to)
+        )
+      : fetchAllRows<{ id: string; name: string; is_fixed_expense?: boolean | null }>((from, to) =>
+          supabase.from("clients").select("id, name").order("id").range(from, to)
+        ),
+    fetchAllRows<{ client_id: string | null; trans_date: string; purchase_amount: number; purchase_vat: number }>((from, to) =>
+      supabase
+        .from("transactions")
+        .select("client_id, trans_date, purchase_amount, purchase_vat")
+        .eq("type", "매입")
+        .gte("trans_date", win.from)
+        .lte("trans_date", today)
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
+  ]);
+  const report = fixedExpenseReport(
+    txs.map((t) => ({ client_id: t.client_id, trans_date: t.trans_date, amount: Number(t.purchase_amount) + Number(t.purchase_vat) })),
+    clients.map((c) => ({ id: c.id, name: c.name, fixed: Boolean(c.is_fixed_expense) })),
+    today
+  );
+  return { ready, report };
+}
+
 
 export default async function ReportsPage({
   searchParams,
@@ -147,6 +185,9 @@ export default async function ReportsPage({
   const selectedYear = year ? Number(year) : currentYear;
 
   const supabase = await createClient();
+  // 고정지출 칸 — 다른 조회와 같이 시작
+  const fixedExpensePromise = loadFixedExpense(supabase, nowKstParts().date);
+  const rolePromise = getCurrentRole();
   const [
     rawTx,
     { data: projects },
@@ -217,6 +258,33 @@ export default async function ReportsPage({
     ]);
 
   const clientNames = (clientRows ?? []).map((c) => c.name);
+  const [fixedExpense, role] = await Promise.all([fixedExpensePromise, rolePromise]);
+  const canEditFixedExpense = role === "admin" || role === "staff";
+  const fixedExportHeaders = [
+    "거래처",
+    "달 평균(÷12)",
+    "12달 합계",
+    "나온 달",
+    "낸 달 평균",
+    "마지막 매입",
+    "이번 달",
+    ...fixedExpense.report.window.months,
+  ];
+  const fixedExportRows: (string | number)[][] = [
+    ...fixedExpense.report.rows.map((r) => [
+      r.name,
+      r.monthlyAvg,
+      r.total,
+      `${r.monthsWithSpend}/12`,
+      r.monthsWithSpend > 0 && r.monthsWithSpend < 12 ? r.activeAvg : "",
+      r.lastDate ?? "",
+      r.thisMonth,
+      ...r.perMonth,
+    ]),
+    ...(fixedExpense.report.rows.length
+      ? [["합계", fixedExpense.report.totalMonthly, fixedExpense.report.totalYear, "", "", "", "", ...fixedExpense.report.perMonth]]
+      : []),
+  ];
 
   const transactions = rawTx.filter((t) => isLedgerVisible(t, creditPayments));
 
@@ -1216,7 +1284,7 @@ export default async function ReportsPage({
       <CollapsibleSection
         title={groupTitle("거래처·카테고리 집계")}
         bare
-        defaultOpen={groupDefaultOpen(["vendors", "purchaseItems", "classification", "categories", "customers"])}
+        defaultOpen={groupDefaultOpen(["vendors", "fixedExpense", "purchaseItems", "classification", "categories", "customers"])}
       >
        <div className="space-y-6 mt-3">
         <CollapsibleSection
@@ -1235,6 +1303,19 @@ export default async function ReportsPage({
             year={selectedYear}
             vendorAgency={includeVendorAgency}
           />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title="고정지출 — 지정한 거래처의 달 평균(최근 12개월 ÷ 12)"
+          className={hiddenClass("fixedExpense")}
+          defaultOpen={printSection === "fixedExpense"}
+          headerExtra={sectionControls("fixedExpense", {
+            filename: `고정지출_${fixedExpense.report.window.months[0]}_${fixedExpense.report.window.months[11]}.xlsx`,
+            headers: fixedExportHeaders,
+            rows: fixedExportRows,
+          })}
+        >
+          <FixedExpensePanel report={fixedExpense.report} ready={fixedExpense.ready} canEdit={canEditFixedExpense} />
         </CollapsibleSection>
 
         <CollapsibleSection
