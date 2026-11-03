@@ -27,6 +27,7 @@ import { CategoryDetailReport } from "@/components/CategoryDetailReport";
 import { ProjectProfitTable } from "@/components/ProjectProfitTable";
 import { SiteProfitTable } from "@/components/SiteProfitTable";
 import { SiteProfitReport } from "@/components/SiteProfitReport";
+import { SortableSimpleTable } from "@/components/SortableSimpleTable";
 import { RevenueVerificationTable } from "@/components/RevenueVerificationTable";
 import { TransactionEditPopup } from "@/components/TransactionEditPopup";
 import { WorkLogSummaryTable } from "@/components/WorkLogSummaryTable";
@@ -1152,8 +1153,13 @@ export default async function ReportsPage({
               rows: quarterly.map((q) => [q.label, q.sales, q.purchase, q.profit]),
             })}
           </div>
-          <SimpleTable
-            rows={quarterly.map((q) => [q.label, formatWon(q.sales), formatWon(q.purchase), formatWon(q.profit)])}
+          <SortableSimpleTable
+            rows={quarterly.map((q, i) => [
+              { text: q.label, value: i },
+              { text: formatWon(q.sales), value: q.sales },
+              { text: formatWon(q.purchase), value: q.purchase },
+              { text: formatWon(q.profit), value: q.profit },
+            ])}
             headers={["분기", "매출", "매입", "손익"]}
           />
         </div>
@@ -1168,8 +1174,13 @@ export default async function ReportsPage({
             rows: monthly.map((m) => [m.label, m.sales, m.purchase, m.profit]),
           })}
         >
-          <SimpleTable
-            rows={monthly.map((m) => [m.label, formatWon(m.sales), formatWon(m.purchase), formatWon(m.profit)])}
+          <SortableSimpleTable
+            rows={monthly.map((m, i) => [
+              { text: m.label, value: i },
+              { text: formatWon(m.sales), value: m.sales },
+              { text: formatWon(m.purchase), value: m.purchase },
+              { text: formatWon(m.profit), value: m.profit },
+            ])}
             headers={["월", "매출", "매입", "손익"]}
           />
         </CollapsibleSection>
@@ -1395,8 +1406,12 @@ export default async function ReportsPage({
             rows: customerExportRows,
           })}
         >
-          <SimpleTable
-            rows={byCustomer.map((v) => [v.name, `${v.count}건`, formatWon(v.amount)])}
+          <SortableSimpleTable
+            rows={byCustomer.map((v) => [
+              { text: v.name, value: v.name },
+              { text: `${v.count}건`, value: v.count },
+              { text: formatWon(v.amount), value: v.amount },
+            ])}
             headers={["거래처", "건수", "매출 합계"]}
             empty="매출 거래가 없습니다."
           />
@@ -1535,50 +1550,6 @@ export default async function ReportsPage({
               : `/reports?year=${selectedYear}${includeVendorAgency ? "&vendorAgency=1" : ""}&vendor=${encodeURIComponent(vendor ?? "")}`
         }
       />
-    </div>
-  );
-}
-
-function SimpleTable({
-  headers,
-  rows,
-  empty = "데이터가 없습니다.",
-}: {
-  headers: string[];
-  rows: string[][];
-  empty?: string;
-}) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[600px] text-sm">
-        <thead>
-          <tr className="border-b border-slate-200 text-left text-slate-500">
-            {headers.map((h, i) => (
-              <th key={h} className={`pb-2 pr-4 ${i > 0 ? "text-right" : ""}`}>
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i} className="border-b border-slate-100 last:border-0">
-              {r.map((cell, j) => (
-                <td key={j} className={`py-2 pr-4 ${j > 0 ? "text-right tabular-nums text-slate-700" : "text-slate-700"}`}>
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
-          {rows.length === 0 && (
-            <tr>
-              <td colSpan={headers.length} className="py-8 text-center text-slate-400">
-                {empty}
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
     </div>
   );
 }

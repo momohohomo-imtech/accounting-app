@@ -24,7 +24,7 @@
   `UncategorizedPurchasesTable`, `TransactionHistoryTable`, `ProjectReceiptsTable`, 통합 보고서의 `ProjectsCombinedTable`·
   `CombinedCategorySection`·`CombinedAgencyTable`, `BankBalanceCheckPopup`(통장 잔액 확인 기록), `YearLockPanel`(잠긴 해),
   `ReceivableAgingTable`(오래된 외상매출금), `HometaxReconcilePanel`(홈택스 대조 결과), `ConstructionMemoList`(공사 메모),
-  `WorkSequenceList`(공사 작업 순서표), `FixedExpensePanel`(고정지출 지정 거래처·카테고리·후보))에
+  `WorkSequenceList`(공사 작업 순서표), `FixedExpensePanel`(고정지출 지정 거래처·카테고리·후보), `SortableSimpleTable`(보고서 분기별·월별 손익·매출처별 집계))에
   이 패턴이 적용돼 있음 — 새 표를 추가할 때 이 목록도 같이 업데이트할 것.
   (예외: `DailyWorkerUsageStatementTable`은 세무사 제출용 사용내역서 문서라
   근로자별 연속일 소계 순서가 고정돼야 해서 임의 정렬을 지원하지 않음 —

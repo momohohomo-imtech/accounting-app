@@ -229,6 +229,8 @@ export function ProjectAgencyPurchaseList({
   const [pending, setPending] = useState(false);
   const [newCategoryId, setNewCategoryId] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // 추가에 성공하면 입력칸을 비우려고 폼을 새로 그림(금액칸 MoneyInput은 자체 상태라 form.reset()으로는 안 비워짐)
+  const [addFormKey, setAddFormKey] = useState(0);
 
   const total = items.reduce((s, i) => s + i.amount, 0);
 
@@ -262,7 +264,10 @@ export function ProjectAgencyPurchaseList({
     );
   }
 
-  async function handleAdd(formData: FormData) {
+  // onSubmit(form action 아님) — form action은 끝나면 입력칸을 비워서, 저장이 실패해도 적은 매입처·품목·금액이 사라졌음
+  async function handleAdd(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
     setPending(true);
     setError(null);
     const result = await globalPending.run(() => addAgencyPurchase(formData));
@@ -272,6 +277,7 @@ export function ProjectAgencyPurchaseList({
       return;
     }
     setNewCategoryId("");
+    setAddFormKey((k) => k + 1);
     router.refresh();
   }
 
@@ -307,7 +313,7 @@ export function ProjectAgencyPurchaseList({
         <p className="mb-2 hidden text-sm text-slate-400 print:block">대행구매 내역이 없습니다.</p>
       )}
 
-      <form action={handleAdd} className="flex flex-wrap items-end gap-2 print:hidden">
+      <form key={addFormKey} onSubmit={handleAdd} className="flex flex-wrap items-end gap-2 print:hidden">
         <input type="hidden" name="project_id" value={projectId} />
         <input list="agency-client-names-new" name="client_name" placeholder="매입처 (자유 입력)" className={`${inlineFieldClass} w-36`} />
         <datalist id="agency-client-names-new">

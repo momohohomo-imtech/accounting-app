@@ -43,6 +43,7 @@ export function ConstructionMemoList({
   const pending = useGlobalPending();
   const [popup, setPopup] = useState<Popup | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   // 전체 내용을 펼쳐 본 메모(휴대폰은 마우스를 올려 볼 수 없어서 눌러서 펼침)
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
   // 기본은 최근 작성이 위(예전 카드 순서와 같게)
@@ -90,7 +91,13 @@ export function ConstructionMemoList({
   async function handleDelete(id: string) {
     const fd = new FormData();
     fd.append("id", id);
-    await pending.run(() => Promise.resolve(deleteAction(fd)));
+    // 실패하면 확인 칸을 그대로 두고 이유를 보여 줌 — 예전엔 결과를 버려서 안 지워져도 아무 표시가 없었음
+    const result = await pending.run(() => Promise.resolve(deleteAction(fd)));
+    if (result && typeof result === "object" && "error" in result && result.error) {
+      setDeleteError(`삭제하지 못했습니다: ${String(result.error)}`);
+      return;
+    }
+    setDeleteError(null);
     setConfirmDeleteId(null);
   }
 
@@ -103,6 +110,7 @@ export function ConstructionMemoList({
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:border-0 print:p-0 print:shadow-none">
+        {deleteError && <p className="mb-2 text-sm text-red-600 print:hidden">{deleteError}</p>}
         {/* 휴대폰: 옆으로 넘기고 프로젝트 칸을 왼쪽에 고정(첫 칸 날짜만으로는 어느 메모인지 알기 어려움) */}
         <Table className="sticky-col-table min-w-[760px] print:min-w-0">
           <THead>
@@ -160,7 +168,15 @@ export function ConstructionMemoList({
                           <Button type="button" variant="danger" size="xs" onClick={() => handleDelete(m.id)}>
                             확인
                           </Button>
-                          <Button type="button" variant="secondary" size="xs" onClick={() => setConfirmDeleteId(null)}>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="xs"
+                            onClick={() => {
+                              setConfirmDeleteId(null);
+                              setDeleteError(null);
+                            }}
+                          >
                             취소
                           </Button>
                         </>
@@ -178,7 +194,15 @@ export function ConstructionMemoList({
                           <Button type="button" variant="secondary" size="xs" onClick={() => setPopup({ mode: "edit", memo: m })}>
                             수정
                           </Button>
-                          <Button type="button" variant="danger" size="xs" onClick={() => setConfirmDeleteId(m.id)}>
+                          <Button
+                            type="button"
+                            variant="danger"
+                            size="xs"
+                            onClick={() => {
+                              setConfirmDeleteId(m.id);
+                              setDeleteError(null);
+                            }}
+                          >
                             삭제
                           </Button>
                         </>
