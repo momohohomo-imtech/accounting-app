@@ -11,6 +11,7 @@ import {
   teamColor,
   tintHex,
   totalSpan,
+  type ForecastStep,
   type ScheduledStep,
   type SequenceStart,
   type StepStatus,
@@ -21,6 +22,7 @@ import {
 // 색 = 팀, 모양 = 상태(사용자 결정 11/2 "팀별 색"): 막대 색은 맡은 팀(팀 미정은 남색), 완료는 옅은 막대 + ✓, 계획 끝이 지났는데
 // 미완료면 빨간 테두리 + !, 앞 작업과 겹치는 날·시간은 막대 앞쪽 빗금, 빨간 세로선 = 오늘(지금, 막대 뒤로 지나감). 색만으로는 3~4팀
 // 넘으면 헷갈려서 막대·왼쪽 칸에 팀 이름도 같이. 앞 작업을 따로 고른 단계는 "N번 뒤", 처음부터 시작하는 단계는 "처음부터"(099 SQL).
+// forecast(예상 일정 — 늦어진 만큼 밀림, 11/3)를 넘기면 계획과 달라진 미완료 단계에 점선 막대(계획 막대 뒤, 늘어난 만큼 오른쪽으로 보임).
 // focus(팀별 보기)를 넘기면 그 단계만 진하게 — 나머지는 흐리게, 인쇄에서는 뺌. onOverlapChange를 넘기면 차트에서 바로 겹침을 −/+로
 // 고침(순서표 화면), 안 넘기면 보기만. 화면에서는 칸마다 최소 폭을 줘서 칸이 많으면 상자 안에서 옆으로 넘기고(페이지 폭은 안
 // 넓힘), 인쇄는 종이 폭에 맞춰 줄임 — 그래서 칸·막대 위치는 px 대신 전체 칸 수에 대한 %로.
@@ -43,6 +45,7 @@ export function WorkSequenceChart({
   seq,
   statuses,
   todayAt = null,
+  forecast = null,
   focus = null,
   teamConflictSteps,
   legendTeams,
@@ -55,6 +58,8 @@ export function WorkSequenceChart({
   statuses?: StepStatus[];
   /** 오늘(지금) 위치 — 순서표 시작부터 몇 칸째(lib/workSequence.ts todayOffset), 차트 밖이면 null */
   todayAt?: number | null;
+  /** 예상 일정(lib/workSequence.ts forecastSchedule) — 계획과 달라진 미완료 단계에 점선 막대 */
+  forecast?: ForecastStep[] | null;
   /** 팀별 보기 — true인 단계만 진하게(나머지는 흐리게, 인쇄에서는 뺌). null = 전체 */
   focus?: boolean[] | null;
   /** 같은 팀 다른 단계와 일정이 겹치는 단계(위치) */
@@ -66,7 +71,10 @@ export function WorkSequenceChart({
   if (steps.length === 0) {
     return <p className="py-6 text-center text-sm text-slate-400">단계를 추가하면 흐름 차트가 그려집니다.</p>;
   }
-  const columns = chartColumns(totalSpan(schedule), seq);
+  // 칸은 계획 끝과 예상 끝 중 늦은 쪽까지
+  const forecastEnd = forecast ? forecast.reduce((max, f) => Math.max(max, f.end), 0) : 0;
+  const columns = chartColumns(Math.max(totalSpan(schedule), forecastEnd), seq);
+  const hasForecastBars = Boolean(forecast?.some((f, i) => f.changed && !steps[i]?.done));
   const count = columns.length;
   const pct = (n: number) => `${(n / count) * 100}%`;
   const minTrack = count * (seq.unit === "day" ? 40 : 30);
@@ -209,6 +217,20 @@ export function WorkSequenceChart({
                     />
                   ))}
                   {todayLine}
+                  {forecast?.[i]?.changed && !step.done && (
+                    <div
+                      className="absolute top-1/2 z-0 flex h-6 -translate-y-1/2 items-center justify-end overflow-hidden rounded border-[1.5px] border-dashed text-[10px] font-semibold text-slate-700"
+                      style={{
+                        left: pct(forecast[i].start),
+                        width: pct(forecast[i].end - forecast[i].start),
+                        borderColor: color.hex,
+                        background: tintHex(color.hex, 0.12),
+                      }}
+                      title={`${i + 1}. ${step.content} — 예상(늦어진 만큼 밀림)`}
+                    >
+                      <span className="truncate px-1">예상</span>
+                    </div>
+                  )}
                   <div
                     className="absolute top-1/2 z-[1] flex h-6 -translate-y-1/2 items-center overflow-hidden rounded text-[11px] font-semibold"
                     style={{ ...barStyle, left: pct(s.start), width: pct(duration) }}
@@ -256,6 +278,12 @@ export function WorkSequenceChart({
           <span className="inline-block h-2.5 w-4 rounded-sm bg-slate-500" style={{ boxShadow: `0 0 0 1.5px #fff, 0 0 0 3px ${LATE_RED}` }} /> !
           빨간 테두리 = 계획보다 늦음
         </span>
+        {hasForecastBars && (
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-2.5 w-4 rounded-sm border-[1.5px] border-dashed border-slate-500 bg-slate-100" /> 점선 = 예상(늦어진
+            만큼 밀림)
+          </span>
+        )}
         <span className="inline-flex items-center gap-1">
           <span className="inline-block h-2.5 w-0.5 bg-red-500" /> {seq.unit === "day" ? "오늘" : "지금"}
         </span>

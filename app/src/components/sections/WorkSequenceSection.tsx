@@ -2,13 +2,18 @@ import { createClient } from "@/lib/supabase/server";
 import { one } from "@/lib/relations";
 import { fetchAllData, fetchAllRows } from "@/lib/supabaseFetchAll";
 import { Card } from "@/components/ui/Card";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
+import { WorkSequenceAgenda, WorkTeamSchedule } from "@/components/WorkSequenceOverview";
 import { LinkButton } from "@/components/ui/Button";
 import type { SiteOption } from "@/components/ProjectPicker";
 import { WorkSequenceList, type WorkSequenceListRow } from "@/components/WorkSequenceList";
 import { WorkSequenceEditor, type WorkSequenceData } from "@/components/WorkSequenceEditor";
 import { nowKstParts } from "@/lib/kstDate";
+import { buildAgenda, teamSchedule, type OverviewSequence } from "@/lib/workSequenceOverview";
 import {
   doneCount,
+  forecastSchedule,
+  forecastSummary,
   parseTeams,
   scheduleSteps,
   sequenceRangeLabel,
@@ -49,8 +54,8 @@ type StepRow = {
   team_id?: string | null;
 };
 
-// 공사 관리 "공사 작업 순서" 탭(사용자 요청 11/2, 098·099·100 SQL) — 순서표 목록 + 순서표 팝업(?seq=아이디, 새로 쓰기 ?seq=new,
-// 복사해서 새로 쓰기 ?seq=new&copyFrom=아이디).
+// 공사 관리 "공사 작업 순서" 탭(사용자 요청 11/2, 098·099·100 SQL) — 모아 보기(오늘·이번 주 할 일, 팀별 2주 일정 — 11/3) + 순서표
+// 목록 + 순서표 팝업(?seq=아이디, 새로 쓰기 ?seq=new, 복사해서 새로 쓰기 ?seq=new&copyFrom=아이디).
 export async function WorkSequenceSection({ seq, copyFrom }: { seq?: string; copyFrom?: string }) {
   const supabase = await createClient();
   // 098 SQL 실행 전이면 안내만
@@ -152,11 +157,26 @@ export async function WorkSequenceSection({ seq, copyFrom }: { seq?: string; cop
     );
   };
 
-  const rows: WorkSequenceListRow[] = sequences.map((r) => {
+  // 모아 보기 — 최근에 고친 순서표가 먼저(같은 이름 팀의 색은 그 순서표 것)
+  const overview: OverviewSequence[] = [];
+  const rows: WorkSequenceListRow[] = [...sequences]
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+    .map((r) => {
     const data = toData(r);
     const schedule = scheduleOf(data);
     const project = one(r.projects) as { name: string; sites?: unknown } | undefined;
     const site = one(project?.sites) as { name: string } | undefined;
+    const seqStart = { unit: data.unit, start_date: data.start_date, start_time: data.start_time };
+    const summary = forecastSummary(forecastSchedule(data.steps, schedule, seqStart, today), schedule, seqStart, data.steps);
+    overview.push({
+      id: r.id,
+      title: r.title,
+      projectLabel: `${site?.name ?? "현장 미지정"} · ${project?.name ?? "(삭제된 프로젝트)"}`,
+      seq: seqStart,
+      teams: data.teams,
+      steps: data.steps,
+      schedule,
+    });
     return {
       id: r.id,
       project_name: project?.name ?? "(삭제된 프로젝트)",
@@ -168,9 +188,14 @@ export async function WorkSequenceSection({ seq, copyFrom }: { seq?: string; cop
       stepCount: data.steps.length,
       doneCount: doneCount(data.steps),
       status: summarizeSequence(data.steps, schedule, data, today),
+      forecast: summary
+        ? { endKey: summary.endKey, endLabel: summary.endLabel, delay: summary.delay, allDone: summary.allDone }
+        : null,
       updated_at: r.updated_at,
     };
   });
+  const agenda = buildAgenda(overview, today);
+  const team = teamSchedule(overview, today, 14);
 
   // 다른 순서표에서 쓴 팀 이름·색(최근에 고친 순서표 것이 먼저) — 팀을 추가할 때 골라 쓰기(색도 그때 색)
   const knownTeams: { name: string; color: TeamColorKey }[] = [];
@@ -214,9 +239,35 @@ export async function WorkSequenceSection({ seq, copyFrom }: { seq?: string; cop
           주세요(칸 2개만 추가 — 기존 자료는 그대로).
         </p>
       )}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      {sequences.length > 0 && (
+        <CollapsibleSection
+          defaultOpen
+          title={
+            <>
+              오늘·이번 주 할 일
+              {agenda.overdue.length > 0 && <span className="ml-1.5 text-sm text-red-600">· 늦은 작업 {agenda.overdue.length}</span>}
+            </>
+          }
+        >
+          <WorkSequenceAgenda agenda={agenda} todayDate={today.date} openHref={`${BASE}&seq=`} />
+        </CollapsibleSection>
+      )}
+      {sequences.length > 0 && (
+        <CollapsibleSection
+          defaultOpen={team.rows.length > 0}
+          title={
+            <>
+              팀별 일정 — 앞으로 2주
+              {team.rows.some((r) => r.conflicts.length > 0) && <span className="ml-1.5 text-sm text-amber-700">· 다른 순서표와 겹침</span>}
+            </>
+          }
+        >
+          <WorkTeamSchedule days={team.days} rows={team.rows} openHref={`${BASE}&seq=`} />
+        </CollapsibleSection>
+      )}
+      <CollapsibleSection defaultOpen title={`작업 순서표 목록 ${sequences.length}개`}>
         <WorkSequenceList rows={rows} openHref={`${BASE}&seq=`} copyHref={`${BASE}&seq=new&copyFrom=`} />
-      </div>
+      </CollapsibleSection>
       {seq && !editorData && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
           열려던 순서표를 찾지 못했습니다(삭제됐을 수 있음).

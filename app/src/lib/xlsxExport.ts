@@ -137,6 +137,8 @@ export type WorkSequenceExport = {
   startLabel: string;
   rangeLabel: string;
   doneLabel: string;
+  /** "예상 완료 11-07 (1일 늦음)"·"실제 완료 …" — 계획대로면 null(lib/workSequence.ts forecastSummary) */
+  forecastLabel: string | null;
   /** 팀 칸·팀 색을 넣음(100 SQL 뒤 팀이 있는 순서표) */
   withTeams: boolean;
   /** 범례에 보일 팀(쓴 팀 + 팀 미정) */
@@ -149,6 +151,10 @@ export type WorkSequenceExport = {
     duration: number;
     overlap: number;
     range: string;
+    /** 예상 일정 글자(늦어진 만큼 밀린 미완료 단계만, 아니면 "") */
+    forecast: string;
+    /** 예상 일정 구간(순서표 시작부터) — 흐름 차트 점선 칸 */
+    forecastSpan: { start: number; end: number } | null;
     done: boolean;
     done_date: string | null;
     /** 앞 작업 글자("바로 앞"·"처음부터"·"2번 뒤") */
@@ -194,6 +200,9 @@ export async function downloadWorkSequenceXlsx(filename: string, data: WorkSeque
       center: true,
     },
     { header: "일정", width: 24, value: (s) => s.range, center: true },
+    ...(data.steps.some((s) => s.forecast)
+      ? [{ header: "예상 일정", width: 22, value: (s: WorkSequenceExport["steps"][number]) => s.forecast, center: true }]
+      : []),
     { header: "상태", width: 18, value: (s) => s.status, center: true, wrap: true },
     { header: "완료", width: 8, value: (s) => (s.done ? "완료" : ""), center: true },
     { header: "완료일", width: 12, value: (s) => (s.done ? s.done_date ?? "" : ""), center: true },
@@ -215,6 +224,7 @@ export async function downloadWorkSequenceXlsx(filename: string, data: WorkSeque
     ["시작", data.startLabel],
     ["전체 일정", data.rangeLabel],
     ["완료", data.doneLabel],
+    ...(data.forecastLabel ? [["예상", data.forecastLabel]] : []),
   ]) {
     const row = ws.addRow([label, value]);
     row.getCell(1).font = { bold: true, color: { argb: "FF334155" } };
@@ -287,7 +297,13 @@ export async function downloadWorkSequenceXlsx(filename: string, data: WorkSeque
       cell.border = box;
       // 칸 [c, c+1)이 단계 [start, end)와 겹치면 팀 색 — 앞 작업과 겹치는 부분 [start, start+overlap)은 빗금
       if (c + 1 <= sch.start || c >= sch.end) {
-        if (cols[c].weekend) cell.fill = fill("FFFFF1F2");
+        // 계획 밖인데 예상(늦어진 만큼 밀림) 안이면 옅은 칸 + 점선 테두리
+        const f = s.forecastSpan;
+        if (f && c + 1 > f.start && c < f.end) {
+          const dash = { style: "dashed" as const, color: { argb: argbOf(color.hex) } };
+          cell.fill = fill(argbOf(tintHex(color.hex, 0.15)));
+          cell.border = { top: dash, bottom: dash, left: border, right: c + 1 >= f.end ? dash : border };
+        } else if (cols[c].weekend) cell.fill = fill("FFFFF1F2");
         continue;
       }
       const inOverlap = sch.overlap > 0 && c < sch.start + sch.overlap;
@@ -311,7 +327,9 @@ export async function downloadWorkSequenceXlsx(filename: string, data: WorkSeque
   chart.addRow([]);
   chart.addRow([
     "",
-    `칸 하나 = ${data.unit === "day" ? "하루" : "한 시간"} · 칸 색 = ${data.withTeams ? "팀(팀 미정은 남색)" : "작업"} · 옅은 칸·✓ = 완료 · 빨간 굵은 테두리·! = 계획보다 늦음 · 빗금 = 앞 작업과 겹침`,
+    `칸 하나 = ${data.unit === "day" ? "하루" : "한 시간"} · 칸 색 = ${data.withTeams ? "팀(팀 미정은 남색)" : "작업"} · 옅은 칸·✓ = 완료 · 빨간 굵은 테두리·! = 계획보다 늦음 · 빗금 = 앞 작업과 겹침${
+      data.steps.some((s) => s.forecastSpan) ? " · 점선 칸 = 예상(늦어진 만큼 밀림)" : ""
+    }`,
   ]);
   if (data.withTeams && data.legendTeams.length > 0) {
     for (const t of data.legendTeams) {

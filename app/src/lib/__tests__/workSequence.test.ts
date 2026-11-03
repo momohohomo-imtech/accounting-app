@@ -5,6 +5,10 @@ import {
   addHours,
   chartColumns,
   daysBetween,
+  delayLabel,
+  delayShort,
+  forecastSchedule,
+  forecastSummary,
   formatAmount,
   cleanTeamName,
   nextTeamColor,
@@ -14,6 +18,7 @@ import {
   plannedRange,
   scheduleSteps,
   sequenceRangeLabel,
+  spanDates,
   spanRangeLabel,
   statusLabel,
   stepRangeLabel,
@@ -360,4 +365,103 @@ test("작업 순서 팀: 저장 전 이름 확인 — 빈 이름·같은 이름(
   assert.equal(teamNameProblem([{ name: "설비팀" }, { name: "  " }]), "이름이 빈 팀이 있습니다. 팀 이름을 입력해주세요.");
   assert.equal(teamNameProblem([{ name: "설비팀" }, { name: " 설비팀 " }]), '"설비팀" 팀이 두 개 있습니다. 팀 이름을 다르게 해주세요.');
   assert.equal(teamNameProblem(Array.from({ length: TEAM_MAX + 1 }, (_, i) => ({ name: `팀${i}` }))), `팀은 ${TEAM_MAX}개까지 만들 수 있습니다.`);
+});
+
+test("작업 순서 예상: 늦게 끝난 단계만큼 뒤 단계가 밀림, 일찍 끝나도 당기지 않음", () => {
+  const seq = { unit: "day" as const, start_date: "2026-11-01", start_time: null };
+  const plan = scheduleSteps([
+    { duration: 2, overlap: 0 },
+    { duration: 3, overlap: 0 },
+    { duration: 1, overlap: 0 },
+  ]);
+  // 1번 계획 11-01~11-02인데 11-03 완료(1일 늦음), 2·3번 미완료 — 오늘 11-03
+  const steps = [
+    { done: true, done_date: "2026-11-03" },
+    { done: false, done_date: null },
+    { done: false, done_date: null },
+  ];
+  const today = { date: "2026-11-03", time: "09:00" };
+  const f = forecastSchedule(steps, plan, seq, today)!;
+  assert.deepEqual(
+    f.map((x) => [x.start, x.end, x.changed]),
+    [
+      [0, 3, false],
+      [3, 6, true],
+      [6, 7, true],
+    ]
+  );
+  const sum = forecastSummary(f, plan, seq, steps)!;
+  assert.equal(sum.delay, 1);
+  assert.equal(sum.endLabel, "11-07");
+  assert.equal(sum.endKey, "2026-11-07");
+  assert.equal(sum.allDone, false);
+  assert.equal(delayLabel(sum.delay, "day"), "1일 늦음");
+  // 1번을 일찍(11-01) 끝내도 2번은 계획대로 11-03 시작
+  const early = forecastSchedule([{ done: true, done_date: "2026-11-01" }, steps[1], steps[2]], plan, seq, { date: "2026-11-01", time: "09:00" })!;
+  assert.deepEqual(early.map((x) => [x.start, x.end, x.changed]), [[0, 1, false], [2, 5, false], [5, 6, false]]);
+  assert.equal(delayLabel(forecastSummary(early, plan, seq, steps)!.delay, "day"), "계획대로");
+});
+
+test("작업 순서 예상: 안 끝난 늦은 단계는 오늘 끝나는 것으로, 겹침·처음부터는 그대로", () => {
+  const seq = { unit: "day" as const, start_date: "2026-11-01", start_time: null };
+  const plan = scheduleSteps([
+    { duration: 3, overlap: 0 },
+    { duration: 2, overlap: 1 },
+    { duration: 2, overlap: 0, after: "start" },
+  ]);
+  assert.deepEqual(plan.map((p) => [p.start, p.end]), [[0, 3], [2, 4], [0, 2]]);
+  const steps = [
+    { done: false, done_date: null },
+    { done: false, done_date: null },
+    { done: false, done_date: null },
+  ];
+  // 오늘 11-05(4번째 칸): 1번(계획 끝 11-03)은 오늘 끝 → 5, 2번은 5 − 겹침 1 = 4부터, 3번(처음부터)도 늦어서 오늘 끝
+  const f = forecastSchedule(steps, plan, seq, { date: "2026-11-05", time: "09:00" })!;
+  assert.deepEqual(f.map((x) => [x.start, x.end, x.changed]), [[0, 5, true], [4, 6, true], [0, 5, true]]);
+  const sum = forecastSummary(f, plan, seq, steps)!;
+  assert.equal(sum.delay, 2);
+  assert.equal(sum.endLabel, "11-06");
+  // 시작일이 없으면 계산하지 않음
+  assert.equal(forecastSchedule(steps, plan, { unit: "day", start_date: null, start_time: null }, { date: "2026-11-05", time: "09:00" }), null);
+  // 다 끝났으면 실제 완료
+  const done = steps.map((_, i) => ({ done: true, done_date: i === 1 ? "2026-11-04" : "2026-11-02" }));
+  const fd = forecastSummary(forecastSchedule(done, plan, seq, { date: "2026-11-05", time: "09:00" }), plan, seq, done)!;
+  assert.equal(fd.allDone, true);
+  assert.equal(fd.endLabel, "11-04");
+  assert.equal(delayLabel(fd.delay, "day"), "계획대로");
+});
+
+test("작업 순서 예상: 시간 단위 — 지금까지 안 끝난 단계는 지금 끝, 완료일이 계획 끝 날짜면 계획대로", () => {
+  const seq = { unit: "hour" as const, start_date: "2026-11-01", start_time: "08:00" };
+  const plan = scheduleSteps([
+    { duration: 2, overlap: 0 },
+    { duration: 1, overlap: 0 },
+  ]);
+  const steps = [
+    { done: false, done_date: null },
+    { done: false, done_date: null },
+  ];
+  // 지금 12:00(시작 4시간 뒤): 1번 10:00 끝 계획 → 지금 끝(4), 2번 4~5 → 13:00
+  const f = forecastSchedule(steps, plan, seq, { date: "2026-11-01", time: "12:00" })!;
+  assert.deepEqual(f.map((x) => [x.start, x.end]), [[0, 4], [4, 5]]);
+  const sum = forecastSummary(f, plan, seq, steps)!;
+  assert.equal(sum.endLabel, "11-01 13:00");
+  assert.equal(delayLabel(sum.delay, "hour"), "2시간 늦음");
+  // 1번을 계획 끝 날짜(11-01)에 완료 → 계획대로(2시간)
+  const f2 = forecastSchedule([{ done: true, done_date: "2026-11-01" }, steps[1]], plan, seq, { date: "2026-11-01", time: "09:00" })!;
+  assert.deepEqual(f2.map((x) => [x.start, x.end]), [[0, 2], [2, 3]]);
+  // 하루 늦게(11-02) 완료 → 그날 끝(24시) = 시작부터 40시간
+  const f3 = forecastSchedule([{ done: true, done_date: "2026-11-02" }, steps[1]], plan, seq, { date: "2026-11-02", time: "09:00" })!;
+  assert.equal(f3[0].end, 40);
+  assert.deepEqual(spanDates(0, 16, seq), { from: "2026-11-01", to: "2026-11-01" });
+  assert.deepEqual(spanDates(0, 17, seq), { from: "2026-11-01", to: "2026-11-02" });
+});
+
+test("작업 순서 예상: 짧은 글자(목록)", () => {
+  assert.equal(delayShort(2, "day"), "+2일");
+  assert.equal(delayShort(-1, "day"), "−1일");
+  assert.equal(delayShort(0, "day"), "");
+  assert.equal(delayShort(1.5, "hour"), "+1.5시간");
+  assert.equal(delayShort(0.1, "hour"), "");
+  assert.equal(delayLabel(-2, "day"), "2일 빠름");
 });

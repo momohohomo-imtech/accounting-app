@@ -179,7 +179,7 @@
   정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
   해 잠금 불러오기(`yearLock`), 오래된 외상매출금(`receivableAging`), 이번 달 신고·납부 일정(`annualTasks`), 홈택스 세금계산서
   대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`), 메모 한 장 엑셀(`memoExport`), 공사 작업 순서
-  일정(`workSequence`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
+  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
   (vitest는 npm 설치 오류로 못 씀 — 새 테스트 라이브러리를 넣지 말 것)
@@ -281,6 +281,12 @@
   골라 쓰기·그때 색), 이름이 비거나 같으면 저장 막음(`teamNameProblem`, 서버도). 팀별 보기 = 그 팀만 진하게(인쇄·엑셀은 그 팀 단계만,
   순번은 원래대로). 같은 팀 일정 겹침(`teamConflicts`)은 완료 단계·팀 미정 빼고 알림만(저장은 막지 않음). 100 실행 전엔 팀 칸을 숨기고
   저장하지 않음(조회는 `select("*")`라 칸이 없어도 됨).
+  11/3 추가(사용자 "1-3번", DB 변경 없음): ① 예상 일정(`forecastSchedule`·`forecastSummary` — 계획은 그대로 두고, 늦게 끝난 단계(완료일)와
+  안 끝난 늦은 단계(오늘 끝나는 것으로 봄)만큼 뒤 단계를 밀어 예상 완료일. 앞 작업이 일찍 끝나도 당겨 시작하지 않음(팀 일정은 계획대로
+  잡혀 있으므로). 순서표 머리 "예상 완료 …(N일 늦음)"·일정 칸 "예상 …"·차트 점선 막대·목록 "예상 완료" 칸·엑셀) ② 팀별 일정
+  (`lib/workSequenceOverview.ts`의 `teamSchedule` — 앞으로 2주, 팀 이름이 같으면 순서표가 달라도 한 팀·한 색, 같은 날 다른 순서표 작업과
+  겹치면 알림 — 한 순서표 안 겹침은 순서표 화면 몫) ③ 오늘·이번 주 할 일(`buildAgenda` — 늦은 작업은 목록 "지연"과 같은 계획 기준,
+  오늘·이번 주는 예상 일정 기준). 모아 보기는 탭 위 카드, 완료한 단계·시작일 없는 순서표는 빠짐.
 - **백업 상태**(10/29 사용자 요청 "A"): 대시보드 접힘 목록 맨 아래 "백업" 줄 + 마지막 자동 백업 후 8일이 넘을 때만 맨 위 카드에
   경고 한 줄(`lib/backupStatus.ts`, 관리자·직원만 — 백업 기록은 그 두 역할만 읽음). 자동 백업 주기(vercel.json 크론)를 바꾸면
   `AUTO_BACKUP_STALE_DAYS`도 같이.
