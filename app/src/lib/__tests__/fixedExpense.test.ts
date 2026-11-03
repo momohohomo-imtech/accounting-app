@@ -37,7 +37,7 @@ const tx = (client_id: string | null, trans_date: string, amount: number, catego
   amount,
 });
 
-test("고정지출: 지정 거래처 12개월 합계 ÷ 12, 나온 달·낸 달 평균, 이번 달·마지막 날, 후보", () => {
+test("고정지출: 지정 거래처 달 평균 = 12개월 합계 ÷ 나온 달(÷12는 참고), 이번 달·마지막 날, 후보", () => {
   const today = "2026-11-03";
   const { months } = fixedExpenseWindow(today);
   const txs: FixedExpenseTx[] = [
@@ -68,30 +68,38 @@ test("고정지출: 지정 거래처 12개월 합계 ÷ 12, 나온 달·낸 달 
   ];
   const r = fixedExpenseReport(txs, clients, [], today);
   assert.deepEqual(
-    r.rows.map((x) => [x.kind, x.name, x.total, x.monthlyAvg, x.monthsWithSpend, x.activeAvg, x.thisMonth, x.lastDate]),
+    r.rows.map((x) => [x.kind, x.name, x.total, x.monthlyAvg, x.monthsWithSpend, x.avg12, x.thisMonth, x.lastDate]),
     [
+      // 1년에 한 번 낸 보험은 그 금액이 그대로 달 평균(÷12 평균 100,000은 참고) — 사용자 결정 "낸 달 평균"
+      ["client", "가짜 보험사", 1_200_000, 1_200_000, 1, 100_000, 0, "2026-03-10"],
       ["client", "가짜 임대인", 13_200_000, 1_100_000, 12, 1_100_000, 1_100_000, "2026-11-01"],
-      ["client", "가짜 보험사", 1_200_000, 100_000, 1, 1_200_000, 0, "2026-03-10"],
-      ["client", "가짜 통신사", 99_000, 8_250, 3, 33_000, 0, "2026-10-25"],
+      // 8월에 시작한 통신사 = 낸 달 평균 33,000(÷12면 8,250으로 작게 나옴)
+      ["client", "가짜 통신사", 99_000, 33_000, 3, 8_250, 0, "2026-10-25"],
       ["client", "가짜 새 거래처", 0, 0, 0, 0, 0, null],
     ]
   );
-  assert.equal(r.totalMonthly, 1_100_000 + 100_000 + 8_250);
+  assert.equal(r.totalMonthly, 1_200_000 + 1_100_000 + 33_000);
+  assert.equal(r.yearEstimate, r.totalMonthly * 12);
   assert.equal(r.clientMonthly, r.totalMonthly);
   assert.equal(r.categoryMonthly, 0);
   assert.equal(r.totalYear, 13_200_000 + 1_200_000 + 99_000);
   assert.equal(r.perMonth[months.indexOf("2026-03")], 1_100_000 + 1_200_000);
   assert.equal(r.perMonth[months.indexOf("2026-09")], 1_100_000 + 33_000);
   // 달마다 범위 — 매입 없는 달은 0
-  assert.deepEqual([r.rows[0].minMonth, r.rows[0].maxMonth], [1_100_000, 1_100_000]);
-  assert.deepEqual([r.rows[1].minMonth, r.rows[1].maxMonth], [0, 1_200_000]);
+  const rowOf = (name: string) => r.rows.find((x) => x.name === name)!;
+  assert.deepEqual([rowOf("가짜 임대인").minMonth, rowOf("가짜 임대인").maxMonth], [1_100_000, 1_100_000]);
+  assert.deepEqual([rowOf("가짜 보험사").minMonth, rowOf("가짜 보험사").maxMonth], [0, 1_200_000]);
   assert.deepEqual(
-    r.candidates.map((x) => [x.name, x.monthsWithSpend, x.monthlyAvg]),
-    [["가짜 정기 매입처", 11, Math.round(550_000 / 12)]]
+    r.candidates.map((x) => [x.name, x.monthsWithSpend, x.monthlyAvg, x.avg12]),
+    [["가짜 정기 매입처", 11, 50_000, Math.round(550_000 / 12)]]
   );
+  // 고르기 목록 = 달 평균 큰 순(자재상 2달 100만 → 50만, 정기 매입처 11달 → 5만)
   assert.deepEqual(
-    r.otherClients.map((x) => x.name),
-    ["가짜 자재상", "가짜 정기 매입처"]
+    r.otherClients.map((x) => [x.name, x.monthlyAvg]),
+    [
+      ["가짜 자재상", 500_000],
+      ["가짜 정기 매입처", 50_000],
+    ]
   );
 });
 
@@ -129,29 +137,30 @@ test("고정지출 카테고리: 지정 거래처 매입은 거래처 줄, 나�
   ];
   const r = fixedExpenseReport(txs, clients, categories, today);
   assert.deepEqual(
-    r.rows.map((x) => [x.kind, x.name, x.total, x.monthlyAvg, x.monthsWithSpend]),
+    r.rows.map((x) => [x.kind, x.name, x.total, x.monthlyAvg, x.monthsWithSpend, x.avg12]),
     [
-      ["category", "가짜 직원급여", 36_000_000, 3_000_000, 12],
-      ["client", "가짜 주유소", 2_400_000, 200_000, 12],
-      ["category", "가짜 숙박비", 1_600_000, Math.round(1_600_000 / 12), 2],
-      ["category", "가짜 차량", 720_000, 60_000, 2],
+      ["category", "가짜 직원급여", 36_000_000, 3_000_000, 12, 3_000_000],
+      ["category", "가짜 숙박비", 1_600_000, 800_000, 2, Math.round(1_600_000 / 12)],
+      ["category", "가짜 차량", 720_000, 360_000, 2, 60_000],
+      ["client", "가짜 주유소", 2_400_000, 200_000, 12, 200_000],
     ]
   );
   // 겹침 없이 합계 = 줄 합
   assert.equal(r.totalYear, 36_000_000 + 2_400_000 + 1_600_000 + 720_000);
   assert.equal(r.clientMonthly, 200_000);
-  assert.equal(r.categoryMonthly, 3_000_000 + Math.round(1_600_000 / 12) + 60_000);
+  assert.equal(r.categoryMonthly, 3_000_000 + 800_000 + 360_000);
   assert.equal(r.totalMonthly, r.clientMonthly + r.categoryMonthly);
+  assert.equal(r.yearEstimate, r.totalMonthly * 12);
   // 숙박비 범위 0 ~ 120만, 급여 이번 달
   const stay = r.rows.find((x) => x.name === "가짜 숙박비")!;
   assert.deepEqual([stay.minMonth, stay.maxMonth], [0, 1_200_000]);
   assert.equal(r.rows.find((x) => x.name === "가짜 직원급여")!.thisMonth, 3_000_000);
   // 후보: 자재 카테고리·자재상(10달), 이미 카테고리 줄에 들어간 정비소·숙소는 고르기 목록에도 없음
   assert.deepEqual(
-    r.candidates.map((x) => [x.kind, x.name, x.monthsWithSpend]).sort(),
+    r.candidates.map((x) => [x.kind, x.name, x.monthsWithSpend, x.monthlyAvg]).sort(),
     [
-      ["category", "가짜 원자재", 10],
-      ["client", "가짜 자재상", 10],
+      ["category", "가짜 원자재", 10, 900_000],
+      ["client", "가짜 자재상", 10, 900_000],
     ]
   );
   assert.deepEqual(
@@ -174,6 +183,8 @@ test("고정지출: 지정한 곳이 없으면 0, 반품(음수)도 합계에 �
   assert.equal(r.totalMonthly, 0);
   assert.deepEqual(r.rows, []);
   assert.equal(r.otherClients[0].total, 100_000);
-  assert.equal(r.otherClients[0].monthlyAvg, Math.round(100_000 / 12));
+  assert.equal(r.otherClients[0].monthlyAvg, 100_000);
+  assert.equal(r.otherClients[0].avg12, Math.round(100_000 / 12));
   assert.equal(r.otherClients[0].monthsWithSpend, 1);
+  assert.equal(r.yearEstimate, 0);
 });

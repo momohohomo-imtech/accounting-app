@@ -278,10 +278,10 @@ export default async function ReportsPage({
   const fixedExportHeaders = [
     "구분",
     "거래처·카테고리",
-    "달 평균(÷12)",
+    "달 평균(합계 ÷ 나온 달)",
     "12달 합계",
     "나온 달",
-    "낸 달 평균",
+    "÷12 평균(참고)",
     "마지막 매입",
     "이번 달",
     "가장 적은 달",
@@ -295,7 +295,7 @@ export default async function ReportsPage({
       r.monthlyAvg,
       r.total,
       `${r.monthsWithSpend}/12`,
-      r.monthsWithSpend > 0 && r.monthsWithSpend < 12 ? r.activeAvg : "",
+      r.monthsWithSpend > 0 && r.monthsWithSpend < 12 ? r.avg12 : "",
       r.lastDate ?? "",
       r.thisMonth,
       r.minMonth,
@@ -1327,7 +1327,7 @@ export default async function ReportsPage({
         </CollapsibleSection>
 
         <CollapsibleSection
-          title="고정지출 — 지정한 거래처·카테고리의 달 평균(최근 12개월 ÷ 12)"
+          title="고정지출 — 지정한 거래처·카테고리의 달 평균(최근 12개월)"
           className={hiddenClass("fixedExpense")}
           defaultOpen={printSection === "fixedExpense"}
           headerExtra={sectionControls("fixedExpense", {

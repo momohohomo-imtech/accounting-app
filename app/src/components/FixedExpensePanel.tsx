@@ -10,9 +10,9 @@ import { formatWon } from "@/lib/format";
 import { cx } from "@/lib/cx";
 import type { FixedExpenseKind, FixedExpenseReport, FixedExpenseRow } from "@/lib/fixedExpense";
 
-// 보고서 "고정지출" 칸(사용자 요청 11/3 — 지정한 거래처·카테고리의 최근 12개월 매입 ÷ 12 = 달 평균, 계산은 lib/fixedExpense.ts). 지정·해제는
-// 거래처(101 SQL)·카테고리(102 SQL)에 저장, 은행 거래는 안 씀(사용자: 자동이체도 매입매출장에 직접 등록). 한 거래는 한 줄에만(지정 거래처 →
-// 지정 카테고리). 표는 머리글로 정렬.
+// 보고서 "고정지출" 칸(사용자 요청 11/3 — 지정한 거래처·카테고리의 최근 12개월 매입 ÷ 나온 달 = 달 평균("낸 달 평균", ÷12는 참고 칸),
+// 계산은 lib/fixedExpense.ts). 지정·해제는 거래처(101 SQL)·카테고리(102 SQL)에 저장, 은행 거래는 안 씀(사용자: 자동이체도 매입매출장에 직접
+// 등록). 한 거래는 한 줄에만(지정 거래처 → 지정 카테고리). 후보는 기본 접힘(사용자 요청 11/3). 표는 머리글로 정렬.
 
 type SortKey =
   | "name"
@@ -20,7 +20,7 @@ type SortKey =
   | "monthlyAvg"
   | "total"
   | "monthsWithSpend"
-  | "activeAvg"
+  | "avg12"
   | "minMonth"
   | "lastDate"
   | "thisMonth";
@@ -136,6 +136,7 @@ export function FixedExpensePanel({
   const pending = useGlobalPending();
   const [error, setError] = useState<string | null>(null);
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const [showCandidates, setShowCandidates] = useState(false);
   const fixed = useSorted<SortKey>(report.rows, "monthlyAvg", "desc");
   const candidates = useSorted<CandidateKey>(report.candidates, "monthlyAvg", "desc");
   const win = report.window;
@@ -176,7 +177,7 @@ export function FixedExpensePanel({
               카테고리를 지정하려면 <span className="font-medium">102_category_fixed_expense.sql</span>
             </>
           )}
-          을 Supabase SQL Editor에서 실행해 주세요(칸만 추가 — 기존 자료는 그대로). 아래 후보는 지금도 볼 수 있습니다.
+          을 Supabase SQL Editor에서 실행해 주세요(칸만 추가 — 기존 자료는 그대로). 아래 &quot;고정지출 후보&quot;는 펼치면 지금도 볼 수 있습니다.
         </p>
       )}
 
@@ -187,7 +188,9 @@ export function FixedExpensePanel({
         </p>
         <p className="mt-0.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="whitespace-nowrap text-2xl font-bold tabular-nums text-slate-900">{formatWon(report.totalMonthly)}</span>
-          <span className="whitespace-nowrap text-sm tabular-nums text-slate-600">1년 {formatWon(report.totalYear)}</span>
+          <span className="whitespace-nowrap text-sm tabular-nums text-slate-600" title="매달 기본으로 나가는 돈 × 12">
+            1년 환산 {formatWon(report.yearEstimate)}
+          </span>
           {categoryCount > 0 && clientCount > 0 && (
             <span className="whitespace-nowrap text-xs tabular-nums text-slate-500">
               거래처 {formatWon(report.clientMonthly)} + 카테고리 {formatWon(report.categoryMonthly)}
@@ -195,9 +198,9 @@ export function FixedExpensePanel({
           )}
         </p>
         <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-          {period}(지난달까지 12개월) 매입 합계 ÷ 12 · 부가세 포함·외상 포함(거래일 기준) · 한 거래는 한 번만(지정 거래처에서 산 건 거래처 줄,
-          나머지는 지정 카테고리 줄) · 카테고리는 프로젝트에 걸린 매입도 포함 · 은행 거래는 넣지 않음 · 급여는 매입매출장 급여 카테고리
-          기준(직원·급여 메뉴 기록은 따로 안 셈)
+          달 평균 = {period}(지난달까지 12개월) 매입 합계 ÷ 매입이 있던 달 수(1년에 한 번 내는 건 그 금액이 그대로 달 평균 — &quot;÷12
+          평균&quot; 칸 참고) · 부가세 포함·외상 포함(거래일 기준) · 한 거래는 한 번만(지정 거래처에서 산 건 거래처 줄, 나머지는 지정 카테고리 줄) ·
+          카테고리는 프로젝트에 걸린 매입도 포함 · 은행 거래는 넣지 않음 · 급여는 매입매출장 급여 카테고리 기준(직원·급여 메뉴 기록은 따로 안 셈)
         </p>
       </div>
 
@@ -216,10 +219,10 @@ export function FixedExpensePanel({
         <THead>
           {fixed.header("name", "거래처·카테고리", "sticky-col pr-3")}
           {fixed.header("kind", "구분", "pr-3")}
-          {fixed.header("monthlyAvg", "달 평균(÷12)", "pr-3 text-right")}
+          {fixed.header("monthlyAvg", "달 평균", "pr-3 text-right")}
           {fixed.header("total", "12달 합계", "pr-3 text-right")}
           {fixed.header("monthsWithSpend", "나온 달", "pr-3 text-right")}
-          {fixed.header("activeAvg", "낸 달 평균", "pr-3 text-right")}
+          {fixed.header("avg12", "÷12 평균", "pr-3 text-right")}
           {fixed.header("minMonth", "달마다 범위", "pr-3 text-right")}
           {fixed.header("lastDate", "마지막 매입", "pr-3")}
           {fixed.header("thisMonth", "이번 달", "pr-3 text-right")}
@@ -239,8 +242,8 @@ export function FixedExpensePanel({
               <Td className={cx("whitespace-nowrap pr-3 text-right tabular-nums", r.monthsWithSpend < 12 && "text-amber-700")}>
                 {r.monthsWithSpend}/12
               </Td>
-              <Td className="whitespace-nowrap pr-3 text-right tabular-nums text-slate-500">
-                {r.monthsWithSpend > 0 && r.monthsWithSpend < 12 ? formatWon(r.activeAvg) : "-"}
+              <Td className="whitespace-nowrap pr-3 text-right tabular-nums text-slate-500" title="참고: 12달 합계 ÷ 12(1년에 한 번 내는 것 등)">
+                {r.monthsWithSpend > 0 && r.monthsWithSpend < 12 ? formatWon(r.avg12) : "-"}
               </Td>
               {/* 금액이 크면 PC에서 "~" 뒤에서 줄바꿈(금액은 안 끊김) — 휴대폰은 표 칸이 한 줄(globals.css) */}
               <Td className="pr-3 text-right tabular-nums text-slate-500" title="가장 적은 달 ~ 가장 많은 달(매입 없는 달은 0원)">
@@ -280,7 +283,7 @@ export function FixedExpensePanel({
           {fixed.sorted.length === 0 && (
             <EmptyRow colSpan={10}>
               {canEdit && (clientReady || categoryReady)
-                ? "아직 지정한 거래처·카테고리가 없습니다. 위에서 고르거나 아래 후보에서 지정해 주세요."
+                ? "아직 지정한 거래처·카테고리가 없습니다. 위에서 고르거나 아래 \"고정지출 후보\"를 펼쳐 지정해 주세요."
                 : "지정한 거래처·카테고리가 없습니다."}
             </EmptyRow>
           )}
@@ -318,51 +321,61 @@ export function FixedExpensePanel({
         </div>
       )}
 
-      {/* 후보 */}
-      <div className="space-y-2">
-        <p className="text-sm font-semibold text-slate-800">
-          고정지출 후보 {report.candidates.length}곳{" "}
-          <span className="font-normal text-slate-500">
-            — 지정 안 했지만 12달 중 10달 이상 매입이 있던 거래처·카테고리(빠뜨린 곳 찾기, 이미 위 표에 들어간 매입은 빼고 셈)
+      {/* 후보 — 기본 접힘(사용자 요청 11/3), 접혀 있으면 인쇄도 안 함 */}
+      <div className={cx("space-y-2", !showCandidates && "print:hidden")}>
+        <button
+          type="button"
+          onClick={() => setShowCandidates((v) => !v)}
+          aria-expanded={showCandidates}
+          className="flex items-start gap-1.5 text-left text-sm font-semibold text-slate-800 hover:text-slate-600"
+        >
+          <span className="mt-0.5 text-xs text-slate-400 print:hidden">{showCandidates ? "▼" : "▶"}</span>
+          <span>
+            고정지출 후보 {report.candidates.length}곳{" "}
+            <span className="font-normal text-slate-500">
+              — 지정 안 했지만 12달 중 10달 이상 매입이 있던 거래처·카테고리(빠뜨린 곳 찾기, 이미 위 표에 들어간 매입은 빼고 셈)
+            </span>
           </span>
-        </p>
-        <Table className="min-w-[680px] print:min-w-0 print:text-xs">
-          <THead>
-            {candidates.header("name", "거래처·카테고리", "pr-4")}
-            {candidates.header("kind", "구분", "pr-4")}
-            {candidates.header("monthsWithSpend", "나온 달", "pr-4 text-right")}
-            {candidates.header("monthlyAvg", "달 평균(÷12)", "pr-4 text-right")}
-            {candidates.header("total", "12달 합계", "pr-4 text-right")}
-            {canEdit && <Th className="text-right print:hidden">지정</Th>}
-          </THead>
-          <tbody>
-            {candidates.sorted.map((r) => (
-              <Tr key={r.key}>
-                <Td className="pr-4 font-medium text-slate-800 max-md:max-w-[10rem] max-md:truncate print:max-w-none print:overflow-visible print:whitespace-normal" title={r.name}>
-                  {r.name}
-                </Td>
-                <Td className="pr-4">
-                  <KindTag kind={r.kind} />
-                </Td>
-                <Td className="whitespace-nowrap pr-4 text-right tabular-nums">{r.monthsWithSpend}/12</Td>
-                <Td className="whitespace-nowrap pr-4 text-right tabular-nums">{formatWon(r.monthlyAvg)}</Td>
-                <Td className="whitespace-nowrap pr-4 text-right tabular-nums">{formatWon(r.total)}</Td>
-                {canEdit && (
-                  <Td className="whitespace-nowrap text-right print:hidden">
-                    {canEditKind(r.kind) ? (
-                      <Button type="button" variant="secondary" size="xs" onClick={() => toggle(r.kind, r.id, true)}>
-                        지정
-                      </Button>
-                    ) : (
-                      <span className="text-xs text-slate-400">SQL 실행 후</span>
-                    )}
+        </button>
+        {showCandidates && (
+          <Table className="min-w-[680px] print:min-w-0 print:text-xs">
+            <THead>
+              {candidates.header("name", "거래처·카테고리", "pr-4")}
+              {candidates.header("kind", "구분", "pr-4")}
+              {candidates.header("monthsWithSpend", "나온 달", "pr-4 text-right")}
+              {candidates.header("monthlyAvg", "달 평균", "pr-4 text-right")}
+              {candidates.header("total", "12달 합계", "pr-4 text-right")}
+              {canEdit && <Th className="text-right print:hidden">지정</Th>}
+            </THead>
+            <tbody>
+              {candidates.sorted.map((r) => (
+                <Tr key={r.key}>
+                  <Td className="pr-4 font-medium text-slate-800 max-md:max-w-[10rem] max-md:truncate print:max-w-none print:overflow-visible print:whitespace-normal" title={r.name}>
+                    {r.name}
                   </Td>
-                )}
-              </Tr>
-            ))}
-            {candidates.sorted.length === 0 && <EmptyRow colSpan={canEdit ? 6 : 5}>후보가 없습니다.</EmptyRow>}
-          </tbody>
-        </Table>
+                  <Td className="pr-4">
+                    <KindTag kind={r.kind} />
+                  </Td>
+                  <Td className="whitespace-nowrap pr-4 text-right tabular-nums">{r.monthsWithSpend}/12</Td>
+                  <Td className="whitespace-nowrap pr-4 text-right tabular-nums">{formatWon(r.monthlyAvg)}</Td>
+                  <Td className="whitespace-nowrap pr-4 text-right tabular-nums">{formatWon(r.total)}</Td>
+                  {canEdit && (
+                    <Td className="whitespace-nowrap text-right print:hidden">
+                      {canEditKind(r.kind) ? (
+                        <Button type="button" variant="secondary" size="xs" onClick={() => toggle(r.kind, r.id, true)}>
+                          지정
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-slate-400">SQL 실행 후</span>
+                      )}
+                    </Td>
+                  )}
+                </Tr>
+              ))}
+              {candidates.sorted.length === 0 && <EmptyRow colSpan={canEdit ? 6 : 5}>후보가 없습니다.</EmptyRow>}
+            </tbody>
+          </Table>
+        )}
       </div>
     </div>
   );

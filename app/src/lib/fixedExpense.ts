@@ -6,9 +6,9 @@
 //    (숙박비·식대는 늘 프로젝트에 붙어서 빼면 0원)
 //  - 한 거래는 한 번만: 지정 거래처에서 산 건 그 거래처 줄, 아니면 지정 카테고리 줄(사용자 결정 "거래처 줄 우선") — 합계가 겹치지 않음.
 //    급여는 이 앱 규칙대로 매입매출장 "직원급여/상여/4대보험" 카테고리 매입으로 셈(직원·급여 메뉴 기록은 안 셈 — 두 번 세지 않게)
-//  - 달 평균 = 12개월 합계 ÷ 12(원 단위 반올림) — 1년에 한 번 내는 것(보험 등)도 저절로 월 금액이 됨. 중간에 시작·끊긴 곳은
-//    "나온 달"(12달 중 매입이 있던 달 수)과 "낸 달 평균"(합계 ÷ 나온 달)을, 달마다 차이가 큰 곳(숙박비·식대·차량)을 위해 "가장 적은 달 ~
-//    가장 많은 달"을 같이 보여 줌
+//  - 달 평균 = 12개월 합계 ÷ 나온 달(12달 중 매입이 있던 달 수, 원 단위 반올림) — "낸 달 평균"(11/3 사용자 결정 "낸 달 평균이 맞다":
+//    중간에 시작한 곳·앱에 기록이 없던 달 때문에 ÷12는 실제보다 작게 나옴). 1년에 한 번 내는 것(보험 등)은 그 금액이 그대로 달 평균이
+//    되므로 "÷12 평균"(합계 ÷ 12)을 참고로 같이. 달마다 차이가 큰 곳(숙박비·식대·차량)을 위해 "가장 적은 달 ~ 가장 많은 달"도 같이
 //  - 후보: 지정 안 한 거래처·카테고리 중 12달 중 10달 이상(이미 다른 줄에 들어간 매입은 빼고 셈)
 //  - 직접 입력한 거래처명 매입은 거래처로는 지정할 수 없음(카테고리로는 잡힘) — 거래처로 등록하면 지정 가능
 
@@ -55,12 +55,12 @@ export type FixedExpenseRow = {
   fixed: boolean;
   /** 12개월 합계 */
   total: number;
-  /** 달 평균 = 12개월 합계 ÷ 12 */
+  /** 달 평균 = 12개월 합계 ÷ 나온 달("낸 달 평균", 나온 달이 없으면 0) */
   monthlyAvg: number;
+  /** 참고: 12개월 합계 ÷ 12(1년에 한 번 내는 것 등) */
+  avg12: number;
   /** 12달 중 매입이 있던 달 수 */
   monthsWithSpend: number;
-  /** 낸 달 평균 = 12개월 합계 ÷ 나온 달(나온 달이 없으면 0) */
-  activeAvg: number;
   /** 달마다 합계(window.months 순서) */
   perMonth: number[];
   /** 가장 적은 달·가장 많은 달(매입 없는 달은 0) */
@@ -78,7 +78,7 @@ export type FixedExpenseReport = {
   rows: FixedExpenseRow[];
   /** 지정 안 했지만 10달 이상 나온 거래처·카테고리(달 평균 큰 순) */
   candidates: FixedExpenseRow[];
-  /** 지정 고르기용 — 지정 안 한 거래처·카테고리 중 기간 안에 (다른 줄에 안 들어간) 매입이 있던 곳, 12개월 합계 큰 순 */
+  /** 지정 고르기용 — 지정 안 한 거래처·카테고리 중 기간 안에 (다른 줄에 안 들어간) 매입이 있던 곳, 달 평균 큰 순(고르기 글자에 보이는 숫자 순) */
   otherClients: FixedExpenseRow[];
   otherCategories: FixedExpenseRow[];
   /** 매달 기본으로 나가는 돈 = 지정 줄 달 평균의 합(표의 합계 줄과 같게) */
@@ -86,14 +86,15 @@ export type FixedExpenseReport = {
   /** 그중 거래처 줄·카테고리 줄 */
   clientMonthly: number;
   categoryMonthly: number;
-  /** 지정 줄 12개월 합계 */
+  /** 1년 환산 = 매달 기본으로 나가는 돈 × 12 */
+  yearEstimate: number;
+  /** 지정 줄 12개월 실제 합계(표의 "12달 합계" 합계 줄) */
   totalYear: number;
   /** 지정 줄의 달마다 합계 */
   perMonth: number[];
 };
 
 const byAvg = (a: FixedExpenseRow, b: FixedExpenseRow) => b.monthlyAvg - a.monthlyAvg || a.name.localeCompare(b.name, "ko");
-const byTotal = (a: FixedExpenseRow, b: FixedExpenseRow) => b.total - a.total || a.name.localeCompare(b.name, "ko");
 
 export function fixedExpenseReport(
   txs: FixedExpenseTx[],
@@ -118,8 +119,8 @@ export function fixedExpenseReport(
         fixed: target.fixed,
         total: 0,
         monthlyAvg: 0,
+        avg12: 0,
         monthsWithSpend: 0,
-        activeAvg: 0,
         perMonth: window.months.map(() => 0),
         minMonth: 0,
         maxMonth: 0,
@@ -158,8 +159,8 @@ export function fixedExpenseReport(
   for (const c of categories) if (c.fixed) rowOf("category", c);
   for (const row of rows.values()) {
     row.monthsWithSpend = row.perMonth.filter((v) => Math.abs(v) > 0.5).length;
-    row.monthlyAvg = Math.round(row.total / FIXED_EXPENSE_MONTHS);
-    row.activeAvg = row.monthsWithSpend ? Math.round(row.total / row.monthsWithSpend) : 0;
+    row.monthlyAvg = row.monthsWithSpend ? Math.round(row.total / row.monthsWithSpend) : 0;
+    row.avg12 = Math.round(row.total / FIXED_EXPENSE_MONTHS);
     row.minMonth = Math.min(...row.perMonth);
     row.maxMonth = Math.max(...row.perMonth);
   }
@@ -167,15 +168,17 @@ export function fixedExpenseReport(
   const fixed = all.filter((r) => r.fixed).sort(byAvg);
   const notFixed = all.filter((r) => !r.fixed);
   const sumAvg = (list: FixedExpenseRow[]) => list.reduce((sum, r) => sum + r.monthlyAvg, 0);
+  const totalMonthly = sumAvg(fixed);
   return {
     window,
     rows: fixed,
     candidates: notFixed.filter((r) => r.monthsWithSpend >= CANDIDATE_MIN_MONTHS).sort(byAvg),
-    otherClients: notFixed.filter((r) => r.kind === "client" && r.total !== 0).sort(byTotal),
-    otherCategories: notFixed.filter((r) => r.kind === "category" && r.total !== 0).sort(byTotal),
-    totalMonthly: sumAvg(fixed),
+    otherClients: notFixed.filter((r) => r.kind === "client" && r.total !== 0).sort(byAvg),
+    otherCategories: notFixed.filter((r) => r.kind === "category" && r.total !== 0).sort(byAvg),
+    totalMonthly,
     clientMonthly: sumAvg(fixed.filter((r) => r.kind === "client")),
     categoryMonthly: sumAvg(fixed.filter((r) => r.kind === "category")),
+    yearEstimate: totalMonthly * FIXED_EXPENSE_MONTHS,
     totalYear: fixed.reduce((sum, r) => sum + r.total, 0),
     perMonth: window.months.map((_, i) => fixed.reduce((sum, r) => sum + r.perMonth[i], 0)),
   };
