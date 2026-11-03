@@ -133,6 +133,8 @@ export async function downloadMemoXlsx(filename: string, title: string, fields: 
 export type WorkSequenceExport = {
   title: string;
   projectLabel: string;
+  /** 순서표 메모(작업 지시사항·전달사항, 103 SQL) — 있으면 프로젝트 줄 아래 */
+  memo?: string;
   unit: SequenceUnit;
   startLabel: string;
   rangeLabel: string;
@@ -220,6 +222,7 @@ export async function downloadWorkSequenceXlsx(filename: string, data: WorkSeque
   ws.mergeCells(titleRow.number, 1, titleRow.number, lastCol);
   for (const [label, value] of [
     ["프로젝트", data.projectLabel],
+    ...(data.memo ? [["메모", data.memo]] : []),
     ["단위", data.unit === "day" ? "일(날짜, 토·일 포함)" : "시간"],
     ["시작", data.startLabel],
     ["전체 일정", data.rangeLabel],
@@ -229,6 +232,15 @@ export async function downloadWorkSequenceXlsx(filename: string, data: WorkSeque
     const row = ws.addRow([label, value]);
     row.getCell(1).font = { bold: true, color: { argb: "FF334155" } };
     ws.mergeCells(row.number, 2, row.number, lastCol);
+    if (label === "메모") {
+      // 여러 줄 메모가 다 보이게 — 합친 칸 폭(한 줄 약 80자)으로 줄 수를 어림해 높이를 줌(엑셀은 합친 칸 높이를 저절로 안 늘림)
+      row.getCell(1).alignment = { vertical: "top" };
+      row.getCell(2).alignment = { wrapText: true, vertical: "top" };
+      const lines = String(value)
+        .split("\n")
+        .reduce((n, line) => n + Math.max(1, Math.ceil(line.length / 80)), 0);
+      row.height = Math.min(409, Math.max(16, lines * 16));
+    }
   }
   ws.addRow([]);
   const header = ws.addRow(sheetCols.map((c) => c.header));
