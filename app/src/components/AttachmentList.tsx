@@ -139,10 +139,11 @@ export function AttachmentList({
     }
     setPending(true);
     setError(null);
-    const uploadError = await globalPending.run(() => uploadFile(file, String(fd.get("memo") ?? "")));
+    // { error } 모양으로 — run()은 연결이 끊기는 등 예외가 나면 { error: 안내 }를 돌려줌(GlobalPendingProvider)
+    const result = await globalPending.run(async () => ({ error: await uploadFile(file, String(fd.get("memo") ?? "")) }));
     setPending(false);
-    if (uploadError) {
-      setError(uploadError);
+    if (result.error) {
+      setError(result.error);
       return;
     }
     form.reset();

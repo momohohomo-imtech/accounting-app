@@ -14,6 +14,7 @@ function SiteRow({ site }: { site: SiteWithColor }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(resolveSiteColor(site.id, site.color));
   const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const globalPending = useGlobalPending();
 
   async function save(color: string | null) {
@@ -21,14 +22,20 @@ function SiteRow({ site }: { site: SiteWithColor }) {
     const fd = new FormData();
     fd.append("id", site.id);
     fd.append("color", color ?? "");
-    await globalPending.run(() => updateSiteColor(fd));
+    // 실패하면 색 고르는 칸을 그대로 두고 이유를 보여 줌 — 예전엔 결과를 버려서 저장이 안 돼도 닫혔음
+    const result = await globalPending.run(() => updateSiteColor(fd));
     setPending(false);
+    if (result?.error) {
+      setError(`색을 저장하지 못했습니다: ${result.error}`);
+      return;
+    }
+    setError(null);
     setEditing(false);
     router.refresh();
   }
 
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2">
+    <div className={`flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 ${error ? "flex-wrap" : ""}`}>
       <span
         className="h-5 w-5 shrink-0 rounded-full border border-slate-200"
         style={{ backgroundColor: resolveSiteColor(site.id, site.color) }}
@@ -57,7 +64,16 @@ function SiteRow({ site }: { site: SiteWithColor }) {
           >
             기본값으로
           </Button>
-          <Button type="button" variant="secondary" size="xs" disabled={pending} onClick={() => setEditing(false)}>
+          <Button
+            type="button"
+            variant="secondary"
+            size="xs"
+            disabled={pending}
+            onClick={() => {
+              setEditing(false);
+              setError(null);
+            }}
+          >
             취소
           </Button>
         </div>
@@ -66,6 +82,7 @@ function SiteRow({ site }: { site: SiteWithColor }) {
           수정
         </Button>
       )}
+      {error && <p className="basis-full text-xs text-red-600">{error}</p>}
     </div>
   );
 }
