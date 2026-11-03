@@ -99,14 +99,21 @@ function KnowHowItem({
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [pending, setPending] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function handleDelete() {
     if (!(await confirm(`이 ${itemLabel}를 삭제하시겠습니까?`, { danger: true }))) return;
     setPending(true);
+    setDeleteError(null);
     const fd = new FormData();
     fd.append("id", note.id);
-    await globalPending.run(() => deleteAction(fd));
+    // 실패하면 이유를 보여 줌 — 예전엔 결과를 버려서 안 지워져도 아무 표시가 없었음
+    const result = await globalPending.run(() => deleteAction(fd));
     setPending(false);
+    if (result?.error) {
+      setDeleteError(`삭제하지 못했습니다: ${result.error}`);
+      return;
+    }
     router.refresh();
   }
 
@@ -161,6 +168,7 @@ function KnowHowItem({
                   삭제
                 </Button>
               </div>
+              {deleteError && <p className="text-right text-xs text-red-600 print:hidden">{deleteError}</p>}
             </div>
           )}
         </div>

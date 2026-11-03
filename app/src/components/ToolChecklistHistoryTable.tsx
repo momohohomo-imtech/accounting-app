@@ -25,21 +25,31 @@ function DeleteButton({ id }: { id: string }) {
   const confirm = useConfirm();
   const globalPending = useGlobalPending();
   const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleDelete() {
     if (!(await confirm("이 체크리스트를 삭제하시겠습니까?", { danger: true }))) return;
     setPending(true);
+    setError(null);
     const fd = new FormData();
     fd.append("id", id);
-    await globalPending.run(() => deleteToolChecklist(fd));
+    // 실패하면 이유를 보여 줌 — 예전엔 결과를 버려서 안 지워져도 아무 표시가 없었음
+    const result = await globalPending.run(() => deleteToolChecklist(fd));
     setPending(false);
+    if (result?.error) {
+      setError(`삭제하지 못했습니다: ${result.error}`);
+      return;
+    }
     router.refresh();
   }
 
   return (
-    <Button variant="danger" size="xs" type="button" disabled={pending} onClick={handleDelete}>
-      삭제
-    </Button>
+    <span className="inline-flex flex-col items-end gap-1">
+      <Button variant="danger" size="xs" type="button" disabled={pending} onClick={handleDelete}>
+        삭제
+      </Button>
+      {error && <span className="max-w-[16rem] whitespace-normal text-left text-xs text-red-600">{error}</span>}
+    </span>
   );
 }
 

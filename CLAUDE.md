@@ -43,7 +43,11 @@
   await pending.run(() => someAsyncServerActionCall(...));
   ```
   `app/src/components/crud/EntityTable.tsx`와
-  `app/src/components/crud/CreatePanel.tsx`가 정석 예시. 서버 렌더링 폼(`<form action={서버액션}>`)이라 `run()`을
+  `app/src/components/crud/CreatePanel.tsx`가 정석 예시. `run()`은 예외(연결 끊김·새 버전 배포 직후 예전 화면의 저장 —
+  "Server Action … not found"·서버 오류)를 던지지 않고 `{ error: 안내 문구 }`로 돌려줌(`lib/actionError.ts`) — 그래서 `run()`에는
+  실패를 `{ error }`로 알리는 함수만 넣고, 결과의 `error`를 먼저 확인할 것(글자 등 다른 모양을 돌려주는 함수는 `{ error }`로 감싸서 —
+  `AttachmentList`). 예전엔 예외가 그대로 튀어 나가 `setPending(false)`가 안 불려서 저장 버튼이 비활성에 갇히고 안내도 없었음
+  (11/4 공구명세서 "수정 저장"). 서버 렌더링 폼(`<form action={서버액션}>`)이라 `run()`을
   못 쓰면 제출 버튼에서 `useFormStatus()`의 `pending`일 때 `PendingOverlay`를 띄울 것(`AccessListSubmitButton`).
 
 - **팝업은 ESC로 닫히고, 닫을 때 뒤로가기 기록을 쌓지 말 것**(사용자 요청 11/1 "모든 팝업창은 esc누르면 닫게", "뒤로가기로 이전 팝업
@@ -179,7 +183,7 @@
   정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
   해 잠금 불러오기(`yearLock`), 오래된 외상매출금(`receivableAging`), 이번 달 신고·납부 일정(`annualTasks`), 홈택스 세금계산서
   대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`), 메모 한 장 엑셀(`memoExport`), 공사 작업 순서
-  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`), 고정지출 달 평균(`fixedExpense`), 자동 백업 실행 기록(`autoBackupStatus`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
+  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`), 고정지출 달 평균(`fixedExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내(`actionError`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
   (vitest는 npm 설치 오류로 못 씀 — 새 테스트 라이브러리를 넣지 말 것)

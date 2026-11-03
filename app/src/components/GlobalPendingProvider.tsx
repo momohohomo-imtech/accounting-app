@@ -2,11 +2,16 @@
 
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { useEscapeKey } from "@/lib/useEscapeKey";
+import { actionFailureMessage } from "@/lib/actionError";
 
 const ignoreEscape = () => {};
 
 type Pending = {
-  /** fn이 끝날 때까지 화면 전체를 클릭 못 하게 막고 "처리 중..." 표시를 띄움. */
+  /**
+   * fn이 끝날 때까지 화면 전체를 클릭 못 하게 막고 "처리 중..." 표시를 띄움. fn이 예외를 던지면(연결 끊김·새 버전 배포 직후·서버
+   * 오류) 예외 대신 `{ error: 안내 문구 }`를 돌려줌 — 그래서 fn은 실패를 `{ error }`로 알리는 서버 액션이어야 하고, 부르는 곳은
+   * 결과의 `error`를 먼저 확인할 것(lib/actionError.ts).
+   */
   run: <T>(fn: () => Promise<T>) => Promise<T>;
 };
 
@@ -30,6 +35,11 @@ export function GlobalPendingProvider({ children }: { children: ReactNode }) {
     setCount((c) => c + 1);
     try {
       return await fn();
+    } catch (err) {
+      // 예외를 그대로 던지면 부르는 화면의 "처리 중" 표시(setPending(false))가 안 풀려 저장 버튼이 비활성에 갇히고 안내도 없었음
+      // (11/4 공구명세서 "수정 저장") — 부르는 곳은 모두 결과의 error로 실패를 보여 주므로 { error }로 바꿔 돌려줌.
+      console.error(err);
+      return { error: actionFailureMessage(err) } as T;
     } finally {
       setCount((c) => Math.max(0, c - 1));
     }
