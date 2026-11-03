@@ -110,40 +110,53 @@ function one<T>(v: T | T[] | null): T | null {
   return Array.isArray(v) ? v[0] ?? null : v;
 }
 
-// 고정지출 칸(lib/fixedExpense.ts) — 선택 연도와 상관없이 최근 12개월(지난달까지) + 이번 달 매입, 거래처의 고정지출 표시(101 SQL).
-// 101 실행 전이면 표시 없이(지정 안 함) 계산해서 후보만 보여 줌.
+// 고정지출 칸(lib/fixedExpense.ts) — 선택 연도와 상관없이 최근 12개월(지난달까지) + 이번 달 매입, 거래처·카테고리의 고정지출 표시
+// (101·102 SQL). 실행 전이면 그 표시 없이(지정 안 함) 계산해서 후보만 보여 줌.
 const MISSING_COLUMN = new Set(["PGRST204", "42703"]);
 async function loadFixedExpense(supabase: Awaited<ReturnType<typeof createClient>>, today: string) {
   const win = fixedExpenseWindow(today);
-  const probe = await supabase.from("clients").select("is_fixed_expense").limit(1);
-  const ready = !(probe.error && MISSING_COLUMN.has(probe.error.code ?? ""));
-  const [clients, txs] = await Promise.all([
-    ready
-      ? fetchAllRows<{ id: string; name: string; is_fixed_expense: boolean | null }>((from, to) =>
-          supabase.from("clients").select("id, name, is_fixed_expense").order("id").range(from, to)
+  const [clientProbe, categoryProbe] = await Promise.all([
+    supabase.from("clients").select("is_fixed_expense").limit(1),
+    supabase.from("expense_categories").select("is_fixed_expense").limit(1),
+  ]);
+  const clientReady = !(clientProbe.error && MISSING_COLUMN.has(clientProbe.error.code ?? ""));
+  const categoryReady = !(categoryProbe.error && MISSING_COLUMN.has(categoryProbe.error.code ?? ""));
+  type Target = { id: string; name: string; is_fixed_expense?: boolean | null };
+  const [clients, categories, txs] = await Promise.all([
+    clientReady
+      ? fetchAllRows<Target>((from, to) => supabase.from("clients").select("id, name, is_fixed_expense").order("id").range(from, to))
+      : fetchAllRows<Target>((from, to) => supabase.from("clients").select("id, name").order("id").range(from, to)),
+    categoryReady
+      ? fetchAllRows<Target>((from, to) =>
+          supabase.from("expense_categories").select("id, name, is_fixed_expense").order("id").range(from, to)
         )
-      : fetchAllRows<{ id: string; name: string; is_fixed_expense?: boolean | null }>((from, to) =>
-          supabase.from("clients").select("id, name").order("id").range(from, to)
-        ),
-    fetchAllRows<{ client_id: string | null; trans_date: string; purchase_amount: number; purchase_vat: number }>((from, to) =>
-      supabase
-        .from("transactions")
-        .select("client_id, trans_date, purchase_amount, purchase_vat")
-        .eq("type", "매입")
-        .gte("trans_date", win.from)
-        .lte("trans_date", today)
-        .order("id", { ascending: true })
-        .range(from, to)
+      : fetchAllRows<Target>((from, to) => supabase.from("expense_categories").select("id, name").order("id").range(from, to)),
+    fetchAllRows<{ client_id: string | null; category_id: string | null; trans_date: string; purchase_amount: number; purchase_vat: number }>(
+      (from, to) =>
+        supabase
+          .from("transactions")
+          .select("client_id, category_id, trans_date, purchase_amount, purchase_vat")
+          .eq("type", "매입")
+          .gte("trans_date", win.from)
+          .lte("trans_date", today)
+          .order("id", { ascending: true })
+          .range(from, to)
     ),
   ]);
+  const target = (c: Target) => ({ id: c.id, name: c.name, fixed: Boolean(c.is_fixed_expense) });
   const report = fixedExpenseReport(
-    txs.map((t) => ({ client_id: t.client_id, trans_date: t.trans_date, amount: Number(t.purchase_amount) + Number(t.purchase_vat) })),
-    clients.map((c) => ({ id: c.id, name: c.name, fixed: Boolean(c.is_fixed_expense) })),
+    txs.map((t) => ({
+      client_id: t.client_id,
+      category_id: t.category_id,
+      trans_date: t.trans_date,
+      amount: Number(t.purchase_amount) + Number(t.purchase_vat),
+    })),
+    clients.map(target),
+    categories.map(target),
     today
   );
-  return { ready, report };
+  return { clientReady, categoryReady, report };
 }
-
 
 export default async function ReportsPage({
   searchParams,
@@ -187,6 +200,8 @@ export default async function ReportsPage({
   const supabase = await createClient();
   // 고정지출 칸 — 다른 조회와 같이 시작
   const fixedExpensePromise = loadFixedExpense(supabase, nowKstParts().date);
+  // 아래 큰 조회가 먼저 실패하면 이 조회는 기다려지지 않음 — 처리 안 된 거부로 남지 않게(기다리는 곳에서는 그대로 오류)
+  fixedExpensePromise.catch(() => {});
   const rolePromise = getCurrentRole();
   const [
     rawTx,
@@ -261,17 +276,21 @@ export default async function ReportsPage({
   const [fixedExpense, role] = await Promise.all([fixedExpensePromise, rolePromise]);
   const canEditFixedExpense = role === "admin" || role === "staff";
   const fixedExportHeaders = [
-    "거래처",
+    "구분",
+    "거래처·카테고리",
     "달 평균(÷12)",
     "12달 합계",
     "나온 달",
     "낸 달 평균",
     "마지막 매입",
     "이번 달",
+    "가장 적은 달",
+    "가장 많은 달",
     ...fixedExpense.report.window.months,
   ];
   const fixedExportRows: (string | number)[][] = [
     ...fixedExpense.report.rows.map((r) => [
+      r.kind === "client" ? "거래처" : "카테고리",
       r.name,
       r.monthlyAvg,
       r.total,
@@ -279,10 +298,12 @@ export default async function ReportsPage({
       r.monthsWithSpend > 0 && r.monthsWithSpend < 12 ? r.activeAvg : "",
       r.lastDate ?? "",
       r.thisMonth,
+      r.minMonth,
+      r.maxMonth,
       ...r.perMonth,
     ]),
     ...(fixedExpense.report.rows.length
-      ? [["합계", fixedExpense.report.totalMonthly, fixedExpense.report.totalYear, "", "", "", "", ...fixedExpense.report.perMonth]]
+      ? [["합계", "", fixedExpense.report.totalMonthly, fixedExpense.report.totalYear, "", "", "", "", "", "", ...fixedExpense.report.perMonth]]
       : []),
   ];
 
@@ -1306,7 +1327,7 @@ export default async function ReportsPage({
         </CollapsibleSection>
 
         <CollapsibleSection
-          title="고정지출 — 지정한 거래처의 달 평균(최근 12개월 ÷ 12)"
+          title="고정지출 — 지정한 거래처·카테고리의 달 평균(최근 12개월 ÷ 12)"
           className={hiddenClass("fixedExpense")}
           defaultOpen={printSection === "fixedExpense"}
           headerExtra={sectionControls("fixedExpense", {
@@ -1315,7 +1336,12 @@ export default async function ReportsPage({
             rows: fixedExportRows,
           })}
         >
-          <FixedExpensePanel report={fixedExpense.report} ready={fixedExpense.ready} canEdit={canEditFixedExpense} />
+          <FixedExpensePanel
+            report={fixedExpense.report}
+            clientReady={fixedExpense.clientReady}
+            categoryReady={fixedExpense.categoryReady}
+            canEdit={canEditFixedExpense}
+          />
         </CollapsibleSection>
 
         <CollapsibleSection

@@ -24,7 +24,7 @@
   `UncategorizedPurchasesTable`, `TransactionHistoryTable`, `ProjectReceiptsTable`, 통합 보고서의 `ProjectsCombinedTable`·
   `CombinedCategorySection`·`CombinedAgencyTable`, `BankBalanceCheckPopup`(통장 잔액 확인 기록), `YearLockPanel`(잠긴 해),
   `ReceivableAgingTable`(오래된 외상매출금), `HometaxReconcilePanel`(홈택스 대조 결과), `ConstructionMemoList`(공사 메모),
-  `WorkSequenceList`(공사 작업 순서표), `FixedExpensePanel`(고정지출 지정 거래처·후보))에
+  `WorkSequenceList`(공사 작업 순서표), `FixedExpensePanel`(고정지출 지정 거래처·카테고리·후보))에
   이 패턴이 적용돼 있음 — 새 표를 추가할 때 이 목록도 같이 업데이트할 것.
   (예외: `DailyWorkerUsageStatementTable`은 세무사 제출용 사용내역서 문서라
   근로자별 연속일 소계 순서가 고정돼야 해서 임의 정렬을 지원하지 않음 —
@@ -287,12 +287,16 @@
   (`lib/workSequenceOverview.ts`의 `teamSchedule` — 앞으로 2주, 팀 이름이 같으면 순서표가 달라도 한 팀·한 색, 같은 날 다른 순서표 작업과
   겹치면 알림 — 한 순서표 안 겹침은 순서표 화면 몫) ③ 오늘·이번 주 할 일(`buildAgenda` — 늦은 작업은 목록 "지연"과 같은 계획 기준,
   오늘·이번 주는 예상 일정 기준). 모아 보기는 탭 위 카드, 완료한 단계·시작일 없는 순서표는 빠짐.
-- **고정지출**(보고서 메뉴 "거래처·카테고리 집계" 안, 11/3 사용자 결정 "지정한 거래처의 총매입액 ÷ 12"): 지정한 거래처의 최근
-  12개월(지난달까지, 한국 시각) 매입 합계(공급가액 + 부가세, 거래일 기준 — 외상 미정산 포함) ÷ 12 = 달 평균, 지정 거래처 달 평균의 합 =
-  "매달 기본으로 나가는 돈" — `lib/fixedExpense.ts`로만 계산. 지정은 101 SQL `clients.is_fixed_expense`(`setClientFixedExpense`, 관리자·
-  직원만 — 바뀐 줄이 없으면 오류). 은행 거래는 넣지 않음(사용자: 자동이체도 매입매출장에 직접 등록 — 넣으면 두 번 셈). 직접 입력한
-  거래처명은 지정 불가(거래처로 등록하면 가능). 중간에 시작·끊긴 곳은 나온 달·낸 달 평균을 같이, 지정 안 한 곳 중 10달 이상 나온 곳은
-  후보. 101 실행 전엔 지정 없이 후보만.
+- **고정지출**(보고서 메뉴 "거래처·카테고리 집계" 안, 11/3 사용자 결정 "지정한 거래처의 총매입액 ÷ 12" + "카테고리에서도 지정 — 급여·
+  차량·숙박비·식비 등"): 지정한 거래처·카테고리의 최근 12개월(지난달까지, 한국 시각) 매입 합계(공급가액 + 부가세, 거래일 기준 — 외상
+  미정산 포함, 프로젝트에 걸린 매입도 포함) ÷ 12 = 달 평균, 지정 줄 달 평균의 합 = "매달 기본으로 나가는 돈" — `lib/fixedExpense.ts`로만
+  계산. **한 거래는 한 줄에만**: 지정 거래처에서 산 건 그 거래처 줄, 아니면 지정 카테고리 줄(사용자 결정 "거래처 줄 우선" — 합계가
+  겹치지 않게, 후보·고르기 목록도 다른 줄에 들어간 매입은 빼고 셈). 지정은 101 SQL `clients.is_fixed_expense`·102 SQL
+  `expense_categories.is_fixed_expense`(`setClientFixedExpense`·`setCategoryFixedExpense`, 관리자·직원만 — 바뀐 줄이 없으면 오류). 은행
+  거래는 넣지 않음(사용자: 자동이체도 매입매출장에 직접 등록 — 넣으면 두 번 셈). 급여는 매입매출장 급여 카테고리로만(직원·급여 메뉴
+  기록은 안 셈). 직접 입력한 거래처명은 거래처로는 지정 불가(카테고리로는 잡힘, 거래처로 등록하면 가능). 중간에 시작·끊긴 곳은 나온 달·낸
+  달 평균, 들쭉날쭉한 곳은 "가장 적은 달 ~ 가장 많은 달"을 같이, 지정 안 한 곳 중 10달 이상 나온 곳은 후보. 101·102 실행 전엔 그쪽
+  지정 없이 후보만.
 - **백업 상태**(10/29 사용자 요청 "A"): 대시보드 접힘 목록 맨 아래 "백업" 줄 + 마지막 자동 백업 후 8일이 넘을 때만 맨 위 카드에
   경고 한 줄(`lib/backupStatus.ts`, 관리자·직원만 — 백업 기록은 그 두 역할만 읽음). 자동 백업 주기(vercel.json 크론)를 바꾸면
   `AUTO_BACKUP_STALE_DAYS`도 같이.
