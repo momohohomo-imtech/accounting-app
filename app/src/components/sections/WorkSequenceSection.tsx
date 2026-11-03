@@ -37,6 +37,8 @@ type SequenceRow = {
   updated_at: string;
   /** 팀 목록(100 SQL) — 실행 전엔 없음 */
   teams?: unknown;
+  /** 순서표 메모(103 SQL) — 실행 전엔 없음 */
+  memo?: string | null;
   projects: { name: string; sites: { name: string } | { name: string }[] | null } | { name: string; sites: unknown }[] | null;
 };
 type StepRow = {
@@ -68,15 +70,18 @@ export async function WorkSequenceSection({ seq, copyFrom }: { seq?: string; cop
       </Card>
     );
   }
-  // 099 SQL(앞 작업 칸) 실행 전이면 앞 작업 칸 없이(지금처럼 바로 앞 단계 뒤로만), 100 SQL(팀 칸) 실행 전이면 팀 없이
-  const [depProbe, teamProbe, stepTeamProbe] = await Promise.all([
+  // 099 SQL(앞 작업 칸) 실행 전이면 앞 작업 칸 없이(지금처럼 바로 앞 단계 뒤로만), 100 SQL(팀 칸) 실행 전이면 팀 없이,
+  // 103 SQL(메모 칸) 실행 전이면 메모 없이
+  const [depProbe, teamProbe, stepTeamProbe, memoProbe] = await Promise.all([
     supabase.from("work_sequence_steps").select("after_step_id, after_start").limit(1),
     supabase.from("work_sequences").select("teams").limit(1),
     supabase.from("work_sequence_steps").select("team_id").limit(1),
+    supabase.from("work_sequences").select("memo").limit(1),
   ]);
   const missingColumn = (r: { error: { code?: string } | null }) => Boolean(r.error && MISSING_COLUMN.has(r.error.code ?? ""));
   const dependencyReady = !missingColumn(depProbe);
   const teamsReady = !missingColumn(teamProbe) && !missingColumn(stepTeamProbe);
+  const memoReady = !missingColumn(memoProbe);
 
   const [{ data: projectsRaw }, { data: sitesRaw }, sequences, steps] = await Promise.all([
     fetchAllData((from, to) =>
@@ -136,6 +141,7 @@ export async function WorkSequenceSection({ seq, copyFrom }: { seq?: string; cop
     start_date: r.start_date,
     start_time: r.start_time ? r.start_time.slice(0, 5) : null,
     teams: teamsBySequence.get(r.id) ?? [],
+    memo: memoReady ? r.memo ?? "" : "",
     steps: stepsBySequence.get(r.id) ?? [],
   });
 
@@ -214,9 +220,9 @@ export async function WorkSequenceSection({ seq, copyFrom }: { seq?: string; cop
   let editorData: WorkSequenceData | null = null;
   if (seq === "new") {
     editorData = copySource
-      ? // 복사: 단계·기간·겹침·앞 작업은 그대로, 프로젝트·시작일은 새로 정하게 비움(완료 체크는 화면이 비움)
+      ? // 복사: 단계·기간·겹침·앞 작업·팀·메모는 그대로, 프로젝트·시작일은 새로 정하게 비움(완료 체크는 화면이 비움)
         { ...toData(copySource), project_id: "", start_date: null }
-      : { id: "", project_id: "", title: "", unit: "day", start_date: null, start_time: null, teams: [], steps: [] };
+      : { id: "", project_id: "", title: "", unit: "day", start_date: null, start_time: null, teams: [], memo: "", steps: [] };
   } else if (openRow) editorData = toData(openRow);
 
   return (
@@ -237,6 +243,12 @@ export async function WorkSequenceSection({ seq, copyFrom }: { seq?: string; cop
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
           팀별 색(분업)을 쓰려면 Supabase SQL Editor에서 <span className="font-medium">100_work_sequence_teams.sql</span>을 실행해
           주세요(칸 2개만 추가 — 기존 자료는 그대로).
+        </p>
+      )}
+      {!memoReady && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          순서표마다 메모(작업 지시사항·전달사항)를 쓰려면 Supabase SQL Editor에서{" "}
+          <span className="font-medium">103_work_sequence_memo.sql</span>을 실행해 주세요(칸 1개만 추가 — 기존 자료는 그대로).
         </p>
       )}
       {sequences.length > 0 && (
@@ -281,6 +293,7 @@ export async function WorkSequenceSection({ seq, copyFrom }: { seq?: string; cop
           copyOfTitle={copySource?.title ?? null}
           dependencyReady={dependencyReady}
           teamsReady={teamsReady}
+          memoReady={memoReady}
           knownTeams={knownTeams}
           sites={siteOptions}
           projects={(projectsRaw ?? []).map((p) => ({

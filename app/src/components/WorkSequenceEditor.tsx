@@ -78,6 +78,8 @@ export type WorkSequenceData = {
   start_time: string | null;
   /** 이 순서표의 팀 목록(이름·색) — 100 SQL */
   teams: WorkTeam[];
+  /** 순서표 메모(작업 지시사항·전달사항 — 화면 맨 위, 인쇄 때 프로젝트 이름 아래) — 103 SQL, 없으면 "" */
+  memo: string;
   steps: WorkSequenceStepData[];
 };
 
@@ -136,6 +138,7 @@ export function WorkSequenceEditor({
   copyOfTitle,
   dependencyReady,
   teamsReady,
+  memoReady,
   knownTeams,
   sites,
   projects,
@@ -152,6 +155,8 @@ export function WorkSequenceEditor({
   dependencyReady: boolean;
   /** 100 SQL 실행 뒤(팀 칸이 있음) — 아니면 팀 칸을 숨기고 저장하지 않음 */
   teamsReady: boolean;
+  /** 103 SQL 실행 뒤(메모 칸이 있음) — 아니면 메모 칸을 숨기고 저장하지 않음 */
+  memoReady: boolean;
   /** 다른 순서표에서 쓴 팀 이름·색(팀 추가할 때 골라 쓰기) */
   knownTeams: { name: string; color: TeamColorKey }[];
   sites: SiteOption[];
@@ -331,7 +336,7 @@ export function WorkSequenceEditor({
       return;
     }
     const result = await pending.run(() =>
-      saveWorkSequence({ ...data, with_dependency: dependencyReady, with_teams: teamsReady })
+      saveWorkSequence({ ...data, with_dependency: dependencyReady, with_teams: teamsReady, with_memo: memoReady })
     );
     if (result?.error) {
       setError(result.error);
@@ -381,6 +386,7 @@ export function WorkSequenceEditor({
     downloadWorkSequenceXlsx(memoFileName(["공사작업순서", projectLabel.split(" · ").pop(), data.title, focusName]), {
       title: `${data.title || "공사 작업 순서"}${focusName ? ` — ${focusName} 일정` : ""}`,
       projectLabel,
+      memo: memoReady ? data.memo.trim() : "",
       unit: data.unit,
       startLabel,
       rangeLabel: `${rangeLabel} (${formatAmount(total, data.unit)})`,
@@ -447,6 +453,24 @@ export function WorkSequenceEditor({
             </p>
           )}
 
+          {/* 메모(사용자 요청 11/4 "작업 순서 최상단에 메모 — 작업 지시사항·전달사항", 103 SQL) — 인쇄는 아래 인쇄 머리에서
+              프로젝트 이름 줄 아래 */}
+          {memoReady && (
+            <div className="flex flex-col gap-1 print:hidden">
+              <label className={labelClass} htmlFor="work-sequence-memo">
+                메모 — 작업 지시사항·전달사항 (인쇄하면 프로젝트 이름 아래에 나옴)
+              </label>
+              <textarea
+                id="work-sequence-memo"
+                value={data.memo}
+                onChange={(e) => update({ memo: e.target.value })}
+                rows={3}
+                placeholder="예: 작업 전 안전교육, 반입 시간, 담당자 연락 등 꼭 전할 내용"
+                className={`${fieldClass} resize-y`}
+              />
+            </div>
+          )}
+
           {/* 인쇄 머리(화면에서는 입력칸이 대신함) */}
           <div className="hidden space-y-1 print:block">
             <p className="text-xl font-bold">
@@ -458,6 +482,12 @@ export function WorkSequenceEditor({
               {lateCount > 0 && ` · 지연 ${lateCount}단계`}
               {forecastText && ` · ${forecastText}`} · {today.date} 기준
             </p>
+            {memoReady && data.memo.trim() && (
+              <div className="break-inside-avoid rounded border border-slate-500 px-2.5 py-1.5 text-sm">
+                <p className="text-xs font-bold">메모</p>
+                <p className="whitespace-pre-wrap">{data.memo.trim()}</p>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 print:hidden">
@@ -936,7 +966,15 @@ export function WorkSequenceEditor({
             </table>
           </div>
 
-          <div className="space-y-2 print:break-inside-avoid">
+          {/* 인쇄: 작업 순서 표와 흐름 차트는 다른 페이지(사용자 요청 11/4) — 차트 페이지 맨 위에 제목·프로젝트를 다시 */}
+          <div className="space-y-2 print:break-before-page print:break-inside-avoid">
+            <p className="hidden text-sm print:block">
+              <span className="font-bold">
+                {data.title}
+                {focusName && ` — ${focusName} 일정`}
+              </span>{" "}
+              · {projectLabel}
+            </p>
             <h3 className="text-sm font-semibold text-slate-900">
               흐름 차트{focusName && <span className="font-normal"> — {focusName}</span>}{" "}
               <span className="font-normal text-slate-500 print:hidden">

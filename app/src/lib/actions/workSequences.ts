@@ -38,6 +38,10 @@ export type WorkSequenceInput = {
   teams?: WorkTeam[];
   /** 100 SQL을 실행해서 팀 칸이 있음(화면이 확인해서 넘김) — 없으면 팀은 저장하지 않음 */
   with_teams?: boolean;
+  /** 순서표 메모(작업 지시사항·전달사항 — 인쇄 때 프로젝트 이름 아래) — 103 SQL */
+  memo?: string;
+  /** 103 SQL을 실행해서 메모 칸이 있음(화면이 확인해서 넘김) — 없으면 메모는 저장하지 않음 */
+  with_memo?: boolean;
 };
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
@@ -50,6 +54,7 @@ function dbError(error: { code?: string; message: string }) {
     return "공사 작업 순서 표가 아직 없습니다 — Supabase SQL Editor에서 098 SQL을 먼저 실행해주세요.";
   }
   if (MISSING_COLUMN.has(error.code ?? "")) {
+    if (/memo/.test(error.message)) return "메모 칸이 아직 없습니다 — Supabase SQL Editor에서 103 SQL을 실행해주세요.";
     return /team/.test(error.message)
       ? "팀 칸이 아직 없습니다 — Supabase SQL Editor에서 100 SQL을 실행해주세요."
       : "앞 작업 칸이 아직 없습니다 — Supabase SQL Editor에서 099 SQL을 실행해주세요.";
@@ -123,6 +128,8 @@ export async function saveWorkSequence(input: WorkSequenceInput): Promise<{ erro
       start_date: startDate,
       start_time: startTime,
       ...(input.with_teams ? { teams } : {}),
+      // 메모는 줄바꿈 그대로, 앞뒤 빈칸만 정리(비우면 빈칸)
+      ...(input.with_memo ? { memo: String(input.memo ?? "").trim() || null } : {}),
       updated_at: new Date().toISOString(),
     },
     { onConflict: "id" }
