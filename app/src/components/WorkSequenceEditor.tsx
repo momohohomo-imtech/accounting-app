@@ -22,7 +22,10 @@ import { saveWorkSequence, setWorkSequenceStepDone } from "@/lib/actions/workSeq
 import {
   chartColumns,
   cleanTeamName,
+  delayLabel,
   doneCount,
+  forecastSchedule,
+  forecastSummary,
   formatAmount,
   NO_TEAM_COLOR,
   NO_TEAM_LABEL,
@@ -192,7 +195,17 @@ export function WorkSequenceEditor({
   );
   const statuses = data.steps.map((s, i) => stepStatus(s, schedule[i], seqStart, today));
   const total = totalSpan(schedule);
-  const columns = chartColumns(total, seqStart);
+  // 예상 일정(늦어진 만큼 뒤 단계 밀기, 11/3) — 계획은 그대로, 차트 칸은 예상 끝까지
+  const forecast = forecastSchedule(data.steps, schedule, seqStart, today);
+  const forecastSum = forecastSummary(forecast, schedule, seqStart, data.steps);
+  const forecastEnd = forecast ? forecast.reduce((max, f) => Math.max(max, f.end), 0) : 0;
+  const forecastText =
+    forecastSum && (forecastSum.allDone || forecastSum.delay !== 0)
+      ? `${forecastSum.allDone ? "실제 완료" : "예상 완료"} ${forecastSum.endLabel} (${delayLabel(forecastSum.delay, data.unit)})`
+      : null;
+  const forecastRange = (i: number) =>
+    forecast?.[i]?.changed && !data.steps[i]?.done ? spanRangeLabel(forecast[i].start, forecast[i].end, seqStart) : "";
+  const columns = chartColumns(Math.max(total, forecastEnd), seqStart);
   const todayAt = todayOffset(seqStart, today, columns.length);
   const unitLabel = UNIT_LABEL[data.unit];
   const amountStep = data.unit === "day" ? 1 : 0.5;
@@ -372,6 +385,7 @@ export function WorkSequenceEditor({
       startLabel,
       rangeLabel: `${rangeLabel} (${formatAmount(total, data.unit)})`,
       doneLabel: pickedLate ? `${pickedDoneLabel} · 지연 ${pickedLate}단계` : pickedDoneLabel,
+      forecastLabel: forecastText,
       withTeams: teamsReady && teams.length > 0,
       legendTeams: chartLegendTeams(
         teams,
@@ -384,6 +398,8 @@ export function WorkSequenceEditor({
           no: i + 1,
           team: team ? { name: team.name, color: team.color } : null,
           range: stepRangeLabel(schedule[i], seqStart),
+          forecast: forecastRange(i),
+          forecastSpan: forecastRange(i) ? { start: forecast![i].start, end: forecast![i].end } : null,
           after: afterLabel(i),
           status: [statusLabel(statuses[i]) || (s.done ? "완료" : ""), conflictText(i)].filter(Boolean).join(" · "),
           overdue: statuses[i].state === "overdue",
@@ -439,7 +455,8 @@ export function WorkSequenceEditor({
             </p>
             <p className="text-sm">
               {projectLabel} · 단위 {data.unit === "day" ? "일(토·일 포함)" : "시간"} · 시작 {startLabel} · 전체 {rangeLabel} · {doneLabel}
-              {lateCount > 0 && ` · 지연 ${lateCount}단계`} · {today.date} 기준
+              {lateCount > 0 && ` · 지연 ${lateCount}단계`}
+              {forecastText && ` · ${forecastText}`} · {today.date} 기준
             </p>
           </div>
 
@@ -507,6 +524,11 @@ export function WorkSequenceEditor({
                   {data.steps.length > 0 && ` (${formatAmount(total, data.unit)})`} · {doneLabel}
                 </span>
                 {lateCount > 0 && <span className="ml-1.5 font-semibold text-red-600">· 지연 {lateCount}단계</span>}
+                {forecastText && (
+                  <span className={cx("ml-1.5", forecastSum!.delay > 0 ? "font-semibold text-red-600" : "font-normal text-emerald-700")}>
+                    · {forecastText}
+                  </span>
+                )}
                 {conflicts.length > 0 && (
                   <span className="ml-1.5 font-semibold text-amber-700 print:hidden">· 같은 팀 일정 겹침 {conflicts.length}건</span>
                 )}
@@ -803,6 +825,11 @@ export function WorkSequenceEditor({
                             </p>
                           )}
                           {conflictPartners.has(i) && <p className="text-[11px] font-semibold text-amber-700">{conflictText(i)}</p>}
+                          {forecastRange(i) && (
+                            <p className="whitespace-nowrap text-[11px] text-slate-600" title="늦어진 앞 작업만큼 밀린 예상 일정">
+                              예상 {forecastRange(i)}
+                            </p>
+                          )}
                         </td>
                         <td className="py-1.5 pr-2">
                           {s.done ? (
@@ -894,7 +921,10 @@ export function WorkSequenceEditor({
                     <td className="border border-slate-400 px-1.5 py-1 text-center">
                       {i === 0 || schedule[i].predecessor === null ? "-" : formatAmount(schedule[i].overlap, data.unit)}
                     </td>
-                    <td className="border border-slate-400 px-1.5 py-1">{stepRangeLabel(schedule[i], seqStart)}</td>
+                    <td className="border border-slate-400 px-1.5 py-1">
+                      {stepRangeLabel(schedule[i], seqStart)}
+                      {forecastRange(i) && <div>예상 {forecastRange(i)}</div>}
+                    </td>
                     <td className={cx("border border-slate-400 px-1.5 py-1", statuses[i].state === "overdue" && "font-semibold text-red-600")}>
                       {[statusLabel(statuses[i]), conflictText(i)].filter(Boolean).join(" · ")}
                     </td>
@@ -960,6 +990,7 @@ export function WorkSequenceEditor({
               seq={seqStart}
               statuses={statuses}
               todayAt={todayAt}
+              forecast={forecast}
               focus={focusMask}
               teamConflictSteps={new Set(conflictPartners.keys())}
               legendTeams={chartLegendTeams(teams, stepTeamIds)}

@@ -8,7 +8,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { deleteWorkSequence } from "@/lib/actions/workSequences";
 import { kstDate } from "@/lib/memoExport";
-import { UNIT_LABEL, type SequenceSummary, type SequenceUnit } from "@/lib/workSequence";
+import { delayShort, UNIT_LABEL, type SequenceSummary, type SequenceUnit } from "@/lib/workSequence";
 import { cx } from "@/lib/cx";
 
 export type WorkSequenceListRow = {
@@ -24,13 +24,25 @@ export type WorkSequenceListRow = {
   doneCount: number;
   /** 오늘 기준 상태(지연 N단계·진행 중·예정·완료) — lib/workSequence.ts summarizeSequence */
   status: SequenceSummary;
+  /** 예상(다 끝났으면 실제) 완료 — 늦어진 만큼 밀린 날짜(lib/workSequence.ts forecastSummary), 시작일 없으면 null */
+  forecast: { endKey: string; endLabel: string; delay: number; allDone: boolean } | null;
   updated_at: string;
 };
 
-type SortKey = "project_name" | "title" | "site_name" | "unit" | "start_date" | "stepCount" | "done" | "status" | "updated_at";
+type SortKey =
+  | "project_name"
+  | "title"
+  | "site_name"
+  | "unit"
+  | "start_date"
+  | "stepCount"
+  | "done"
+  | "status"
+  | "forecast"
+  | "updated_at";
 
 // 공사 작업 순서표 목록(사용자 요청 11/2) — 줄을 누르거나 "열기"로 순서표 팝업(주소 ?seq=, 뒤로가기로 닫힘), "복사"는 그 순서표로
-// 새 순서표(다른 프로젝트로). 상태 칸 = 오늘 기준(지연 N단계는 빨강). 머리글로 정렬.
+// 새 순서표(다른 프로젝트로). 상태 칸 = 오늘 기준(지연 N단계는 빨강), 예상 완료 = 늦어진 만큼 밀린 날짜(+N일은 빨강). 머리글로 정렬.
 export function WorkSequenceList({ rows, openHref, copyHref }: { rows: WorkSequenceListRow[]; openHref: string; copyHref: string }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -41,7 +53,15 @@ export function WorkSequenceList({ rows, openHref, copyHref }: { rows: WorkSeque
 
   const sorted = useMemo(() => {
     const value = (r: WorkSequenceListRow): string | number =>
-      sortKey === "done" ? (r.stepCount ? r.doneCount / r.stepCount : -1) : sortKey === "status" ? r.status.rank : r[sortKey];
+      sortKey === "done"
+        ? r.stepCount
+          ? r.doneCount / r.stepCount
+          : -1
+        : sortKey === "status"
+          ? r.status.rank
+          : sortKey === "forecast"
+            ? r.forecast?.endKey ?? ""
+            : r[sortKey];
     const copy = [...rows];
     copy.sort((a, b) => {
       const va = value(a);
@@ -83,7 +103,7 @@ export function WorkSequenceList({ rows, openHref, copyHref }: { rows: WorkSeque
   return (
     <div className="space-y-3">
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
-      <Table className="min-w-[960px]">
+      <Table className="min-w-[1060px]">
         <THead>
           {header("project_name", "프로젝트", "pr-4")}
           {header("title", "제목", "pr-4")}
@@ -93,6 +113,7 @@ export function WorkSequenceList({ rows, openHref, copyHref }: { rows: WorkSeque
           {header("stepCount", "단계", "pr-4 text-right")}
           {header("done", "완료", "pr-4 text-right")}
           {header("status", "상태", "pr-4")}
+          {header("forecast", "예상 완료", "pr-4")}
           {header("updated_at", "수정일", "pr-4")}
           <Th className="text-right">관리</Th>
         </THead>
@@ -125,6 +146,21 @@ export function WorkSequenceList({ rows, openHref, copyHref }: { rows: WorkSeque
               >
                 {r.status.label}
               </Td>
+              <Td className="whitespace-nowrap pr-4 tabular-nums">
+                {!r.forecast ? (
+                  <span className="text-slate-400">-</span>
+                ) : (
+                  <>
+                    {r.forecast.allDone && <span className="text-emerald-700">완료 </span>}
+                    {r.forecast.endLabel}
+                    {delayShort(r.forecast.delay, r.unit) && (
+                      <span className={cx("ml-1", r.forecast.delay > 0 ? "font-semibold text-red-600" : "text-emerald-700")}>
+                        ({delayShort(r.forecast.delay, r.unit)})
+                      </span>
+                    )}
+                  </>
+                )}
+              </Td>
               <Td className="whitespace-nowrap pr-4 tabular-nums text-slate-500">{kstDate(r.updated_at)}</Td>
               <Td className="whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-end gap-1.5">
@@ -141,7 +177,7 @@ export function WorkSequenceList({ rows, openHref, copyHref }: { rows: WorkSeque
               </Td>
             </Tr>
           ))}
-          {sorted.length === 0 && <EmptyRow colSpan={10}>작성된 작업 순서표가 없습니다.</EmptyRow>}
+          {sorted.length === 0 && <EmptyRow colSpan={11}>작성된 작업 순서표가 없습니다.</EmptyRow>}
         </tbody>
       </Table>
     </div>

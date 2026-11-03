@@ -399,3 +399,129 @@ export function teamNameProblem(teams: { name: unknown }[]): string | null {
   }
   return null;
 }
+
+// ── 예상 일정(사용자 요청 11/3 "1-3번" 중 1번 — 늦어진 만큼 뒤 단계 밀기) ──────────────────────────────────────────────
+// 계획(scheduleSteps)은 그대로 두고 실제 진행을 반영한 예상만 따로 계산(저장하지 않음):
+//  - 완료한 단계: 완료일에 끝난 것으로(완료일이 없으면 계획 끝 — 오늘보다 늦지 않게). 시간 단위는 완료일이 날짜뿐이라 계획 끝 날짜에
+//    완료했으면 계획대로, 그 뒤 날짜면 그날 끝(24시)에 끝난 것으로
+//  - 완료 안 한 단계: 시작 = 계획 시작과 (앞 작업 예상 끝 − 겹침) 중 늦은 쪽 — 앞 작업이 일찍 끝나도 당겨 시작하지 않음(팀 일정은
+//    계획대로 잡혀 있으므로). 끝 = 시작 + 기간, 그 끝이 이미 지났으면 오늘(시간 단위는 지금) 끝나는 것으로(아직 안 끝났으니 가장 이른 끝)
+//  - 시작일이 없는 순서표는 날짜를 모르므로 계산하지 않음(null)
+export type ForecastStep = {
+  start: number;
+  end: number;
+  /** 완료 안 한 단계 중 계획과 달라진 것(밀리거나 늘어남) — 차트에 점선 막대 */
+  changed: boolean;
+};
+
+const startHoursOf = (seq: SequenceStart) => {
+  const [h, mi] = (seq.start_time && /^\d{1,2}:\d{2}/.test(seq.start_time) ? seq.start_time : "00:00").split(":").map(Number);
+  return h + mi / 60;
+};
+
+/** 지금이 순서표 시작부터 어디쯤인지 — 일: 오늘 칸 번호(0부터), 시간: 시작부터 지난 시간 */
+function nowOffset(seq: SequenceStart & { start_date: string }, today: Today): number {
+  const days = daysBetween(seq.start_date, today.date);
+  if (seq.unit === "day") return days;
+  return days * 24 + Number(today.time.slice(0, 2)) + Number(today.time.slice(3, 5)) / 60 - startHoursOf(seq);
+}
+
+/** 그 날짜가 끝나는 때(다음 날 0시)가 순서표 시작부터 어디인지 */
+function dateEndOffset(seq: SequenceStart & { start_date: string }, ymd: string): number {
+  const days = daysBetween(seq.start_date, ymd) + 1;
+  return seq.unit === "day" ? days : days * 24 - startHoursOf(seq);
+}
+
+/** [start, end) 구간이 걸친 날짜(끝날 포함) — 시간 단위는 0시에 끝나면 그 전날까지 */
+export function spanDates(start: number, end: number, seq: SequenceStart): { from: string; to: string } | null {
+  if (!isYmd(seq.start_date)) return null;
+  if (seq.unit === "day") {
+    const first = Math.floor(start);
+    const last = Math.max(first, Math.ceil(end) - 1);
+    return { from: addDays(seq.start_date, first), to: addDays(seq.start_date, last) };
+  }
+  const a = addHours(seq.start_date, seq.start_time, start);
+  const b = addHours(seq.start_date, seq.start_time, end);
+  const to = b.time === "00:00" && end > start ? addDays(b.date, -1) : b.date;
+  return { from: a.date, to: to < a.date ? a.date : to };
+}
+
+export function forecastSchedule(
+  steps: { done: boolean; done_date: string | null }[],
+  schedule: ScheduledStep[],
+  seq: SequenceStart,
+  today: Today
+): ForecastStep[] | null {
+  if (!isYmd(seq.start_date)) return null;
+  const s0 = { ...seq, start_date: seq.start_date };
+  const now = nowOffset(s0, today);
+  const out: ForecastStep[] = [];
+  steps.forEach((step, i) => {
+    const plan = schedule[i] ?? { start: 0, end: 0, overlap: 0, overlapClamped: false, predecessor: null, afterInvalid: false };
+    const duration = plan.end - plan.start;
+    const pred = plan.predecessor;
+    const start = pred !== null && out[pred] ? Math.max(plan.start, out[pred].end - plan.overlap) : plan.start;
+    if (step.done) {
+      let end: number;
+      if (!isYmd(step.done_date)) end = Math.min(plan.end, seq.unit === "day" ? now + 1 : now);
+      else if (seq.unit === "day") end = dateEndOffset(s0, step.done_date);
+      else {
+        const planEndDate = spanDates(plan.start, plan.end, s0)!.to;
+        end = step.done_date === planEndDate ? plan.end : dateEndOffset(s0, step.done_date);
+      }
+      out.push({ start: Math.min(start, end), end, changed: false });
+      return;
+    }
+    const end = Math.max(start + duration, seq.unit === "day" ? now + 1 : now);
+    const changed = Math.abs(start - plan.start) > 1e-9 || Math.abs(end - plan.end) > 1e-9;
+    out.push({ start, end, changed });
+  });
+  return out;
+}
+
+export type ForecastSummary = {
+  /** 계획 끝·예상 끝(순서표 시작부터) */
+  planEnd: number;
+  forecastEnd: number;
+  /** 예상 − 계획: 일 단위는 일, 시간 단위는 시간 — 양수 = 늦음 */
+  delay: number;
+  /** 단계를 다 완료함(예상 = 실제 완료) */
+  allDone: boolean;
+  /** 예상(실제) 완료 글자 — 일: "11-06", 시간: "11-06 15:00" */
+  endLabel: string;
+  /** 정렬용 — 일: YYYY-MM-DD, 시간: "YYYY-MM-DD HH:MM" */
+  endKey: string;
+};
+
+export function forecastSummary(
+  forecast: ForecastStep[] | null,
+  schedule: ScheduledStep[],
+  seq: SequenceStart,
+  steps: { done: boolean }[]
+): ForecastSummary | null {
+  if (!forecast || forecast.length === 0 || !isYmd(seq.start_date)) return null;
+  const planEnd = totalSpan(schedule);
+  const forecastEnd = forecast.reduce((max, f) => Math.max(max, f.end), 0);
+  const allDone = steps.length > 0 && steps.every((s) => s.done);
+  if (seq.unit === "day") {
+    const lastDay = addDays(seq.start_date, Math.max(0, Math.ceil(forecastEnd) - 1));
+    return { planEnd, forecastEnd, delay: Math.ceil(forecastEnd) - Math.ceil(planEnd), allDone, endLabel: md(lastDay), endKey: lastDay };
+  }
+  const at = addHours(seq.start_date, seq.start_time, forecastEnd);
+  const delay = Math.round((forecastEnd - planEnd) * 60) / 60;
+  return { planEnd, forecastEnd, delay, allDone, endLabel: `${md(at.date)} ${at.time}`, endKey: `${at.date} ${at.time}` };
+}
+
+/** "2일 늦음" · "계획대로" · "1일 빠름"(시간 단위는 시간, 30분 단위) */
+export function delayLabel(delay: number, unit: SequenceUnit): string {
+  const amount = (n: number) => (unit === "day" ? `${n}일` : `${formatHours(Math.round(n * 2) / 2)}시간`);
+  if (unit === "hour" ? Math.abs(delay) < 0.25 : delay === 0) return "계획대로";
+  return delay > 0 ? `${amount(delay)} 늦음` : `${amount(-delay)} 빠름`;
+}
+
+/** 목록용 짧은 글자 — "+2일" · "−1일" · "+1.5시간", 계획대로면 "" */
+export function delayShort(delay: number, unit: SequenceUnit): string {
+  if (unit === "hour" ? Math.abs(delay) < 0.25 : delay === 0) return "";
+  const n = Math.abs(delay);
+  return `${delay > 0 ? "+" : "−"}${unit === "day" ? `${n}일` : `${formatHours(Math.round(n * 2) / 2)}시간`}`;
+}
