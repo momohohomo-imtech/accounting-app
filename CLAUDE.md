@@ -187,7 +187,7 @@
   정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
   해 잠금 불러오기(`yearLock`), 오래된 외상매출금(`receivableAging`), 이번 달 신고·납부 일정(`annualTasks`), 홈택스 세금계산서
   대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`), 메모 한 장 엑셀(`memoExport`), 공사 작업 순서
-  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`), 고정지출 달 평균(`fixedExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내(`actionError`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
+  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내(`actionError`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
   (vitest는 npm 설치 오류로 못 씀 — 새 테스트 라이브러리를 넣지 말 것)
@@ -317,6 +317,12 @@
   맨 위 입력칸(프로젝트 칸 위), 인쇄 때 프로젝트 이름 줄 아래 상자, 엑셀 첫 장 "프로젝트" 줄 아래 "메모" 줄, 복사하면 같이(새로 쓰기는
   빈칸). 103 실행 전엔 메모 칸을 숨기고 저장하지 않음(`memoReady`·`with_memo`). 인쇄는 작업 순서 표와 흐름 차트를 다른 페이지로
   (차트 칸 `print:break-before-page`, 차트 페이지 맨 위에 제목·프로젝트 한 줄 — 사용자 요청 11/4).
+  11/4 추가(사용자 요청, DB 변경 없음): "오늘·이번 주 할 일"·"팀별 일정"은 늘 접힌 채로 시작(제목 줄에 늦은 작업·겹침 요약), 순서표 목록은
+  펼침. 연도·현장 필터(`lib/workSequenceFilter.ts`, 기본 올해·현장 전체, 주소 `seqYear`(전체는 all로 남김)·`seqSite`(현장 미지정은 none) —
+  다른 탭 필터와 이름이 안 겹치게)는 할 일·팀별 일정·목록에 같이 적용. 연도 = 순서표 일정이 걸친 해(시작일 ~ 계획·예상 끝 중 늦은 날 —
+  해를 넘기면 두 해, 안 끝난 늦은 작업은 오늘까지라 올해에도 보임), 시작일 없으면 프로젝트 연도. 현장 = 프로젝트 현장. 현장 하나만 고르면
+  다른 현장과의 팀 겹침은 안 보임(현장 전체에서 보임). 팝업 열기·닫기·저장·복사·작성 주소에 필터를 붙여 닫아도 그대로
+  (`sequenceFilterQuery`). 순서표 팝업은 필터와 상관없이 전체에서 찾음(할 일·다른 링크로 열어도 열림), 전에 쓴 팀 이름도 전체에서.
 - **고정지출**(보고서 메뉴 "거래처·카테고리 집계" 안, 11/3 사용자 결정 "지정한 거래처의 총매입액 ÷ 12" + "카테고리에서도 지정 — 급여·
   차량·숙박비·식비 등"): 지정한 거래처·카테고리의 최근 12개월(지난달까지, 한국 시각 — 매달 1일에 한 달씩 넘어감, 해마다 새로 시작하지
   않고 보고서 연도와 무관, 사용자 확인 "현시점에 이전 12개월") 매입 합계(공급가액 + 부가세, 거래일 기준 — 외상 미정산 포함, 프로젝트에

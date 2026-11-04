@@ -32,6 +32,8 @@ export default async function QualityConstructionPage({
     historyMonth?: string;
     historySite?: string;
     seq?: string;
+    seqYear?: string;
+    seqSite?: string;
   }>;
 }) {
   const {
@@ -48,6 +50,8 @@ export default async function QualityConstructionPage({
     historyMonth,
     historySite,
     seq,
+    seqYear,
+    seqSite,
   } = await searchParams;
   const active = tab ?? "tools";
   // 프로젝트·현장 페이지 메모장과 같은 메모 한 장 — 어느 쪽에서 고쳐도 같이 바뀜(사용자 요청).
@@ -67,7 +71,7 @@ export default async function QualityConstructionPage({
       </div>
       {active === "quality" && <QualityChecklistSection projectId={project_id} />}
       {active === "construction" && <ConstructionMemoSection year={year} siteId={site_id} month={month} />}
-      {active === "sequence" && <WorkSequenceSection seq={seq} copyFrom={copyFrom} />}
+      {active === "sequence" && <WorkSequenceSection seq={seq} copyFrom={copyFrom} seqYear={seqYear} seqSite={seqSite} />}
       {active === "tools" && (
         <ToolListSection
           copyFrom={copyFrom}

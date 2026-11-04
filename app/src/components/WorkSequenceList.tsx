@@ -43,7 +43,18 @@ type SortKey =
 
 // 공사 작업 순서표 목록(사용자 요청 11/2) — 줄을 누르거나 "열기"로 순서표 팝업(주소 ?seq=, 뒤로가기로 닫힘), "복사"는 그 순서표로
 // 새 순서표(다른 프로젝트로). 상태 칸 = 오늘 기준(지연 N단계는 빨강), 예상 완료 = 늦어진 만큼 밀린 날짜(+N일은 빨강). 머리글로 정렬.
-export function WorkSequenceList({ rows, openHref, copyHref }: { rows: WorkSequenceListRow[]; openHref: string; copyHref: string }) {
+export function WorkSequenceList({
+  rows,
+  openHref,
+  copyHref,
+  emptyText = "작성된 작업 순서표가 없습니다.",
+}: {
+  rows: WorkSequenceListRow[];
+  openHref: string;
+  copyHref: string;
+  /** 줄이 없을 때 문구(연도·현장 필터로 다 빠졌을 때 등) */
+  emptyText?: string;
+}) {
   const router = useRouter();
   const confirm = useConfirm();
   const pending = useGlobalPending();
@@ -177,7 +188,7 @@ export function WorkSequenceList({ rows, openHref, copyHref }: { rows: WorkSeque
               </Td>
             </Tr>
           ))}
-          {sorted.length === 0 && <EmptyRow colSpan={11}>작성된 작업 순서표가 없습니다.</EmptyRow>}
+          {sorted.length === 0 && <EmptyRow colSpan={11}>{emptyText}</EmptyRow>}
         </tbody>
       </Table>
     </div>

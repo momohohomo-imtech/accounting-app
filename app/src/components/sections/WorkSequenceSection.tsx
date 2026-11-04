@@ -8,8 +8,19 @@ import { LinkButton } from "@/components/ui/Button";
 import type { SiteOption } from "@/components/ProjectPicker";
 import { WorkSequenceList, type WorkSequenceListRow } from "@/components/WorkSequenceList";
 import { WorkSequenceEditor, type WorkSequenceData } from "@/components/WorkSequenceEditor";
+import { WorkSequenceFilter } from "@/components/WorkSequenceFilter";
 import { nowKstParts } from "@/lib/kstDate";
 import { buildAgenda, teamSchedule, type OverviewSequence } from "@/lib/workSequenceOverview";
+import {
+  SEQ_FILTER_ALL,
+  SEQ_NO_SITE,
+  matchesSequenceFilter,
+  parseSequenceFilter,
+  sequenceFilterQuery,
+  sequenceYearOptions,
+  sequenceYears,
+  yearParamInAddress,
+} from "@/lib/workSequenceFilter";
 import {
   doneCount,
   forecastSchedule,
@@ -39,7 +50,10 @@ type SequenceRow = {
   teams?: unknown;
   /** 순서표 메모(103 SQL) — 실행 전엔 없음 */
   memo?: string | null;
-  projects: { name: string; sites: { name: string } | { name: string }[] | null } | { name: string; sites: unknown }[] | null;
+  projects:
+    | { name: string; year: number | null; site_id: string | null; sites: { name: string } | { name: string }[] | null }
+    | { name: string; year: number | null; site_id: string | null; sites: unknown }[]
+    | null;
 };
 type StepRow = {
   id: string;
@@ -58,7 +72,19 @@ type StepRow = {
 
 // 공사 관리 "공사 작업 순서" 탭(사용자 요청 11/2, 098·099·100 SQL) — 모아 보기(오늘·이번 주 할 일, 팀별 2주 일정 — 11/3) + 순서표
 // 목록 + 순서표 팝업(?seq=아이디, 새로 쓰기 ?seq=new, 복사해서 새로 쓰기 ?seq=new&copyFrom=아이디).
-export async function WorkSequenceSection({ seq, copyFrom }: { seq?: string; copyFrom?: string }) {
+// 11/4 사용자 요청: 할 일·팀별 일정은 늘 접힌 채로 시작(제목 줄에 늦은 작업·겹침 요약), 순서표 목록은 펼침 + 연도·현장 필터(기본 올해·
+// 현장 전체, 주소 seqYear·seqSite — lib/workSequenceFilter.ts) — 할 일·팀별 일정·목록에 같이 적용, 팝업을 열고 닫아도 필터 그대로.
+export async function WorkSequenceSection({
+  seq,
+  copyFrom,
+  seqYear,
+  seqSite,
+}: {
+  seq?: string;
+  copyFrom?: string;
+  seqYear?: string;
+  seqSite?: string;
+}) {
   const supabase = await createClient();
   // 098 SQL 실행 전이면 안내만
   const probe = await supabase.from("work_sequences").select("id", { count: "exact", head: true });
@@ -97,7 +123,7 @@ export async function WorkSequenceSection({ seq, copyFrom }: { seq?: string; cop
     ),
     // 칸 전부(*) — 099·100 SQL 실행 여부와 상관없이 있는 칸만 옴(앞 작업·팀 칸은 위 확인으로 씀)
     fetchAllRows<SequenceRow>((from, to) =>
-      supabase.from("work_sequences").select("*, projects(name, sites(name))").order("id").range(from, to)
+      supabase.from("work_sequences").select("*, projects(name, year, site_id, sites(name))").order("id").range(from, to)
     ),
     fetchAllRows<StepRow>((from, to) => supabase.from("work_sequence_steps").select("*").order("id").range(from, to)),
   ]);
@@ -163,45 +189,77 @@ export async function WorkSequenceSection({ seq, copyFrom }: { seq?: string; cop
     );
   };
 
+  // 연도·현장 필터(기본 올해·현장 전체) — 팝업 주소에도 붙여서 열고 닫아도 그대로
+  const currentYear = Number(today.date.slice(0, 4));
+  const filter = parseSequenceFilter({ seqYear, seqSite }, currentYear);
+  const base = `${BASE}${sequenceFilterQuery(filter, yearParamInAddress(seqYear))}`;
+
   // 모아 보기 — 최근에 고친 순서표가 먼저(같은 이름 팀의 색은 그 순서표 것)
-  const overview: OverviewSequence[] = [];
-  const rows: WorkSequenceListRow[] = [...sequences]
+  const entries = [...sequences]
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
     .map((r) => {
-    const data = toData(r);
-    const schedule = scheduleOf(data);
-    const project = one(r.projects) as { name: string; sites?: unknown } | undefined;
-    const site = one(project?.sites) as { name: string } | undefined;
-    const seqStart = { unit: data.unit, start_date: data.start_date, start_time: data.start_time };
-    const summary = forecastSummary(forecastSchedule(data.steps, schedule, seqStart, today), schedule, seqStart, data.steps);
-    overview.push({
-      id: r.id,
-      title: r.title,
-      projectLabel: `${site?.name ?? "현장 미지정"} · ${project?.name ?? "(삭제된 프로젝트)"}`,
-      seq: seqStart,
-      teams: data.teams,
-      steps: data.steps,
-      schedule,
+      const data = toData(r);
+      const schedule = scheduleOf(data);
+      const project = one(r.projects) as { name: string; year?: number | null; site_id?: string | null; sites?: unknown } | undefined;
+      const site = one(project?.sites) as { name: string } | undefined;
+      const seqStart = { unit: data.unit, start_date: data.start_date, start_time: data.start_time };
+      const summary = forecastSummary(forecastSchedule(data.steps, schedule, seqStart, today), schedule, seqStart, data.steps);
+      const overviewItem: OverviewSequence = {
+        id: r.id,
+        title: r.title,
+        projectLabel: `${site?.name ?? "현장 미지정"} · ${project?.name ?? "(삭제된 프로젝트)"}`,
+        seq: seqStart,
+        teams: data.teams,
+        steps: data.steps,
+        schedule,
+      };
+      const row: WorkSequenceListRow = {
+        id: r.id,
+        project_name: project?.name ?? "(삭제된 프로젝트)",
+        site_name: site?.name ?? "현장 미지정",
+        title: r.title,
+        unit: data.unit,
+        start_date: r.start_date ?? "",
+        rangeLabel: sequenceRangeLabel(schedule, data),
+        stepCount: data.steps.length,
+        doneCount: doneCount(data.steps),
+        status: summarizeSequence(data.steps, schedule, data, today),
+        forecast: summary
+          ? { endKey: summary.endKey, endLabel: summary.endLabel, delay: summary.delay, allDone: summary.allDone }
+          : null,
+        updated_at: r.updated_at,
+      };
+      return {
+        overview: overviewItem,
+        row,
+        years: sequenceYears(seqStart, schedule, summary?.forecastEnd, project?.year ?? null),
+        siteId: project?.site_id ?? null,
+        siteName: site?.name ?? null,
+      };
     });
-    return {
-      id: r.id,
-      project_name: project?.name ?? "(삭제된 프로젝트)",
-      site_name: site?.name ?? "현장 미지정",
-      title: r.title,
-      unit: data.unit,
-      start_date: r.start_date ?? "",
-      rangeLabel: sequenceRangeLabel(schedule, data),
-      stepCount: data.steps.length,
-      doneCount: doneCount(data.steps),
-      status: summarizeSequence(data.steps, schedule, data, today),
-      forecast: summary
-        ? { endKey: summary.endKey, endLabel: summary.endLabel, delay: summary.delay, allDone: summary.allDone }
-        : null,
-      updated_at: r.updated_at,
-    };
-  });
+  const visible = entries.filter((e) => matchesSequenceFilter(e, filter));
+  const rows = visible.map((e) => e.row);
+  const overview = visible.map((e) => e.overview);
   const agenda = buildAgenda(overview, today);
   const team = teamSchedule(overview, today, 14);
+
+  // 필터 선택 목록 — 순서표가 있는 해·현장(고른 값이 목록에 없으면 같이 — 선택칸이 빈칸으로 안 보이게)
+  const filterYears = sequenceYearOptions(
+    entries.map((e) => e.years),
+    currentYear,
+    filter.year
+  );
+  const siteNames = new Map<string, string>();
+  let hasNoSite = false;
+  for (const e of entries) {
+    if (e.siteId) siteNames.set(e.siteId, e.siteName ?? "(이름 없는 현장)");
+    else hasNoSite = true;
+  }
+  if (filter.site !== SEQ_FILTER_ALL && filter.site !== SEQ_NO_SITE && !siteNames.has(filter.site)) {
+    siteNames.set(filter.site, (sitesRaw ?? []).find((x) => x.id === filter.site)?.name ?? "(없는 현장)");
+  }
+  const filterSites = [...siteNames].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  if (hasNoSite || filter.site === SEQ_NO_SITE) filterSites.push({ id: SEQ_NO_SITE, name: "현장 미지정" });
 
   // 다른 순서표에서 쓴 팀 이름·색(최근에 고친 순서표 것이 먼저) — 팀을 추가할 때 골라 쓰기(색도 그때 색)
   const knownTeams: { name: string; color: TeamColorKey }[] = [];
@@ -229,10 +287,26 @@ export async function WorkSequenceSection({ seq, copyFrom }: { seq?: string; cop
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-slate-900">공사 작업 순서 — 프로젝트별 작업 순서·흐름 차트</h2>
-        <LinkButton href={`${BASE}&seq=new`} scroll={false}>
+        <LinkButton href={`${base}&seq=new`} scroll={false}>
           + 순서표 작성
         </LinkButton>
       </div>
+      {sequences.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 print:hidden">
+          <WorkSequenceFilter
+            basePath="/quality-construction"
+            years={filterYears}
+            selectedYear={filter.year}
+            sites={filterSites}
+            selectedSite={filter.site}
+          />
+          {visible.length !== entries.length && (
+            <span className="text-xs text-slate-500">
+              전체 {entries.length}개 중 {visible.length}개
+            </span>
+          )}
+        </div>
+      )}
       {!dependencyReady && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
           단계마다 &ldquo;앞 작업&rdquo;(어느 단계 뒤에 — 동시에 여러 작업)을 고르려면 Supabase SQL Editor에서{" "}
@@ -251,9 +325,8 @@ export async function WorkSequenceSection({ seq, copyFrom }: { seq?: string; cop
           <span className="font-medium">103_work_sequence_memo.sql</span>을 실행해 주세요(칸 1개만 추가 — 기존 자료는 그대로).
         </p>
       )}
-      {sequences.length > 0 && (
+      {visible.length > 0 && (
         <CollapsibleSection
-          defaultOpen
           title={
             <>
               오늘·이번 주 할 일
@@ -261,12 +334,11 @@ export async function WorkSequenceSection({ seq, copyFrom }: { seq?: string; cop
             </>
           }
         >
-          <WorkSequenceAgenda agenda={agenda} todayDate={today.date} openHref={`${BASE}&seq=`} />
+          <WorkSequenceAgenda agenda={agenda} todayDate={today.date} openHref={`${base}&seq=`} />
         </CollapsibleSection>
       )}
-      {sequences.length > 0 && (
+      {visible.length > 0 && (
         <CollapsibleSection
-          defaultOpen={team.rows.length > 0}
           title={
             <>
               팀별 일정 — 앞으로 2주
@@ -274,11 +346,16 @@ export async function WorkSequenceSection({ seq, copyFrom }: { seq?: string; cop
             </>
           }
         >
-          <WorkTeamSchedule days={team.days} rows={team.rows} openHref={`${BASE}&seq=`} />
+          <WorkTeamSchedule days={team.days} rows={team.rows} openHref={`${base}&seq=`} />
         </CollapsibleSection>
       )}
-      <CollapsibleSection defaultOpen title={`작업 순서표 목록 ${sequences.length}개`}>
-        <WorkSequenceList rows={rows} openHref={`${BASE}&seq=`} copyHref={`${BASE}&seq=new&copyFrom=`} />
+      <CollapsibleSection defaultOpen title={`작업 순서표 목록 ${rows.length}개`}>
+        <WorkSequenceList
+          rows={rows}
+          openHref={`${base}&seq=`}
+          copyHref={`${base}&seq=new&copyFrom=`}
+          emptyText={entries.length > 0 ? "고른 연도·현장에 작업 순서표가 없습니다." : undefined}
+        />
       </CollapsibleSection>
       {seq && !editorData && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
@@ -305,9 +382,9 @@ export async function WorkSequenceSection({ seq, copyFrom }: { seq?: string; cop
             project_code: p.project_code,
           }))}
           projectLabels={projectLabels}
-          closeHref={BASE}
-          savedHref={`${BASE}&seq=`}
-          copyHref={`${BASE}&seq=new&copyFrom=`}
+          closeHref={base}
+          savedHref={`${base}&seq=`}
+          copyHref={`${base}&seq=new&copyFrom=`}
         />
       )}
     </div>
