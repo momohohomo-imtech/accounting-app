@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { formatWon, formatDate, moneyClass } from "@/lib/format";
-import { remainingBalance, isLedgerVisible } from "@/lib/credit";
+import { formatWon, moneyClass } from "@/lib/format";
+import { remainingBalance, isLedgerVisible, transactionTotal } from "@/lib/credit";
 import type { ExpenseCategory, Transaction } from "@/lib/types";
 import { vatOf, salesSupplyOf, purchaseCostOf } from "@/lib/vatBasis";
 import {
@@ -31,8 +31,6 @@ import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { VatQuarterTable } from "@/components/VatQuarterTable";
 import { YearFilter } from "@/components/YearFilter";
 import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Table, THead, Th, Tr, Td, EmptyRow } from "@/components/ui/Table";
 import { cx } from "@/lib/cx";
 import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
 import {
@@ -48,6 +46,7 @@ import { receivableAging } from "@/lib/receivableAging";
 import { tasksForMonth, tasksSummary } from "@/lib/annualTasks";
 import { one } from "@/lib/relations";
 import { ReceivableAgingTable } from "@/components/ReceivableAgingTable";
+import { RecentTransactionsTable, type RecentTxRow } from "@/components/RecentTransactionsTable";
 import { findDuplicateCandidates, uncategorizedPurchases } from "@/lib/ledgerCheck";
 import { unbilledRemainingByGroup } from "@/lib/projectProfit";
 import { businessMonthsIn, firstBusinessYear } from "@/lib/businessYear";
@@ -214,11 +213,15 @@ export default async function DashboardPage({
         .range(from, to)
     ),
     creditPaymentsPromise,
+    // 최근 등록 거래 — 등록한 순서(11/4 사용자 결정), 정산 전 외상도 포함("외상 미정산" 표시). 같은 시각에 한꺼번에 넣은 것은 id 순.
     supabase
       .from("transactions")
-      .select("*, clients(name), projects(name)")
-      .order("trans_date", { ascending: false })
-      .limit(20),
+      .select(
+        "id, trans_date, type, payment_type, client_name_raw, item_name, sales_amount, sales_vat, purchase_amount, purchase_vat, created_at, clients(name), projects(name)"
+      )
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(8),
     fetchAllRows<{
       id: string;
       type: string;
@@ -292,7 +295,16 @@ export default async function DashboardPage({
   const receivedByProject = receivedSalesByProject(o.projectTx, payments);
 
   const monthTx = (monthTxRaw ?? []).filter((t) => isLedgerVisible(t as Transaction, payments));
-  const recentTx = (recentTxRaw ?? []).filter((t) => isLedgerVisible(t as Transaction, payments)).slice(0, 8);
+  const recentTx: RecentTxRow[] = (recentTxRaw ?? []).map((t) => ({
+    id: t.id,
+    date: t.trans_date,
+    type: t.type,
+    client: one(t.clients)?.name ?? t.client_name_raw ?? "",
+    project: one(t.projects)?.name ?? "",
+    item: t.item_name ?? "",
+    amount: transactionTotal(t),
+    unsettled: !isLedgerVisible(t, payments),
+  }));
   const yearTx = yearTxRaw.filter((t) => isLedgerVisible(t, payments));
 
   const monthPurchase = monthTx.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
@@ -451,16 +463,13 @@ export default async function DashboardPage({
           ? " · 12월까지 고정지출 반영"
           : "");
 
+  // 접힌 줄 요약 = 가장 최근에 등록한 거래
   const latestTx = recentTx[0];
   const latestTxLabel = latestTx
-    ? `${Number(latestTx.trans_date.slice(5, 7))}월 ${Number(latestTx.trans_date.slice(8, 10))}일 ${
-        latestTx.clients?.name ?? latestTx.client_name_raw ?? ""
-      } ${latestTx.type} ${formatWon(
-        latestTx.type === "매출"
-          ? latestTx.sales_amount + latestTx.sales_vat
-          : latestTx.purchase_amount + latestTx.purchase_vat
-      )}`
-    : "거래 내역 없음";
+    ? `${Number(latestTx.date.slice(5, 7))}월 ${Number(latestTx.date.slice(8, 10))}일 ${latestTx.client} ${latestTx.type} ${formatWon(
+        latestTx.amount
+      )}${latestTx.unsettled ? " (외상 미정산)" : ""}`
+    : "등록된 거래 없음";
 
   // 백업 상태(관리자·직원만, lib/backupStatus.ts) — 마지막 자동 백업 후 8일이 넘으면 맨 위 카드에 경고.
   const backup = backupRecords ? backupStatus(backupRecords, new Date().toISOString()) : null;
@@ -1018,38 +1027,11 @@ export default async function DashboardPage({
           </Footnote>
         </FoldRow>
 
-        <FoldRow title="최근 거래 내역" summary={latestTxLabel}>
-          <div className="[&_table]:text-xs [&_td]:py-1 [&_th]:pb-1">
-            <Table className="min-w-[600px]">
-              <THead>
-                <Th className="pr-4">날짜</Th>
-                <Th className="pr-4">구분</Th>
-                <Th className="pr-4">거래처</Th>
-                <Th className="pr-4">프로젝트</Th>
-                <Th className="pr-4">품목</Th>
-                <Th className="text-right">금액</Th>
-              </THead>
-              <tbody>
-                {recentTx.map((t) => (
-                  <Tr key={t.id}>
-                    <Td className="pr-4">{formatDate(t.trans_date)}</Td>
-                    <Td className="pr-4">
-                      <Badge variant={t.type === "매출" ? "blue" : "orange"}>{t.type}</Badge>
-                    </Td>
-                    <Td className="pr-4">{t.clients?.name ?? t.client_name_raw ?? "-"}</Td>
-                    <Td className="pr-4">{t.projects?.name ?? "-"}</Td>
-                    <Td className="pr-4">{t.item_name ?? "-"}</Td>
-                    <Td className="text-right font-medium text-slate-900">
-                      {formatWon(t.type === "매출" ? t.sales_amount + t.sales_vat : t.purchase_amount + t.purchase_vat)}
-                    </Td>
-                  </Tr>
-                ))}
-                {recentTx.length === 0 && <EmptyRow colSpan={6}>거래 내역이 없습니다.</EmptyRow>}
-              </tbody>
-            </Table>
-          </div>
-          <div className="mt-1.5 text-right">
-            <Link href="/transactions" className="text-xs text-slate-500 transition-colors hover:text-slate-800">
+        <FoldRow title="최근 등록 거래" summary={latestTxLabel}>
+          <RecentTransactionsTable rows={recentTx} />
+          <div className="mt-1.5 flex items-center justify-between gap-2">
+            <p className="text-[11px] text-slate-400">등록한 순서(최근 등록이 위) · 정산 전 외상 거래 포함</p>
+            <Link href="/transactions" className="shrink-0 text-xs text-slate-500 transition-colors hover:text-slate-800">
               전체 내역 보기
             </Link>
           </div>
