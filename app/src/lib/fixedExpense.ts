@@ -224,10 +224,51 @@ export function fixedExpenseReport(
 // 지정 줄만, 달 평균은 "이익 기준"(공급가액, 매입세액 불공제 카테고리는 부가세 포함 — vatBasis의 purchaseCostOf)으로 다시 계산한
 // 고정지출 표(fixedExpenseLoad.ts)에서 가져옴 — 위 표의 달 평균은 실제로 나간 돈(공급가액 + 부가세)이라 이익에 그대로 쓰면 돌려받는
 // 부가세만큼 비용이 커짐.
-export type FixedCostRow = { key: string; kind: FixedExpenseKind; id: string; name: string; monthlyAvg: number };
+export type FixedCostRow = {
+  key: string;
+  kind: FixedExpenseKind;
+  id: string;
+  name: string;
+  /** 달 평균(이익 기준 — 공급가액, 불공제 카테고리는 부가세 포함) */
+  monthlyAvg: number;
+  /** 달 평균 중 돌려받는 매입세액(실제로 나간 돈의 달 평균 − 이익 기준 달 평균) — 1월 부가세 예상에서 뺌. 비과세·불공제는 0 */
+  monthlyVat?: number;
+  /** 마지막 매입일(이번 달 포함) */
+  lastDate?: string | null;
+  /** 몇 달 나오다 최근에 멈춘 지정 줄(stoppedFixedRow) — 거래가 끝났으면 지정 해제하라고 알림 */
+  stopped?: boolean;
+};
 
-export function fixedCostRows(report: FixedExpenseReport): FixedCostRow[] {
-  return report.rows.map((r) => ({ key: r.key, kind: r.kind, id: r.id, name: r.name, monthlyAvg: r.monthlyAvg }));
+/** 최근 이만큼의 지난달(+ 이번 달)에 매입이 없으면 "멈춤" — 석 달마다 내는 곳(사이에 빈 달 2개)이 걸리지 않게 4달 */
+export const STOPPED_EMPTY_MONTHS = 4;
+
+/** 지난 12달 중 3달 이상 나왔는데 최근 4달·이번 달에 매입이 없는 줄 — 끝난 계약이 달 평균에 남아 예상 이익을 낮추지 않게 알림만
+ * (1년에 한두 번 내는 보험 등은 3달이 안 돼서 안 걸림) */
+export function stoppedFixedRow(r: Pick<FixedExpenseRow, "monthsWithSpend" | "perMonth" | "thisMonth">) {
+  const empty = (v: number) => Math.abs(v) <= 0.5;
+  return (
+    r.monthsWithSpend >= NEW_REGULAR_MIN_MONTHS &&
+    r.perMonth.slice(-STOPPED_EMPTY_MONTHS).every(empty) &&
+    empty(r.thisMonth)
+  );
+}
+
+/** costReport = 이익 기준 금액으로 계산한 표, cashReport = 실제로 나간 돈(공급가액 + 부가세)으로 계산한 표(같은 매입) */
+export function fixedCostRows(costReport: FixedExpenseReport, cashReport?: FixedExpenseReport): FixedCostRow[] {
+  const cashByKey = new Map((cashReport?.rows ?? []).map((r) => [r.key, r]));
+  return costReport.rows.map((r) => {
+    const cash = cashByKey.get(r.key);
+    return {
+      key: r.key,
+      kind: r.kind,
+      id: r.id,
+      name: r.name,
+      monthlyAvg: r.monthlyAvg,
+      monthlyVat: cash ? cash.monthlyAvg - r.monthlyAvg : 0,
+      lastDate: r.lastDate,
+      stopped: stoppedFixedRow(r),
+    };
+  });
 }
 
 /** 거래가 들어가는 지정 줄 키 — 고정지출 표와 같은 규칙(지정 거래처 → 지정 카테고리, 한 거래는 한 줄에만), 지정 줄이 아니면 null */

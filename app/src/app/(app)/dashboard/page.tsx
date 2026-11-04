@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { formatWon, formatDate, moneyClass } from "@/lib/format";
-import { remainingBalance, isLedgerVisible } from "@/lib/credit";
+import { formatWon, moneyClass } from "@/lib/format";
+import { remainingBalance, isLedgerVisible, transactionTotal } from "@/lib/credit";
 import type { ExpenseCategory, Transaction } from "@/lib/types";
 import { vatOf, salesSupplyOf, purchaseCostOf } from "@/lib/vatBasis";
 import {
@@ -31,8 +31,6 @@ import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { VatQuarterTable } from "@/components/VatQuarterTable";
 import { YearFilter } from "@/components/YearFilter";
 import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Table, THead, Th, Tr, Td, EmptyRow } from "@/components/ui/Table";
 import { cx } from "@/lib/cx";
 import { fetchAllRows, fetchAllCreditPayments } from "@/lib/supabaseFetchAll";
 import {
@@ -43,11 +41,15 @@ import {
 import { nowKst, kstDateTime } from "@/lib/kstDate";
 import { PROJECT_STATUS_AWAITING_PAYMENT } from "@/lib/projectStatus";
 import { getCurrentRole } from "@/lib/currentRole";
-import { backupStatus, AUTO_BACKUP_STALE_DAYS, type BackupRecord } from "@/lib/backupStatus";
+import { backupStatus, type BackupRecord } from "@/lib/backupStatus";
 import { receivableAging } from "@/lib/receivableAging";
 import { tasksForMonth, tasksSummary } from "@/lib/annualTasks";
 import { one } from "@/lib/relations";
 import { ReceivableAgingTable } from "@/components/ReceivableAgingTable";
+import { RecentTransactionsTable, type RecentTxRow } from "@/components/RecentTransactionsTable";
+import { findDuplicateCandidates, uncategorizedPurchases } from "@/lib/ledgerCheck";
+import { unbilledRemainingByGroup } from "@/lib/projectProfit";
+import { businessMonthsIn, firstBusinessYear } from "@/lib/businessYear";
 
 // 수금 예정액 상태 칸 — 상태 목록은 프로젝트 목록 미수 금액·보고서 남은 금액과 같은 RECEIVABLE_STATUSES.
 // 외상 거래 — 잔액(remainingBalance)·오래된 미수금(거래일·거래처)에 쓰는 칸만.
@@ -180,7 +182,6 @@ export default async function DashboardPage({
     { data: monthTxRaw },
     creditTx,
     payments,
-    { data: ongoingProjects },
     { data: recentTxRaw },
     yearTxRaw,
     { data: firstTx },
@@ -190,6 +191,8 @@ export default async function DashboardPage({
     { data: pageMemo },
     { data: vatNoticeRows, error: vatNoticeError },
     backupRecords,
+    { data: firstSale },
+    groupedRows,
   ] = await Promise.all([
     fetchAllRows<Transaction>((from, to) =>
       supabase
@@ -210,12 +213,15 @@ export default async function DashboardPage({
         .range(from, to)
     ),
     creditPaymentsPromise,
-    supabase.from("projects").select("id, status").eq("status", "ongoing"),
+    // 최근 등록 거래 — 등록한 순서(11/4 사용자 결정), 정산 전 외상도 포함("외상 미정산" 표시). 같은 시각에 한꺼번에 넣은 것은 id 순.
     supabase
       .from("transactions")
-      .select("*, clients(name), projects(name)")
-      .order("trans_date", { ascending: false })
-      .limit(20),
+      .select(
+        "id, trans_date, type, payment_type, client_name_raw, item_name, sales_amount, sales_vat, purchase_amount, purchase_vat, created_at, clients(name), projects(name)"
+      )
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(8),
     fetchAllRows<{
       id: string;
       type: string;
@@ -223,16 +229,21 @@ export default async function DashboardPage({
       trans_date: string;
       project_id: string | null;
       client_id: string | null;
+      client_name_raw: string | null;
+      item_name: string | null;
+      note1: string | null;
       category_id: string | null;
       sales_amount: number;
       sales_vat: number;
       purchase_amount: number;
       purchase_vat: number;
+      clients: { name: string } | { name: string }[] | null;
     }>((from, to) =>
       supabase
         .from("transactions")
+        // 거래처·품목·메모1은 장부 점검 알림(중복 의심·카테고리 빈 세금·금융 매입)용
         .select(
-          "id, type, payment_type, trans_date, project_id, client_id, category_id, sales_amount, sales_vat, purchase_amount, purchase_vat"
+          "id, type, payment_type, trans_date, project_id, client_id, client_name_raw, item_name, note1, category_id, sales_amount, sales_vat, purchase_amount, purchase_vat, clients(name)"
         )
         .gte("trans_date", `${selectedYear}-01-01`)
         .lte("trans_date", `${selectedYear}-12-31`)
@@ -252,6 +263,20 @@ export default async function DashboardPage({
     // 부가가치세 예정고지서 금액(093 SQL) — 실행 전이면 표가 없어 오류 → 입력칸을 숨기고 장부 기준 추정만.
     supabase.from("vat_prepayment_notices").select("month, amount").eq("year", selectedYear),
     backupRecordsPromise,
+    // 사업 첫해 = 첫 매출이 있는 해(lib/businessYear.ts) — 준비기간 매입이 지난 해 날짜로 있어도 첫해 칸이 사라지지 않게.
+    supabase.from("transactions").select("trans_date").eq("type", "매출").order("trans_date", { ascending: true }).limit(1),
+    // 장부 점검 알림의 중복 의심 — 한 결제로 묶은 줄끼리는 빼야 해서 묶음 번호(092 SQL). 실행 전이라 칸이 없거나 못 읽으면 묶음 없이 셈
+    // (알림용이라 화면은 그대로 — 그 해 거래 조회에 칸을 넣으면 실행 전엔 대시보드 전체가 안 열림).
+    fetchAllRows<{ id: string; payment_group_id: string }>((from, to) =>
+      supabase
+        .from("transactions")
+        .select("id, payment_group_id")
+        .gte("trans_date", `${selectedYear}-01-01`)
+        .lte("trans_date", `${selectedYear}-12-31`)
+        .not("payment_group_id", "is", null)
+        .order("id", { ascending: true })
+        .range(from, to)
+    ).catch(() => [] as { id: string; payment_group_id: string }[]),
   ]);
   const yearProjects = yearProjectRows ?? [];
   const categoryById = new Map(((categoryRows ?? []) as ExpenseCategory[]).map((c) => [c.id, c]));
@@ -270,7 +295,16 @@ export default async function DashboardPage({
   const receivedByProject = receivedSalesByProject(o.projectTx, payments);
 
   const monthTx = (monthTxRaw ?? []).filter((t) => isLedgerVisible(t as Transaction, payments));
-  const recentTx = (recentTxRaw ?? []).filter((t) => isLedgerVisible(t as Transaction, payments)).slice(0, 8);
+  const recentTx: RecentTxRow[] = (recentTxRaw ?? []).map((t) => ({
+    id: t.id,
+    date: t.trans_date,
+    type: t.type,
+    client: one(t.clients)?.name ?? t.client_name_raw ?? "",
+    project: one(t.projects)?.name ?? "",
+    item: t.item_name ?? "",
+    amount: transactionTotal(t),
+    unsettled: !isLedgerVisible(t, payments),
+  }));
   const yearTx = yearTxRaw.filter((t) => isLedgerVisible(t, payments));
 
   const monthPurchase = monthTx.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);
@@ -357,10 +391,12 @@ export default async function DashboardPage({
     firstTx?.[0]?.trans_date ? Number(firstTx[0].trans_date.slice(0, 4)) : currentYear,
     currentYear
   );
-  // 사업 첫해: 첫 거래가 있는 해. 그해 사업 기간은 첫 거래 달부터 12월까지.
-  const isFirstBusinessYear = selectedYear === firstYear;
-  const businessStartMonth = isFirstBusinessYear && firstTx?.[0] ? Number(firstTx[0].trans_date.slice(5, 7)) : 1;
-  const businessMonths = 12 - businessStartMonth + 1;
+  // 사업 첫해 = 첫 매출이 있는 해(lib/businessYear.ts — 예전엔 가장 이른 거래 연도라 지난 해 날짜 매입 하나로 첫해 칸이 사라졌음).
+  // 그해 사업 기간은 그 해 첫 거래 달부터 12월까지. 연도 선택 목록(firstYear)은 그대로 가장 이른 거래부터.
+  const isFirstBusinessYear = selectedYear === firstBusinessYear(firstSale?.[0]?.trans_date, currentYear);
+  const business = isFirstBusinessYear ? businessMonthsIn(yearTxRaw.map((t) => t.trans_date)) : { startMonth: 1, months: 12 };
+  const businessStartMonth = business.startMonth;
+  const businessMonths = business.months;
 
   const insuranceBaseProfit = o.combinedProfit ?? o.profitEstimate;
   // 내년 보험료는 내년 요율로, 올해분 건강보험 정산은 올해 요율로(lib/ownerSocialInsurance.ts — 정해지지 않은 요율은 최근 값으로 추정).
@@ -384,7 +420,8 @@ export default async function DashboardPage({
   const ownerHealthPaidMonthly = ownerPaidMonthly((e) => Number(e.health_insurance) + Number(e.long_term_care_insurance));
   const ownerPensionPaidMonthly = ownerPaidMonthly((e) => Number(e.national_pension));
   // 1월 부가세 2기 확정 = 7~12월 부가세 − 10월 예정고지(1~6월 납부세액의 1/2, 50만원 미만이면 고지 없음)
-  // + 미발행 계산서 예상분(그 해 귀속 미발행 프로젝트의 남은 발주액 부가세, 12월까지 끊는다고 봄 — 사용자 결정).
+  // + 미발행 계산서 예상분(그 해 귀속 미발행 프로젝트의 남은 발주액 부가세, 12월까지 끊는다고 봄 — 사용자 결정)
+  // − 남은 달 고정지출 매입세액(예상 이익과 같은 지정 줄·같은 "모자란 만큼만" 규칙, lib/projectProfit.ts의 fixedCostProjection).
   // 실제 예정고지는 세무사가 매입장 외 공제까지 반영해 신고한 1기 세액 기준이라 이 장부 기준 추정과 다를 수 있음 —
   // 고지서 금액을 입력해 두면(093 SQL) 추정 대신 그 금액.
   const vat1 = vatQuarters[0].net + vatQuarters[1].net;
@@ -393,7 +430,7 @@ export default async function DashboardPage({
   const octoberNoticeAmount = enteredOctoberNotice ? Number(enteredOctoberNotice.amount) : null;
   const vatOctoberNotice = octoberNoticeAmount ?? vatPrepaymentNotice(vat1);
   const cashOut = {
-    vat2: vatQuarters[2].net + vatQuarters[3].net - vatOctoberNotice + o.unbilledVat.vat,
+    vat2: vatQuarters[2].net + vatQuarters[3].net - vatOctoberNotice + o.unbilledVat.vat - o.fixedCost.h2.vatAdded,
     mayTax: nextYearTax.totalTax,
     installment: incomeTaxInstallment(nextYearTax.incomeTax),
     healthSettlement:
@@ -413,26 +450,26 @@ export default async function DashboardPage({
   // 맨 위 핵심 숫자 — 상반기 확정 이익금을 넣었으면 연간 합계, 아니면 프로젝트 기준(몰리는 돈·보험료 추정과 같은 기준).
   const headlineProfit = o.combinedProfit ?? (o.hasProjectsWithProfit ? o.profitEstimate : null);
   const headlineTax = o.combinedTax ?? (o.hasProjectsWithProfit ? o.profitTax : null);
-  // 맨 위 숫자에 반영한 남은 달 고정지출(연간 합계면 하반기 예상 쪽, 아니면 프로젝트 기준 쪽)
+  // 맨 위 숫자에 반영한 남은 달 고정지출(연간 합계면 하반기 예상 쪽, 아니면 프로젝트 기준 쪽). 칸 아래 설명은 한 줄로 짧게(11/4 사용자
+  // "정보가 너무 많은 것도 보기 힘들어요") — 자세한 기준은 손익 및 세액 상세의 산정 기준.
   const headlineFixed = o.combinedProfit != null ? o.fixedCost.h2 : o.fixedCost.project;
-  const headlineFixedNote =
-    headlineProfit == null
+  const headlineSub =
+    (o.combinedProfit != null ? "상반기 확정 + 하반기 추정" : headlineProfit != null ? "프로젝트 기준 추정" : "상반기 확정치 입력 필요") +
+    (headlineProfit == null
       ? ""
       : o.fixedCostFailed
         ? " · 고정지출 미반영(불러오기 실패)"
         : headlineFixed.applied
           ? " · 12월까지 고정지출 반영"
-          : "";
+          : "");
+
+  // 접힌 줄 요약 = 가장 최근에 등록한 거래
   const latestTx = recentTx[0];
   const latestTxLabel = latestTx
-    ? `${Number(latestTx.trans_date.slice(5, 7))}월 ${Number(latestTx.trans_date.slice(8, 10))}일 ${
-        latestTx.clients?.name ?? latestTx.client_name_raw ?? ""
-      } ${latestTx.type} ${formatWon(
-        latestTx.type === "매출"
-          ? latestTx.sales_amount + latestTx.sales_vat
-          : latestTx.purchase_amount + latestTx.purchase_vat
-      )}`
-    : "거래 내역 없음";
+    ? `${Number(latestTx.date.slice(5, 7))}월 ${Number(latestTx.date.slice(8, 10))}일 ${latestTx.client} ${latestTx.type} ${formatWon(
+        latestTx.amount
+      )}${latestTx.unsettled ? " (외상 미정산)" : ""}`
+    : "등록된 거래 없음";
 
   // 백업 상태(관리자·직원만, lib/backupStatus.ts) — 마지막 자동 백업 후 8일이 넘으면 맨 위 카드에 경고.
   const backup = backupRecords ? backupStatus(backupRecords, new Date().toISOString()) : null;
@@ -445,6 +482,28 @@ export default async function DashboardPage({
     backup?.daysSinceAuto == null
       ? "자동 백업 기록 없음"
       : `자동 백업 ${backup.daysSinceAuto === 0 ? "당일" : `${backup.daysSinceAuto}일 전`}`;
+
+  // 일정·확인 사항의 "확인" 줄 — 해당될 때만 한 줄씩(계산은 기존 lib 그대로: 장부 점검 탭·연말 점검·고정지출 표와 같은 기준).
+  // 장부 점검: 그 해 등록된 거래 전부(외상 미정산 포함 — 장부 점검 탭과 같게)의 중복 의심 묶음·카테고리 빈 매입.
+  const groupIdOf = new Map(groupedRows.map((r) => [r.id, r.payment_group_id]));
+  const checkRows = yearTxRaw.map((t) => ({ ...t, clients: one(t.clients), payment_group_id: groupIdOf.get(t.id) ?? null }));
+  const duplicateGroupCount = findDuplicateCandidates(checkRows).length;
+  const uncategorized = uncategorizedPurchases(checkRows);
+  const uncategorizedFlagged = uncategorized.filter((t) => t.kind).length;
+  // 연말 점검: 프로젝트 목록과 같은 때(그 해 10월부터, 지난 해는 늘)·같은 계산(unbilledRemainingByGroup).
+  const showYearEnd = selectedYear < currentYear || (selectedYear === currentYear && today.month >= 10);
+  const yearEndRows = showYearEnd
+    ? unbilledRemainingByGroup(yearProjects, o.projectTx, o.agencyByProject).filter((g) => g.remaining > 0)
+    : [];
+  const yearEndRemaining = yearEndRows.reduce((s, g) => s + g.remaining, 0);
+  // 고정지출: 몇 달 나오다 최근 4달·이번 달에 매입이 없는 지정 줄(lib/fixedExpense.ts stoppedFixedRow) — 끝난 계약이면 지정 해제.
+  const stoppedFixed = o.fixedCostRows.filter((r) => r.stopped);
+  const backupIssue = Boolean(backup && (backup.autoStale || !backup.latest || backup.latestComplete === false));
+  const checkCount =
+    Number(backupIssue) +
+    Number(duplicateGroupCount + uncategorized.length > 0) +
+    Number(yearEndRows.length > 0) +
+    Number(stoppedFixed.length > 0);
 
   return (
     <div className="space-y-3">
@@ -467,7 +526,8 @@ export default async function DashboardPage({
         save={updateDashboardPageMemo}
       />
 
-      {/* 핵심 숫자 5칸만 늘 보이게 — 나머지는 아래 접힘 목록에 한 줄 요약과 함께(사용자 요청: 정보는 다 두되 간결하게).
+      {/* 핵심 숫자 5칸만 늘 보이게 — 나머지는 아래 접힘 목록에 한 줄 요약과 함께(사용자 요청: 정보는 다 두되 간결하게, 11/4 "정보가 너무
+          많은 것도 보기 힘들어요" — 칸 아래 설명은 한 줄로 짧게, 자세한 기준은 손익 및 세액 상세의 산정 기준으로).
           휴대폰·태블릿(사이드바가 있어 본문이 좁음): 예상 매출액 한 줄 + 2칸씩 두 줄 / lg~: 예상 매출·이익·세액 3칸 + 수금·지급
           예정액 2칸 / xl~: 5칸 한 줄. 문구는 포멀 톤(사용자 요청) — 회계·세무 용어, 칸 이름·요약은 명사형. */}
       <Card padding="none" className={CARD_PAD}>
@@ -476,22 +536,11 @@ export default async function DashboardPage({
             href="/projects"
             className="col-span-2 rounded-lg transition hover:ring-2 hover:ring-slate-200 xl:col-span-1"
           >
-            <Stat label={`${selectedYear}년 예상 매출액`} sub="발주액에서 대행구매액 차감(발주액 미입력 시 실제 매출) · 공급가액 기준">
+            <Stat label={`${selectedYear}년 예상 매출액`} sub="공급가액 기준">
               <Money value={o.expectedRevenue} />
             </Stat>
           </Link>
-          <Stat
-            label={`${selectedYear}년 예상 세전이익`}
-            emphasis
-            className="lg:col-span-2 xl:col-span-1"
-            sub={
-              (o.combinedProfit != null
-                ? "상반기 확정치 + 하반기 추정치"
-                : headlineProfit != null
-                  ? "프로젝트 기준 추정 (상반기 확정치 미입력)"
-                  : "상반기 확정치 입력 필요") + headlineFixedNote
-            }
-          >
+          <Stat label={`${selectedYear}년 예상 세전이익`} emphasis className="lg:col-span-2 xl:col-span-1" sub={headlineSub}>
             {headlineProfit != null ? <Money value={headlineProfit} /> : "-"}
           </Stat>
           <Stat
@@ -516,9 +565,6 @@ export default async function DashboardPage({
             </Stat>
           </Link>
         </div>
-        {o.hasIncompleteProjects && (
-          <p className="mt-1.5 text-[11px] font-semibold text-red-600">진행 중인 프로젝트가 있어 추가 매출·매입이 발생할 수 있습니다.</p>
-        )}
         {backup?.autoStale && (
           <Link href="/backups" className="mt-1.5 block text-[11px] font-semibold text-red-600 hover:underline">
             {backup.daysSinceAuto == null
@@ -528,9 +574,17 @@ export default async function DashboardPage({
         )}
       </Card>
 
-      {/* 자세한 내용은 한 카드 안의 접힘 목록 — 접힌 줄 오른쪽에 핵심 숫자 한 줄. */}
+      {/* 자세한 내용은 한 카드 안의 접힘 목록(11/4 정돈 — 9줄 → 6줄, 같은 숫자는 한 곳에만) — 접힌 줄 오른쪽에 핵심 숫자 한 줄. */}
       <Card padding="none" className="divide-y divide-slate-100">
-        <FoldRow title={`이번 달(${today.month}월) 신고·납부 일정`} summary={tasksSummary(monthTasks)}>
+        <FoldRow
+          title={`이번 달(${today.month}월) 일정·확인 사항`}
+          summary={
+            <>
+              {tasksSummary(monthTasks)}
+              {checkCount > 0 && <span className="font-semibold text-amber-600">{` · 확인 ${checkCount}건`}</span>}
+            </>
+          }
+        >
           <ul className="space-y-1 text-xs text-slate-700">
             {monthTasks.map((t) => (
               <li key={`${t.day}-${t.short}`} className="flex gap-2">
@@ -548,35 +602,69 @@ export default async function DashboardPage({
               </li>
             ))}
           </ul>
+          {(backup || showPrevYearFiling || checkCount > 0) && (
+            <div className="mt-3">
+              <p className="text-xs font-semibold text-slate-700">확인 사항</p>
+              <ul className="mt-1 space-y-1 text-xs">
+                {backup && (
+                  <CheckItem
+                    href="/backups"
+                    label="백업"
+                    tone={backup.autoStale || !backup.latest ? "red" : backup.latestComplete === false ? "amber" : undefined}
+                  >
+                    {backup.latest
+                      ? `최근 ${backupTime(backup.latest.created_at)}(${backupTypeLabel(backup.latest.backup_type)}${
+                          backup.latestTransactionCount != null ? ` · 거래 ${backup.latestTransactionCount.toLocaleString()}건` : ""
+                        }) · ${autoBackupLabel}${backup.latestComplete === false ? " · 예전 방식 백업(새 백업 필요)" : ""}`
+                      : "백업 기록 없음"}
+                  </CheckItem>
+                )}
+                {duplicateGroupCount + uncategorized.length > 0 && (
+                  <CheckItem href={`/transactions?tab=check&year=${selectedYear}`} label="장부 점검" tone="amber">
+                    {[
+                      duplicateGroupCount > 0 && `중복 의심 ${duplicateGroupCount}묶음`,
+                      uncategorized.length > 0 &&
+                        `카테고리 빈 매입 ${uncategorized.length}건${
+                          uncategorizedFlagged > 0 ? `(세금·보험·금융으로 보이는 것 ${uncategorizedFlagged}건)` : ""
+                        }`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </CheckItem>
+                )}
+                {yearEndRows.length > 0 && (
+                  <CheckItem href={`/projects?year=${selectedYear}`} label="연말 점검" tone="amber">
+                    {`세금계산서 미발행 ${yearEndRows.length}건 · 남은 발행 예정액 ${formatWon(yearEndRemaining)} — 연내 발행 또는 귀속 연도 변경 확인`}
+                  </CheckItem>
+                )}
+                {stoppedFixed.length > 0 && (
+                  <CheckItem href="/reports" label="고정지출" tone="amber">
+                    {`최근 4개월 매입 없는 지정 항목 ${stoppedFixed.length}곳(${stoppedFixed
+                      .slice(0, 3)
+                      .map((r) => r.name)
+                      .join(", ")}${stoppedFixed.length > 3 ? " 외" : ""}) — 거래 종료 시 지정 해제(보고서 → 거래처·카테고리 집계)`}
+                  </CheckItem>
+                )}
+                {showPrevYearFiling && (
+                  <CheckItem href={`/dashboard?year=${today.year - 1}`} label="전년도 신고">
+                    {`${today.year - 1}년 대시보드 · `}
+                    <Link href={`/transactions?year=${today.year - 1}&month=all`} className="underline decoration-slate-300 underline-offset-2">
+                      매입매출장
+                    </Link>
+                    {" · "}
+                    <Link href={`/reports?year=${today.year - 1}`} className="underline decoration-slate-300 underline-offset-2">
+                      보고서
+                    </Link>
+                    {" — 5월 31일 종합소득세 신고 기한"}
+                  </CheckItem>
+                )}
+              </ul>
+            </div>
+          )}
           <Footnote>
             <p>마감일이 주말·공휴일이면 다음 영업일 · 세무사 대리 신고 항목 포함 · 개인사업자(일반과세자) 기준 일정</p>
           </Footnote>
         </FoldRow>
-
-        {showPrevYearFiling && (
-          <FoldRow
-            title={`전년도(${today.year - 1}년) 신고 자료`}
-            summary={`5월 31일 종합소득세 신고 기한 · ${today.year - 1}년 대시보드·매입매출장·보고서`}
-          >
-            <div className="flex flex-wrap gap-2 text-xs">
-              <Link href={`/dashboard?year=${today.year - 1}`} className="rounded-lg border border-slate-200 px-3 py-1.5 hover:bg-slate-50">
-                {today.year - 1}년 대시보드
-              </Link>
-              <Link
-                href={`/transactions?year=${today.year - 1}&month=all`}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 hover:bg-slate-50"
-              >
-                {today.year - 1}년 매입매출장
-              </Link>
-              <Link href={`/reports?year=${today.year - 1}`} className="rounded-lg border border-slate-200 px-3 py-1.5 hover:bg-slate-50">
-                {today.year - 1}년 보고서
-              </Link>
-            </div>
-            <Footnote>
-              <p>1~5월에만 표시 · 신고가 끝나면 매입매출 → 장부 점검에서 전년도 잠금 가능</p>
-            </Footnote>
-          </FoldRow>
-        )}
 
         <FoldRow
           title="손익 및 세액 상세"
@@ -598,6 +686,8 @@ export default async function DashboardPage({
           <p className="mb-2 text-[11px] text-slate-400">
             개인사업자 종합소득세 기준 · 지방소득세(10%) 포함 · 종합소득공제는 본인 기본공제만 반영(참고용 추정치)
           </p>
+          {/* 상반기 확정치를 넣으면 연간(확정+예상), 아니면 프로젝트 기준을 같은 자리에 — 맨 위 숫자와 같은 기준. 두 기준이 다를 때만
+              프로젝트 기준을 아래 한 줄로 비교(예전엔 칸 8개에 같은 숫자가 겹쳐 보였음). */}
           <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
             <Stat
               label="상반기 확정 이익 (세무사 결산 기준)"
@@ -608,20 +698,23 @@ export default async function DashboardPage({
             <Stat label="하반기 예상 이익 (7~12월)" sub={fixedCostNote(o.fixedCost.h2)}>
               <Money value={o.h2EstimatedProfit} />
             </Stat>
-            <Stat label="연간 예상 이익 (확정+예상)">
-              {o.combinedProfit != null ? (
-                <Money value={o.combinedProfit} />
-              ) : (
-                <span className="text-sm text-slate-400">상반기 확정치 입력 필요</span>
-              )}
-            </Stat>
-            <Stat
-              label="연간 예상 종합소득세"
-              sub={o.combinedTax ? `지방소득세 포함 · ${taxRateLabel(o.combinedTax)}` : "상반기 확정치 입력 필요"}
-            >
-              {o.combinedTax ? <Money value={o.combinedTax.totalTax} /> : "-"}
-            </Stat>
-            {o.hasProjectsWithProfit && (
+            {o.combinedProfit != null || !o.hasProjectsWithProfit ? (
+              <>
+                <Stat label="연간 예상 이익 (확정+예상)">
+                  {o.combinedProfit != null ? (
+                    <Money value={o.combinedProfit} />
+                  ) : (
+                    <span className="text-sm text-slate-400">상반기 확정치 입력 필요</span>
+                  )}
+                </Stat>
+                <Stat
+                  label="연간 예상 종합소득세"
+                  sub={o.combinedTax ? `지방소득세 포함 · ${taxRateLabel(o.combinedTax)}` : "상반기 확정치 입력 필요"}
+                >
+                  {o.combinedTax ? <Money value={o.combinedTax.totalTax} /> : "-"}
+                </Stat>
+              </>
+            ) : (
               <>
                 <Stat label="프로젝트 기준 예상 이익 (진행 중 포함)" sub={fixedCostNote(o.fixedCost.project)}>
                   <Money value={o.profitEstimate} />
@@ -635,7 +728,11 @@ export default async function DashboardPage({
               label={`${selectedYear + 1}년 대표자 국민연금 (월)`}
               sub={
                 hasOwnerIncome
-                  ? `연 ${formatWon(ownerInsurance.pensionYearly)}${ofProfit(ownerInsurance.pensionYearly)}`
+                  ? `연 ${formatWon(ownerInsurance.pensionYearly)}${ofProfit(ownerInsurance.pensionYearly)}${
+                      isFirstBusinessYear && ownerPensionPaidMonthly != null
+                        ? ` · 7월부터 현재 대비 월 ${formatWon(Math.max(ownerInsurance.pensionMonthly - ownerPensionPaidMonthly, 0))} 인상`
+                        : ""
+                    }`
                   : NO_INCOME_NOTE
               }
             >
@@ -652,8 +749,15 @@ export default async function DashboardPage({
               {hasOwnerIncome ? <Money value={ownerInsurance.healthMonthly} /> : "-"}
             </Stat>
           </div>
+          {o.combinedProfit != null && o.hasProjectsWithProfit && (
+            <p className="mt-1.5 text-[11px] text-slate-500">
+              {`참고: 프로젝트 기준 예상 이익 ${formatWon(o.profitEstimate)} · 예상 종합소득세 ${formatWon(o.profitTax.totalTax)}`}
+              {o.fixedCost.project.applied && ` (${fixedCostNote(o.fixedCost.project)})`}
+            </p>
+          )}
           <Footnote>
             <DetailToggle label="산정 기준">
+              {o.hasIncompleteProjects && <p className="font-semibold text-slate-600">진행 중인 프로젝트 있음 — 추가 매출·매입 발생 시 예상치 변동</p>}
               <p>
                 하반기 예상 이익 = 하반기 매출−매입 + 세금계산서 미발행분 예상 이익 − 인건비 − 남은 기간 고정지출 · 연간 예상 이익 =
                 상반기 확정 이익 + 하반기 예상 이익
@@ -709,18 +813,18 @@ export default async function DashboardPage({
             }`}
           >
             <p className="text-[11px] text-slate-400">사업 첫해에는 중간예납이 없어 이듬해에 납부가 집중됩니다.</p>
-            <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-5">
+            <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-4">
               <Stat
                 label="1월 · 부가가치세 제2기 확정신고 (7~12월)"
                 sub={[
                   o.unbilledVat.vat > 0 &&
                     `미발행 계산서 ${o.unbilledVat.count}건 예상분 약 ${formatWon(o.unbilledVat.vat)} 포함`,
+                  o.fixedCost.h2.vatAdded > 0 && `남은 기간 고정지출 매입세액 약 ${formatWon(o.fixedCost.h2.vatAdded)} 차감`,
                   octoberNoticeAmount != null
                     ? `10월 예정고지액 ${formatWon(octoberNoticeAmount)} 차감(고지서 기준)`
                     : vatOctoberNotice > 0 && `10월 예정고지액 약 ${formatWon(vatOctoberNotice)} 차감`,
                   octoberNoticeAmount == null && vatOctoberNotice === 0 && vat1 > 0 && "10월 예정고지 없음(50만원 미만)",
                   cashOut.vat2 < 0 && "환급 예상",
-                  o.unbilledVat.vat > 0 ? "추가 매입 시 감소 가능" : "4분기 실적에 따라 증가 가능",
                 ]
                   .filter(Boolean)
                   .join(" · ")}
@@ -752,39 +856,28 @@ export default async function DashboardPage({
               >
                 <Money value={cashOut.interim} />
               </Stat>
-              <Stat
-                label="7월부터 · 대표자 국민연금 조정 (월)"
-                sub={
-                  !hasOwnerIncome
-                    ? `${NO_INCOME_NOTE} · 소급 정산 없음`
-                    : ownerPensionPaidMonthly != null
-                      ? `현재 월 ${formatWon(ownerPensionPaidMonthly)} 대비 ${formatWon(
-                          Math.max(ownerInsurance.pensionMonthly - ownerPensionPaidMonthly, 0)
-                        )} 인상 · 소급 정산 없음`
-                      : "현재 납부액은 급여 정보 조회 권한이 있는 계정에서 표시 · 소급 정산 없음"
-                }
-              >
-                {hasOwnerIncome ? <Money value={ownerInsurance.pensionMonthly} /> : "-"}
-              </Stat>
             </div>
             <Footnote>
-              <p>
-                사업 기간 {businessMonths}개월({businessStartMonth}월 첫 거래 기준) · 건강보험료 정산액 = 당해 이익 기준 보험료 −
-                기납부액(최고 급여 직원 기준, 직원 공제액의 2배) · 국민연금은 연간 정산 없이 7월부터 월 보험료만 조정(소득총액신고
-                누락 시 11월에 7월분부터 소급 부과) · 모든 금액은 세무사 확인 전 추정치
-              </p>
-              {o.unbilledVat.vat > 0 && (
+              <DetailToggle label="산정 기준">
                 <p>
-                  미발행 계산서 예상분 = {selectedYear}년 귀속 진행중·공사 완료·완료 수금대기 프로젝트의 남은 발주액(발주액 −
-                  대행구매액 − 발행 매출, 공급가액 {formatWon(o.unbilledVat.supply)})의 10% · 12월까지 발행 가정 · 해당 프로젝트의 추가
-                  매입 세금계산서 부가가치세만큼 감소
+                  사업 기간 {businessMonths}개월({businessStartMonth}월 첫 거래 기준) · 건강보험료 정산액 = 당해 이익 기준 보험료 −
+                  기납부액(최고 급여 직원 기준, 직원 공제액의 2배) · 국민연금은 연간 정산 없이 7월부터 월 보험료만 조정(소득총액신고
+                  누락 시 11월에 7월분부터 소급 부과) · 모든 금액은 세무사 확인 전 추정치
                 </p>
-              )}
-              <p>
-                10월 부가가치세 예정고지(제1기 납부세액의 1/2)·11월 중간예납(소득세의 1/2)은 50만원 미만 시 고지 없음 · 실제
-                고지액은 세무사가 매입장 외 공제까지 반영해 신고한 세액 기준으로, 장부 기준 추정액과 차이 발생 가능 · 부가가치세
-                예정고지서 금액은 &quot;부가가치세 (분기별)&quot;에 입력 시 그 금액으로 산출
-              </p>
+                {o.unbilledVat.vat > 0 && (
+                  <p>
+                    미발행 계산서 예상분 = {selectedYear}년 귀속 진행중·공사 완료·완료 수금대기 프로젝트의 남은 발주액(발주액 −
+                    대행구매액 − 발행 매출, 공급가액 {formatWon(o.unbilledVat.supply)})의 10% · 12월까지 발행 가정 · 해당 프로젝트의 추가
+                    매입 세금계산서 부가가치세만큼 감소
+                  </p>
+                )}
+                <p>
+                  10월 부가가치세 예정고지(제1기 납부세액의 1/2)·11월 중간예납(소득세의 1/2)은 50만원 미만 시 고지 없음 · 실제
+                  고지액은 세무사가 매입장 외 공제까지 반영해 신고한 세액 기준으로, 장부 기준 추정액과 차이 발생 가능 · 부가가치세
+                  예정고지서 금액은 &quot;부가가치세 (분기별)&quot;에 입력 시 그 금액으로 산출 · 1월 부가가치세는 4분기 실적·추가 매입에 따라
+                  변동
+                </p>
+              </DetailToggle>
             </Footnote>
           </FoldRow>
         )}
@@ -801,12 +894,7 @@ export default async function DashboardPage({
           }
         >
           <p className="text-[11px] text-slate-400">외상 거래는 정산 등록 전까지 매입매출장 합계에서 제외됩니다.</p>
-          <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-4">
-            <Link href="/projects" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
-              <Stat label="수금 예정액 (진행중·공사 완료·수금 대기)">
-                <Money value={expectedReceivable} />
-              </Stat>
-            </Link>
+          <div className="mt-2 grid grid-cols-2 gap-2">
             <Link href="/projects" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
               <Stat label="공사 완료 · 수금 대기" sub={`${awaitingPayment.count}건`}>
                 <Money value={awaitingPayment.amount} />
@@ -817,25 +905,22 @@ export default async function DashboardPage({
                 <Money value={creditReceivable} />
               </Stat>
             </Link>
-            <Link href="/transactions?tab=credit" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
-              <Stat label="외상매입금" sub={`미정산 ${creditPayableCount}건`}>
-                <Money value={creditPayable} className="text-slate-600" />
-              </Stat>
-            </Link>
           </div>
           <Footnote>
-            <p>
-              수금 예정액 = 수주예상액 − 기수령 기성금 ·{" "}
-              {expectedReceivableByStatus.map((r) => `${r.label} ${r.count}건 ${formatWon(r.amount)}`).join(" · ")}
-              {receivedSalesTotal > 0 && ` · 기수령 기성금(차감 완료, 공급가액 기준) ${formatWon(receivedSalesTotal)}`}
-            </p>
-            <p>외상매출금 = 세금계산서 발행 후 입금 대기분 · 공사 완료·수금 대기 금액은 기수령 기성금 제외</p>
+            <DetailToggle label="산정 기준">
+              <p>
+                수금 예정액 = 수주예상액 − 기수령 기성금 ·{" "}
+                {expectedReceivableByStatus.map((r) => `${r.label} ${r.count}건 ${formatWon(r.amount)}`).join(" · ")}
+                {receivedSalesTotal > 0 && ` · 기수령 기성금(차감 완료, 공급가액 기준) ${formatWon(receivedSalesTotal)}`}
+              </p>
+              <p>외상매출금 = 세금계산서 발행 후 입금 대기분 · 공사 완료·수금 대기 금액은 기수령 기성금 제외</p>
+            </DetailToggle>
           </Footnote>
           {aging.items.length > 0 && (
             <div className="mt-3">
               <p className="text-xs font-semibold text-slate-700">외상매출금 경과 기간(세금계산서 일자 기준)</p>
               <div className="mt-1.5 grid grid-cols-2 gap-2 lg:grid-cols-4">
-                {aging.buckets.map((b) => (
+                {aging.buckets.filter((b) => b.count > 0).map((b) => (
                   <Stat key={b.key} label={b.label} sub={`${b.count}건`}>
                     <Money value={b.amount} className={b.key === "over90" && b.amount > 0 ? "text-red-600" : undefined} />
                   </Stat>
@@ -851,38 +936,38 @@ export default async function DashboardPage({
           )}
         </FoldRow>
 
-        <FoldRow title="매출·매입 실적" summary={`${selectedYear}년 매출 ${formatWon(yearSales)} · 매입 ${formatWon(yearPurchase)}`}>
+        <FoldRow
+          title={`${selectedYear}년 매출·매입 실적 및 부가가치세`}
+          summary={`매출 ${formatWon(yearSales)} · 매입 ${formatWon(yearPurchase)} · 부가가치세 예상 ${formatWon(vatTotal.net)}`}
+        >
           <p className="text-[11px] text-slate-400">매입매출장 기준 · 부가가치세 포함</p>
-          <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-4">
+          {/* 맨 위와 겹치는 예상 매출액·진행 중 프로젝트 수는 뺌, 당월은 올해를 볼 때만(다른 해를 골라도 올해 이번 달 숫자였음) */}
+          <div className={cx("mt-2 grid grid-cols-2 gap-2", selectedYear === currentYear ? "lg:grid-cols-5" : "lg:grid-cols-3")}>
             <Stat label={`${selectedYear}년 매출액`}>
               <Money value={yearSales} />
             </Stat>
             <Stat label={`${selectedYear}년 매입액`}>
               <Money value={yearPurchase} />
             </Stat>
-            <Stat label={`${selectedYear}년 매출·매입 차액`}>
+            <Stat label={`${selectedYear}년 매출·매입 차액`} className="col-span-2 lg:col-span-1">
               <Money value={yearProfit} />
             </Stat>
-            <Stat label={`${selectedYear}년 예상 매출액`}>
-              <Money value={o.expectedRevenue} />
-            </Stat>
-            <Stat label={`당월(${today.month}월) 매출`}>
-              <Money value={monthSales} />
-            </Stat>
-            <Stat label={`당월(${today.month}월) 매입`}>
-              <Money value={monthPurchase} />
-            </Stat>
-            <Link href="/projects" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
-              <Stat label="진행 중인 프로젝트">{ongoingProjects?.length ?? 0}건</Stat>
-            </Link>
+            {selectedYear === currentYear && (
+              <>
+                <Stat label={`당월(${today.month}월) 매출`}>
+                  <Money value={monthSales} />
+                </Stat>
+                <Stat label={`당월(${today.month}월) 매입`}>
+                  <Money value={monthPurchase} />
+                </Stat>
+              </>
+            )}
           </div>
-        </FoldRow>
-
-        <FoldRow title={`${selectedYear}년 부가가치세 (분기별)`} summary={`예상 납부세액 합계 ${formatWon(vatTotal.net)}`}>
+          <p className="mt-3 text-xs font-semibold text-slate-700">부가가치세 (분기별)</p>
           <p className="text-[11px] text-slate-400">
             부가가치세 포함 총액 기준 산출 · 비과세 제외 · 외상 미정산분 포함(세금계산서 기준)
           </p>
-          <div className="mt-2 [&_table]:text-xs [&_td]:py-1 [&_th]:pb-1">
+          <div className="mt-1.5 [&_table]:text-xs [&_td]:py-1 [&_th]:pb-1">
             <VatQuarterTable rows={vatQuarters} total={vatTotal} />
           </div>
           <div className="mt-2 space-y-1 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
@@ -911,120 +996,75 @@ export default async function DashboardPage({
                   {" "}+ 미발행 계산서 예상분 <span className="whitespace-nowrap">{formatWon(o.unbilledVat.vat)}</span>
                 </>
               )}
+              {o.fixedCost.h2.vatAdded > 0 && (
+                <>
+                  {" "}− 남은 기간 고정지출 매입세액 <span className="whitespace-nowrap">{formatWon(o.fixedCost.h2.vatAdded)}</span>
+                </>
+              )}
               {cashOut.vat2 < 0 && " (환급 예상)"}
             </p>
           </div>
           <Footnote>
-            <p>
-              불공제 매입세액(승용차 렌트·유류비 등 &quot;매입세액 불공제&quot; 카테고리)은 예상 납부세액에서 차감하지 않음 · 신고는
-              반기(1~6월, 7~12월) 단위 · 4월·10월에 직전 반기 납부세액의 1/2을 예정고지로 선납(50만원 미만 시 고지 없음)하고
-              7월·1월 확정신고 시 차감 · 매입장 외 공제는 세무사 신고 시 반영되어 실제 납부액과 차이 발생 가능
-            </p>
-            {o.unbilledVat.vat > 0 && (
+            <DetailToggle label="산정 기준">
               <p>
-                세금계산서 미발행 프로젝트 {o.unbilledVat.count}건의 남은 발주액 부가가치세 예상 약 {formatWon(o.unbilledVat.vat)}은
-                표에 미포함(12월까지 발행 시 제2기 납부세액에 추가)
+                불공제 매입세액(승용차 렌트·유류비 등 &quot;매입세액 불공제&quot; 카테고리)은 예상 납부세액에서 차감하지 않음 · 신고는
+                반기(1~6월, 7~12월) 단위 · 4월·10월에 직전 반기 납부세액의 1/2을 예정고지로 선납(50만원 미만 시 고지 없음)하고
+                7월·1월 확정신고 시 차감 · 매입장 외 공제는 세무사 신고 시 반영되어 실제 납부액과 차이 발생 가능
               </p>
-            )}
+              {o.unbilledVat.vat > 0 && (
+                <p>
+                  세금계산서 미발행 프로젝트 {o.unbilledVat.count}건의 남은 발주액 부가가치세 예상 약 {formatWon(o.unbilledVat.vat)}은
+                  표에 미포함(12월까지 발행 시 제2기 납부세액에 추가)
+                </p>
+              )}
+              {o.fixedCost.h2.vatAdded > 0 && (
+                <p>
+                  남은 기간 고정지출 매입세액 = 이번 달부터 12월까지 지정 고정지출의 달 평균 매입세액 중 장부에 아직 없는 금액(예상 이익의
+                  남은 기간 고정지출과 같은 기준, 비과세·불공제 제외) · 표에 미포함
+                </p>
+              )}
+            </DetailToggle>
           </Footnote>
         </FoldRow>
 
-        <FoldRow title="최근 거래 내역" summary={latestTxLabel}>
-          <div className="[&_table]:text-xs [&_td]:py-1 [&_th]:pb-1">
-            <Table className="min-w-[600px]">
-              <THead>
-                <Th className="pr-4">날짜</Th>
-                <Th className="pr-4">구분</Th>
-                <Th className="pr-4">거래처</Th>
-                <Th className="pr-4">프로젝트</Th>
-                <Th className="pr-4">품목</Th>
-                <Th className="text-right">금액</Th>
-              </THead>
-              <tbody>
-                {recentTx.map((t) => (
-                  <Tr key={t.id}>
-                    <Td className="pr-4">{formatDate(t.trans_date)}</Td>
-                    <Td className="pr-4">
-                      <Badge variant={t.type === "매출" ? "blue" : "orange"}>{t.type}</Badge>
-                    </Td>
-                    <Td className="pr-4">{t.clients?.name ?? t.client_name_raw ?? "-"}</Td>
-                    <Td className="pr-4">{t.projects?.name ?? "-"}</Td>
-                    <Td className="pr-4">{t.item_name ?? "-"}</Td>
-                    <Td className="text-right font-medium text-slate-900">
-                      {formatWon(t.type === "매출" ? t.sales_amount + t.sales_vat : t.purchase_amount + t.purchase_vat)}
-                    </Td>
-                  </Tr>
-                ))}
-                {recentTx.length === 0 && <EmptyRow colSpan={6}>거래 내역이 없습니다.</EmptyRow>}
-              </tbody>
-            </Table>
-          </div>
-          <div className="mt-1.5 text-right">
-            <Link href="/transactions" className="text-xs text-slate-500 transition-colors hover:text-slate-800">
+        <FoldRow title="최근 등록 거래" summary={latestTxLabel}>
+          <RecentTransactionsTable rows={recentTx} />
+          <div className="mt-1.5 flex items-center justify-between gap-2">
+            <p className="text-[11px] text-slate-400">등록한 순서(최근 등록이 위) · 정산 전 외상 거래 포함</p>
+            <Link href="/transactions" className="shrink-0 text-xs text-slate-500 transition-colors hover:text-slate-800">
               전체 내역 보기
             </Link>
           </div>
         </FoldRow>
 
-        {backup && (
-          <FoldRow
-            title="백업"
-            summary={
-              backup.latest ? (
-                <>
-                  {`최근 백업 ${backupTime(backup.latest.created_at)}(${backupTypeLabel(backup.latest.backup_type)})`}
-                  {backup.latestTransactionCount != null && ` · 거래 ${backup.latestTransactionCount.toLocaleString()}건 포함`}
-                  {backup.latestComplete === false && <span className="font-semibold text-amber-600"> · 예전 방식 백업(새 백업 필요)</span>}
-                  {" · "}
-                  <span className={backup.autoStale ? "font-semibold text-red-600" : undefined}>{autoBackupLabel}</span>
-                </>
-              ) : (
-                <span className="font-semibold text-red-600">백업 기록 없음</span>
-              )
-            }
-          >
-            <div className="grid grid-cols-2 gap-2">
-              <Link href="/backups" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
-                <Stat
-                  label="최근 백업"
-                  sub={
-                    backup.latest
-                      ? `${backupTypeLabel(backup.latest.backup_type)}${
-                          backup.latestTransactionCount != null ? ` · 거래 ${backup.latestTransactionCount.toLocaleString()}건 포함` : ""
-                        }`
-                      : undefined
-                  }
-                >
-                  {backup.latest ? backupTime(backup.latest.created_at) : "-"}
-                </Stat>
-              </Link>
-              <Link href="/backups" className="rounded-lg transition hover:ring-2 hover:ring-slate-200">
-                <Stat
-                  label="최근 자동 백업"
-                  sub={<span className={backup.autoStale ? "font-semibold text-red-600" : undefined}>{autoBackupLabel}</span>}
-                >
-                  {backup.lastAutoAt ? backupTime(backup.lastAutoAt) : "-"}
-                </Stat>
-              </Link>
-            </div>
-            <Footnote>
-              <p>
-                자동 백업 = 매주 일요일 오전 6시 전체 자료 백업 · 마지막 자동 백업 후 {AUTO_BACKUP_STALE_DAYS}일 경과 시 맨 위에 경고 표시 ·
-                백업 파일 다운로드·복구는 백업 화면에서 관리
-              </p>
-              {backup.latestComplete === false && (
-                <p className="text-amber-600">
-                  최근 백업은 표마다 1,000줄까지만 담기던 예전 방식으로 생성되어 일부 자료가 누락되었을 수 있음 — 백업 화면의
-                  &quot;지금 백업&quot;으로 새 백업 생성 필요
-                </p>
-              )}
-              {backup.latest && backup.latestComplete === null && (
-                <p>백업별 거래 수는 Supabase에서 095 SQL 실행 후 생성한 백업부터 표시</p>
-              )}
-            </Footnote>
-          </FoldRow>
-        )}
       </Card>
     </div>
+  );
+}
+
+// 일정·확인 사항의 확인 줄 — 이름(누르면 그 화면) + 내용 한 줄. tone: 빨강 = 바로 확인, 주황 = 확인 권장.
+function CheckItem({
+  href,
+  label,
+  tone,
+  children,
+}: {
+  href: string;
+  label: string;
+  tone?: "red" | "amber";
+  children: ReactNode;
+}) {
+  return (
+    <li className="flex gap-2">
+      <Link
+        href={href}
+        className="w-20 shrink-0 font-medium text-slate-700 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
+      >
+        {label}
+      </Link>
+      <span className={cx("min-w-0", tone === "red" ? "font-semibold text-red-600" : tone === "amber" ? "text-amber-700" : "text-slate-600")}>
+        {children}
+      </span>
+    </li>
   );
 }
