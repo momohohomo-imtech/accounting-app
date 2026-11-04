@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fixedExpenseReport, fixedExpenseWindow, type FixedExpenseTx } from "@/lib/fixedExpense";
+import { fixedCostRows, fixedExpenseReport, fixedExpenseWindow, fixedRowRouter, type FixedExpenseTx } from "@/lib/fixedExpense";
 
 // 가짜 자료만
 test("고정지출 기간: 최근 12개월(지난달까지) — 이번 달은 따로, 해를 넘겨도", () => {
@@ -267,4 +267,39 @@ test("고정지출: 지정한 곳이 없으면 0, 반품(음수)도 합계에 �
   assert.equal(a.monthlyAvg, Math.round(100_000 / 12));
   assert.equal(a.activeAvg, 100_000);
   assert.equal(a.monthsWithSpend, 1);
+});
+
+test("예상 이익용 지정 줄: 지정한 줄만 달 평균 그대로, 거래는 지정 거래처 → 지정 카테고리 줄 하나에만", () => {
+  const report = fixedExpenseReport(
+    [
+      tx("c1", "2026-05-10", 1_200_000),
+      tx("c2", "2026-05-11", 600_000, "k1"),
+      tx("c3", "2026-05-12", 2_400_000, "k2"),
+      tx("c3", "2025-11-05", 10_000, "k2"), // 앱 기록이 12달 전부터 있음
+    ],
+    [
+      { id: "c1", name: "가짜 임대", fixed: true },
+      { id: "c2", name: "가짜 일반", fixed: false },
+      { id: "c3", name: "가짜 기타", fixed: false },
+    ],
+    [
+      { id: "k1", name: "가짜 숙박비", fixed: true },
+      { id: "k2", name: "가짜 자재", fixed: false },
+    ],
+    "2026-11-04"
+  );
+  const rows = fixedCostRows(report);
+  assert.deepEqual(
+    rows.map((r) => [r.key, r.monthlyAvg]),
+    [
+      ["client:c1", 100_000],
+      ["category:k1", 50_000],
+    ]
+  );
+  const route = fixedRowRouter(rows);
+  assert.equal(route({ client_id: "c1", category_id: "k1" }), "client:c1");
+  assert.equal(route({ client_id: "c2", category_id: "k1" }), "category:k1");
+  assert.equal(route({ client_id: null, category_id: "k1" }), "category:k1");
+  assert.equal(route({ client_id: "c3", category_id: "k2" }), null);
+  assert.equal(route({ client_id: null, category_id: null }), null);
 });

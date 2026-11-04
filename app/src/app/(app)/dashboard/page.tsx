@@ -19,7 +19,9 @@ import {
   insuranceRatesFor,
   ownerHealthSettlement,
 } from "@/lib/ownerSocialInsurance";
-import { loadProfitOutlook, ProfitCalculationDetail } from "@/components/sections/ProfitOutlook";
+import { fixedCostNote, loadProfitOutlook, ProfitCalculationDetail } from "@/components/sections/ProfitOutlook";
+import { loadFixedCostRows } from "@/lib/fixedExpenseLoad";
+import type { FixedCostRow } from "@/lib/fixedExpense";
 import { HalfYearSettlementInput } from "@/components/sections/HalfYearSettlementInput";
 import { VatNoticeInput } from "@/components/sections/VatNoticeInput";
 import { PageMemo } from "@/components/PageMemo";
@@ -146,6 +148,20 @@ export default async function DashboardPage({
   const mm = String(today.month).padStart(2, "0");
   const monthStart = `${currentYear}-${mm}-01`;
   const monthEnd = `${currentYear}-${mm}-${String(new Date(currentYear, today.month, 0).getDate()).padStart(2, "0")}`;
+  const todayKey = `${today.year}-${mm}-${String(today.day).padStart(2, "0")}`;
+
+  // 예상 세전이익의 남은 달 고정지출(지정 줄·이익 기준 달 평균, lib/fixedExpenseLoad.ts) — 다른 조회와 같이 시작. 지난 해는
+  // 반영하지 않아 조회도 안 함. 못 불러오면 반영 없이 안내만(대시보드는 그대로 열림).
+  const fixedCostPromise: Promise<{ rows: FixedCostRow[]; failed: boolean }> =
+    selectedYear >= currentYear
+      ? loadFixedCostRows(supabase, todayKey).then(
+          (rows) => ({ rows, failed: false }),
+          (err) => {
+            console.error(err);
+            return { rows: [], failed: true };
+          }
+        )
+      : Promise.resolve({ rows: [], failed: false });
 
   // 외상 정산 이력 — 장부 표시(정산 전 외상 숨김)·외상 잔액·수금 예정액(이미 받은 매출)이 같이 쓴다.
   const creditPaymentsPromise = fetchAllCreditPayments(supabase);
@@ -206,6 +222,7 @@ export default async function DashboardPage({
       payment_type: string;
       trans_date: string;
       project_id: string | null;
+      client_id: string | null;
       category_id: string | null;
       sales_amount: number;
       sales_vat: number;
@@ -214,7 +231,9 @@ export default async function DashboardPage({
     }>((from, to) =>
       supabase
         .from("transactions")
-        .select("id, type, payment_type, trans_date, project_id, category_id, sales_amount, sales_vat, purchase_amount, purchase_vat")
+        .select(
+          "id, type, payment_type, trans_date, project_id, client_id, category_id, sales_amount, sales_vat, purchase_amount, purchase_vat"
+        )
         .gte("trans_date", `${selectedYear}-01-01`)
         .lte("trans_date", `${selectedYear}-12-31`)
         .order("id", { ascending: true })
@@ -238,10 +257,14 @@ export default async function DashboardPage({
   const categoryById = new Map(((categoryRows ?? []) as ExpenseCategory[]).map((c) => [c.id, c]));
   const categoryRel = (categoryId: string | null) => (categoryId ? categoryById.get(categoryId) ?? null : null);
 
-  // 이익 예상은 세금계산서 기준 — 외상 미정산도 포함한 그 해 거래 전부를 넘긴다.
+  // 이익 예상은 세금계산서 기준 — 외상 미정산도 포함한 그 해 거래 전부를 넘긴다. 이번 달부터 12월까지는 고정지출 달 평균을 매입으로.
+  const fixedCostLoad = await fixedCostPromise;
   const o = await loadProfitOutlook(selectedYear, {
     yearProjects,
     yearTx: yearTxRaw.map((t) => ({ ...t, expense_categories: categoryRel(t.category_id) })),
+    today: todayKey,
+    fixedCostRows: fixedCostLoad.rows,
+    fixedCostFailed: fixedCostLoad.failed,
   });
   // 기성금 등 이미 받은 매출 — 연도와 상관없이 그 해 프로젝트로 등록된 매출 전부(이익 예상이 받아 온 거래를 그대로 씀).
   const receivedByProject = receivedSalesByProject(o.projectTx, payments);
@@ -258,7 +281,6 @@ export default async function DashboardPage({
   const creditPayable = creditTx.filter((t) => t.type === "매입").reduce((s, t) => s + remainingBalance(t, payments), 0);
   const creditReceivableCount = creditTx.filter((t) => t.type === "매출" && remainingBalance(t, payments) > 0).length;
   // 오래된 외상매출금 — 세금계산서(거래일)부터 오늘까지 지난 날(lib/receivableAging.ts), 잔액은 외상매출금 합계와 같은 기준.
-  const todayKey = `${today.year}-${mm}-${String(today.day).padStart(2, "0")}`;
   const aging = receivableAging(
     creditTx
       .filter((t) => t.type === "매출")
@@ -354,7 +376,7 @@ export default async function DashboardPage({
   // 사업 첫해라 이듬해에 몰리는 돈 (첫해는 중간예납이 없어 올해 소득세 전액이 이듬해 5월, 11월엔 중간예납 시작).
   const nextYearTax = o.combinedTax ?? o.profitTax;
   const activeEmployees = (employeeRows ?? []).filter(
-    (e) => !e.resigned_date || e.resigned_date > `${today.year}-${mm}-${String(today.day).padStart(2, "0")}`
+    (e) => !e.resigned_date || e.resigned_date > todayKey
   );
   // 첫해 대표자 보험료는 최고 급여 직원 기준 — 직원 공제액(본인 절반)의 2배로 추정.
   const ownerPaidMonthly = (pick: (e: (typeof activeEmployees)[number]) => number) =>
@@ -391,6 +413,16 @@ export default async function DashboardPage({
   // 맨 위 핵심 숫자 — 상반기 확정 이익금을 넣었으면 연간 합계, 아니면 프로젝트 기준(몰리는 돈·보험료 추정과 같은 기준).
   const headlineProfit = o.combinedProfit ?? (o.hasProjectsWithProfit ? o.profitEstimate : null);
   const headlineTax = o.combinedTax ?? (o.hasProjectsWithProfit ? o.profitTax : null);
+  // 맨 위 숫자에 반영한 남은 달 고정지출(연간 합계면 하반기 예상 쪽, 아니면 프로젝트 기준 쪽)
+  const headlineFixed = o.combinedProfit != null ? o.fixedCost.h2 : o.fixedCost.project;
+  const headlineFixedNote =
+    headlineProfit == null
+      ? ""
+      : o.fixedCostFailed
+        ? " · 고정지출 미반영(불러오기 실패)"
+        : headlineFixed.applied
+          ? " · 12월까지 고정지출 반영"
+          : "";
   const latestTx = recentTx[0];
   const latestTxLabel = latestTx
     ? `${Number(latestTx.trans_date.slice(5, 7))}월 ${Number(latestTx.trans_date.slice(8, 10))}일 ${
@@ -453,11 +485,11 @@ export default async function DashboardPage({
             emphasis
             className="lg:col-span-2 xl:col-span-1"
             sub={
-              o.combinedProfit != null
+              (o.combinedProfit != null
                 ? "상반기 확정치 + 하반기 추정치"
                 : headlineProfit != null
                   ? "프로젝트 기준 추정 (상반기 확정치 미입력)"
-                  : "상반기 확정치 입력 필요"
+                  : "상반기 확정치 입력 필요") + headlineFixedNote
             }
           >
             {headlineProfit != null ? <Money value={headlineProfit} /> : "-"}
@@ -573,7 +605,7 @@ export default async function DashboardPage({
             >
               {o.half1Profit != null ? <Money value={o.half1Profit} /> : <span className="text-sm text-slate-400">미입력</span>}
             </Stat>
-            <Stat label="하반기 예상 이익 (7~12월)">
+            <Stat label="하반기 예상 이익 (7~12월)" sub={fixedCostNote(o.fixedCost.h2)}>
               <Money value={o.h2EstimatedProfit} />
             </Stat>
             <Stat label="연간 예상 이익 (확정+예상)">
@@ -591,7 +623,7 @@ export default async function DashboardPage({
             </Stat>
             {o.hasProjectsWithProfit && (
               <>
-                <Stat label="프로젝트 기준 예상 이익 (진행 중 포함)">
+                <Stat label="프로젝트 기준 예상 이익 (진행 중 포함)" sub={fixedCostNote(o.fixedCost.project)}>
                   <Money value={o.profitEstimate} />
                 </Stat>
                 <Stat label="프로젝트 기준 예상 종합소득세" sub={`지방소득세 포함 · ${taxRateLabel(o.profitTax)}`}>
@@ -623,10 +655,19 @@ export default async function DashboardPage({
           <Footnote>
             <DetailToggle label="산정 기준">
               <p>
-                하반기 예상 이익 = 하반기 매출−매입 + 세금계산서 미발행분 예상 이익 − 인건비 · 연간 예상 이익 = 상반기 확정 이익 +
-                하반기 예상 이익
+                하반기 예상 이익 = 하반기 매출−매입 + 세금계산서 미발행분 예상 이익 − 인건비 − 남은 기간 고정지출 · 연간 예상 이익 =
+                상반기 확정 이익 + 하반기 예상 이익
                 {o.hasProjectsWithProfit &&
-                  " · 프로젝트 기준 예상 이익 = 프로젝트 총이익(발주액 − 대행구매액, 발행 세금계산서가 더 많거나 발주액이 없으면 실제 매출 · 매입은 전부 반영) + 프로젝트 미지정 매출 − 일반경비 − 직원급여·상여·4대보험 (추가 지출 발생 시 즉시 반영)"}
+                  " · 프로젝트 기준 예상 이익 = 프로젝트 총이익(발주액 − 대행구매액, 발행 세금계산서가 더 많거나 발주액이 없으면 실제 매출 · 매입은 전부 반영) + 프로젝트 미지정 매출 − 일반경비 − 직원급여·상여·4대보험 − 남은 기간 고정지출 (추가 지출 발생 시 즉시 반영)"}
+              </p>
+              <p>
+                남은 기간 고정지출 = 이번 달부터 12월까지 지정 고정지출(보고서 → 거래처·카테고리 집계)의 달 평균을 매입으로 예상 —
+                지난달까지는 장부 금액(마감), 이번 달은 지정 고정지출마다 달 평균과 이미 등록한 금액 중 큰 쪽, 지정하지 않은 거래는
+                장부 그대로 · 공급가액 기준(매입세액 불공제 카테고리는 부가세 포함) · 하반기 예상 이익은 7월부터, 지난 연도는 미반영
+                {selectedYear >= currentYear && !o.fixedCostFailed && o.fixedCostRows.length === 0 && " · 현재 지정된 고정지출 없음"}
+                {o.fixedCostFailed && (
+                  <span className="font-semibold text-amber-600"> · 고정지출을 불러오지 못해 이번 계산에는 미반영</span>
+                )}
               </p>
               <p>
                 매출·매입은 세금계산서(거래일) 기준으로 외상 미정산분 포함 · 검토중 프로젝트의 발주액은 미반영 · 귀속 연도가 해당

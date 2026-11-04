@@ -219,3 +219,24 @@ export function fixedExpenseReport(
     perMonth: window.months.map((_, i) => fixed.reduce((sum, r) => sum + r.perMonth[i], 0)),
   };
 }
+
+// ── 예상 세전이익에 남은 달 고정지출(11/4 사용자 결정) — 계산은 lib/projectProfit.ts의 fixedCostOutlook ──
+// 지정 줄만, 달 평균은 "이익 기준"(공급가액, 매입세액 불공제 카테고리는 부가세 포함 — vatBasis의 purchaseCostOf)으로 다시 계산한
+// 고정지출 표(fixedExpenseLoad.ts)에서 가져옴 — 위 표의 달 평균은 실제로 나간 돈(공급가액 + 부가세)이라 이익에 그대로 쓰면 돌려받는
+// 부가세만큼 비용이 커짐.
+export type FixedCostRow = { key: string; kind: FixedExpenseKind; id: string; name: string; monthlyAvg: number };
+
+export function fixedCostRows(report: FixedExpenseReport): FixedCostRow[] {
+  return report.rows.map((r) => ({ key: r.key, kind: r.kind, id: r.id, name: r.name, monthlyAvg: r.monthlyAvg }));
+}
+
+/** 거래가 들어가는 지정 줄 키 — 고정지출 표와 같은 규칙(지정 거래처 → 지정 카테고리, 한 거래는 한 줄에만), 지정 줄이 아니면 null */
+export function fixedRowRouter(rows: FixedCostRow[]) {
+  const clients = new Set(rows.filter((r) => r.kind === "client").map((r) => r.id));
+  const categories = new Set(rows.filter((r) => r.kind === "category").map((r) => r.id));
+  return (t: { client_id: string | null; category_id: string | null }) => {
+    if (t.client_id && clients.has(t.client_id)) return `client:${t.client_id}`;
+    if (t.category_id && categories.has(t.category_id)) return `category:${t.category_id}`;
+    return null;
+  };
+}

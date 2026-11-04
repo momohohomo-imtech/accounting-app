@@ -16,7 +16,7 @@ import { isLedgerVisible, remainingBalance } from "@/lib/credit";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import { VendorAggregateTable } from "@/components/VendorAggregateTable";
 import { FixedExpensePanel } from "@/components/FixedExpensePanel";
-import { fixedExpenseReport, fixedExpenseWindow } from "@/lib/fixedExpense";
+import { loadFixedExpense } from "@/lib/fixedExpenseLoad";
 import { getCurrentRole } from "@/lib/currentRole";
 import { nowKstParts } from "@/lib/kstDate";
 import { PurchaseItemSearchTable } from "@/components/PurchaseItemSearchTable";
@@ -52,7 +52,7 @@ import { fetchAllRows, fetchAllCreditPayments, fetchAllData, fetchAllRowsIn } fr
 import { purchaseCostOf, salesSupplyOf, supplyOf, vatOf } from "@/lib/vatBasis";
 import type { WorkLog } from "@/lib/types";
 import { nowKst } from "@/lib/kstDate";
-import { effectiveStatus, projectBasedProfit, projectGroups } from "@/lib/projectProfit";
+import { effectiveStatus, fixedCostOutlook, projectBasedProfit, projectGroups } from "@/lib/projectProfit";
 import { receivableOf, receivedSalesByProject } from "@/lib/expectedReceivable";
 import { categoryReportHref } from "@/lib/reportLinks";
 
@@ -66,6 +66,7 @@ type Row = {
   client_id: string | null;
   client_name_raw: string | null;
   project_id: string | null;
+  category_id: string | null;
   item_name: string | null;
   sales_amount: number;
   sales_vat: number;
@@ -111,54 +112,6 @@ function one<T>(v: T | T[] | null): T | null {
   return Array.isArray(v) ? v[0] ?? null : v;
 }
 
-// 고정지출 칸(lib/fixedExpense.ts) — 선택 연도와 상관없이 최근 12개월(지난달까지) + 이번 달 매입, 거래처·카테고리의 고정지출 표시
-// (101·102 SQL). 실행 전이면 그 표시 없이(지정 안 함) 계산해서 후보만 보여 줌.
-const MISSING_COLUMN = new Set(["PGRST204", "42703"]);
-async function loadFixedExpense(supabase: Awaited<ReturnType<typeof createClient>>, today: string) {
-  const win = fixedExpenseWindow(today);
-  const [clientProbe, categoryProbe] = await Promise.all([
-    supabase.from("clients").select("is_fixed_expense").limit(1),
-    supabase.from("expense_categories").select("is_fixed_expense").limit(1),
-  ]);
-  const clientReady = !(clientProbe.error && MISSING_COLUMN.has(clientProbe.error.code ?? ""));
-  const categoryReady = !(categoryProbe.error && MISSING_COLUMN.has(categoryProbe.error.code ?? ""));
-  type Target = { id: string; name: string; is_fixed_expense?: boolean | null };
-  const [clients, categories, txs] = await Promise.all([
-    clientReady
-      ? fetchAllRows<Target>((from, to) => supabase.from("clients").select("id, name, is_fixed_expense").order("id").range(from, to))
-      : fetchAllRows<Target>((from, to) => supabase.from("clients").select("id, name").order("id").range(from, to)),
-    categoryReady
-      ? fetchAllRows<Target>((from, to) =>
-          supabase.from("expense_categories").select("id, name, is_fixed_expense").order("id").range(from, to)
-        )
-      : fetchAllRows<Target>((from, to) => supabase.from("expense_categories").select("id, name").order("id").range(from, to)),
-    fetchAllRows<{ client_id: string | null; category_id: string | null; trans_date: string; purchase_amount: number; purchase_vat: number }>(
-      (from, to) =>
-        supabase
-          .from("transactions")
-          .select("client_id, category_id, trans_date, purchase_amount, purchase_vat")
-          .eq("type", "매입")
-          .gte("trans_date", win.from)
-          .lte("trans_date", today)
-          .order("id", { ascending: true })
-          .range(from, to)
-    ),
-  ]);
-  const target = (c: Target) => ({ id: c.id, name: c.name, fixed: Boolean(c.is_fixed_expense) });
-  const report = fixedExpenseReport(
-    txs.map((t) => ({
-      client_id: t.client_id,
-      category_id: t.category_id,
-      trans_date: t.trans_date,
-      amount: Number(t.purchase_amount) + Number(t.purchase_vat),
-    })),
-    clients.map(target),
-    categories.map(target),
-    today
-  );
-  return { clientReady, categoryReady, report };
-}
-
 export default async function ReportsPage({
   searchParams,
 }: {
@@ -199,8 +152,10 @@ export default async function ReportsPage({
   const selectedYear = year ? Number(year) : currentYear;
 
   const supabase = await createClient();
-  // 고정지출 칸 — 다른 조회와 같이 시작
-  const fixedExpensePromise = loadFixedExpense(supabase, nowKstParts().date);
+  // 고정지출 칸(lib/fixedExpenseLoad.ts — 선택 연도와 상관없이 최근 12개월) — 다른 조회와 같이 시작. 예상 순이익율의 남은 달
+  // 고정지출도 이것으로(대시보드 예상 세전이익과 같은 지정 줄·달 평균).
+  const todayDate = nowKstParts().date;
+  const fixedExpensePromise = loadFixedExpense(supabase, todayDate);
   // 아래 큰 조회가 먼저 실패하면 이 조회는 기다려지지 않음 — 처리 안 된 거부로 남지 않게(기다리는 곳에서는 그대로 오류)
   fixedExpensePromise.catch(() => {});
   const rolePromise = getCurrentRole();
@@ -579,8 +534,10 @@ export default async function ReportsPage({
   // 상단 박스의 "예상 순이익율" — 대시보드 "프로젝트 기준 예상 이익"과 같은 계산(lib/projectProfit.ts의
   // projectBasedProfit: 연도 전체, site 필터와 무관, 세금계산서 기준이라 외상 미정산 포함, 검토중 발주액 제외,
   // 발행 세금계산서가 더 많거나 발주액이 없으면 실제 매출, 프로젝트 없는 매출 포함) ÷ 발주액 합계(검토중 제외).
-  // 수주액(수기 입력)은 입력 확인용이라 계산에 안 씀.
-  const yearEstimate = projectBasedProfit(projects ?? [], projectTxRaw, rawTx, agencyByProject);
+  // 수주액(수기 입력)은 입력 확인용이라 계산에 안 씀. 이번 달부터 12월까지는 고정지출 달 평균을 매입으로(대시보드와 같게 —
+  // fixedCostOutlook, 지난 해는 반영 없음).
+  const yearFixedCost = fixedCostOutlook(selectedYear, todayDate, fixedExpense.costRows, projects ?? [], rawTx).project;
+  const yearEstimate = projectBasedProfit(projects ?? [], projectTxRaw, rawTx, agencyByProject, yearFixedCost.added);
   const yearProfitEstimateRate =
     yearEstimate.quoteTotal > 0 ? (yearEstimate.profit / yearEstimate.quoteTotal) * 100 : null;
 
@@ -1083,6 +1040,7 @@ export default async function ReportsPage({
               </p>
               <p className="mt-1 text-[11px] leading-tight text-slate-400">
                 {selectedYear}년 이익 예상 ÷ 발주액 합계(검토중 제외) — site 필터와 무관한 연간 전체 기준
+                {yearFixedCost.applied && " · 12월까지 고정지출 반영"}
               </p>
             </div>
           </div>
