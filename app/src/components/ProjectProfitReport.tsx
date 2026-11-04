@@ -241,6 +241,12 @@ export async function ProjectProfitReport({
   // 금액을 노란 글씨로(사용자 요청). 정산되면 매입 합계로 옮겨 가서 두 번 빠지지 않음.
   const unsettled = unsettledCreditPurchase(purchaseRowsRaw, creditPayments);
   const profitAfterUnsettled = profit !== null ? profit - unsettled.cost : null;
+  // 남은 금액을 다 받아도 남는 최종 손익(외상 미정산 매입이 있으면 그것까지 뺀 것) — 이익금이 마이너스인데 남은 금액이 양수라 헷갈린다는
+  // 사용자 문의(11/4)로 남은 금액 아래에 "다 받아도 이익금 −○원" 한 줄.
+  const finalProfit = unsettled.count > 0 && profitAfterUnsettled !== null ? profitAfterUnsettled : profit;
+  // 기타 공제 = 발주액 − 수주액(실수령액) − 대행구매액(수주액과 맞춰 보는 확인용, 계산에는 안 씀). 수주액이 없으면 의미가 없어 "-",
+  // 수주액이 발주액 − 대행구매액보다 크면 음수라 예전엔 "--○원"처럼 빼기표가 두 번 붙었음 → "-"로 두고 수주액 칸 아래 설명.
+  const otherDeductionLabel = contractTotal === 0 || otherDeduction <= 0 ? "-" : `-${formatWon(otherDeduction)}`;
   // 그래프·보고서 상단 참고용 — 발주액의 25%를 이윤+잡비로 가정했을 때 금액(실제 이익금/이익율
   // 계산에는 영향 없는 순수 표시용 수치).
   const handlingFeeAmount = quoteTotal > 0 ? Math.round((quoteTotal * HANDLING_FEE_PCT) / 100) : 0;
@@ -296,7 +302,7 @@ export async function ProjectProfitReport({
   const summaryRows: [string, string | number][] = [
     ["발주액 (원청 발주금액)", formatWon(quoteTotal)],
     ["대행구매액", `-${formatWon(agencyTotal)}`],
-    ["기타 공제 (수수료 등)", `-${formatWon(otherDeduction)}`],
+    ["기타 공제 (수수료 등)", otherDeductionLabel],
     [
       `수주액 (실수령액)${project.contract_amount_estimated ? " - 예상금액" : project.contract_amount_minimum ? " - 최소금액 산정액" : ""}`,
       formatWon(contractTotal),
@@ -315,6 +321,9 @@ export async function ProjectProfitReport({
     ["이익율", margin === null ? "-" : `${margin.toFixed(2)}%`],
     ["받은 금액 (부가세 제외)", formatWon(receipts.received)],
     ["남은 금액 (받을 금액, 부가세 제외)", receivableLabel],
+    ...(receivable && receivable.quote > 0 && receivable.amount > 0 && finalProfit !== null && finalProfit < 0
+      ? ([["남은 금액을 다 받아도 이익금", formatWon(finalProfit)]] as [string, string][])
+      : []),
   ];
 
   const parentLabel = parentProject
@@ -423,7 +432,8 @@ export async function ProjectProfitReport({
         </div>
         <div>
           <p className="text-xs text-slate-500 print:text-[9px]">기타 공제 (수수료 등)</p>
-          <p className="tabular-nums text-sm font-bold whitespace-nowrap text-slate-500 print:text-xs">-{formatWon(otherDeduction)}</p>
+          <p className="tabular-nums text-sm font-bold whitespace-nowrap text-slate-500 print:text-xs">{otherDeductionLabel}</p>
+          {contractTotal === 0 && <p className="mt-0.5 text-[11px] text-slate-400 print:text-[8px]">수주액 미입력</p>}
         </div>
         <div>
           <p className="text-xs text-slate-500 print:text-[9px]">
@@ -444,7 +454,8 @@ export async function ProjectProfitReport({
           </p>
           {contractTotal > 0 && otherDeduction !== 0 && (
             <p className="mt-0.5 text-[11px] text-amber-600 print:text-[8px]">
-              발주액-대행구매액 기준 예상 {formatWon(quoteTotal - agencyTotal)} (차이 {formatWon(Math.abs(otherDeduction))})
+              발주액-대행구매액 기준 예상 {formatWon(quoteTotal - agencyTotal)} (수주액이 {formatWon(Math.abs(otherDeduction))}{" "}
+              {otherDeduction < 0 ? "많음" : "적음"})
             </p>
           )}
         </div>
@@ -507,6 +518,12 @@ export async function ProjectProfitReport({
               <p className="mt-0.5 text-[11px] text-slate-400 print:text-[8px]">진행중·공사 완료·수금 대기 프로젝트만 계산</p>
             )
           )}
+          {receivable && receivable.quote > 0 && receivable.amount > 0 && finalProfit !== null && finalProfit < 0 && (
+            <p className="mt-0.5 text-[11px] font-semibold text-red-600 print:text-[8px]">
+              다 받아도 이익금 {formatWon(finalProfit)}
+              {unsettled.count > 0 && " (외상 미정산 매입 포함)"}
+            </p>
+          )}
         </div>
       </div>
 
@@ -537,6 +554,7 @@ export async function ProjectProfitReport({
           <div className="print:mt-2 print:border-t print:border-slate-400 print:pt-2">
             <ProjectAgencyPurchaseList
               projectId={project.id}
+              quoteAmount={project.quote_amount}
               categories={expenseCategories ?? []}
               clientNames={clientNames}
               items={(agencyRows ?? []).map((a) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { addAgencyPurchase, updateAgencyPurchase, deleteAgencyPurchase } from "@/lib/actions/projectAgencyPurchases";
 import { formatWon } from "@/lib/format";
@@ -9,6 +9,19 @@ import { Button } from "@/components/ui/Button";
 import { fieldClass, inlineFieldClass } from "@/components/ui/field";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { MoneyInput } from "@/components/ui/MoneyInput";
+import { useConfirm } from "@/components/ConfirmProvider";
+import {
+  DEFAULT_INTERMEDIARY_FEE,
+  FEE_SETTINGS_STORAGE_KEY,
+  feeItemLabel,
+  feeRowCheck,
+  intermediaryFeeAmount,
+  intermediaryFeeRows,
+  parseFeeSettings,
+  roundFeePct,
+  validFeePct,
+  type IntermediaryFeeSettings,
+} from "@/lib/intermediaryFee";
 
 type Category = { id: string; name: string; project_only: boolean; color: string | null };
 type AgencyPurchase = {
@@ -216,14 +229,18 @@ export function ProjectAgencyPurchaseList({
   items,
   categories,
   clientNames,
+  quoteAmount,
 }: {
   projectId: string;
   items: AgencyPurchase[];
   categories: Category[];
   clientNames: string[];
+  /** 이 프로젝트의 발주액 — "+ 현대 수수료 20% 추가" 버튼이 쓰는 금액 기준(없으면 버튼 비활성) */
+  quoteAmount?: number | null;
 }) {
   const router = useRouter();
   const globalPending = useGlobalPending();
+  const confirm = useConfirm();
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [pending, setPending] = useState(false);
@@ -262,6 +279,66 @@ export function ProjectAgencyPurchaseList({
         {sortKey === key && <span className="text-[10px]">{sortDir === "asc" ? "▲" : "▼"}</span>}
       </button>
     );
+  }
+
+  // 중간 업체 수수료(lib/intermediaryFee.ts) — 발주액 × 비율을 설정한 거래처·카테고리 줄로(기본 현대기계·현대·20%, 버튼 설정에서 바꿈 —
+  // 이 기기에 저장). 이미 수수료 줄이 있으면 확인창에서 알리고, 지금 발주액 기준 금액과 다르면(발주액을 바꾼 뒤 줄을 안 고친 경우) 알림 —
+  // 줄 이름에 적힌 비율로 확인(비율 설정을 바꿔도 예전 비율로 넣은 줄에는 알림이 안 뜸).
+  const [feeSettings, setFeeSettings] = useState<IntermediaryFeeSettings>(DEFAULT_INTERMEDIARY_FEE);
+  const [editingFee, setEditingFee] = useState(false);
+  useEffect(() => {
+    // 저장소를 못 쓰는 브라우저(사생활 보호 모드 등)면 기본값 그대로
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 후 localStorage에서 저장된 버튼 설정을 1회 불러옴(SSR 시엔 값이 없어 하이드레이션 불일치 없음, EntityTable과 같은 방식)
+      setFeeSettings(parseFeeSettings(window.localStorage.getItem(FEE_SETTINGS_STORAGE_KEY)));
+    } catch {
+      /* 기본값 */
+    }
+  }, []);
+  function saveFeeSettings(next: IntermediaryFeeSettings) {
+    setFeeSettings(next);
+    setEditingFee(false);
+    try {
+      window.localStorage.setItem(FEE_SETTINGS_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      /* 저장 못 하면 이번 화면에서만 */
+    }
+  }
+  const feeLabel = feeItemLabel(feeSettings);
+  const fee = intermediaryFeeAmount(quoteAmount, feeSettings.pct);
+  const feeRows = intermediaryFeeRows(items, feeSettings);
+  const feeCategory = categories.find((c) => c.name === feeSettings.categoryName);
+  const feeCheck = feeRows.length === 1 ? feeRowCheck(feeRows[0], quoteAmount, feeSettings.pct) : null;
+
+  async function addIntermediaryFee() {
+    if (fee <= 0) return;
+    const notes = [
+      feeRows.length > 0 && `이미 수수료 줄이 ${feeRows.length}개 있습니다(${feeRows.map((r) => formatWon(r.amount)).join(", ")}).`,
+      !feeCategory && (feeSettings.categoryName ? `카테고리 "${feeSettings.categoryName}"가 없어 미분류로 들어갑니다.` : "미분류로 들어갑니다."),
+    ].filter(Boolean);
+    const ok = await confirm(
+      `발주액 ${formatWon(quoteAmount ?? 0)}의 ${feeSettings.pct}%(${formatWon(fee)})를 거래처 "${feeSettings.clientName}"·품목 "${feeLabel}" 줄로 추가할까요?${
+        notes.length ? `\n${notes.join("\n")}` : ""
+      }`,
+      { title: `${feeLabel} 추가`, confirmLabel: "추가" }
+    );
+    if (!ok) return;
+    const fd = new FormData();
+    fd.append("project_id", projectId);
+    fd.append("client_name", feeSettings.clientName);
+    fd.append("item_name", feeLabel);
+    fd.append("category_id", feeCategory?.id ?? "");
+    fd.append("amount", String(fee));
+    fd.append("memo", `발주액 ${formatWon(quoteAmount ?? 0)} × ${feeSettings.pct}%`);
+    setPending(true);
+    setError(null);
+    const result = await globalPending.run(() => addAgencyPurchase(fd));
+    setPending(false);
+    if (result?.error) {
+      setError(result.error);
+      return;
+    }
+    router.refresh();
   }
 
   // onSubmit(form action 아님) — form action은 끝나면 입력칸을 비워서, 저장이 실패해도 적은 매입처·품목·금액이 사라졌음
@@ -313,6 +390,40 @@ export function ProjectAgencyPurchaseList({
         <p className="mb-2 hidden text-sm text-slate-400 print:block">대행구매 내역이 없습니다.</p>
       )}
 
+      {((feeCheck && !feeCheck.matches) || feeRows.length > 1) && (
+        <p className="mb-2 text-xs text-amber-600 print:hidden">
+          {feeCheck && !feeCheck.matches
+            ? `수수료 줄 ${formatWon(feeRows[0].amount)} — 지금 발주액의 ${feeCheck.pct}%는 ${formatWon(feeCheck.expected)}입니다. 발주액을 바꿨으면 수수료 줄도 고쳐 주세요.`
+            : `수수료 줄이 ${feeRows.length}개 있습니다 — 두 번 들어간 것이 아닌지 확인해 주세요.`}
+        </p>
+      )}
+
+      {editingFee ? (
+        <FeeSettingsEditor
+          settings={feeSettings}
+          categories={categories}
+          clientNames={clientNames}
+          onSave={saveFeeSettings}
+          onCancel={() => setEditingFee(false)}
+        />
+      ) : (
+        <div className="mb-2 flex flex-wrap justify-end gap-1 print:hidden">
+          <Button
+            type="button"
+            variant="secondary"
+            size="xs"
+            disabled={pending || fee <= 0}
+            title={fee <= 0 ? "발주액을 먼저 입력해 주세요" : undefined}
+            onClick={addIntermediaryFee}
+          >
+            + {feeLabel} 추가
+          </Button>
+          <Button type="button" variant="secondary" size="xs" onClick={() => setEditingFee(true)} title="버튼 이름·비율 바꾸기">
+            ✎ 버튼 설정
+          </Button>
+        </div>
+      )}
+
       <form key={addFormKey} onSubmit={handleAdd} className="flex flex-wrap items-end gap-2 print:hidden">
         <input type="hidden" name="project_id" value={projectId} />
         <input list="agency-client-names-new" name="client_name" placeholder="매입처 (자유 입력)" className={`${inlineFieldClass} w-36`} />
@@ -330,6 +441,121 @@ export function ProjectAgencyPurchaseList({
         </Button>
         {error && <span className="w-full text-xs text-red-600">{error}</span>}
       </form>
+    </div>
+  );
+}
+
+// "+ 현대 수수료 20% 추가" 버튼 설정(사용자 요청 11/4 "이름변경과 값변경") — 품목 이름·거래처·카테고리·비율. 이 기기(브라우저)에 저장.
+function FeeSettingsEditor({
+  settings,
+  categories,
+  clientNames,
+  onSave,
+  onCancel,
+}: {
+  settings: IntermediaryFeeSettings;
+  categories: Category[];
+  clientNames: string[];
+  onSave: (s: IntermediaryFeeSettings) => void;
+  onCancel: () => void;
+}) {
+  const [itemName, setItemName] = useState(settings.itemName);
+  const [clientName, setClientName] = useState(settings.clientName);
+  const [categoryName, setCategoryName] = useState(settings.categoryName);
+  const [pct, setPct] = useState(String(settings.pct));
+  const [error, setError] = useState<string | null>(null);
+
+  function save() {
+    const pctValue = roundFeePct(Number(pct));
+    if (!itemName.trim() || !clientName.trim()) {
+      setError("품목 이름과 거래처를 적어 주세요.");
+      return;
+    }
+    if (!validFeePct(pctValue)) {
+      setError("비율은 0보다 크고 100 이하로 적어 주세요.");
+      return;
+    }
+    onSave({ itemName: itemName.trim(), clientName: clientName.trim(), categoryName: categoryName.trim(), pct: pctValue });
+  }
+
+  function reset() {
+    setItemName(DEFAULT_INTERMEDIARY_FEE.itemName);
+    setClientName(DEFAULT_INTERMEDIARY_FEE.clientName);
+    setCategoryName(DEFAULT_INTERMEDIARY_FEE.categoryName);
+    setPct(String(DEFAULT_INTERMEDIARY_FEE.pct));
+    setError(null);
+  }
+
+  return (
+    <div className="mb-2 rounded-lg border border-slate-200 bg-slate-50 p-2 print:hidden">
+      <p className="mb-1.5 text-xs font-semibold text-slate-700">수수료 버튼 설정</p>
+      <div className="flex flex-wrap items-end gap-2 max-md:flex-col max-md:items-stretch">
+        <label className="text-[11px] text-slate-500">
+          품목 이름
+          <input value={itemName} onChange={(e) => setItemName(e.target.value)} className={`${inlineFieldClass} mt-0.5 block w-40 max-md:w-full`} />
+        </label>
+        <label className="text-[11px] text-slate-500">
+          거래처
+          <input
+            list="fee-settings-client-names"
+            value={clientName}
+            onChange={(e) => setClientName(e.target.value)}
+            className={`${inlineFieldClass} mt-0.5 block w-36 max-md:w-full`}
+          />
+          <datalist id="fee-settings-client-names">
+            {clientNames.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+        </label>
+        <label className="text-[11px] text-slate-500">
+          카테고리
+          <select
+            value={categoryName}
+            onChange={(e) => setCategoryName(e.target.value)}
+            className={`${inlineFieldClass} mt-0.5 block w-32 max-md:w-full`}
+          >
+            <option value="">미분류</option>
+            {categoryName && !categories.some((c) => c.name === categoryName) && (
+              <option value={categoryName}>{categoryName} (없음 — 미분류로 들어감)</option>
+            )}
+            {categories.map((c) => (
+              <option key={c.id} value={c.name}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-[11px] text-slate-500">
+          비율(%)
+          <input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            max={100}
+            step="any"
+            value={pct}
+            onChange={(e) => setPct(e.target.value)}
+            className={`${inlineFieldClass} mt-0.5 block w-24 text-right max-md:w-full`}
+          />
+        </label>
+        <div className="flex gap-1">
+          <Button type="button" size="xs" onClick={save}>
+            저장
+          </Button>
+          <Button type="button" size="xs" variant="secondary" onClick={reset}>
+            기본값
+          </Button>
+          <Button type="button" size="xs" variant="secondary" onClick={onCancel}>
+            취소
+          </Button>
+        </div>
+      </div>
+      <p className="mt-1 text-[11px] text-slate-400">
+        버튼은 &quot;{feeItemLabel({ itemName: itemName.trim() || "이름", clientName, categoryName, pct: Number(pct) || 0 })}&quot;로 보입니다 · 이
+        기기(브라우저)에만 저장됨 — 휴대폰·PC에서 각각 한 번씩 맞춰 주세요 · 이미 추가한 줄은 그대로(줄의 &quot;수정&quot;으로 고침)
+      </p>
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
     </div>
   );
 }
