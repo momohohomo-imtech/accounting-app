@@ -5,6 +5,7 @@ import {
   fixedExpenseReport,
   fixedExpenseWindow,
   type FixedCostRow,
+  type FixedExpenseReport,
   type FixedExpenseTarget,
 } from "@/lib/fixedExpense";
 import { purchaseCostOf } from "@/lib/vatBasis";
@@ -41,9 +42,31 @@ function fetchPurchases(supabase: Supabase, today: string) {
   );
 }
 
+// 실제로 나간 돈(공급가액 + 부가세) 기준 표 — 보고서 고정지출 칸
+function cashReportOf(txs: PurchaseRow[], clients: FixedExpenseTarget[], categories: Category[], today: string) {
+  return fixedExpenseReport(
+    txs.map((t) => ({
+      client_id: t.client_id,
+      category_id: t.category_id,
+      trans_date: t.trans_date,
+      amount: Number(t.purchase_amount) + Number(t.purchase_vat),
+    })),
+    clients,
+    categories.map(target),
+    today
+  );
+}
+
 // 예상 이익용 지정 줄 — 같은 매입으로 고정지출 표를 한 번 더 계산하되 금액을 이익 기준(공급가액, 매입세액 불공제 카테고리는 부가세
-// 포함 — 매입장 이익 계산과 같은 purchaseCostOf)으로. 나누는 달(÷12·시작한 달부터·앱 기록 짧으면)은 표와 같게 정해짐.
-function costRowsOf(txs: PurchaseRow[], clients: FixedExpenseTarget[], categories: Category[], today: string): FixedCostRow[] {
+// 포함 — 매입장 이익 계산과 같은 purchaseCostOf)으로. 나누는 달(÷12·시작한 달부터·앱 기록 짧으면)은 표와 같게 정해짐. 두 표의 달 평균
+// 차이 = 돌려받는 매입세액(1월 부가세 예상용).
+function costRowsOf(
+  txs: PurchaseRow[],
+  clients: FixedExpenseTarget[],
+  categories: Category[],
+  today: string,
+  cashReport: FixedExpenseReport
+): FixedCostRow[] {
   const categoryById = new Map(categories.map((c) => [c.id, c]));
   const report = fixedExpenseReport(
     txs.map((t) => ({
@@ -63,7 +86,7 @@ function costRowsOf(txs: PurchaseRow[], clients: FixedExpenseTarget[], categorie
     categories.map(target),
     today
   );
-  return fixedCostRows(report);
+  return fixedCostRows(report, cashReport);
 }
 
 /** 보고서 고정지출 칸(실제로 나간 돈 기준 표) + 예상 순이익율용 지정 줄(이익 기준). today = 한국 시각 오늘(YYYY-MM-DD) */
@@ -83,18 +106,8 @@ export async function loadFixedExpense(supabase: Supabase, today: string) {
     fetchPurchases(supabase, today),
   ]);
   const clientTargets = clients.map(target);
-  const report = fixedExpenseReport(
-    txs.map((t) => ({
-      client_id: t.client_id,
-      category_id: t.category_id,
-      trans_date: t.trans_date,
-      amount: Number(t.purchase_amount) + Number(t.purchase_vat),
-    })),
-    clientTargets,
-    categories.map(target),
-    today
-  );
-  return { clientReady, categoryReady, report, costRows: costRowsOf(txs, clientTargets, categories, today) };
+  const report = cashReportOf(txs, clientTargets, categories, today);
+  return { clientReady, categoryReady, report, costRows: costRowsOf(txs, clientTargets, categories, today, report) };
 }
 
 /** 대시보드 예상 세전이익용 지정 줄(이익 기준)만 — 지정한 곳이 없으면 매입은 조회하지 않음. 지정 줄은 보고서와 같음
@@ -109,5 +122,6 @@ export async function loadFixedCostRows(supabase: Supabase, today: string): Prom
   const fixedClients = clientRes.error ? [] : ((clientRes.data ?? []) as Target[]).map(target);
   const categories = (categoryRes.data ?? []) as Category[];
   if (fixedClients.length === 0 && !categories.some((c) => c.is_fixed_expense)) return [];
-  return costRowsOf(await fetchPurchases(supabase, today), fixedClients, categories, today);
+  const txs = await fetchPurchases(supabase, today);
+  return costRowsOf(txs, fixedClients, categories, today, cashReportOf(txs, fixedClients, categories, today));
 }

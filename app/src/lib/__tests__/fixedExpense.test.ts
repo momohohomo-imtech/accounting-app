@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fixedCostRows, fixedExpenseReport, fixedExpenseWindow, fixedRowRouter, type FixedExpenseTx } from "@/lib/fixedExpense";
+import { fixedCostRows, fixedExpenseReport, fixedExpenseWindow, fixedRowRouter, stoppedFixedRow, type FixedExpenseTx } from "@/lib/fixedExpense";
 
 // 가짜 자료만
 test("고정지출 기간: 최근 12개월(지난달까지) — 이번 달은 따로, 해를 넘겨도", () => {
@@ -302,4 +302,33 @@ test("예상 이익용 지정 줄: 지정한 줄만 달 평균 그대로, 거래
   assert.equal(route({ client_id: null, category_id: "k1" }), "category:k1");
   assert.equal(route({ client_id: "c3", category_id: "k2" }), null);
   assert.equal(route({ client_id: null, category_id: null }), null);
+});
+
+test("예상 이익용 지정 줄: 실제로 나간 돈 표와 짝지어 달 평균 매입세액(돌려받는 부가세), 마지막 매입일", () => {
+  const clients = [{ id: "c1", name: "가짜 임대", fixed: true }];
+  const months = fixedExpenseWindow("2026-11-04").months;
+  // 매달 110만(공급가 100만 + 부가세 10만)
+  const cash = fixedExpenseReport(months.map((m) => tx("c1", `${m}-05`, 1_100_000)), clients, [], "2026-11-04");
+  const cost = fixedExpenseReport(months.map((m) => tx("c1", `${m}-05`, 1_000_000)), clients, [], "2026-11-04");
+  const [row] = fixedCostRows(cost, cash);
+  assert.equal(row.monthlyAvg, 1_000_000);
+  assert.equal(row.monthlyVat, 100_000);
+  assert.equal(row.lastDate, "2026-10-05");
+  assert.equal(row.stopped, false);
+  // 실제로 나간 돈 표가 없으면 매입세액 0
+  assert.equal(fixedCostRows(cost)[0].monthlyVat, 0);
+});
+
+test("멈춘 지정 줄: 3달 이상 나오다 최근 4달·이번 달에 없으면 — 석 달마다·1년에 한 번은 안 걸림", () => {
+  const z = (arr: number[]) => ({ perMonth: arr, monthsWithSpend: arr.filter((v) => v !== 0).length, thisMonth: 0 });
+  // 8달 나오고 최근 4달 없음 → 멈춤
+  assert.equal(stoppedFixedRow(z([1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0])), true);
+  // 이번 달에 나왔으면 아님
+  assert.equal(stoppedFixedRow({ ...z([1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0]), thisMonth: 5 }), false);
+  // 석 달마다(사이 빈 달 2개) — 다음 낼 달(이번 달)을 앞두고 지난 석 달이 비어도 아님
+  assert.equal(stoppedFixedRow(z([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0])), false);
+  // 1년에 한두 번(보험 등)은 아님
+  assert.equal(stoppedFixedRow(z([1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0])), false);
+  // 최근 3달만 빈 매달 거래는 아직 아님(4달부터)
+  assert.equal(stoppedFixedRow(z([1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0])), false);
 });

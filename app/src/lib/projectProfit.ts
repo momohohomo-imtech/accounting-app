@@ -1,5 +1,5 @@
 import type { CreditPayment } from "@/lib/types";
-import { isLedgerVisible } from "@/lib/credit";
+import { isLedgerVisible, transactionTotal } from "@/lib/credit";
 import { purchaseCostOf, salesSupplyOf, type VatBasisRow } from "@/lib/vatBasis";
 import { one } from "@/lib/relations";
 import { PAYROLL_CATEGORY_NAME } from "@/lib/vatExempt";
@@ -292,6 +292,10 @@ export type FixedCostProjection = {
   booked: number;
   /** 이익에서 더 빼는 금액 = planned − booked(0 이상) */
   added: number;
+  /** 지정 줄 달 평균 매입세액 합(돌려받는 부가세 — 비과세·불공제 제외) */
+  monthlyVat: number;
+  /** 1월 부가세 예상에서 더 빼는 매입세액 = Σ 달 Σ 줄 max(0, 달 평균 매입세액 − 그 달 장부 매입세액) — 이익과 같은 "모자란 만큼만" */
+  vatAdded: number;
   /** 반영 대상(지정 줄과 남은 달)이 있는지 — 없으면 화면에 표시 안 함 */
   applied: boolean;
 };
@@ -301,6 +305,7 @@ export function fixedCostProjection(months: string[], rows: FixedCostRow[], tx: 
   const route = fixedRowRouter(rows);
   const monthSet = new Set(months);
   const bookedBy = new Map<string, number>();
+  const bookedVatBy = new Map<string, number>();
   for (const t of tx) {
     if (t.type !== "매입") continue;
     const month = t.trans_date.slice(0, 7);
@@ -308,15 +313,20 @@ export function fixedCostProjection(months: string[], rows: FixedCostRow[], tx: 
     const key = route(t);
     if (!key) continue;
     const k = `${month}|${key}`;
-    bookedBy.set(k, (bookedBy.get(k) ?? 0) + purchaseCostOf(t));
+    const cost = purchaseCostOf(t);
+    bookedBy.set(k, (bookedBy.get(k) ?? 0) + cost);
+    // 돌려받는 매입세액 = 총액 − 이익 기준 비용(비과세·불공제는 0)
+    bookedVatBy.set(k, (bookedVatBy.get(k) ?? 0) + transactionTotal(t) - cost);
   }
   let planned = 0;
   let booked = 0;
+  let vatAdded = 0;
   for (const month of months) {
     for (const r of rows) {
       const b = bookedBy.get(`${month}|${r.key}`) ?? 0;
       planned += Math.max(r.monthlyAvg, b);
       booked += b;
+      vatAdded += Math.max(0, (r.monthlyVat ?? 0) - (bookedVatBy.get(`${month}|${r.key}`) ?? 0));
     }
   }
   return {
@@ -325,6 +335,8 @@ export function fixedCostProjection(months: string[], rows: FixedCostRow[], tx: 
     planned,
     booked,
     added: planned - booked,
+    monthlyVat: rows.reduce((s, r) => s + (r.monthlyVat ?? 0), 0),
+    vatAdded,
     applied: rows.length > 0 && months.length > 0,
   };
 }

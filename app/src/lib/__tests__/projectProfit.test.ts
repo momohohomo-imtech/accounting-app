@@ -469,3 +469,19 @@ test("남은 달 고정지출을 프로젝트 기준 예상 이익·하반기 �
   assert.equal(h2.h2EstimatedProfit, 37_000_000 - 2_000_000);
   assert.equal(h2Of([PA, PB], txs).h2FixedCost, 0);
 });
+
+test("남은 달 고정지출 매입세액(1월 부가세용): 줄마다·달마다 달 평균 매입세액 중 장부에 없는 만큼, 불공제·비과세는 0", () => {
+  const rent: FixedCostRow = { ...RENT, monthlyVat: 100_000 };
+  const lodging: FixedCostRow = { ...LODGING, monthlyVat: 200_000 };
+  const tx = [
+    fbuy("2026-11-01", 1_100_000, { client: "c-rent" }), // 11월 임대 매입세액 10만 이미 장부에
+    fbuy("2026-11-02", 550_000, { category: "k-lodge", cat: LODGE_CAT }), // 숙박 매입세액 5만
+    fbuy("2026-11-03", 330_000, { client: "c-rent", category: "k-lodge", cat: CAR_CAT }), // 임대 줄이지만 불공제 → 매입세액 0
+  ];
+  const r = fixedCostProjection(["2026-11", "2026-12"], [rent, lodging], tx);
+  // 11월: 임대 max(0, 10만 − 10만) + 숙박 max(0, 20만 − 5만), 12월: 10만 + 20만
+  assert.equal(r.vatAdded, 0 + 150_000 + 100_000 + 200_000);
+  assert.equal(r.monthlyVat, 300_000);
+  // 매입세액 칸이 없는 줄(예전 형태)은 0
+  assert.equal(fixedCostProjection(["2026-12"], [RENT], []).vatAdded, 0);
+});
