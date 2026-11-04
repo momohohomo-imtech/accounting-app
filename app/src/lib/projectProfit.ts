@@ -4,6 +4,7 @@ import { purchaseCostOf, salesSupplyOf, type VatBasisRow } from "@/lib/vatBasis"
 import { one } from "@/lib/relations";
 import { PAYROLL_CATEGORY_NAME } from "@/lib/vatExempt";
 import { PROJECT_STATUS_AWAITING_PAYMENT, PROJECT_STATUS_MERGED, PROJECT_STATUS_REVIEW } from "@/lib/projectStatus";
+import { fixedRowRouter, type FixedCostRow } from "@/lib/fixedExpense";
 
 type ProjectAmountRow = { id: string; quote_amount: number | null };
 
@@ -146,11 +147,13 @@ function unbilledGroups(projects: OutlookProject[]) {
 // 직원급여/상여/4대보험. 묶음 이익 = 묶음 매출(groupRevenue) − 매입(공급가) — 매입은 발주액과 상관없이 실제로 나간 돈이라
 // 빠짐없이 뺀다. 프로젝트 없이 등록한 매출도 그 해 매출로 더함(예전엔 매입만 일반경비로 빠지고 매출은 빠져 이익이 적게 잡혔음).
 // revenue = 그 매출 합계(대시보드 "예상 매출액"). projectTx = 이 프로젝트들에 붙은 거래 전부(기간 무관), yearTx = 그 해 거래 전부.
+// fixedCost = 남은 달 고정지출 중 장부에 아직 없는 만큼(fixedCostOutlook의 project.added) — 이익에서 뺌.
 export function projectBasedProfit(
   projects: OutlookProject[],
   projectTx: OutlookTx[],
   yearTx: OutlookTx[],
-  agencyByProject: Map<string, number>
+  agencyByProject: Map<string, number>,
+  fixedCost = 0
 ) {
   const ids = new Set(projects.map((p) => p.id));
   const salesBy = new Map<string, number>();
@@ -181,7 +184,8 @@ export function projectBasedProfit(
     generalSales,
     generalExpense,
     payrollCost,
-    profit: projectProfit + generalSales - generalExpense - payrollCost,
+    fixedCost,
+    profit: projectProfit + generalSales - generalExpense - payrollCost - fixedCost,
     quoteTotal,
     revenue: projectRevenue + generalSales,
   };
@@ -194,12 +198,14 @@ export function projectBasedProfit(
 //   매출이 더 크면 그 금액, − 7~12월 매입). 다음 해에 계산서를 끊을 프로젝트는 사용자가 귀속 연도를 다음 해로 바꿈(사용자 운영
 //   방식). 매출·매입은 그 해 12월 31일까지만 — 다음 해 것은 다음 해.
 // - 하반기 인건비: 7~12월 직원급여/상여/4대보험 — 프로젝트를 지정한 것도 포함(미발행 묶음에 붙은 건 위에서 이미 뺌).
+// - 남은 달 고정지출(fixedCost): 7월·이번 달 중 늦은 달부터 12월까지 고정지출 중 장부에 아직 없는 만큼(fixedCostOutlook의 h2.added).
 export function secondHalfOutlook(
   year: number,
   projects: OutlookProject[],
   projectTx: OutlookTx[],
   yearTx: OutlookTx[],
-  agencyByProject: Map<string, number>
+  agencyByProject: Map<string, number>,
+  fixedCost = 0
 ) {
   const yearStart = `${year}-01-01`;
   const h2Start = `${year}-07-01`;
@@ -254,7 +260,94 @@ export function secondHalfOutlook(
     priorBilledSales: total(priorBilledBy),
     unbilledProjectNames: unbilled.map((g) => g.label),
     h2PayrollCost,
-    h2EstimatedProfit: h2Profit + unbilledPendingProfit - h2PayrollCost,
+    h2FixedCost: fixedCost,
+    h2EstimatedProfit: h2Profit + unbilledPendingProfit - h2PayrollCost - fixedCost,
+  };
+}
+
+// ── 남은 달 고정지출(11/4 사용자 결정 "이전 달까지는 마감, 이번 달과 남은 달은 고정지출을 매입으로") ──
+// 예상 이익 = 장부(그대로) − 장부에 아직 없는 고정지출. 남은 달마다·지정 줄마다 "달 평균과 그 달에 이미 장부에 있는 매입 중 큰 쪽"을
+// 그 달 고정지출로 봄 — 이번 달은 얼마나 더 나갈지 몰라서 큰 쪽 한 번만(이미 나간 돈은 장부에 있으니 모자란 만큼만 더 뺌), 미리
+// 등록한 다음 달 매입도 같은 규칙. 지정하지 않은 거래는 장부 그대로. 지난 해는 장부가 마감돼 반영 안 함. 금액은 이익 기준(공급가액,
+// 불공제 카테고리는 부가세 포함), 지정 줄·달 평균은 보고서 고정지출 표(lib/fixedExpense.ts — 최근 12개월 기준)와 같음.
+
+export type FixedCostTx = OutlookTx & { client_id: string | null; category_id: string | null };
+
+/** 고정지출을 매입으로 예상할 달(YYYY-MM) — 지난 해는 없음, 올해는 이번 달(fromMonth가 더 늦으면 그 달)부터 12월, 다음 해부터는 fromMonth부터 */
+export function openMonths(year: number, today: string, fromMonth = 1): string[] {
+  const thisYear = Number(today.slice(0, 4));
+  if (year < thisYear) return [];
+  const start = year === thisYear ? Math.max(fromMonth, Number(today.slice(5, 7))) : fromMonth;
+  return Array.from({ length: Math.max(0, 13 - start) }, (_, i) => `${year}-${String(start + i).padStart(2, "0")}`);
+}
+
+export type FixedCostProjection = {
+  /** 반영한 달(YYYY-MM) */
+  months: string[];
+  /** 지정 줄 달 평균 합(이익 기준) */
+  monthlyAvg: number;
+  /** 남은 달 고정지출 예상 = Σ 달 Σ 줄 max(달 평균, 그 달 장부) */
+  planned: number;
+  /** 그중 이미 장부에 있는 지정 줄 매입(이미 이익에 들어가 있음) */
+  booked: number;
+  /** 이익에서 더 빼는 금액 = planned − booked(0 이상) */
+  added: number;
+  /** 반영 대상(지정 줄과 남은 달)이 있는지 — 없으면 화면에 표시 안 함 */
+  applied: boolean;
+};
+
+/** tx = 그 이익에 들어간 거래(매입만 셈) */
+export function fixedCostProjection(months: string[], rows: FixedCostRow[], tx: FixedCostTx[]): FixedCostProjection {
+  const route = fixedRowRouter(rows);
+  const monthSet = new Set(months);
+  const bookedBy = new Map<string, number>();
+  for (const t of tx) {
+    if (t.type !== "매입") continue;
+    const month = t.trans_date.slice(0, 7);
+    if (!monthSet.has(month)) continue;
+    const key = route(t);
+    if (!key) continue;
+    const k = `${month}|${key}`;
+    bookedBy.set(k, (bookedBy.get(k) ?? 0) + purchaseCostOf(t));
+  }
+  let planned = 0;
+  let booked = 0;
+  for (const month of months) {
+    for (const r of rows) {
+      const b = bookedBy.get(`${month}|${r.key}`) ?? 0;
+      planned += Math.max(r.monthlyAvg, b);
+      booked += b;
+    }
+  }
+  return {
+    months,
+    monthlyAvg: rows.reduce((s, r) => s + r.monthlyAvg, 0),
+    planned,
+    booked,
+    added: planned - booked,
+    applied: rows.length > 0 && months.length > 0,
+  };
+}
+
+// 대시보드 예상 세전이익·보고서 예상 순이익율 공통 — project: 프로젝트 기준 예상 이익(이번 달~12월), h2: 하반기 예상 이익(7월·이번
+// 달 중 늦은 달~12월, 상반기는 세무사 확정치라). 장부로 보는 매입은 그 이익에 실제로 들어간 것만 — 프로젝트 기준은 프로젝트 없는
+// 매입 + 그 해 귀속 프로젝트 매입(다른 해 귀속 프로젝트의 매입은 그 해 이익), 하반기 예상은 그 해 7~12월 매입 전부.
+// today = 한국 시각 오늘(YYYY-MM-DD), yearTx = 그 해 거래 전부(client_id·category_id 포함).
+export function fixedCostOutlook(
+  year: number,
+  today: string,
+  rows: FixedCostRow[],
+  projects: OutlookProject[],
+  yearTx: FixedCostTx[]
+) {
+  const ids = new Set(projects.map((p) => p.id));
+  return {
+    project: fixedCostProjection(
+      openMonths(year, today),
+      rows,
+      yearTx.filter((t) => !t.project_id || ids.has(t.project_id))
+    ),
+    h2: fixedCostProjection(openMonths(year, today, 7), rows, yearTx),
   };
 }
 

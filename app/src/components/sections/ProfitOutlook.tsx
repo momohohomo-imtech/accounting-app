@@ -3,19 +3,36 @@ import { formatWon, moneyClass } from "@/lib/format";
 import { taxEstimate } from "@/lib/tax";
 import { loadProjectTxAndAgency } from "@/lib/projectTxLoad";
 import {
+  fixedCostOutlook,
   projectBasedProfit,
   secondHalfOutlook,
   unbilledInvoiceVat,
+  type FixedCostProjection,
+  type FixedCostTx,
   type OutlookProject,
-  type OutlookTx,
 } from "@/lib/projectProfit";
+import type { FixedCostRow } from "@/lib/fixedExpense";
 
 // 대시보드의 이익·세금 추정치를 한 번에 계산 — 계산식은 lib/projectProfit.ts(자동 검사 있음), 여기서는 조회만.
 // 선택 연도의 거래·프로젝트는 대시보드가 이미 받아온 것을 그대로 넘겨받아 같은 데이터를 다시 조회하지 않는다.
 // 거래는 세금계산서 기준(외상 미정산 포함) — yearTx도 정산 여부로 거르지 않은 그 해 거래 전부를 넘길 것.
+// fixedCostRows = 고정지출 지정 줄(이익 기준 달 평균, lib/fixedExpenseLoad.ts의 loadFixedCostRows) — 이번 달부터 12월까지 매입으로
+// 예상(fixedCostOutlook). 불러오지 못했으면 빈 목록 + fixedCostFailed(반영 없이 안내만).
 export async function loadProfitOutlook(
   year: number,
-  { yearProjects, yearTx }: { yearProjects: OutlookProject[]; yearTx: OutlookTx[] }
+  {
+    yearProjects,
+    yearTx,
+    today,
+    fixedCostRows,
+    fixedCostFailed = false,
+  }: {
+    yearProjects: OutlookProject[];
+    yearTx: FixedCostTx[];
+    today: string;
+    fixedCostRows: FixedCostRow[];
+    fixedCostFailed?: boolean;
+  }
 ) {
   const supabase = await createClient();
   const projectIds = yearProjects.map((p) => p.id);
@@ -32,12 +49,15 @@ export async function loadProfitOutlook(
   const { projectTx, agencyByProject } = await loadProjectTxAndAgency(supabase, projectIds);
   const { data: halfYearRow } = await halfYearPromise;
 
+  // 남은 달 고정지출 — 프로젝트 기준은 이번 달~12월, 하반기 예상은 7월·이번 달 중 늦은 달~12월(지난 해는 반영 없음).
+  const fixedCost = fixedCostOutlook(year, today, fixedCostRows, yearProjects, yearTx);
+
   // 프로젝트 기준 예상 이익(진행 중 포함) — 귀속 연도 프로젝트의 발주액(검토중 제외) 기준.
-  const estimate = projectBasedProfit(yearProjects, projectTx, yearTx, agencyByProject);
+  const estimate = projectBasedProfit(yearProjects, projectTx, yearTx, agencyByProject, fixedCost.project.added);
   const profitTax = taxEstimate(estimate.profit);
 
   // 연간 예상 이익 = 상반기 확정 이익(세무사 결산) + 하반기 예상 이익.
-  const h2 = secondHalfOutlook(year, yearProjects, projectTx, yearTx, agencyByProject);
+  const h2 = secondHalfOutlook(year, yearProjects, projectTx, yearTx, agencyByProject, fixedCost.h2.added);
   const half1Profit = halfYearRow?.profit_amount ?? null;
   const combinedProfit = half1Profit != null ? Number(half1Profit) + h2.h2EstimatedProfit : null;
   const combinedTax = combinedProfit != null ? taxEstimate(combinedProfit) : null;
@@ -57,6 +77,10 @@ export async function loadProfitOutlook(
     combinedTax,
     // 1월 부가세(제2기 확정) 추정에 따로 더하는 미발행 계산서 예상분.
     unbilledVat: unbilledInvoiceVat(yearProjects, projectTx, agencyByProject),
+    // 남은 달 고정지출(지정 줄·프로젝트 기준·하반기) — 화면 표시용
+    fixedCostRows,
+    fixedCost,
+    fixedCostFailed: fixedCostFailed && year >= Number(today.slice(0, 4)),
     // 대시보드 수금 예정액 계산용(같은 거래를 다시 조회하지 않게) — 화면에 그대로 내보내지 말 것.
     projectTx,
     agencyByProject,
@@ -65,7 +89,21 @@ export async function loadProfitOutlook(
 
 export type ProfitOutlook = Awaited<ReturnType<typeof loadProfitOutlook>>;
 
+/** 반영한 달 범위 글자("11~12월", "12월") */
+export function fixedCostMonthsLabel(months: string[]) {
+  if (months.length === 0) return "";
+  const first = Number(months[0].slice(5, 7));
+  const last = Number(months[months.length - 1].slice(5, 7));
+  return first === last ? `${first}월` : `${first}~${last}월`;
+}
+
+/** 예상 이익 칸 아래 한 줄 — "고정지출 ○원 차감(11~12월)" */
+export function fixedCostNote(p: FixedCostProjection) {
+  return p.applied ? `남은 기간 고정지출 ${formatWon(p.added)} 차감 (${fixedCostMonthsLabel(p.months)})` : undefined;
+}
+
 export function ProfitCalculationDetail({ year, o }: { year: number; o: ProfitOutlook }) {
+  const h2Fixed = o.fixedCost.h2;
   return (
     <div className="space-y-1 text-sm text-slate-700">
       <p>
@@ -108,8 +146,28 @@ export function ProfitCalculationDetail({ year, o }: { year: number; o: ProfitOu
         {" — "}
         <span className="tabular-nums font-semibold">{formatWon(o.h2PayrollCost)}</span>
       </p>
+      {h2Fixed.applied && (
+        <>
+          <p>
+            <span className="font-semibold">
+              {year}년 남은 기간 고정지출 ({fixedCostMonthsLabel(h2Fixed.months)})
+            </span>
+            {" — 예상 "}
+            <span className="tabular-nums font-semibold">{formatWon(h2Fixed.planned)}</span>
+            {" − 장부 반영분 "}
+            <span className="tabular-nums font-semibold">{formatWon(h2Fixed.booked)}</span>
+            {" = 추가 차감 "}
+            <span className="tabular-nums font-semibold">{formatWon(h2Fixed.added)}</span>
+            {` (지정 고정지출 달 평균 ${formatWon(h2Fixed.monthlyAvg)} × ${h2Fixed.months.length}개월, 장부 반영분이 더 큰 달은 장부 금액 · 공급가액 기준)`}
+          </p>
+          <p className="pl-4 text-xs text-slate-500">
+            {o.fixedCostRows.map((r) => `${r.name} ${formatWon(r.monthlyAvg)}`).join(", ")}
+          </p>
+        </>
+      )}
       <p className="text-slate-500">
         하반기 예상 이익 = 하반기 매출-매입 + 세금계산서 미발행분 예상 이익 − 하반기 인건비
+        {h2Fixed.applied && " − 남은 기간 고정지출"}
         <br />
         연간 예상 이익 = 상반기 확정 이익 + 하반기 예상 이익
       </p>
@@ -142,6 +200,13 @@ export function ProfitCalculationDetail({ year, o }: { year: number; o: ProfitOu
           결산)에 포함되어 있으므로 발주액에서 차감한 잔액만 하반기분으로 반영합니다. 예: 발주액 5,000만원 중
           5월에 기성금 2,000만원을 발행했다면 하반기에는 3,000만원만 반영합니다. 전년도 이전에 발행한 기성금도 해당 연도
           이익에 포함되어 있으므로 같은 방식으로 차감합니다.
+        </p>
+        <p>
+          남은 기간 고정지출: 지난달까지는 장부 금액(마감)을 그대로 쓰고, 이번 달부터 12월까지는 보고서 → 거래처·카테고리
+          집계에서 지정한 고정지출의 달 평균(최근 12개월 기준, 공급가액 — 매입세액 불공제 카테고리는 부가세 포함)을 매입으로
+          예상합니다. 이번 달은 지정 고정지출마다 달 평균과 이미 등록한 금액 중 큰 쪽을 한 번만 반영하며(이미 등록한 금액은
+          장부에 있으므로 부족분만 추가 차감), 지정하지 않은 거래는 장부 그대로 반영합니다. 하반기 예상 이익은 7월부터(상반기는
+          확정 이익 기준) 반영하고, 지난 연도는 반영하지 않습니다.
         </p>
         <p className="font-semibold text-slate-900">산출 예시</p>
         <p>

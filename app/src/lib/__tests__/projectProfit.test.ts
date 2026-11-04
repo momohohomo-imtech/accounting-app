@@ -10,9 +10,14 @@ import {
   countedQuote,
   unbilledInvoiceVat,
   unbilledRemainingByGroup,
+  openMonths,
+  fixedCostProjection,
+  fixedCostOutlook,
+  type FixedCostTx,
   type OutlookProject,
   type OutlookTx,
 } from "@/lib/projectProfit";
+import type { FixedCostRow } from "@/lib/fixedExpense";
 import type { CreditPayment } from "@/lib/types";
 
 // 어미 A(발주 2,000만) + 귀속 하위 B(발주 없음) + 귀속 하위 C(발주 500만), 별개 프로젝트 D(발주 없음)
@@ -369,4 +374,98 @@ test("예전 3단 귀속(어미 ← 하위 ← 하위의 하위)은 맨 위 어�
   const loopA = childOf("LA", "LB", 1_000_000, "ongoing");
   const loopB = childOf("LB", "LA", 2_000_000, "ongoing");
   assert.equal(unbilledRemainingByGroup([loopA, loopB], [], new Map()).length, 2);
+});
+
+// ── 예상 세전이익에 남은 달 고정지출 (가짜 자료) ──
+const RENT: FixedCostRow = { key: "client:c-rent", kind: "client", id: "c-rent", name: "가짜 임대", monthlyAvg: 1_000_000 };
+const LODGING: FixedCostRow = { key: "category:k-lodge", kind: "category", id: "k-lodge", name: "가짜 숙박비", monthlyAvg: 2_000_000 };
+const LODGE_CAT = { name: "가짜 숙박비", vat_exempt: false, vat_non_deductible: false };
+const CAR_CAT = { name: "가짜 차량", vat_exempt: false, vat_non_deductible: true };
+const fbuy = (
+  date: string,
+  total: number,
+  o: { client?: string | null; category?: string | null; project?: string | null; cat?: typeof LODGE_CAT; type?: string } = {}
+): FixedCostTx => ({
+  type: o.type ?? "매입",
+  trans_date: date,
+  project_id: o.project ?? null,
+  client_id: o.client ?? null,
+  category_id: o.category ?? null,
+  sales_amount: o.type === "매출" ? total : 0,
+  sales_vat: 0,
+  purchase_amount: o.type === "매출" ? 0 : total,
+  purchase_vat: 0,
+  expense_categories: o.cat ?? CAT.mat,
+});
+
+test("남은 달: 지난 해는 없음, 올해는 이번 달부터 12월, 하반기는 7월·이번 달 중 늦은 달부터, 다음 해는 전부", () => {
+  assert.deepEqual(openMonths(2026, "2026-11-04"), ["2026-11", "2026-12"]);
+  assert.deepEqual(openMonths(2026, "2026-11-04", 7), ["2026-11", "2026-12"]);
+  assert.equal(openMonths(2026, "2026-03-10").length, 10);
+  assert.deepEqual(openMonths(2026, "2026-03-10", 7), ["2026-07", "2026-08", "2026-09", "2026-10", "2026-11", "2026-12"]);
+  assert.deepEqual(openMonths(2026, "2026-12-31"), ["2026-12"]);
+  assert.deepEqual(openMonths(2025, "2026-01-02"), []);
+  assert.equal(openMonths(2027, "2026-11-04").length, 12);
+  assert.equal(openMonths(2027, "2026-11-04", 7).length, 6);
+});
+
+test("남은 달 고정지출: 줄마다 달 평균과 그 달 장부 중 큰 쪽, 장부에 있는 만큼은 빼고 모자란 만큼만 — 한 거래는 한 줄에만", () => {
+  const tx = [
+    fbuy("2026-11-01", 1_100_000, { client: "c-rent" }), // 임대 이번 달 공급가 100만 — 평균만큼 이미 나감
+    fbuy("2026-11-02", 550_000, { category: "k-lodge", cat: LODGE_CAT }), // 숙박비 이번 달 공급가 50만
+    fbuy("2026-11-03", 220_000, { client: "c-rent", category: "k-lodge", cat: LODGE_CAT }), // 지정 거래처 우선 → 임대 줄(20만)
+    fbuy("2026-10-15", 1_100_000, { category: "k-lodge", cat: LODGE_CAT }), // 지난달 — 마감, 안 셈
+    fbuy("2026-12-20", 1_100_000, { client: "c-rent" }), // 미리 등록한 12월 임대 100만
+    fbuy("2026-11-04", 5_500_000, { client: "c-other" }), // 지정 안 한 거래 — 장부 그대로
+    fbuy("2026-11-04", 9_900_000, { client: "c-rent", type: "매출" }), // 매출은 안 셈
+  ];
+  const r = fixedCostProjection(["2026-11", "2026-12"], [RENT, LODGING], tx);
+  // 11월: 임대 max(100만, 120만) + 숙박 max(200만, 50만), 12월: 임대 max(100만, 100만) + 숙박 200만
+  assert.equal(r.planned, 1_200_000 + 2_000_000 + 1_000_000 + 2_000_000);
+  assert.equal(r.booked, 1_200_000 + 500_000 + 1_000_000);
+  assert.equal(r.added, 1_500_000 + 2_000_000);
+  assert.equal(r.monthlyAvg, 3_000_000);
+  assert.equal(r.applied, true);
+  // 불공제 카테고리 매입은 부가세 포함 금액이 비용(이익 기준)
+  const CAR: FixedCostRow = { key: "category:k-car", kind: "category", id: "k-car", name: "가짜 차량", monthlyAvg: 330_000 };
+  const car = fixedCostProjection(["2026-11", "2026-12"], [CAR], [fbuy("2026-11-02", 330_000, { category: "k-car", cat: CAR_CAT })]);
+  assert.deepEqual([car.booked, car.added], [330_000, 330_000]);
+  // 지정 줄이나 남은 달이 없으면 반영 없음
+  assert.deepEqual(
+    [fixedCostProjection([], [RENT], tx).added, fixedCostProjection([], [RENT], tx).applied],
+    [0, false]
+  );
+  assert.equal(fixedCostProjection(["2026-11"], [], tx).applied, false);
+});
+
+test("남은 달 고정지출: 프로젝트 기준은 그 해 귀속 프로젝트·프로젝트 없는 매입만 장부로, 하반기는 7월부터 그 해 매입 전부", () => {
+  const ps: OutlookProject[] = [{ id: "P26", name: "가짜 올해", status: "ongoing", quote_amount: 10_000_000 }];
+  const tx = [
+    fbuy("2026-03-05", 1_100_000, { category: "k-lodge", cat: LODGE_CAT, project: "OLD" }), // 다른 해 귀속 프로젝트 숙박비
+    fbuy("2026-04-05", 2_200_000, { category: "k-lodge", cat: LODGE_CAT, project: "P26" }), // 올해 프로젝트 숙박비 200만
+    fbuy("2026-08-01", 1_100_000, { category: "k-lodge", cat: LODGE_CAT, project: "OLD" }),
+  ];
+  const o = fixedCostOutlook(2026, "2026-03-10", [LODGING], ps, tx);
+  // 프로젝트 기준 3~12월 10달 × 200만 − 장부(4월 올해 프로젝트 200만, 다른 해 프로젝트 것은 이 이익에 없어서 장부로 안 봄)
+  assert.equal(o.project.months.length, 10);
+  assert.deepEqual([o.project.planned, o.project.booked, o.project.added], [20_000_000, 2_000_000, 18_000_000]);
+  // 하반기 7~12월 6달 × 200만 − 8월 장부 100만(하반기 예상에는 그 해 하반기 매입이 전부 들어가 있음)
+  assert.deepEqual([o.h2.planned, o.h2.booked, o.h2.added], [12_000_000, 1_000_000, 11_000_000]);
+  // 지난 해는 장부 마감 — 반영 없음
+  const past = fixedCostOutlook(2025, "2026-03-10", [LODGING], ps, tx);
+  assert.deepEqual([past.project.added, past.h2.added, past.project.applied], [0, 0, false]);
+});
+
+test("남은 달 고정지출을 프로젝트 기준 예상 이익·하반기 예상 이익에서 뺌(넘기지 않으면 예전과 같음)", () => {
+  const txs = baseTx();
+  const base = projectBasedProfit([PA, PB], ofProjects(txs, [PA, PB]), inYear(txs), AG);
+  const withFixed = projectBasedProfit([PA, PB], ofProjects(txs, [PA, PB]), inYear(txs), AG, 3_000_000);
+  assert.equal(base.fixedCost, 0);
+  assert.equal(withFixed.fixedCost, 3_000_000);
+  assert.equal(withFixed.profit, base.profit - 3_000_000);
+  assert.equal(withFixed.revenue, base.revenue);
+  const h2 = secondHalfOutlook(2026, [PA, PB], ofProjects(txs, [PA, PB]), inYear(txs), AG, 2_000_000);
+  assert.equal(h2.h2FixedCost, 2_000_000);
+  assert.equal(h2.h2EstimatedProfit, 37_000_000 - 2_000_000);
+  assert.equal(h2Of([PA, PB], txs).h2FixedCost, 0);
 });
