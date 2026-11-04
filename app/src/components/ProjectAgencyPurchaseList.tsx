@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/Button";
 import { fieldClass, inlineFieldClass } from "@/components/ui/field";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { MoneyInput } from "@/components/ui/MoneyInput";
+import { useConfirm } from "@/components/ConfirmProvider";
+import { INTERMEDIARY_FEE, intermediaryFeeAmount, intermediaryFeeRows } from "@/lib/intermediaryFee";
 
 type Category = { id: string; name: string; project_only: boolean; color: string | null };
 type AgencyPurchase = {
@@ -216,14 +218,18 @@ export function ProjectAgencyPurchaseList({
   items,
   categories,
   clientNames,
+  quoteAmount,
 }: {
   projectId: string;
   items: AgencyPurchase[];
   categories: Category[];
   clientNames: string[];
+  /** 이 프로젝트의 발주액 — "+ 현대 수수료 20% 추가" 버튼이 쓰는 금액 기준(없으면 버튼 비활성) */
+  quoteAmount?: number | null;
 }) {
   const router = useRouter();
   const globalPending = useGlobalPending();
+  const confirm = useConfirm();
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [pending, setPending] = useState(false);
@@ -262,6 +268,44 @@ export function ProjectAgencyPurchaseList({
         {sortKey === key && <span className="text-[10px]">{sortDir === "asc" ? "▲" : "▼"}</span>}
       </button>
     );
+  }
+
+  // 중간 업체 수수료(lib/intermediaryFee.ts) — 발주액의 20%를 거래처 "현대기계"·카테고리 "현대" 줄로. 이미 수수료 줄이 있으면
+  // 확인창에서 알리고, 지금 발주액 기준 금액과 다르면(발주액을 바꾼 뒤 줄을 안 고친 경우) 목록 아래에 알림.
+  const fee = intermediaryFeeAmount(quoteAmount);
+  const feeRows = intermediaryFeeRows(items);
+  const feeCategory = categories.find((c) => c.name === INTERMEDIARY_FEE.categoryName);
+  const feeMismatch = feeRows.length === 1 && fee > 0 && feeRows[0].amount !== fee;
+
+  async function addIntermediaryFee() {
+    if (fee <= 0) return;
+    const notes = [
+      feeRows.length > 0 && `이미 수수료 줄이 ${feeRows.length}개 있습니다(${feeRows.map((r) => formatWon(r.amount)).join(", ")}).`,
+      !feeCategory && `카테고리 "${INTERMEDIARY_FEE.categoryName}"가 없어 미분류로 들어갑니다.`,
+    ].filter(Boolean);
+    const ok = await confirm(
+      `발주액 ${formatWon(quoteAmount ?? 0)}의 ${INTERMEDIARY_FEE.pct}%(${formatWon(fee)})를 거래처 "${INTERMEDIARY_FEE.clientName}" 수수료 줄로 추가할까요?${
+        notes.length ? `\n${notes.join("\n")}` : ""
+      }`,
+      { title: `${INTERMEDIARY_FEE.itemName} 추가`, confirmLabel: "추가" }
+    );
+    if (!ok) return;
+    const fd = new FormData();
+    fd.append("project_id", projectId);
+    fd.append("client_name", INTERMEDIARY_FEE.clientName);
+    fd.append("item_name", INTERMEDIARY_FEE.itemName);
+    fd.append("category_id", feeCategory?.id ?? "");
+    fd.append("amount", String(fee));
+    fd.append("memo", `발주액 ${formatWon(quoteAmount ?? 0)} × ${INTERMEDIARY_FEE.pct}%`);
+    setPending(true);
+    setError(null);
+    const result = await globalPending.run(() => addAgencyPurchase(fd));
+    setPending(false);
+    if (result?.error) {
+      setError(result.error);
+      return;
+    }
+    router.refresh();
   }
 
   // onSubmit(form action 아님) — form action은 끝나면 입력칸을 비워서, 저장이 실패해도 적은 매입처·품목·금액이 사라졌음
@@ -312,6 +356,27 @@ export function ProjectAgencyPurchaseList({
       ) : (
         <p className="mb-2 hidden text-sm text-slate-400 print:block">대행구매 내역이 없습니다.</p>
       )}
+
+      {(feeMismatch || feeRows.length > 1) && (
+        <p className="mb-2 text-xs text-amber-600 print:hidden">
+          {feeMismatch
+            ? `수수료 줄 ${formatWon(feeRows[0].amount)} — 지금 발주액의 ${INTERMEDIARY_FEE.pct}%는 ${formatWon(fee)}입니다. 발주액을 바꿨으면 수수료 줄도 고쳐 주세요.`
+            : `수수료 줄이 ${feeRows.length}개 있습니다 — 두 번 들어간 것이 아닌지 확인해 주세요.`}
+        </p>
+      )}
+
+      <div className="mb-2 flex justify-end print:hidden">
+        <Button
+          type="button"
+          variant="secondary"
+          size="xs"
+          disabled={pending || fee <= 0}
+          title={fee <= 0 ? "발주액을 먼저 입력해 주세요" : undefined}
+          onClick={addIntermediaryFee}
+        >
+          + {INTERMEDIARY_FEE.itemName} 추가
+        </Button>
+      </div>
 
       <form key={addFormKey} onSubmit={handleAdd} className="flex flex-wrap items-end gap-2 print:hidden">
         <input type="hidden" name="project_id" value={projectId} />
