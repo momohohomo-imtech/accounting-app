@@ -245,7 +245,7 @@ export async function ProjectProfitReport({
   // 사용자 문의(11/4)로 남은 금액 아래에 "다 받아도 이익금 −○원" 한 줄.
   const finalProfit = unsettled.count > 0 && profitAfterUnsettled !== null ? profitAfterUnsettled : profit;
   // 기타 공제 = 발주액 − 수주액(실수령액) − 대행구매액(수주액과 맞춰 보는 확인용, 계산에는 안 씀). 수주액이 없으면 의미가 없어 "-",
-  // 수주액이 발주액 − 대행구매액보다 크면 음수라 예전엔 "--1,700,000원"처럼 빼기표가 두 번 붙었음 → "-"로 두고 수주액 칸 아래 설명.
+  // 수주액이 발주액 − 대행구매액보다 크면 음수라 예전엔 "--○원"처럼 빼기표가 두 번 붙었음 → "-"로 두고 수주액 칸 아래 설명.
   const otherDeductionLabel = contractTotal === 0 || otherDeduction <= 0 ? "-" : `-${formatWon(otherDeduction)}`;
   // 그래프·보고서 상단 참고용 — 발주액의 25%를 이윤+잡비로 가정했을 때 금액(실제 이익금/이익율
   // 계산에는 영향 없는 순수 표시용 수치).
