@@ -42,7 +42,8 @@ function labelStyle(heightMm: number, fontMm: number): CSSProperties {
   return { ...cellStyle(heightMm, fontMm), textAlign: "center", fontWeight: 600, background: "#f8f8f8" };
 }
 
-export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitItem[] }) {
+// companyName: 우리 회사 상호 — "업체(부서)" 칸에 바로 넣음(사용자 요청 11/5, 견적서 공급자 목록의 기본 공급자). 없으면 빈칸.
+export function DongheeAccessPassPermitTable({ items, companyName = "" }: { items: DongheePermitItem[]; companyName?: string }) {
   const rows = Array.from({ length: ROW_COUNT }, (_, i) => items[i]);
 
   return (
@@ -66,7 +67,9 @@ export function DongheeAccessPassPermitTable({ items }: { items: DongheePermitIt
           </tr>
           <tr>
             <td style={labelStyle(9, 3.3)}>업체(부서)</td>
-            <td style={cellStyle(9, 3.3)} />
+            <td style={cellStyle(9, 3.3)} title={companyName || undefined}>
+              {companyName}
+            </td>
             <td style={labelStyle(9, 3.3)}>반입자</td>
             <td style={cellStyle(9, 3.3)} />
           </tr>

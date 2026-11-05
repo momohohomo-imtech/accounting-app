@@ -74,7 +74,7 @@ export async function ToolListSection({
   historySite?: string;
 }) {
   const supabase = await createClient();
-  const [{ data: tools }, { data: sites }, { data: projects }, checklists, items, { data: knowHowNotes }] =
+  const [{ data: tools }, { data: sites }, { data: projects }, checklists, items, { data: knowHowNotes }, { data: companyProfiles }] =
     await Promise.all([
       supabase.from("tools").select("*").order("sort_order").order("position").order("name"),
       fetchAllData((from, to) =>
@@ -109,6 +109,9 @@ export async function ToolListSection({
         supabase.from("tool_checklist_items").select("*").order("id", { ascending: true }).range(from, to)
       ),
       supabase.from("know_how_notes").select("*").eq("category", "tools").order("created_at", { ascending: false }),
+      // 우리 회사 상호(견적서 공급자 목록, 089 SQL) — 동희 반입반출증 "업체(부서)" 칸에 바로 넣음. 기본 공급자가 맨 앞. 표가 없으면(SQL 실행 전)
+      // 빈 목록이라 칸도 비어 있음(오류로 막지 않음).
+      supabase.from("company_profiles").select("company_name, is_default").order("is_default", { ascending: false }).order("created_at"),
     ]);
 
   const siteOptions = (sites ?? []).map((s) => ({
@@ -363,6 +366,13 @@ export async function ToolListSection({
             closeHref: "/quality-construction?tab=tools",
             copyHref: detailChecklist ? `/quality-construction?tab=tools&copyFrom=${detailChecklist.id}` : "/quality-construction?tab=tools",
             hideEditActions: isBlankForm,
+            companyNames: [
+              ...new Set(
+                ((companyProfiles ?? []) as { company_name: string | null }[])
+                  .map((c) => (c.company_name ?? "").trim())
+                  .filter(Boolean)
+              ),
+            ],
           }}
           form={
             detailChecklist

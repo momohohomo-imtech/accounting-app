@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { formatDate } from "@/lib/format";
 import { PrintButton } from "@/components/PrintButton";
 import { Button } from "@/components/ui/Button";
+import { inlineFieldClass } from "@/components/ui/field";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 import { usePrintFitToPage } from "@/lib/usePrintFitToPage";
 import { downloadToolChecklistXlsx, downloadAccessPassFormXlsx } from "@/lib/xlsxExport";
@@ -31,6 +32,7 @@ export function ToolChecklistDetailReport({
   copyHref,
   onEdit,
   hideEditActions = false,
+  companyNames = [],
 }: {
   title: string;
   helperCount?: number | null;
@@ -46,10 +48,14 @@ export function ToolChecklistDetailReport({
    *  숨기고, 인쇄 시 회색 톤 보조 글자까지 전부 검정으로 강제(실제 저장된
    *  명세서 인쇄는 기존 방식 그대로 둠). */
   hideEditActions?: boolean;
+  /** 우리 회사 상호(견적서 공급자 목록 company_profiles, 기본 공급자가 맨 앞) — 동희 반입반출증 "업체(부서)" 칸에 바로 넣음(사용자 요청 11/5) */
+  companyNames?: string[];
 }) {
   const router = useRouter();
   const [accessPassOnly, setAccessPassOnly] = useState(false);
   const [formMode, setFormMode] = useState<FormMode>("none");
+  // 동희 반입반출증 "업체(부서)" 칸 — 기본 공급자 상호, 회사가 둘 이상이면 고를 수 있게(빈칸도)
+  const [companyName, setCompanyName] = useState(companyNames[0] ?? "");
   // 동희 반입반출증은 품목 수에 따라 여러 페이지로 늘어나는 게 정상이라, 전체를
   // 억지로 1페이지에 욱여넣는 이 훅을 꺼야 함(아래 dongheePages 참고).
   const printRef = usePrintFitToPage<HTMLDivElement>(270, formMode === "donghee");
@@ -153,6 +159,23 @@ export function ToolChecklistDetailReport({
               동희 반입반출증
             </label>
           )}
+          {formMode === "donghee" && companyNames.length > 1 && (
+            <label className="flex items-center gap-1.5 text-xs text-slate-600">
+              업체(부서)
+              <select
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                className={`${inlineFieldClass} max-w-[12rem] py-1 text-xs`}
+              >
+                {companyNames.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+                <option value="">빈칸으로</option>
+              </select>
+            </label>
+          )}
           {formMode === "donghee" && (
             <span className="text-xs font-medium text-amber-600">
               ⚠ 내용을 세로 용지에 맞게 90도 돌려서 인쇄합니다 — 인쇄 대화상자 용지
@@ -211,21 +234,21 @@ export function ToolChecklistDetailReport({
           // 중앙(49%+1% 여백=50%)에 오도록 `justify-between`으로 배치.
           <div className="space-y-4 print:space-y-0">
             {dongheePages.map((page, pageIdx) => (
-              // 실제 인쇄해보니 90도 회전한 내용이 계산상 크기(190×277mm)보다 작게
-              // 나와서(정확한 원인 불명 — 배율 150%로 하면 딱 맞았음), 바깥에 zoom:1.5
-              // 래퍼를 하나 더 둬서 안쪽 회전 로직은 그대로 두고 전체를 1.5배 키움.
-              <div key={pageIdx} className="print:[zoom:1.5]">
+              // 9/10엔 100% 배율에서 작게 나와서 바깥에 zoom:1.5를 뒀었는데, 11/5 사용자가 "인쇄 때 배율을 66%로 해야 맞는다"고 함 —
+              // 크롬 141로 확인하니 zoom 1.5면 회전한 양식이 인쇄 영역(190×277mm)의 1.5배로 커져 3장으로 넘치고, 빼면 A4 한 장에
+              // 딱 맞음(66% ≈ 1/1.5). 그래서 zoom을 뺌 — 배율은 인쇄 대화상자 기본값(100%) 그대로.
+              <div key={pageIdx}>
                 <div
                   className={`flex justify-between print:break-inside-avoid print:w-[277mm] print:h-[190mm] print:origin-top-left donghee-print-rotate ${
                     pageIdx < dongheePages.length - 1 ? "print:break-after-page" : ""
                   }`}
                 >
                   <div className="w-[49%] min-w-0">
-                    <DongheeAccessPassPermitTable items={page[0]} />
+                    <DongheeAccessPassPermitTable items={page[0]} companyName={companyName} />
                   </div>
                   <div className="w-px shrink-0 border-l border-dashed border-slate-300" />
                   <div className="w-[49%] min-w-0 print:break-inside-avoid">
-                    <DongheeAccessPassPermitTable items={page[1] ?? []} />
+                    <DongheeAccessPassPermitTable items={page[1] ?? []} companyName={companyName} />
                   </div>
                 </div>
               </div>
