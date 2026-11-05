@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { printToolName, splitToolNameNote } from "@/lib/toolNameNote";
+import { printToolName, splitToolNameNote, stripEmptyBrackets, withEmptyBracket } from "@/lib/toolNameNote";
 
 // 가짜 자료만
 test("이름칸 [ ]: 인쇄용은 괄호 밖, 화면 메모는 괄호 안", () => {
@@ -25,4 +25,21 @@ test("괄호만 있으면 괄호 기호만 빼서 인쇄(빈 줄 안 생기게),
   const nested = splitToolNameNote("가짜 공구 [크기 [대] 두 개] 끝");
   assert.equal(nested.printName, "가짜 공구 끝");
   assert.deepEqual([...nested.notes].sort(), ["대", "크기 두 개"].sort());
+});
+
+test("작성 화면 기본 [ ]: 괄호 없는 이름 끝에 빈 [ ], 저장 때 빈 [ ]는 지워 예전 이름 그대로", () => {
+  assert.equal(withEmptyBracket("가짜 스페너"), "가짜 스페너 [ ]");
+  assert.equal(withEmptyBracket("  가짜 드릴 "), "가짜 드릴 [ ]");
+  assert.equal(withEmptyBracket("가짜 스페너 [13·17]"), "가짜 스페너 [13·17]");
+  assert.equal(withEmptyBracket(""), "");
+  assert.equal(withEmptyBracket(null), "");
+  assert.equal(stripEmptyBrackets("가짜 스페너 [ ]"), "가짜 스페너");
+  assert.equal(stripEmptyBrackets("가짜 스페너 []"), "가짜 스페너");
+  assert.equal(stripEmptyBrackets("가짜 스페너[  ]"), "가짜 스페너");
+  assert.equal(stripEmptyBrackets("[ ] 가짜 망치"), "가짜 망치");
+  assert.equal(stripEmptyBrackets("가짜 스페너 [ ] 세트"), "가짜 스페너 세트");
+  assert.equal(stripEmptyBrackets("가짜 스페너 [13·17]"), "가짜 스페너 [13·17]");
+  assert.equal(stripEmptyBrackets("  가짜  드릴  "), "가짜  드릴");
+  // 손대지 않으면 저장되는 이름은 예전과 같음
+  for (const name of ["가짜 스페너", "가짜 망치(대)", "가짜 드릴 18V"]) assert.equal(stripEmptyBrackets(withEmptyBracket(name)), name);
 });

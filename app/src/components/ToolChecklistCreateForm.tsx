@@ -11,6 +11,7 @@ import { groupToolsBySortOrder, toolGroupLabel } from "@/lib/tools";
 import { cx } from "@/lib/cx";
 import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components/ProjectPicker";
 import { todayString } from "@/lib/format";
+import { stripEmptyBrackets, withEmptyBracket } from "@/lib/toolNameNote";
 
 type Tool = {
   id: string;
@@ -26,6 +27,19 @@ type AdhocItem = { key: string; name: string; quantity: string; forAccessPass: b
 
 function todayIso() {
   return todayString();
+}
+
+/** 이름이 아직 없고 빈 [ ]만 있는 칸(새 임의 추가)을 누르면 글자 자리를 맨 앞으로 — 적은 이름이 [ ] 앞에 들어가게 */
+function emptyNameCaretToStart(e: React.FocusEvent<HTMLInputElement>) {
+  const el = e.currentTarget;
+  if (!/^\s*\[\s*\]\s*$/.test(el.value)) return;
+  requestAnimationFrame(() => {
+    try {
+      el.setSelectionRange(0, 0);
+    } catch {
+      /* 선택 위치를 못 바꾸는 브라우저는 그대로 */
+    }
+  });
 }
 
 export function ToolChecklistCreateForm({
@@ -82,9 +96,13 @@ export function ToolChecklistCreateForm({
   const [quantities, setQuantities] = useState<Record<string, string>>(
     Object.keys(initialQuantities).length > 0 || isEdit || hasSource ? initialQuantities : toolDefaultQuantities
   );
-  const [toolNames, setToolNames] = useState<Record<string, string>>(initialToolNames);
+  // 이름칸마다 빈 [ ]를 기본으로 둠(사용자 요청 11/5 "모든 항에 [ ] 기본 배치" — 안에 종류 등을 적으면 반입반출증에서만 빠짐,
+  // lib/toolNameNote.ts). 안에 적은 게 없으면 저장할 때 빼서 이름은 예전처럼 저장됨. 손대지 않은 공구는 아래 칸에서 마스터 이름 + [ ].
+  const [toolNames, setToolNames] = useState<Record<string, string>>(() =>
+    Object.fromEntries(Object.entries(initialToolNames).map(([id, name]) => [id, withEmptyBracket(name)]))
+  );
   const [adhocItems, setAdhocItems] = useState<AdhocItem[]>(
-    initialAdhocItems.map((a) => ({ key: crypto.randomUUID(), ...a }))
+    initialAdhocItems.map((a) => ({ key: crypto.randomUUID(), ...a, name: withEmptyBracket(a.name) }))
   );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +111,7 @@ export function ToolChecklistCreateForm({
   const isSelected = (id: string) => (quantities[id] ?? "").trim() !== "";
   // 저장될 품목(수량 적은 공구 + 이름 적은 임의 추가) — 아래 "담긴 품목" 요약·개수에 씀.
   const selectedTools = groups.flatMap(([, groupTools]) => groupTools).filter((t) => isSelected(t.id));
-  const namedAdhocItems = adhocItems.filter((a) => a.name.trim() !== "");
+  const namedAdhocItems = adhocItems.filter((a) => stripEmptyBrackets(a.name) !== "");
   const selectedCount = selectedTools.length + namedAdhocItems.length;
 
   function setQuantity(id: string, value: string) {
@@ -113,7 +131,8 @@ export function ToolChecklistCreateForm({
   }
 
   function addAdhocItem() {
-    setAdhocItems((prev) => [...prev, { key: crypto.randomUUID(), name: "", quantity: "", forAccessPass: false }]);
+    // 임의 추가도 빈 [ ]를 미리 — 이름은 그 앞에 적게(칸을 누르면 글자 자리가 맨 앞으로, emptyNameCaretToStart)
+    setAdhocItems((prev) => [...prev, { key: crypto.randomUUID(), name: " [ ]", quantity: "", forAccessPass: false }]);
   }
   function updateAdhocItem(key: string, patch: Partial<AdhocItem>) {
     setAdhocItems((prev) => prev.map((a) => (a.key === key ? { ...a, ...patch } : a)));
@@ -147,13 +166,13 @@ export function ToolChecklistCreateForm({
       const qty = (quantities[t.id] ?? "").trim();
       if (qty) {
         fd.append("tool_id", t.id);
-        fd.append("tool_name", (toolNames[t.id] ?? t.name).trim() || t.name);
+        fd.append("tool_name", stripEmptyBrackets(toolNames[t.id] ?? t.name) || t.name);
         fd.append("quantity", qty);
         fd.append("for_access_pass", String(t.for_access_pass));
       }
     }
     for (const a of adhocItems) {
-      const name = a.name.trim();
+      const name = stripEmptyBrackets(a.name);
       if (name) {
         fd.append("tool_id", "");
         fd.append("tool_name", name);
@@ -246,8 +265,8 @@ export function ToolChecklistCreateForm({
 
       {/* 이름칸의 [ ] 메모는 화성·동희 반입반출증에서만 빠짐(lib/toolNameNote.ts, 사용자 요청 11/5) */}
       <p className="px-0.5 text-xs text-slate-500 print:hidden">
-        이름칸에 <span className="font-semibold text-slate-700">[ ]</span>로 적은 글자(예: 스페너 [13·17·19mm])는 공구명세서 화면·인쇄·엑셀에는
-        이름 아래 보이고, 화성·동희 반입반출증에는 나오지 않습니다.
+        이름칸의 <span className="font-semibold text-slate-700">[ ]</span> 안에 적은 글자(예: 스페너 [13·17·19mm])는 공구명세서 화면·인쇄·엑셀에는
+        이름 아래 보이고, 화성·동희 반입반출증에는 나오지 않습니다. 비워 두면 아무것도 안 나옵니다.
       </p>
       {tools.length === 0 ? (
         <p className="text-sm text-slate-400">등록된 공구가 없습니다 — 아래에서 직접 추가해도 됩니다.</p>
@@ -291,7 +310,7 @@ export function ToolChecklistCreateForm({
                         {/* globals.css가 입력칸 배경·글자색을 흰색·검정으로 고정해서(레이어 밖 규칙이라
                             bg·text 색 클래스가 안 먹음) 입력칸 색은 style로 줌. */}
                         <input
-                          value={toolNames[t.id] ?? t.name}
+                          value={toolNames[t.id] ?? withEmptyBracket(t.name)}
                           onChange={(e) => setToolNames((prev) => ({ ...prev, [t.id]: e.target.value }))}
                           title="이 명세서에서만 표시될 이름 — 공구 마스터의 이름은 바뀌지 않음 · [ ] 안 글자는 화성·동희 반입반출증에는 안 나옴"
                           aria-label={`${t.name} 이름`}
@@ -339,7 +358,7 @@ export function ToolChecklistCreateForm({
         {adhocItems.length > 0 && (
           <div className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-1.5">
             {adhocItems.map((a) => {
-              const named = a.name.trim() !== "";
+              const named = stripEmptyBrackets(a.name) !== "";
               return (
                 <div
                   key={a.key}
@@ -351,7 +370,8 @@ export function ToolChecklistCreateForm({
                   <input
                     value={a.name}
                     onChange={(e) => updateAdhocItem(a.key, { name: e.target.value })}
-                    placeholder="품명/메모"
+                    placeholder="품명 [종류]"
+                    onFocus={emptyNameCaretToStart}
                     aria-label="임의 추가 품명"
                     className={cx(
                       "min-w-0 flex-1 border-none p-0 text-sm focus:outline-none",
@@ -414,7 +434,7 @@ export function ToolChecklistCreateForm({
                 onClick={() => focusQuantity(`tool-qty-${t.id}`)}
                 className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 transition-colors hover:border-slate-400"
               >
-                {(toolNames[t.id] ?? t.name).trim() || t.name}{" "}
+                {stripEmptyBrackets(toolNames[t.id] ?? t.name) || t.name}{" "}
                 <span className="font-semibold text-slate-900">{quantities[t.id].trim()}</span>
               </button>
             ))}
@@ -425,7 +445,7 @@ export function ToolChecklistCreateForm({
                 onClick={() => focusQuantity(`adhoc-qty-${a.key}`)}
                 className="rounded-full border border-dashed border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-700 transition-colors hover:border-slate-400"
               >
-                {a.name.trim()} <span className="font-semibold text-slate-900">{a.quantity.trim() || "1"}</span>
+                {stripEmptyBrackets(a.name)} <span className="font-semibold text-slate-900">{a.quantity.trim() || "1"}</span>
               </button>
             ))}
           </div>
