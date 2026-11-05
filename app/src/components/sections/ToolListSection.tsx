@@ -109,8 +109,8 @@ export async function ToolListSection({
         supabase.from("tool_checklist_items").select("*").order("id", { ascending: true }).range(from, to)
       ),
       supabase.from("know_how_notes").select("*").eq("category", "tools").order("created_at", { ascending: false }),
-      // 우리 회사 상호(견적서 공급자 목록, 089 SQL) — 동희 반입반출증 "업체(부서)" 칸에 바로 넣음. 기본 공급자가 맨 앞. 표가 없으면(SQL 실행 전)
-      // 빈 목록이라 칸도 비어 있음(오류로 막지 않음).
+      // 우리 회사 상호(견적서 공급자 목록, 089 SQL) — 동희 반입반출증 "업체(부서)" 칸에 골라 넣는 목록(기본은 빈칸). 기본 공급자가 맨 앞.
+      // 표가 없으면(SQL 실행 전) 빈 목록이라 고르는 칸이 안 보이고 칸도 비어 있음(오류로 막지 않음).
       supabase.from("company_profiles").select("company_name, is_default").order("is_default", { ascending: false }).order("created_at"),
     ]);
 

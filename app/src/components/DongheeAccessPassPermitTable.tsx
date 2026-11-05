@@ -42,7 +42,7 @@ function labelStyle(heightMm: number, fontMm: number): CSSProperties {
   return { ...cellStyle(heightMm, fontMm), textAlign: "center", fontWeight: 600, background: "#f8f8f8" };
 }
 
-// companyName: 우리 회사 상호 — "업체(부서)" 칸에 바로 넣음(사용자 요청 11/5, 견적서 공급자 목록의 기본 공급자). 없으면 빈칸.
+// companyName: 우리 회사 상호 — "업체(부서)" 칸에 넣음(사용자 요청 11/5, 명세서 보기 위 고르는 칸에서 견적서 공급자 목록 중 하나). 기본은 빈칸.
 export function DongheeAccessPassPermitTable({ items, companyName = "" }: { items: DongheePermitItem[]; companyName?: string }) {
   const rows = Array.from({ length: ROW_COUNT }, (_, i) => items[i]);
 

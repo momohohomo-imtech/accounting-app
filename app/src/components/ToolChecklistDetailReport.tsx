@@ -48,14 +48,14 @@ export function ToolChecklistDetailReport({
    *  숨기고, 인쇄 시 회색 톤 보조 글자까지 전부 검정으로 강제(실제 저장된
    *  명세서 인쇄는 기존 방식 그대로 둠). */
   hideEditActions?: boolean;
-  /** 우리 회사 상호(견적서 공급자 목록 company_profiles, 기본 공급자가 맨 앞) — 동희 반입반출증 "업체(부서)" 칸에 바로 넣음(사용자 요청 11/5) */
+  /** 우리 회사 상호(견적서 공급자 목록 company_profiles, 기본 공급자가 맨 앞) — 동희 반입반출증 "업체(부서)" 칸에 골라 넣음(기본은 빈칸, 사용자 요청 11/5) */
   companyNames?: string[];
 }) {
   const router = useRouter();
   const [accessPassOnly, setAccessPassOnly] = useState(false);
   const [formMode, setFormMode] = useState<FormMode>("none");
-  // 동희 반입반출증 "업체(부서)" 칸 — 기본 공급자 상호, 회사가 둘 이상이면 고를 수 있게(빈칸도)
-  const [companyName, setCompanyName] = useState(companyNames[0] ?? "");
+  // 동희 반입반출증 "업체(부서)" 칸 — 기본은 빈칸(사용자 요청 11/5 "기본 빈칸으로"), 양식 위 고르는 칸에서 우리 회사 상호를 고르면 채움
+  const [companyName, setCompanyName] = useState("");
   // 동희 반입반출증은 품목 수에 따라 여러 페이지로 늘어나는 게 정상이라, 전체를
   // 억지로 1페이지에 욱여넣는 이 훅을 꺼야 함(아래 dongheePages 참고).
   const printRef = usePrintFitToPage<HTMLDivElement>(270, formMode === "donghee");
@@ -159,7 +159,7 @@ export function ToolChecklistDetailReport({
               동희 반입반출증
             </label>
           )}
-          {formMode === "donghee" && companyNames.length > 1 && (
+          {formMode === "donghee" && companyNames.length > 0 && (
             <label className="flex items-center gap-1.5 text-xs text-slate-600">
               업체(부서)
               <select
@@ -167,12 +167,12 @@ export function ToolChecklistDetailReport({
                 onChange={(e) => setCompanyName(e.target.value)}
                 className={`${inlineFieldClass} max-w-[12rem] py-1 text-xs`}
               >
+                <option value="">빈칸</option>
                 {companyNames.map((n) => (
                   <option key={n} value={n}>
                     {n}
                   </option>
                 ))}
-                <option value="">빈칸으로</option>
               </select>
             </label>
           )}
