@@ -244,10 +244,10 @@ export function ToolChecklistCreateForm({
         </div>
       </div>
 
-      {/* 이름칸의 [ ] 메모는 화면에서만(lib/toolNameNote.ts, 사용자 요청 11/5) */}
+      {/* 이름칸의 [ ] 메모는 화성·동희 반입반출증에서만 빠짐(lib/toolNameNote.ts, 사용자 요청 11/5) */}
       <p className="px-0.5 text-xs text-slate-500 print:hidden">
-        이름칸에 <span className="font-semibold text-slate-700">[ ]</span>로 적은 글자(예: 스페너 [13·17·19mm])는 앱 화면에서만 보이고,
-        공구명세서 인쇄·엑셀과 화성·동희 반입반출증에는 나오지 않습니다.
+        이름칸에 <span className="font-semibold text-slate-700">[ ]</span>로 적은 글자(예: 스페너 [13·17·19mm])는 공구명세서 화면·인쇄·엑셀에는
+        이름 아래 보이고, 화성·동희 반입반출증에는 나오지 않습니다.
       </p>
       {tools.length === 0 ? (
         <p className="text-sm text-slate-400">등록된 공구가 없습니다 — 아래에서 직접 추가해도 됩니다.</p>
@@ -293,7 +293,7 @@ export function ToolChecklistCreateForm({
                         <input
                           value={toolNames[t.id] ?? t.name}
                           onChange={(e) => setToolNames((prev) => ({ ...prev, [t.id]: e.target.value }))}
-                          title="이 명세서에서만 표시될 이름 — 공구 마스터의 이름은 바뀌지 않음 · [ ] 안 글자는 화면에서만(인쇄 안 됨)"
+                          title="이 명세서에서만 표시될 이름 — 공구 마스터의 이름은 바뀌지 않음 · [ ] 안 글자는 화성·동희 반입반출증에는 안 나옴"
                           aria-label={`${t.name} 이름`}
                           className={cx(
                             "min-w-0 flex-1 truncate border-none p-0 text-sm focus:outline-none",

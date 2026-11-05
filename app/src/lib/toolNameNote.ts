@@ -1,11 +1,11 @@
-// 공구명세서 이름칸의 대괄호 [ ] = 화면에서만 보이는 메모(사용자 요청 11/5 — 스페너처럼 여러 종류를 챙길 때 "스페너 [13·17·19mm]"로
-// 적으면 앱 화면(작성·명세서 보기)에는 그대로 보이고, 인쇄물(공구명세서 인쇄·엑셀, 화성·동희 반입반출증·엑셀)에는 "스페너"만).
+// 공구명세서 이름칸의 대괄호 [ ] = 반입반출증에는 안 나오는 메모(사용자 요청 11/5 — 스페너처럼 여러 종류를 챙길 때 "스페너 [13·17·19mm]"로
+// 적으면 공구명세서 화면·인쇄·엑셀에는 이름 아래 [ ]까지 보이고, 화성·동희 반입반출증(화면 미리보기·인쇄·엑셀)에는 "스페너"만).
 // DB 변경 없음 — 이름은 적은 그대로 저장하고 보여 줄 때만 나눔. 검사: toolNameNote.test.ts
 const BRACKET = /\[([^[\]]*)\]/g;
 
 /**
- * 이름을 인쇄용(괄호 밖)과 화면 메모(괄호 안)로 나눔. 괄호가 없으면 그대로(앞뒤 공백만 정리). 짝이 안 맞는 "["는 그냥 글자로 둠.
- * 괄호만 있어 인쇄용 이름이 비면 괄호 기호만 뺀 글자를 인쇄용으로(반입반출증에 빈 줄이 생기지 않게).
+ * 이름을 반입반출증용(괄호 밖, printName)과 메모(괄호 안)로 나눔. 괄호가 없으면 그대로(앞뒤 공백만 정리). 짝이 안 맞는 "["는 그냥 글자로 둠.
+ * 괄호만 있어 괄호 밖 이름이 비면 괄호 기호만 뺀 글자를 printName으로(반입반출증에 빈 줄이 생기지 않게).
  */
 export function splitToolNameNote(name: string | null | undefined): { printName: string; notes: string[] } {
   const raw = name ?? "";
@@ -29,7 +29,7 @@ export function splitToolNameNote(name: string | null | undefined): { printName:
   return { printName: printName || raw.replace(/[[\]]/g, " ").replace(/\s+/g, " ").trim(), notes };
 }
 
-/** 인쇄물·엑셀·반입반출증에 쓰는 이름("스페너 [13·17·19mm]" → "스페너") */
+/** 화성·동희 반입반출증(화면·인쇄·엑셀)에 쓰는 이름("스페너 [13·17·19mm]" → "스페너") */
 export function printToolName(name: string | null | undefined): string {
   return splitToolNameNote(name).printName;
 }
