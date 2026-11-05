@@ -33,3 +33,15 @@ export function splitToolNameNote(name: string | null | undefined): { printName:
 export function printToolName(name: string | null | undefined): string {
   return splitToolNameNote(name).printName;
 }
+
+/** 작성 화면 이름칸 기본값 — 괄호가 없으면 끝에 빈 [ ]를 붙여 둠(사용자 요청 11/5 "모든 항에 [ ] 기본 배치"). 이미 괄호가 있거나 빈 이름이면 그대로 */
+export function withEmptyBracket(name: string | null | undefined): string {
+  const n = (name ?? "").trim();
+  if (!n || /[[\]]/.test(n)) return n;
+  return `${n} [ ]`;
+}
+
+/** 저장·요약 표시용 — 안에 적은 게 없는 [ ]는 지움(그대로 두면 이름만 예전처럼 저장). 앞뒤 공백 정리, 다른 글자·띄어쓰기는 그대로 */
+export function stripEmptyBrackets(name: string | null | undefined): string {
+  return (name ?? "").replace(/\s*\[\s*\]/g, "").trim();
+}
