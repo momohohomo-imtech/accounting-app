@@ -95,8 +95,10 @@ export function ToolChecklistDetailReport({
       `${title}_${accessPassOnly ? "반입반출증" : "공구명세서"}.xlsx`,
       accessPassOnly ? `${title} (반입반출증)` : title,
       metaLine,
-      // 엑셀도 인쇄물이라 이름칸의 [ ] 메모는 빼고
-      visibleGroups.map((g) => ({ ...g, items: g.items.map((it) => ({ ...it, tool_name: printToolName(it.tool_name) })) })),
+      // 엑셀도 인쇄물이라 이름칸의 [ ] 메모는 빼고 — "반입반출증용만 표시" 보기는 인쇄처럼 [ ]까지 그대로(사용자 요청 11/5)
+      accessPassOnly
+        ? visibleGroups
+        : visibleGroups.map((g) => ({ ...g, items: g.items.map((it) => ({ ...it, tool_name: printToolName(it.tool_name) })) })),
       accessPassOnly ? null : memo
     );
   }
@@ -251,7 +253,8 @@ export function ToolChecklistDetailReport({
                     // 명세서처럼 흐리게(opacity-50) 처리하면 전부 흐려져 버림 — 빈
                     // 양식일 땐 흐림 처리 없이 전부 또렷하게(진하게) 보이게 함.
                     const dimUnfilled = !hideEditActions && !filled;
-                    // 이름칸의 [ ] 메모(스페너 종류 등)는 화면에서만 이름 아래 작은 글씨로 — 인쇄에는 괄호 밖 이름만(사용자 요청 11/5)
+                    // 이름칸의 [ ] 메모(스페너 종류 등)는 화면에서만 이름 아래 작은 글씨로 — 인쇄에는 괄호 밖 이름만(사용자 요청 11/5).
+                    // 단 "반입반출증용만 표시" 보기는 인쇄에도 나옴(사용자 요청 11/5 — 긴 종류 글자는 칸 안에서 줄바꿈)
                     const { printName, notes } = splitToolNameNote(it.tool_name);
                     return (
                       <li
@@ -261,7 +264,11 @@ export function ToolChecklistDetailReport({
                         <span className="min-w-0 flex-1 print:text-slate-900" title={it.tool_name}>
                           <span className="block truncate">☐ {printName}</span>
                           {notes.length > 0 && (
-                            <span className="block text-xs text-slate-500 print:hidden">{notes.map((n) => `[${n}]`).join(" ")}</span>
+                            <span
+                              className={`block text-xs text-slate-500 ${accessPassOnly ? "[overflow-wrap:anywhere] print:text-[22px] print:text-slate-900" : "print:hidden"}`}
+                            >
+                              {notes.map((n) => `[${n}]`).join(" ")}
+                            </span>
                           )}
                         </span>
                         <span
