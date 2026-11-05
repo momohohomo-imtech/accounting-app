@@ -13,6 +13,7 @@ import { AccessPassPermitTable } from "@/components/AccessPassPermitTable";
 import { DongheeAccessPassPermitTable, ROW_COUNT as DONGHEE_ROW_COUNT } from "@/components/DongheeAccessPassPermitTable";
 import { PopupCloseLink } from "@/components/PopupCloseLink";
 import { closePopup } from "@/lib/popupNavigation";
+import { printToolName, splitToolNameNote } from "@/lib/toolNameNote";
 
 type FormMode = "none" | "kia" | "donghee";
 
@@ -67,7 +68,8 @@ export function ToolChecklistDetailReport({
   const accessPassItems = groups
     .flatMap((g) => g.items)
     .filter((it) => it.for_access_pass && it.quantity.trim() !== "")
-    .map((it) => ({ tool_name: it.tool_name, quantity: it.quantity }));
+    // 이름칸의 [ ] 메모는 화면에서만 — 화성·동희 반입반출증(화면 미리보기·인쇄·엑셀)에는 괄호 밖 이름만(lib/toolNameNote.ts)
+    .map((it) => ({ tool_name: printToolName(it.tool_name), quantity: it.quantity }));
   const metaLine = `${projectName ? `${projectName} · ` : ""}${tripDate ? formatDate(tripDate) : "출장일 미지정"}`;
 
   // 동희 반입반출증 한 장(DongheeAccessPassPermitTable)은 원본 서류와 동일하게
@@ -93,7 +95,8 @@ export function ToolChecklistDetailReport({
       `${title}_${accessPassOnly ? "반입반출증" : "공구명세서"}.xlsx`,
       accessPassOnly ? `${title} (반입반출증)` : title,
       metaLine,
-      visibleGroups,
+      // 엑셀도 인쇄물이라 이름칸의 [ ] 메모는 빼고
+      visibleGroups.map((g) => ({ ...g, items: g.items.map((it) => ({ ...it, tool_name: printToolName(it.tool_name) })) })),
       accessPassOnly ? null : memo
     );
   }
@@ -248,12 +251,19 @@ export function ToolChecklistDetailReport({
                     // 명세서처럼 흐리게(opacity-50) 처리하면 전부 흐려져 버림 — 빈
                     // 양식일 땐 흐림 처리 없이 전부 또렷하게(진하게) 보이게 함.
                     const dimUnfilled = !hideEditActions && !filled;
+                    // 이름칸의 [ ] 메모(스페너 종류 등)는 화면에서만 이름 아래 작은 글씨로 — 인쇄에는 괄호 밖 이름만(사용자 요청 11/5)
+                    const { printName, notes } = splitToolNameNote(it.tool_name);
                     return (
                       <li
                         key={it.id}
                         className={`flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 print:gap-2 print:rounded-none print:border-0 print:px-0 print:py-1 print:text-[28px] ${filled && !hideEditActions ? "print:border-b-2 print:border-black" : ""} ${dimUnfilled ? "print:opacity-50" : ""}`}
                       >
-                        <span className="truncate print:text-slate-900">☐ {it.tool_name}</span>
+                        <span className="min-w-0 flex-1 print:text-slate-900" title={it.tool_name}>
+                          <span className="block truncate">☐ {printName}</span>
+                          {notes.length > 0 && (
+                            <span className="block text-xs text-slate-500 print:hidden">{notes.map((n) => `[${n}]`).join(" ")}</span>
+                          )}
+                        </span>
                         <span
                           className={`shrink-0 tabular-nums font-semibold print:text-slate-900 ${filled ? "text-slate-900" : "text-slate-400"}`}
                         >

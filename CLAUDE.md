@@ -187,7 +187,7 @@
   정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
   해 잠금 불러오기(`yearLock`), 오래된 외상매출금(`receivableAging`), 이번 달 신고·납부 일정(`annualTasks`), 홈택스 세금계산서
   대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`), 메모 한 장 엑셀(`memoExport`), 공사 작업 순서
-  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내(`actionError`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
+  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내(`actionError`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`), 공구명세서 이름 [ ] 메모(`toolNameNote`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
   (vitest는 npm 설치 오류로 못 씀 — 새 테스트 라이브러리를 넣지 말 것)
@@ -288,6 +288,11 @@
 - **11/2 사용자 요청**: 공사 메모는 메모 하나 = 한 줄 표(`ConstructionMemoList` — 내용은 한 줄 말줄임, 누르면 그 줄만 전체, 날짜는
   한국 시각). 공사 메모·품질관리 노하우·공구 메모는 항목마다 "엑셀"로 그 메모 하나만(`downloadMemoXlsx` + `lib/memoExport.ts` 항목 —
   "항목 | 내용" 두 칸, 긴 내용은 행을 나눠 다 보이게).
+- **공구명세서 이름칸의 [ ]**(11/5 사용자 요청 — 스페너처럼 여러 종류를 챙길 때 "스페너 [13·17·19mm]"): [ ] 안 글자는 앱 화면(작성 화면,
+  명세서 보기 — 이름 아래 작은 글씨)에서만 보이고, 공구명세서 인쇄·엑셀과 화성·동희 반입반출증(화면 미리보기·인쇄·엑셀)에는 괄호 밖 이름만
+  (`lib/toolNameNote.ts`의 `splitToolNameNote`·`printToolName`). DB 변경 없음 — 이름은 적은 그대로 저장, 보여 줄 때만 나눔(괄호만 있으면
+  괄호 기호만 빼서 인쇄, 짝이 안 맞는 "["는 글자 그대로, 공구 마스터 이름의 [ ]도 같이 빠짐). 공구 이름을 인쇄물·반입반출증에 새로 쓰는
+  곳도 `printToolName`을 거칠 것. 작성 화면 맨 위에 안내 한 줄.
 - **공사 작업 순서**(공사 관리 탭, 098 SQL `work_sequences`·`work_sequence_steps`, 11/2 사용자 결정): 순서표 = 프로젝트·제목·단위(순서표마다
   일 또는 시간)·시작일(시간이면 시작 시각), 단계 = 순번(숫자를 고치면 그 줄이 내용째 이동 — 공용 `SeqInput`)·작업 내용·세부 설명·
   주의사항·기간·앞 작업과 겹침·완료·완료일. 단계 날짜는 저장하지 않고 `lib/workSequence.ts`로만 계산(시작 = 앞 단계 끝 − 겹침, 겹침은 앞
