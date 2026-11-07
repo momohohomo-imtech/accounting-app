@@ -13,6 +13,10 @@ import {
   type AutoBackupRunView,
 } from "@/lib/autoBackupStatus";
 import { cx } from "@/lib/cx";
+import { checkSqlStatus } from "@/lib/sqlStatus";
+import { SqlStatusTable } from "@/components/SqlStatusTable";
+import { storageUsage, formatMb, FREE_STORAGE_LIMIT_MB } from "@/lib/storageUsage";
+import { fetchAllRows } from "@/lib/supabaseFetchAll";
 
 const TONE_CLASS: Record<AutoBackupRunView["tone"], string> = {
   ok: "text-emerald-700",
@@ -47,7 +51,7 @@ export default async function BackupsPage() {
   // 자동 백업 점검(서버 설정·마지막 자동 실행 기록) — 백업 저장소를 읽을 수 있는 관리자·직원만
   const canCheckAuto = profile?.role === "admin" || profile?.role === "staff";
 
-  const [{ data: backups }, accounts, lastRunText] = await Promise.all([
+  const [{ data: backups }, accounts, lastRunText, sqlRows, attachmentSizes] = await Promise.all([
     supabase.from("backups").select("*").order("created_at", { ascending: false }),
     isAdmin ? getAccounts() : Promise.resolve([]),
     canCheckAuto
@@ -57,7 +61,23 @@ export default async function BackupsPage() {
           .then(({ data }) => (data ? data.text() : null))
           .catch(() => null)
       : Promise.resolve(null),
+    // SQL 실행 상태(11/7) — 표·칸을 1줄씩 읽어 보기만(lib/sqlStatus.ts)
+    canCheckAuto ? checkSqlStatus(supabase) : Promise.resolve([]),
+    // 저장 공간(11/7) — 첨부파일 크기(바이트)만. 못 읽으면 칸을 숨김
+    canCheckAuto
+      ? fetchAllRows<{ id: string; file_size: number | null }>((from, to) =>
+          supabase.from("attachments").select("id, file_size").order("id", { ascending: true }).range(from, to)
+        ).catch(() => null)
+      : Promise.resolve(null),
   ]);
+  const neededSql = sqlRows.filter((r) => r.state === "needed").map((r) => r.file);
+  const unknownSql = sqlRows.filter((r) => r.state === "unknown").map((r) => r.file);
+  const usage = attachmentSizes
+    ? storageUsage(
+        attachmentSizes.map((a) => a.file_size),
+        (backups ?? []).map((b) => b.file_size_mb as number | null)
+      )
+    : null;
   const nowIso = new Date().toISOString();
   const lastRun = describeAutoBackupRun(parseAutoBackupRun(lastRunText), nowIso);
   // 서버 환경변수가 있는지만(값은 보이지 않음) — CRON_SECRET이 없으면 자동 백업이 늘 막힘(11/3 자동 백업이 안 된 원인 후보)
@@ -156,6 +176,69 @@ export default async function BackupsPage() {
             </CheckRow>
           </dl>
           <p className="mt-2 text-[11px] text-slate-400">설정값 자체는 보이지 않고, 지금 실행 중인 배포에 들어 있는지만 확인합니다.</p>
+        </div>
+      )}
+
+      {canCheckAuto && usage && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="font-semibold text-slate-900">파일 저장 공간</h2>
+          <dl className="mt-2 divide-y divide-slate-100">
+            <CheckRow label="합계">
+              <span className={cx("font-medium", usage.warn ? "text-red-700" : "text-slate-900")}>
+                약 {formatMb(usage.totalMb)}
+              </span>
+              <span className="ml-2 text-xs text-slate-500">
+                무료 요금제 한도 {formatMb(FREE_STORAGE_LIMIT_MB)}의 {usage.pct.toLocaleString("ko-KR")}%
+              </span>
+              <span className="mt-1 block h-1.5 w-full max-w-sm overflow-hidden rounded-full bg-slate-100">
+                <span
+                  className={cx("block h-full rounded-full", usage.warn ? "bg-red-500" : "bg-slate-400")}
+                  style={{ width: `${Math.min(100, usage.pct)}%` }}
+                />
+              </span>
+              {usage.warn && (
+                <span className="mt-1 block text-xs text-red-700">
+                  80%를 넘었습니다 — 오래된 첨부·직접 만든 백업을 정리하거나 Supabase 요금제를 확인해 주세요.
+                </span>
+              )}
+            </CheckRow>
+            <CheckRow label="첨부파일">
+              {usage.attachmentCount.toLocaleString("ko-KR")}개 · {formatMb(usage.attachmentsMb)}
+              {usage.unknownSizeCount > 0 && (
+                <span className="ml-1 text-xs text-slate-500">(크기 모름 {usage.unknownSizeCount.toLocaleString("ko-KR")}개 제외)</span>
+              )}
+            </CheckRow>
+            <CheckRow label="백업 파일">
+              {usage.backupCount.toLocaleString("ko-KR")}개 · {formatMb(usage.backupsMb)}
+            </CheckRow>
+          </dl>
+          <p className="mt-2 text-[11px] text-slate-400">
+            앱이 올린 파일(첨부·백업)의 크기를 더한 값입니다. 거래 등 DB 자료(무료 요금제 500MB)는 따로이며, 정확한 사용량은 Supabase →
+            Project Settings → Usage에서 볼 수 있습니다.
+          </p>
+        </div>
+      )}
+
+      {canCheckAuto && sqlRows.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="font-semibold text-slate-900">SQL 실행 상태</h2>
+          <p className={cx("mt-1 text-sm", neededSql.length > 0 ? "font-medium text-red-700" : "text-emerald-700")}>
+            {neededSql.length > 0
+              ? `실행이 필요한 SQL ${neededSql.length}개: ${neededSql.join(", ")} — 실행 전엔 그 기능이 숨겨져 있습니다.`
+              : unknownSql.length > 0
+                ? "확인한 SQL은 모두 실행됐습니다."
+                : "아래 SQL은 모두 실행됐습니다."}
+          </p>
+          {unknownSql.length > 0 && (
+            <p className="mt-0.5 text-xs text-amber-700">
+              확인하지 못한 SQL {unknownSql.length}개: {unknownSql.join(", ")} — 연결이 잠깐 끊겼을 수 있으니 새로 고침해 보세요.
+            </p>
+          )}
+          <p className="mb-3 mt-1 text-xs text-slate-500">
+            실행 필요인 번호는 Supabase → SQL Editor에서 그 번호의 SQL 파일 내용을 붙여 넣고 Run(작은 번호부터 차례로). 확인은 표·칸이
+            있는지만 읽어 봅니다. 084(조회 전용 계정)·091(견적·발주 번호 — 097에 다시 들어 있음)은 표·칸이 없어 여기서 확인할 수 없습니다.
+          </p>
+          <SqlStatusTable rows={sqlRows} />
         </div>
       )}
 

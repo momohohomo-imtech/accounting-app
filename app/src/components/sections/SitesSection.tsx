@@ -6,6 +6,7 @@ import type { FieldConfig } from "@/components/crud/types";
 import { ClientsSection } from "@/components/sections/ClientsSection";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { fetchAllData } from "@/lib/supabaseFetchAll";
+import { byName } from "@/lib/listOrder";
 
 export async function SitesSection() {
   const supabase = await createClient();
@@ -38,9 +39,10 @@ export async function SitesSection() {
       <CollapsibleSection title="현장" bare>
         <CreatePanel title="현장" fields={fields} createAction={createSiteRecord} />
         <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          {/* 기본 순서 = 현장명 가나다순(11/7, lib/listOrder.ts) */}
           <EntityTable
             fields={fields}
-            rows={(sites ?? []).map((s) => ({ ...s }))}
+            rows={byName((sites ?? []).map((s) => ({ ...s })))}
             updateAction={updateSiteRecord}
             deleteAction={deleteSiteRecord}
           />

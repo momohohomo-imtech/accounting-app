@@ -18,7 +18,8 @@ import { YearFilter } from "@/components/YearFilter";
 import { EmployeeCertificate } from "@/components/EmployeeCertificate";
 import { LinkButton } from "@/components/ui/Button";
 import { sortByEmployeeNo } from "@/lib/format";
-import { nowKst } from "@/lib/kstDate";
+import { nowKst, nowKstParts } from "@/lib/kstDate";
+import { activeEmployeesFirst, payrollOrder } from "@/lib/listOrder";
 
 const employeeFields: FieldConfig[] = [
   { name: "employee_no", label: "사원번호" },
@@ -79,7 +80,10 @@ export default async function EmployeesPage({
   if (!payrollYears.includes(selectedYear)) payrollYears.unshift(selectedYear);
   payrollYears.sort((a, b) => b - a);
 
-  const employees = sortByEmployeeNo(employeesRaw ?? []);
+  // 목록 기본 순서(11/7): 직원은 재직자 먼저 → 사원번호순, 급여 이력은 지급월 최신순 → 같은 달은 사원번호순(lib/listOrder.ts).
+  const employeesByNo = sortByEmployeeNo(employeesRaw ?? []);
+  const employees = activeEmployeesFirst(employeesByNo, nowKstParts().date);
+  const payrollRows = payrollOrder(payroll ?? [], new Map(employeesByNo.map((e, i) => [e.id as string, i])));
 
   const employeeOptions = employees.map((e) => ({
     id: e.id,
@@ -137,7 +141,7 @@ export default async function EmployeesPage({
 
           <div className="overflow-x-auto">
             <PayrollTable
-              payroll={payroll ?? []}
+              payroll={payrollRows}
               employees={employeeOptions}
               year={selectedYear}
               updateAction={updatePayrollRecord}

@@ -13,7 +13,7 @@ import { KnowHowSection } from "@/components/KnowHowSection";
 import { createKnowHowNote, updateKnowHowNote, deleteKnowHowNote } from "@/lib/actions/knowHow";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { groupToolsBySortOrder, toolGroupLabel } from "@/lib/tools";
-import { fetchAllRows, fetchAllData } from "@/lib/supabaseFetchAll";
+import { fetchAllRows, fetchAllData, fetchAllRowsIn } from "@/lib/supabaseFetchAll";
 import { nowKst } from "@/lib/kstDate";
 
 const toolFields: FieldConfig[] = [
@@ -74,7 +74,7 @@ export async function ToolListSection({
   historySite?: string;
 }) {
   const supabase = await createClient();
-  const [{ data: tools }, { data: sites }, { data: projects }, checklists, items, { data: knowHowNotes }, { data: companyProfiles }] =
+  const [{ data: tools }, { data: sites }, { data: projects }, checklists, { data: knowHowNotes }, { data: companyProfiles }] =
     await Promise.all([
       supabase.from("tools").select("*").order("sort_order").order("position").order("name"),
       fetchAllData((from, to) =>
@@ -105,9 +105,6 @@ export async function ToolListSection({
           .order("id", { ascending: true })
           .range(from, to)
       ),
-      fetchAllRows<ChecklistItemRow>((from, to) =>
-        supabase.from("tool_checklist_items").select("*").order("id", { ascending: true }).range(from, to)
-      ),
       supabase.from("know_how_notes").select("*").eq("category", "tools").order("created_at", { ascending: false }),
       // 우리 회사 상호(견적서 공급자 목록, 089 SQL) — 동희 반입반출증 "업체(부서)" 칸에 골라 넣는 목록(기본은 빈칸). 기본 공급자가 맨 앞.
       // 표가 없으면(SQL 실행 전) 빈 목록이라 고르는 칸이 안 보이고 칸도 비어 있음(오류로 막지 않음).
@@ -126,13 +123,6 @@ export async function ToolListSection({
     return createKnowHowNote(formData);
   }
 
-  const itemsByChecklist = new Map<string, ChecklistItemRow[]>();
-  for (const it of items) {
-    const list = itemsByChecklist.get(it.checklist_id) ?? [];
-    list.push(it);
-    itemsByChecklist.set(it.checklist_id, list);
-  }
-
   const historyRows = checklists.map((c) => {
     const project = one(c.projects) as { name: string; site_id: string | null } | null;
     return {
@@ -141,7 +131,6 @@ export async function ToolListSection({
       project_name: project?.name ?? null,
       site_id: project?.site_id ?? null,
       trip_date: c.trip_date as string | null,
-      item_count: (itemsByChecklist.get(c.id) ?? []).length,
       created_at: c.created_at as string,
     };
   });
@@ -164,8 +153,8 @@ export async function ToolListSection({
   ).sort((a, b) => b - a);
 
   const siteHistoryRows = historyRows.filter((r) => selectedHistorySiteId === "all" || r.site_id === selectedHistorySiteId);
-  // historyRows는 저장일(created_at) 최신순으로 조회돼 있어서 앞에서 15건이 최근 작성분.
-  const filteredHistoryRows =
+  // historyRows는 저장일(created_at) 최신순으로 조회돼 있어서 앞에서 15건이 최근 작성분(표에서는 출장일 최신순으로 보여 줌 — 11/7).
+  const shownHistoryRows =
     selectedHistoryYear === "recent"
       ? siteHistoryRows.slice(0, HISTORY_RECENT_COUNT)
       : siteHistoryRows.filter((r) => {
@@ -204,6 +193,37 @@ export async function ToolListSection({
   // 팝업으로 볼 명세서 — 예전 수정 주소(?editFrom=id)도 그 명세서 팝업을 수정 화면으로 엶.
   const checklist = checklistParam ?? editFrom;
   const startEditing = edit === "1" || Boolean(editFrom && !checklistParam);
+  // "__blank__"는 실제 저장된 명세서가 아니라, 마스터 공구 전체를 빈 칸으로 인쇄해볼
+  // 수 있게 하는 특수 값(아래 "폼 인쇄" 링크에서 씀).
+  const isBlankForm = checklist === "__blank__";
+  const detailChecklist = checklist && !isBlankForm ? (checklists ?? []).find((c) => c.id === checklist) : null;
+
+  // 품목은 이 화면에 쓰는 명세서 것만 — 이력 표에 보이는 명세서(공구 개수) + 연 명세서·복사 원본. 예전엔 탭을 열 때마다 지금까지
+  // 만든 모든 명세서의 품목을 다 읽어서 몇 년 쌓이면 느려질 수 있었음(11/7). 명세서가 많아도 요청 주소가 너무 길어지지 않게 나눠 조회.
+  const neededChecklistIds = Array.from(
+    new Set([
+      ...shownHistoryRows.map((r) => r.id),
+      ...(copySource ? [copySource.id as string] : []),
+      ...(detailChecklist ? [detailChecklist.id as string] : []),
+    ])
+  );
+  const items = neededChecklistIds.length
+    ? await fetchAllRowsIn<ChecklistItemRow>(neededChecklistIds, (ids, from, to) =>
+        supabase
+          .from("tool_checklist_items")
+          .select("*")
+          .in("checklist_id", ids)
+          .order("id", { ascending: true })
+          .range(from, to)
+      )
+    : [];
+  const itemsByChecklist = new Map<string, ChecklistItemRow[]>();
+  for (const it of items) {
+    const list = itemsByChecklist.get(it.checklist_id) ?? [];
+    list.push(it);
+    itemsByChecklist.set(it.checklist_id, list);
+  }
+  const filteredHistoryRows = shownHistoryRows.map((r) => ({ ...r, item_count: (itemsByChecklist.get(r.id) ?? []).length }));
 
   const {
     initialQuantities,
@@ -233,11 +253,6 @@ export async function ToolListSection({
         initialHelperCount: "",
         initialMemo: "",
       };
-
-  // "__blank__"는 실제 저장된 명세서가 아니라, 마스터 공구 전체를 빈 칸으로 인쇄해볼
-  // 수 있게 하는 특수 값(아래 "폼 인쇄" 링크에서 씀).
-  const isBlankForm = checklist === "__blank__";
-  const detailChecklist = checklist && !isBlankForm ? (checklists ?? []).find((c) => c.id === checklist) : null;
 
   // 인쇄/엑셀용 상세 목록은 (선택된 품목만이 아니라) 마스터 공구 전체를 순번별로
   // 보여주되, 이 명세서에 실제 담긴 품목만 수량을 채워서 표시함(나머지는 빈칸/회색).

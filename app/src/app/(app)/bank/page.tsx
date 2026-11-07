@@ -77,6 +77,7 @@ export default async function BankPage({
     id: string;
     bank_account_id: string;
     trans_date: string;
+    created_at?: string | null;
     direction: string;
     description: string | null;
     amount: number;
@@ -96,7 +97,9 @@ export default async function BankPage({
         .select("*, bank_accounts(nickname, bank_name), clients(name)")
         .gte("trans_date", rangeStart)
         .lte("trans_date", rangeEnd)
+        // 같은 날짜 안은 나중에 등록한 것이 위(lib/entryOrder.ts)
         .order("trans_date", { ascending: false })
+        .order("created_at", { ascending: false })
         .order("id", { ascending: true })
         .range(from, to);
       // 둘 다 체크(전체) 또는 둘 다 해제(빈 결과 방지)면 필터 안 걸고, 하나만 체크됐을 때만 그 방향으로 좁힌다.

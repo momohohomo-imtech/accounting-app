@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { remainingBalance } from "@/lib/credit";
 import { fetchAllRowsIn } from "@/lib/supabaseFetchAll";
+import { entryTimestamps } from "@/lib/entryOrder";
 import type { CreditPayment, Transaction } from "@/lib/types";
 
 // 거래가 바뀌면 금액이 보이는 모든 화면을 새로 그리게 한다.
@@ -158,7 +159,11 @@ export async function bulkImportTransactions(
     paymentGroupId = crypto.randomUUID();
   }
 
-  const inserts = rows.map((r) => ({
+  // 한 번에 넣는 줄은 DB가 모두 같은 등록 시각을 넣어 순서가 사라짐 → 줄마다 1/1000초씩 다르게(lib/entryOrder.ts — 같은 날짜 안의
+  // 목록 순서가 엑셀·입력한 줄 순서대로 나오게).
+  const stamps = rows.length > 1 ? entryTimestamps(rows.map((r) => r.trans_date), Date.now()) : null;
+  const inserts = rows.map((r, i) => ({
+    ...(stamps ? { created_at: stamps[i] } : {}),
     trans_date: r.trans_date,
     type: r.type,
     client_id: r.client_id,

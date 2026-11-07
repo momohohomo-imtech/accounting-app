@@ -14,6 +14,7 @@ import { DailyWorkerUsageSection } from "@/components/sections/DailyWorkerUsageS
 import { DailyWorkerTaxSection } from "@/components/sections/DailyWorkerTaxSection";
 import { Pill } from "@/components/ui/Pill";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
+import { dailyWorkersOrder } from "@/lib/listOrder";
 
 const TABS = [
   { key: "list", label: "일용직 근로자" },
@@ -57,7 +58,7 @@ async function WorkerListSection({ officeId }: { officeId?: string }) {
   const supabase = await createClient();
   const [{ data: offices }, workers] = await Promise.all([
     supabase.from("daily_worker_offices").select("id, name").order("name"),
-    fetchAllRows<Record<string, unknown> & { id: string; office_id: string | null }>((from, to) =>
+    fetchAllRows<Record<string, unknown> & { id: string; office_id: string | null; name: string | null; status: string | null }>((from, to) =>
       supabase
         .from("daily_workers")
         .select("*, daily_worker_offices(name)")
@@ -67,7 +68,8 @@ async function WorkerListSection({ officeId }: { officeId?: string }) {
     ),
   ]);
 
-  const filteredWorkers = officeId ? workers.filter((w) => w.office_id === officeId) : workers;
+  // 기본 순서 = 근무중 먼저 → 이름 가나다순(11/7, lib/listOrder.ts — 출입명단에서 고를 때와 같은 이름순)
+  const filteredWorkers = dailyWorkersOrder(officeId ? workers.filter((w) => w.office_id === officeId) : workers);
 
   const fields: FieldConfig[] = [
     {

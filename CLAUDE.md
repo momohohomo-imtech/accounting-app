@@ -24,7 +24,7 @@
   `UncategorizedPurchasesTable`, `TransactionHistoryTable`, `ProjectReceiptsTable`, 통합 보고서의 `ProjectsCombinedTable`·
   `CombinedCategorySection`·`CombinedAgencyTable`, `BankBalanceCheckPopup`(통장 잔액 확인 기록), `YearLockPanel`(잠긴 해),
   `ReceivableAgingTable`(오래된 외상매출금), `HometaxReconcilePanel`(홈택스 대조 결과), `ConstructionMemoList`(공사 메모),
-  `WorkSequenceList`(공사 작업 순서표), `FixedExpensePanel`(고정지출 지정 거래처·카테고리·후보), `RecentTransactionsTable`(대시보드 최근 등록 거래), `SortableSimpleTable`(보고서 분기별·월별 손익·매출처별 집계))에
+  `WorkSequenceList`(공사 작업 순서표), `FixedExpensePanel`(고정지출 지정 거래처·카테고리·후보), `RecentTransactionsTable`(대시보드 최근 등록 거래), `SortableSimpleTable`(보고서 분기별·월별 손익·매출처별 집계), `SqlStatusTable`(백업 화면 SQL 실행 상태))에
   이 패턴이 적용돼 있음 — 새 표를 추가할 때 이 목록도 같이 업데이트할 것.
   (예외: `DailyWorkerUsageStatementTable`은 세무사 제출용 사용내역서 문서라
   근로자별 연속일 소계 순서가 고정돼야 해서 임의 정렬을 지원하지 않음 —
@@ -158,6 +158,9 @@
   백업(`lib/backup.ts`)도 표마다 고유 칸 순으로 끝까지 읽음 — 예전엔 한 번에 `select`해서 백업 파일이 표마다 1,000줄에서
   잘렸음(복원은 다 지우고 파일 내용만 넣어서 나머지가 영구히 사라짐). 백업에 새 표를 넣으면 고유 칸(`id`, 없으면 `ORDER_KEY`)을
   확인하고, 복원은 `restoreBlockReason`(잘린·손상 파일 막기)을 거치게 둘 것.
+- **새 SQL을 만들면 `lib/sqlStatus.ts`의 `SQL_ITEMS`에도 한 줄**(그 SQL이 만든 표나 칸 하나 — 백업 화면 "SQL 실행 상태"가 1줄씩 읽어
+  보고 실행됐는지 보여 줌, 11/7). 실행 전엔 기능을 숨기는 방식이라 사용자가 안 돌린 SQL을 여기서 찾음. 표·칸을 안 만드는 SQL(정책·함수만)은
+  확인할 수 없어 목록에 없음(084·091).
 - **새 표를 만들면 백업·복원 목록에 같이 넣을 것**: `lib/backup.ts`의 `BACKUP_TABLES` + `supabase/096_atomic_restore.sql`의
   `restore_allowed_tables()`(새 SQL에서 함수를 다시 만들어 목록 추가 — `restore.test.ts`가 앱 목록과 비교). 예전엔 공사 메모·일용직
   사용내역 등이 빠져 있어 백업으로 못 되살렸고, 복원 때 프로젝트·일용직을 지우면서 같이 지워졌음. 복원은 DB 함수
@@ -187,7 +190,8 @@
   정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
   해 잠금 불러오기(`yearLock`), 오래된 외상매출금(`receivableAging`), 이번 달 신고·납부 일정(`annualTasks`), 홈택스 세금계산서
   대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`), 메모 한 장 엑셀(`memoExport`), 공사 작업 순서
-  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내(`actionError`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`), 공구명세서 이름 [ ] 메모(`toolNameNote`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
+  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내(`actionError`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`), 공구명세서 이름 [ ] 메모(`toolNameNote`), 같은 날 순서·한 번에 넣는 줄의 등록 시각·넣은 순서 id(`entryOrder`), 목록 기본 순서(`listOrder`),
+  매입매출장 글자 검색(`ledgerSearch`), SQL 실행 상태(`sqlStatus`), 파일 저장 공간(`storageUsage`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
   (vitest는 npm 설치 오류로 못 씀 — 새 테스트 라이브러리를 넣지 말 것)
@@ -288,6 +292,25 @@
 - **11/2 사용자 요청**: 공사 메모는 메모 하나 = 한 줄 표(`ConstructionMemoList` — 내용은 한 줄 말줄임, 누르면 그 줄만 전체, 날짜는
   한국 시각). 공사 메모·품질관리 노하우·공구 메모는 항목마다 "엑셀"로 그 메모 하나만(`downloadMemoXlsx` + `lib/memoExport.ts` 항목 —
   "항목 | 내용" 두 칸, 긴 내용은 행을 나눠 다 보이게).
+- **목록 기본 순서·같은 날 순서**(11/7 사용자 요청 "목록 순서"·"순번", DB 변경 없음) — 처음 보이는 순서만 정하고 머리글 정렬은 그대로:
+  - 매입매출장·은행 거래·외상관리는 날짜 최신순, **같은 날은 나중에 등록한 것이 위**(예전엔 같은 날 안이 무작위 id 순이라 방금 넣은 거래가
+    가운데 끼었음). 서버 조회는 `.order("trans_date", desc).order("created_at", desc).order("id")`, 표의 날짜 머리글 정렬은 `compareEntry`로
+    같은 날 안도 같은 방향(`lib/entryOrder.ts`). 거래 목록을 새로 만들 때도 이 순서로.
+  - 한 번에 여러 줄 넣는 저장(엑셀 일괄 등록·여러 줄 거래 등록·통장 여러 건)은 DB가 한 요청의 모든 줄에 같은 등록 시각(now())을 넣어 순서가
+    사라짐 → `entryTimestamps`로 줄마다 1/1000초씩 다른 `created_at`을 넣음(최신이 위로 적힌 표면 거꾸로 — 그래야 장부에 표 순서 그대로).
+    여러 줄을 한 번에 넣는 저장을 새로 만들면 이것도. 이미 한 번에 넣은 예전 줄은 순서가 저장돼 있지 않아 되살릴 수 없음.
+  - 등록 시각 칸이 없고 저장 때 지우고 다시 넣는 표(공구명세서 품목)는 `orderedIds`(UUID v7 모양 — id 정렬 = 넣은 순서) — 예전엔 저장할
+    때마다 임의 추가 품목 순서가 섞였음.
+  - `lib/listOrder.ts`: 거래처·현장 = 이름 가나다순, 일용직 = 근무중 먼저 → 이름순, 직원 = 재직자 먼저(퇴사일이 지난 사람만 아래) →
+    사원번호순, 급여 이력 = 지급월 최신순 → 같은 달은 사원번호순, 공구명세서 이력 = 출장일 최신순(출장일 없으면 저장한 날 자리 — "최근 작성
+    15건" 고르기는 그대로 저장일 기준). 보고서 "프로젝트별 손익" = 프로젝트 번호 최신순(`compareProjectCodeDesc` — 예전엔 조회 순서가 없어
+    고칠 때마다 줄 위치가 바뀔 수 있었음).
+- **매입매출장 글자 검색**(11/7, 주소 `?q=`, `lib/ledgerSearch.ts`) — 고른 기간·필터 안에서 거래처·품목·메모1·2·프로젝트·카테고리(띄어 쓴
+  낱말은 모두, 띄어쓰기·대소문자 무시), 숫자만 적으면 합계 금액이 같은 거래도. 한 결제 묶음은 한 줄만 맞아도 묶음째. 상단 총 매입·매출액,
+  "필터된 전체 금액", 표, 엑셀, 인쇄, 수정 팝업 주소(`editHrefFor`·`redirectTo`)가 같은 검색을 씀 — 매입매출장 주소를 새로 만들면 q도 같이.
+  세무사 계정도 씀. 공구리스트 탭은 이력 표에 보이는 명세서·연 명세서·복사 원본의 품목만 읽음(예전엔 모든 명세서 품목을 매번).
+  백업 화면 "파일 저장 공간"(`lib/storageUsage.ts`)은 첨부(`attachments.file_size`) + 백업(`file_size_mb`) 합계 ÷ 무료 1GB — 저장소에
+  새 종류의 파일을 올리게 되면 여기에도 더할 것.
 - **공구명세서 이름칸의 [ ]**(11/5 사용자 요청 — 스페너처럼 여러 종류를 챙길 때 "스페너 [13·17·19mm]"): [ ] 안 글자는 화성·동희
   반입반출증(화면 미리보기·인쇄·엑셀)에서만 빠지고 괄호 밖 이름만(`lib/toolNameNote.ts`의 `printToolName`). 공구명세서는 화면·인쇄·엑셀
   모두(체크 없는 전체 보기·"반입반출증용만 표시" 둘 다) 이름 아래 [ ] 작은 글씨(긴 글자는 칸 안에서 줄바꿈, 엑셀은 이름 칸에 적은 그대로) —

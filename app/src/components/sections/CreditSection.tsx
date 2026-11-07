@@ -10,10 +10,11 @@ import { Card } from "@/components/ui/Card";
 import { fetchAllRows, fetchAllCreditPayments, fetchAllRowsIn } from "@/lib/supabaseFetchAll";
 import { hasPaymentGroupColumn } from "@/lib/paymentGroup";
 import { supplyOf } from "@/lib/vatBasis";
+import { newestFirst } from "@/lib/entryOrder";
 
 // 거래처별 이력에 쓰는 칸(외상 정산 판단·금액·부가세 제외 금액·표시).
 const VENDOR_HISTORY_COLUMNS =
-  "id, type, trans_date, payment_type, client_id, client_name_raw, item_name, needs_classification, sales_amount, sales_vat, purchase_amount, purchase_vat, tax_invoice_issued, clients(name), projects(name), payment_methods(name), expense_categories(*)";
+  "id, type, trans_date, created_at, payment_type, client_id, client_name_raw, item_name, needs_classification, sales_amount, sales_vat, purchase_amount, purchase_vat, tax_invoice_issued, clients(name), projects(name), payment_methods(name), expense_categories(*)";
 const RAW_NAME_CHUNK = 30;
 type NameRel = { name: string } | { name: string }[] | null;
 type VendorHistoryTx = Pick<
@@ -21,6 +22,7 @@ type VendorHistoryTx = Pick<
   | "id"
   | "type"
   | "trans_date"
+  | "created_at"
   | "payment_type"
   | "client_id"
   | "client_name_raw"
@@ -46,7 +48,9 @@ export async function CreditSection() {
         .from("transactions")
         .select("*, clients(name), projects(name), expense_categories(*)")
         .eq("payment_type", "credit")
+        // 같은 날짜 안은 나중에 등록한 것이 위(lib/entryOrder.ts)
         .order("trans_date", { ascending: false })
+        .order("created_at", { ascending: false })
         .order("id", { ascending: true })
         .range(from, to)
     ),
@@ -126,9 +130,8 @@ export async function CreditSection() {
       RAW_NAME_CHUNK
     ),
   ]);
-  const vendorAllTx = [...vendorAllTxById, ...vendorAllTxByName].sort(
-    (a, b) => b.trans_date.localeCompare(a.trans_date) || a.id.localeCompare(b.id)
-  );
+  // 날짜 최신순, 같은 날은 나중에 등록한 것이 위(lib/entryOrder.ts — 매입매출장과 같은 순서)
+  const vendorAllTx = [...vendorAllTxById, ...vendorAllTxByName].sort(newestFirst);
 
   const vendorGroupMap = new Map<string, VendorHistoryGroup>();
   for (const tx of vendorAllTx) {

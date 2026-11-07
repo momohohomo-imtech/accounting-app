@@ -25,7 +25,9 @@ import { monthRange } from "@/lib/dateRange";
 import { isLedgerVisible } from "@/lib/credit";
 import type { CreditPayment, Transaction } from "@/lib/types";
 import { fetchAllRows, fetchAllData, fetchAllRowsIn } from "@/lib/supabaseFetchAll";
-import { hasPaymentGroupColumn } from "@/lib/paymentGroup";
+import { groupLedgerRows, hasPaymentGroupColumn } from "@/lib/paymentGroup";
+import { applyLedgerSearch } from "@/lib/ledgerSearch";
+import { LedgerSearchBox } from "@/components/LedgerSearchBox";
 import { LedgerCheckSection } from "@/components/sections/LedgerCheckSection";
 import { getCurrentRole } from "@/lib/currentRole";
 import { isYearLocked, loadLockedYears, type LockedYear } from "@/lib/yearLock";
@@ -57,9 +59,10 @@ export default async function TransactionsPage({
     showCategory?: string;
     showItem?: string;
     showMemo?: string;
+    q?: string;
   }>;
 }) {
-  const { tab, year, month, type, project_id, payment_method_id, editTx, showProject, showCategory, showItem, showMemo } =
+  const { tab, year, month, type, project_id, payment_method_id, editTx, showProject, showCategory, showItem, showMemo, q } =
     await searchParams;
   // 세무사 계정은 매입매출장(매입매출 목록)만 — 다른 탭·등록·수정 없이 읽기만(사용자 요청 10/28, 미들웨어에서도 막음).
   const ledgerOnly = (await getCurrentRole()) === "tax_agent";
@@ -74,12 +77,13 @@ export default async function TransactionsPage({
     if (type) p.set("type", type);
     if (project_id) p.set("project_id", project_id);
     if (payment_method_id) p.set("payment_method_id", payment_method_id);
+    if (q?.trim()) p.set("q", q.trim());
     const qs = p.toString();
     return qs ? `/transactions?${qs}` : "/transactions";
   })();
 
   const totals =
-    active === "list" ? await fetchTransactionTotals({ year, month, type, project_id, payment_method_id }) : null;
+    active === "list" ? await fetchTransactionTotals({ year, month, type, project_id, payment_method_id, q }) : null;
 
   return (
     <div className="space-y-6">
@@ -116,6 +120,7 @@ export default async function TransactionsPage({
           type={type}
           project_id={project_id}
           payment_method_id={payment_method_id}
+          q={q}
           showProject={showProject}
           showCategory={showCategory}
           showItem={showItem}
@@ -156,7 +161,9 @@ const loadLedgerTransactions = cache(
         .select("*, clients(name), projects(name), payment_methods(*), expense_categories(*)")
         .gte("trans_date", start)
         .lte("trans_date", end)
+        // 같은 날짜 안은 나중에 등록한 것이 위(lib/entryOrder.ts — 화면 표·엑셀 순서)
         .order("trans_date", { ascending: false })
+        .order("created_at", { ascending: false })
         .order("id", { ascending: true })
         .range(from, to);
       if (type) q = q.eq("type", type);
@@ -193,18 +200,22 @@ async function fetchTransactionTotals({
   type,
   project_id,
   payment_method_id,
+  q,
 }: {
   year?: string;
   month?: string;
   type?: string;
   project_id?: string;
   payment_method_id?: string;
+  q?: string;
 }) {
   const { year: currentYear, month: currentMonth } = nowKst();
   const selectedYear = year ? Number(year) : currentYear;
   const selectedMonth = month ?? "current";
   const { start, end } = monthRange(selectedYear, selectedMonth, currentMonth);
-  const { rows: visible } = await loadLedgerTransactions(start, end, type ?? "", project_id ?? "", payment_method_id ?? "");
+  const { rows } = await loadLedgerTransactions(start, end, type ?? "", project_id ?? "", payment_method_id ?? "");
+  // 글자 검색(?q=)을 했으면 상단 합계도 검색된 거래만(목록과 같게, lib/ledgerSearch.ts)
+  const visible = applyLedgerSearch(rows, q);
 
   return {
     purchase: visible.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0),
@@ -218,6 +229,7 @@ async function TransactionListSection({
   type,
   project_id,
   payment_method_id,
+  q,
   showProject,
   showCategory,
   showItem,
@@ -229,6 +241,7 @@ async function TransactionListSection({
   type?: string;
   project_id?: string;
   payment_method_id?: string;
+  q?: string;
   showProject?: string;
   showCategory?: string;
   showItem?: string;
@@ -251,7 +264,7 @@ async function TransactionListSection({
   const { start, end } = monthRange(selectedYear, selectedMonth, currentMonth);
 
   const [
-    { rows: transactions, paidDateById },
+    { rows: periodTransactions, paidDateById },
     { data: projectTree },
     { data: latestTx },
     { data: importClients },
@@ -285,9 +298,13 @@ async function TransactionListSection({
     ),
   ]);
   const yearLocked = isYearLocked(locks.years, selectedYear);
+  // 글자 검색(?q=, 11/7) — 고른 기간·필터의 거래 안에서 거래처·품목·메모 등으로 거름(한 결제 묶음은 묶음째)
+  const searchText = q?.trim() ?? "";
+  const transactions = applyLedgerSearch(periodTransactions, searchText);
+  const shownRowCount = groupLedgerRows(transactions).length;
 
   // 092 SQL 실행 전에는 거래에 묶음 번호 칸이 없음 → 묶기 버튼을 숨김(거래가 없으면 고를 것도 없어서 상관없음).
-  const groupingReady = hasPaymentGroupColumn(transactions);
+  const groupingReady = hasPaymentGroupColumn(periodTransactions);
 
   const filteredNetTotal = transactions.reduce(
     (s, t) => s + (t.type === "매출" ? t.sales_amount + t.sales_vat : -(t.purchase_amount + t.purchase_vat)),
@@ -319,6 +336,7 @@ async function TransactionListSection({
       project_id: project_id ?? "",
       payment_method_id: payment_method_id ?? "",
     });
+    if (searchText) p.set("q", searchText);
     if (value) p.set(key, value);
     else p.delete(key);
     return `/transactions?${p.toString()}`;
@@ -343,6 +361,7 @@ async function TransactionListSection({
             </Pill>
           ))}
         </div>
+        <LedgerSearchBox key={searchText} initial={searchText} />
         <TransactionExportButtons transactions={transactions as Transaction[]} />
         {!readOnly && (
           <div className="min-w-[16rem] max-w-2xl flex-1 print:hidden">
@@ -370,6 +389,11 @@ async function TransactionListSection({
           {formatWon(Math.abs(filteredNetTotal))}
         </span>
         {" (매출 +, 매입 -)"}
+        {searchText && (
+          <span className="ml-2 font-medium text-slate-800">
+            · 검색 &ldquo;{searchText}&rdquo; {shownRowCount.toLocaleString("ko-KR")}건
+          </span>
+        )}
       </p>
 
       <Card>
@@ -379,7 +403,8 @@ async function TransactionListSection({
           clients={importClients ?? []}
           categories={importExpenseCategories ?? []}
           paymentMethods={importPaymentMethods ?? []}
-          listParams={{ year: selectedYear, month: selectedMonth, type: type ?? "", project_id: project_id ?? "" }}
+          listParams={{ year: selectedYear, month: selectedMonth, type: type ?? "", project_id: project_id ?? "", q: searchText }}
+          emptyText={searchText ? `“${searchText}” 검색에 맞는 거래가 없습니다.` : undefined}
           groupingReady={groupingReady}
           paidDateById={paidDateById}
           readOnly={readOnly}
