@@ -4,6 +4,7 @@ import { EntityTable } from "@/components/crud/EntityTable";
 import { createClientRecord, updateClientRecord, deleteClientRecord } from "@/lib/actions/clients";
 import type { FieldConfig } from "@/components/crud/types";
 import { fetchAllData } from "@/lib/supabaseFetchAll";
+import { byName } from "@/lib/listOrder";
 
 export async function ClientsSection({ showHeading = true }: { showHeading?: boolean } = {}) {
   const supabase = await createClient();
@@ -62,9 +63,10 @@ export async function ClientsSection({ showHeading = true }: { showHeading?: boo
       {showHeading && <h2 className="text-lg font-semibold text-slate-900">거래처</h2>}
       <CreatePanel title="거래처" fields={fields} createAction={createClientRecord} />
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        {/* 기본 순서 = 거래처명 가나다순(11/7 — 이름으로 찾는 목록, lib/listOrder.ts) */}
         <EntityTable
           fields={fields}
-          rows={clients ?? []}
+          rows={byName(clients ?? [])}
           updateAction={updateClientRecord}
           deleteAction={deleteClientRecord}
         />

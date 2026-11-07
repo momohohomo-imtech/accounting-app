@@ -8,6 +8,7 @@ import { deleteToolChecklist } from "@/lib/actions/toolChecklists";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { compareToolChecklistDay } from "@/lib/listOrder";
 
 type HistoryRow = {
   id: string;
@@ -54,7 +55,8 @@ function DeleteButton({ id }: { id: string }) {
 }
 
 export function ToolChecklistHistoryTable({ rows }: { rows: HistoryRow[] }) {
-  const [sortKey, setSortKey] = useState<SortKey>("created_at");
+  // 기본 순서 = 출장일 최신순(11/7 사용자 결정 — 출장일이 없으면 저장한 날 자리, 같은 날은 나중에 저장한 것이 위)
+  const [sortKey, setSortKey] = useState<SortKey>("trip_date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   function handleSort(key: SortKey) {
@@ -69,6 +71,10 @@ export function ToolChecklistHistoryTable({ rows }: { rows: HistoryRow[] }) {
   const sorted = useMemo(() => {
     const copy = [...rows];
     copy.sort((a, b) => {
+      if (sortKey === "trip_date") {
+        const cmp = compareToolChecklistDay(a, b);
+        return sortDir === "asc" ? cmp : -cmp;
+      }
       const va = a[sortKey];
       const vb = b[sortKey];
       const cmp =

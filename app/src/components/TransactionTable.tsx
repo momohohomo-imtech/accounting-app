@@ -15,6 +15,7 @@ import {
 import { formatWon, formatDate } from "@/lib/format";
 import { transactionTotal } from "@/lib/credit";
 import { dateSpan, groupKindLabel, groupLedgerRows, sameCommonFields, sortGroupLines, summaryLabel } from "@/lib/paymentGroup";
+import { compareEntry } from "@/lib/entryOrder";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import { paymentMethodColorStyle } from "@/lib/paymentMethodColors";
 import { Badge } from "@/components/ui/Badge";
@@ -133,6 +134,7 @@ export function TransactionTable({
   categories,
   paymentMethods,
   listParams,
+  emptyText,
   showProject = true,
   showCategory = true,
   showItem = true,
@@ -146,7 +148,9 @@ export function TransactionTable({
   clients: { id: string; name: string }[];
   categories: { id: string; name: string }[];
   paymentMethods: { id: string; name: string; text_color?: string | null; background_color?: string | null }[];
-  listParams: { year: number; month: string; type: string; project_id: string };
+  listParams: { year: number; month: string; type: string; project_id: string; q?: string };
+  // 거래가 없을 때 문구(글자 검색 중이면 "검색에 맞는 거래가 없습니다")
+  emptyText?: string;
   showProject?: boolean;
   showCategory?: boolean;
   showItem?: boolean;
@@ -173,6 +177,8 @@ export function TransactionTable({
       project_id: listParams.project_id,
       editTx: id,
     });
+    // 글자 검색 중이면 수정 팝업 뒤 목록도 검색된 그대로(닫으면 뒤로 가기라 검색이 남음)
+    if (listParams.q) p.set("q", listParams.q);
     return `/transactions?${p.toString()}`;
   }
 
@@ -310,7 +316,9 @@ export function TransactionTable({
     copy.sort((a, b) => {
       const va = sortValue(a.head, sortKey);
       const vb = sortValue(b.head, sortKey);
-      const cmp = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb));
+      let cmp = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb));
+      // 같은 날짜 안은 등록 순서 — 날짜 정렬과 같은 방향(최신순이면 나중에 등록한 것이 위, lib/entryOrder.ts)
+      if (cmp === 0 && sortKey === "trans_date") cmp = compareEntry(a.head, b.head);
       return sortDir === "asc" ? cmp : -cmp;
     });
     return copy;
@@ -899,7 +907,9 @@ export function TransactionTable({
               </Fragment>
             );
           })}
-          {sorted.length === 0 && <EmptyRow colSpan={COLUMNS.length + (readOnly ? 0 : 2)}>거래 내역이 없습니다.</EmptyRow>}
+          {sorted.length === 0 && (
+            <EmptyRow colSpan={COLUMNS.length + (readOnly ? 0 : 2)}>{emptyText ?? "거래 내역이 없습니다."}</EmptyRow>
+          )}
         </tbody>
       </Table>
     </div>

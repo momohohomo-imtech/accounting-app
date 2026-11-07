@@ -12,11 +12,13 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { MatchedClientField } from "@/components/MatchedClientField";
 import { MoneyInput } from "@/components/ui/MoneyInput";
+import { compareEntry } from "@/lib/entryOrder";
 
 type BankTxRow = {
   id: string;
   bank_account_id: string;
   trans_date: string;
+  created_at?: string | null;
   direction: string;
   description: string | null;
   amount: number;
@@ -93,7 +95,9 @@ export function BankTransactionTable({
     copy.sort((a, b) => {
       const va = sortValue(a, sortKey);
       const vb = sortValue(b, sortKey);
-      const cmp = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb));
+      let cmp = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb));
+      // 같은 날짜 안은 등록 순서 — 날짜 정렬과 같은 방향(lib/entryOrder.ts). 처음 화면은 서버가 같은 순서로 줌.
+      if (cmp === 0 && sortKey === "trans_date") cmp = compareEntry(a, b);
       return sortDir === "asc" ? cmp : -cmp;
     });
     return copy;

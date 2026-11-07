@@ -53,6 +53,7 @@ import { purchaseCostOf, salesSupplyOf, supplyOf, vatOf } from "@/lib/vatBasis";
 import type { WorkLog } from "@/lib/types";
 import { nowKst } from "@/lib/kstDate";
 import { effectiveStatus, fixedCostOutlook, projectBasedProfit, projectGroups } from "@/lib/projectProfit";
+import { compareProjectCodeDesc } from "@/lib/projectCode";
 import { receivableOf, receivedSalesByProject } from "@/lib/expectedReceivable";
 import { categoryReportHref } from "@/lib/reportLinks";
 
@@ -363,7 +364,9 @@ export default async function ReportsPage({
     const r = receivableOf(group, agencyByProject, receivedByProject);
     return r && r.quote > 0 ? r.amount : null;
   };
-  const byProjectAll = (projects ?? []).map((p) => {
+  // 기본 순서 = 프로젝트 번호 최신순(프로젝트 목록·거래 등록 선택 목록과 같게 — 예전엔 조회 순서가 정해지지 않아 프로젝트를 고치면
+  // 줄 위치가 바뀔 수 있었음, 11/7). 머리글을 누르면 그 칸으로 정렬.
+  const byProjectAll = [...(projects ?? [])].sort((a, b) => compareProjectCodeDesc(a.project_code, b.project_code)).map((p) => {
     const rows = projectTx.filter((t) => t.project_id === p.id);
     // 손익은 부가세 제외 기준 — 발주액·대행구매액이 부가세 제외라 매출·매입도 공급가로 맞춘다
     // (총액을 부가세 포함으로 보고 ÷1.1, 인건비 등 비과세 카테고리는 총액 그대로 — lib/vatBasis.ts).

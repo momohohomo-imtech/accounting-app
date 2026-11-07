@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { orderedIds } from "@/lib/entryOrder";
 
 export async function createToolChecklist(formData: FormData) {
   const supabase = await createClient();
@@ -28,7 +29,10 @@ export async function createToolChecklist(formData: FormData) {
     .single();
   if (error || !checklist) return { error: error?.message ?? "저장 중 오류가 발생했습니다." };
 
+  // 품목 id는 넣은 순서대로 정렬되는 값(lib/entryOrder.ts) — 다시 열어도 임의 추가 품목이 적은 순서대로 나오게(11/7).
+  const itemIds = orderedIds(toolIds.length, Date.now());
   const items = toolIds.map((id, i) => ({
+    id: itemIds[i],
     checklist_id: checklist.id,
     tool_id: id || null,
     tool_name: toolNames[i] ?? "",
@@ -44,8 +48,8 @@ export async function createToolChecklist(formData: FormData) {
 }
 
 // 기존 체크리스트의 제목/프로젝트/출장일/품목을 수정 — 작업일지 날짜별 저장과 동일하게
-// 품목은 항상 "전부 지우고 다시 insert" 방식(부분 수정보다 단순하고, 그룹 묶기/순서
-// 문제도 없음).
+// 품목은 항상 "전부 지우고 다시 insert" 방식(부분 수정보다 단순하고, 그룹 묶기 문제도 없음 — 줄 순서는 넣은 순서대로 정렬되는
+// id로 남김).
 export async function updateToolChecklist(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("id") ?? "");
@@ -72,7 +76,10 @@ export async function updateToolChecklist(formData: FormData) {
   const { error: deleteError } = await supabase.from("tool_checklist_items").delete().eq("checklist_id", id);
   if (deleteError) return { error: deleteError.message };
 
+  // 품목 id는 넣은 순서대로 정렬되는 값(lib/entryOrder.ts) — 예전엔 무작위 id라 저장할 때마다 임의 추가 품목 순서가 섞였음(11/7).
+  const itemIds = orderedIds(toolIds.length, Date.now());
   const items = toolIds.map((toolId, i) => ({
+    id: itemIds[i],
     checklist_id: id,
     tool_id: toolId || null,
     tool_name: toolNames[i] ?? "",

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { deleteBlockReason, deleteErrorMessage, BANK_ACCOUNT_LINKS } from "@/lib/deleteGuard";
+import { entryTimestamps } from "@/lib/entryOrder";
 
 function parseAccount(formData: FormData) {
   return {
@@ -92,7 +93,9 @@ export async function createBankTransactionsBulk(formData: FormData) {
     return { error: "계좌와 금액을 모두 입력해주세요." };
   }
 
-  const inserts = rows.map((r) => ({ ...r, trans_date: transDate }));
+  // 한 번에 넣는 줄은 DB가 모두 같은 등록 시각을 넣어 순서가 사라짐 → 줄마다 1/1000초씩 다르게(적은 순서대로, lib/entryOrder.ts).
+  const stamps = entryTimestamps(rows.map(() => transDate), Date.now());
+  const inserts = rows.map((r, i) => ({ ...r, trans_date: transDate, ...(rows.length > 1 ? { created_at: stamps[i] } : {}) }));
   const { error } = await supabase.from("bank_transactions").insert(inserts);
   if (error) return { error: error.message };
 
