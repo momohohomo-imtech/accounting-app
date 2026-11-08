@@ -10,10 +10,13 @@ export function MemoCreateForm({
   createAction,
   hasCategory,
   defaultCategory,
+  categoryNames,
 }: {
   createAction: (formData: FormData) => unknown;
   hasCategory: boolean;
   defaultCategory?: string;
+  /** 구분 고르기 목록(구분 목록 순서) */
+  categoryNames: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +47,7 @@ export function MemoCreateForm({
         }}
         className="space-y-3"
       >
-        {hasCategory && <MemoCategorySelect defaultValue={defaultCategory} />}
+        {hasCategory && <MemoCategorySelect defaultValue={defaultCategory} categoryNames={categoryNames} />}
         <div className="flex flex-col gap-1">
           <label className={labelClass}>제목</label>
           <input name="title" required autoFocus className={fieldClass} />

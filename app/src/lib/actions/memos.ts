@@ -2,18 +2,19 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { isMemoCategory, MEMO_UNCATEGORIZED } from "@/lib/memoCategories";
+import { MEMO_CATEGORY_MAX_LENGTH, MEMO_UNCATEGORIZED, normalizeMemoCategoryName } from "@/lib/memoCategories";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
 
-// 구분(category)은 085 SQL 실행 후에만 폼에 나옴 — 폼에 칸이 없으면 아예 건드리지 않는다.
+// 구분(category)은 085 SQL 실행 후에만 폼에 나옴 — 폼에 칸이 없으면 아예 건드리지 않는다. 구분 목록은 lib/memoCategories.ts(104 SQL).
 function parse(formData: FormData) {
   const row: { title: string; content: string; category?: string | null } = {
     title: String(formData.get("title") ?? ""),
     content: String(formData.get("content") ?? ""),
   };
   if (formData.has("category")) {
-    const category = String(formData.get("category") ?? "");
-    row.category = isMemoCategory(category) ? category : null;
+    // 구분 이름 그대로(104 SQL부터 사용자가 만든 구분도 — 선택 칸이 구분 목록에서만 고르게 함). 104 실행 전엔 DB 제약이 5개만 받음.
+    const category = normalizeMemoCategoryName(String(formData.get("category") ?? "")).slice(0, MEMO_CATEGORY_MAX_LENGTH);
+    row.category = category || null;
   }
   return row;
 }
@@ -65,7 +66,7 @@ export async function moveMemoRecord(formData: FormData) {
     memos = await fetchAllRows<{ id: string; sort_order: number }>((from, to) => {
       let query = supabase.from("memos").select("id, sort_order");
       if (scope === MEMO_UNCATEGORIZED) query = query.is("category", null);
-      else if (scope && isMemoCategory(scope)) query = query.eq("category", scope);
+      else if (scope) query = query.eq("category", scope);
       return query.order("sort_order").order("created_at", { ascending: false }).order("id").range(from, to);
     });
   } catch (err) {

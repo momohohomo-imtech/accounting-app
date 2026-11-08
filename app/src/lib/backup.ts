@@ -55,6 +55,8 @@ export const BACKUP_TABLES = [
   // 098 SQL — 공사 작업 순서(순서표·단계)
   "work_sequences",
   "work_sequence_steps",
+  // 104 SQL — 메모장 구분 목록(이름·색·순서). 메모에는 구분 이름이 글자로 들어 있어 이 표가 없는 예전 백업도 그대로 복원됨.
+  "memo_categories",
 ];
 
 // 표마다 겹치지 않게 나눠 받을 고유 칸(대부분 id).
