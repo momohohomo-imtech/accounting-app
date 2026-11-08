@@ -191,7 +191,8 @@
   해 잠금 불러오기(`yearLock`), 오래된 외상매출금(`receivableAging`), 이번 달 신고·납부 일정(`annualTasks`), 홈택스 세금계산서
   대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`), 메모 한 장 엑셀(`memoExport`), 공사 작업 순서
   일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내(`actionError`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`), 공구명세서 이름 [ ] 메모(`toolNameNote`), 같은 날 순서·한 번에 넣는 줄의 등록 시각·넣은 순서 id(`entryOrder`), 목록 기본 순서(`listOrder`),
-  매입매출장 글자 검색(`ledgerSearch`), SQL 실행 상태(`sqlStatus`), 파일 저장 공간(`storageUsage`)의 검사가 `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
+  매입매출장 글자 검색(`ledgerSearch`), SQL 실행 상태(`sqlStatus`), 파일 저장 공간(`storageUsage`), 메모장 구분(`memoCategories`)의 검사가
+  `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
   (vitest는 npm 설치 오류로 못 씀 — 새 테스트 라이브러리를 넣지 말 것)
@@ -311,6 +312,13 @@
   세무사 계정도 씀. 공구리스트 탭은 이력 표에 보이는 명세서·연 명세서·복사 원본의 품목만 읽음(예전엔 모든 명세서 품목을 매번).
   백업 화면 "파일 저장 공간"(`lib/storageUsage.ts`)은 첨부(`attachments.file_size`) + 백업(`file_size_mb`) 합계 ÷ 무료 1GB — 저장소에
   새 종류의 파일을 올리게 되면 여기에도 더할 것.
+- **메모장 구분**(11/8 사용자 요청 "구분을 추가·수정할 수 있게", 104 SQL `memo_categories` — 이름·색·순서, 사용자 결정 "구분 관리 칸" +
+  "메모가 남은 구분은 삭제 막기"): 메모에는 구분 이름(글자)이 그대로 저장되고 목록은 메모장 "구분 관리"(지출카테고리처럼 `CreatePanel` +
+  `EntityTable`, `lib/actions/memoCategories.ts`)에서 추가·이름/색/순서 바꾸기·삭제. 이름 바꾸기는 DB 함수 `rename_memo_category`로 구분과 그
+  구분의 메모를 한 번에(앱에서 두 번에 나눠 바꾸지 말 것 — 중간에 실패하면 어긋남, 메모 수정일은 안 바뀜). 메모가 남은 구분은 삭제를 막고 몇
+  개인지 안내(확인 조회가 실패하면 지우지 않음). 목록에 없는 구분 이름이 메모에 남아 있으면(예전 백업 복원 등) 탭·고르기 칸에 그대로 보여 줌
+  (`memoCategoryTabs` — 메모가 숨거나 저장 때 미분류로 바뀌지 않게). 104 실행 전엔 고정 5개(`DEFAULT_MEMO_CATEGORIES` = 085 제약)로 동작하고
+  구분 관리 칸은 숨김. 색은 `MEMO_CATEGORY_COLORS`(이름은 `EntityTable` 점 색과 같게, 배지는 예전 5개 색 그대로) — `lib/memoCategories.ts`.
 - **공구명세서 이름칸의 [ ]**(11/5 사용자 요청 — 스페너처럼 여러 종류를 챙길 때 "스페너 [13·17·19mm]"): [ ] 안 글자는 화성·동희
   반입반출증(화면 미리보기·인쇄·엑셀)에서만 빠지고 괄호 밖 이름만(`lib/toolNameNote.ts`의 `printToolName`). 공구명세서는 화면·인쇄·엑셀
   모두(체크 없는 전체 보기·"반입반출증용만 표시" 둘 다) 이름 아래 [ ] 작은 글씨(긴 글자는 칸 안에서 줄바꿈, 엑셀은 이름 칸에 적은 그대로) —

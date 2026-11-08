@@ -6,7 +6,7 @@ import { fieldClass, labelClass } from "@/components/ui/field";
 import { Button } from "@/components/ui/Button";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { MemoCategorySelect } from "@/components/MemoCategorySelect";
-import { MEMO_UNCATEGORIZED, memoCategoryBadge } from "@/lib/memoCategories";
+import { MEMO_UNCATEGORIZED, memoCategoryBadge, type MemoCategory } from "@/lib/memoCategories";
 
 type Memo = { id: string; title: string; content: string | null; category?: string | null; created_at: string; updated_at: string };
 
@@ -19,9 +19,12 @@ export function MemoCard({
   moveAction,
   hasCategory = false,
   moveScope,
+  categories = [],
 }: {
   memo: Memo;
   hasCategory?: boolean;
+  /** 구분 목록(배지 색·고르기 목록) — lib/memoCategories.ts */
+  categories?: MemoCategory[];
   /** 구분 탭으로 걸러 보는 중이면 그 구분 — 순서 이동을 그 안에서 한다. */
   moveScope?: string | null;
   isFirst: boolean;
@@ -73,7 +76,7 @@ export function MemoCard({
           className="space-y-3"
         >
           <input type="hidden" name="id" value={memo.id} />
-          {hasCategory && <MemoCategorySelect defaultValue={memo.category} />}
+          {hasCategory && <MemoCategorySelect defaultValue={memo.category} categoryNames={categories.map((c) => c.name)} />}
           <div className="flex flex-col gap-1">
             <label className={labelClass}>제목</label>
             <input name="title" defaultValue={memo.title} required className={fieldClass} />
@@ -147,7 +150,7 @@ export function MemoCard({
           </span>
           {hasCategory && (
             <span
-              className={`shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium ${memoCategoryBadge(memo.category)}`}
+              className={`shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium ${memoCategoryBadge(memo.category, categories)}`}
             >
               {memo.category ?? MEMO_UNCATEGORIZED}
             </span>

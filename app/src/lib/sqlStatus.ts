@@ -65,6 +65,7 @@ export const SQL_ITEMS: SqlItem[] = [
   { file: "101", feature: "거래처 고정지출 지정", probes: [{ kind: "column", table: "clients", column: "is_fixed_expense" }] },
   { file: "102", feature: "카테고리 고정지출 지정", probes: [{ kind: "column", table: "expense_categories", column: "is_fixed_expense" }] },
   { file: "103", feature: "작업 순서표 메모", probes: [{ kind: "column", table: "work_sequences", column: "memo" }] },
+  { file: "104", feature: "메모장 구분 추가·수정", probes: [{ kind: "table", table: "memo_categories", column: "id" }] },
 ];
 
 const MISSING_TABLE = new Set(["PGRST205", "42P01"]);
