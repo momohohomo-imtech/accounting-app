@@ -191,7 +191,8 @@
   해 잠금 불러오기(`yearLock`), 오래된 외상매출금(`receivableAging`), 이번 달 신고·납부 일정(`annualTasks`), 홈택스 세금계산서
   대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`), 메모 한 장 엑셀(`memoExport`), 공사 작업 순서
   일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내(`actionError`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`), 공구명세서 이름 [ ] 메모(`toolNameNote`), 같은 날 순서·한 번에 넣는 줄의 등록 시각·넣은 순서 id(`entryOrder`), 목록 기본 순서(`listOrder`),
-  매입매출장 글자 검색(`ledgerSearch`), SQL 실행 상태(`sqlStatus`), 파일 저장 공간(`storageUsage`), 메모장 구분(`memoCategories`)의 검사가
+  매입매출장 글자 검색(`ledgerSearch`), SQL 실행 상태(`sqlStatus`), 파일 저장 공간(`storageUsage`), 메모장 구분(`memoCategories`), 거래 일괄
+  변경 나눠 바꾸기(`bulkUpdate`)·일괄 변경 칸(`transactionBulkEdit`)의 검사가
   `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
@@ -319,6 +320,13 @@
   개인지 안내(확인 조회가 실패하면 지우지 않음). 목록에 없는 구분 이름이 메모에 남아 있으면(예전 백업 복원 등) 탭·고르기 칸에 그대로 보여 줌
   (`memoCategoryTabs` — 메모가 숨거나 저장 때 미분류로 바뀌지 않게). 104 실행 전엔 고정 5개(`DEFAULT_MEMO_CATEGORIES` = 085 제약)로 동작하고
   구분 관리 칸은 숨김. 색은 `MEMO_CATEGORY_COLORS`(이름은 `EntityTable` 점 색과 같게, 배지는 예전 5개 색 그대로) — `lib/memoCategories.ts`.
+- **거래 일괄 변경**(11/11 사용자 요청 "보고서에서 보는 내역들을 선택 후 카테고리·품목·프로젝트·거래처 등 일괄 수정", 사용자 결정 "매입·매출
+  거래만"): 매입매출장과 보고서 내역 표(거래처·카테고리·현장 내역 팝업, 매입 품목 검색, 프로젝트 분류 대기, 프로젝트 보고서·통합 보고서
+  매입내역)는 같은 일괄 변경 칸(`TransactionBulkEditBar` — 보고서는 체크했을 때 선택 목록을 불러오고 바꾸기 전 확인창을 띄우는
+  `ReportBulkEditBar`)과 같은 저장(`bulkUpdate*` → `lib/bulkUpdate.ts`의 `updateInChunks`: 100개씩 나눠 바꾸고 바뀐 줄 수 확인 — 모자라면 안내)을
+  씀. 금액·날짜는 바꾸지 않음. 체크칸은 관리자·직원만, 대행구매 줄(따로 저장되는 표)은 체크칸 없음, 바꾸는 건 보이는(필터·검색된) 줄 중 체크한
+  것만(`lib/useRowSelection.ts`), 체크칸·일괄 변경 칸은 인쇄에 안 나옴. 거래 내역 표를 새로 만들면 이 칸을 붙이고, 체크칸을 첫 칸에 두면 표에
+  `sticky-col-table` + 알아보기 쉬운 칸에 `sticky-col`. 선택 목록·확인 문구 계산은 `lib/transactionBulkEdit.ts`.
 - **공구명세서 이름칸의 [ ]**(11/5 사용자 요청 — 스페너처럼 여러 종류를 챙길 때 "스페너 [13·17·19mm]"): [ ] 안 글자는 화성·동희
   반입반출증(화면 미리보기·인쇄·엑셀)에서만 빠지고 괄호 밖 이름만(`lib/toolNameNote.ts`의 `printToolName`). 공구명세서는 화면·인쇄·엑셀
   모두(체크 없는 전체 보기·"반입반출증용만 표시" 둘 다) 이름 아래 [ ] 작은 글씨(긴 글자는 칸 안에서 줄바꿈, 엑셀은 이름 칸에 적은 그대로) —

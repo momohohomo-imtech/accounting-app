@@ -36,6 +36,7 @@ import {
 import type { WorkLogTitleRow } from "@/lib/workLogSummary";
 import { ProjectTripDetailTable } from "@/components/ProjectTripDetailTable";
 import { ProjectReceiptsTable } from "@/components/ProjectReceiptsTable";
+import { getCurrentRole } from "@/lib/currentRole";
 
 // ownOnly: 귀속 하위가 있는 어미 프로젝트를 하위 없이 자기 것만(프로젝트 목록에서 묶음을 펼친 어미 줄의 "보고서").
 export async function ProjectProfitReport({
@@ -50,6 +51,9 @@ export async function ProjectProfitReport({
   const supabase = await createClient();
   const { data: project } = await supabase.from("projects").select("*, sites(name)").eq("id", projectId).single();
   if (!project) return null;
+  // 매입내역 체크칸·일괄 변경(11/11) — 바꿀 수 있는 관리자·직원만(역할 조회는 한 요청에 한 번 — 레이아웃과 같이 씀)
+  const role = await getCurrentRole();
+  const canBulkEdit = role === "admin" || role === "staff";
 
   const siteName = (one(project.sites) as { name: string } | undefined)?.name;
   const { data: parentProject } = project.parent_project_id
@@ -530,6 +534,7 @@ export async function ProjectProfitReport({
       <CollapsibleSection title="매입내역 · 대행구매액" defaultOpen printAlways bare className="order-2 print:order-3">
         <div className="space-y-4">
           <ProjectPurchaseTable
+            canEdit={canBulkEdit}
             rows={purchaseRowsRaw.map((t) => {
               const category = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
               return {

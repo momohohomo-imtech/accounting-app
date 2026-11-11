@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { remainingBalance } from "@/lib/credit";
 import { fetchAllRowsIn } from "@/lib/supabaseFetchAll";
 import { entryTimestamps } from "@/lib/entryOrder";
+import { updateInChunks } from "@/lib/bulkUpdate";
 import type { CreditPayment, Transaction } from "@/lib/types";
 
 // 거래가 바뀌면 금액이 보이는 모든 화면을 새로 그리게 한다.
@@ -313,68 +314,45 @@ export async function ungroupTransactions(formData: FormData) {
   revalidateLedgerPages();
 }
 
-export async function bulkUpdateProjectId(formData: FormData) {
-  const supabase = await createClient();
+// 일괄 변경(매입매출장·보고서 내역 표 — 11/11) — 고른 거래의 한 칸만 같은 값으로. 금액·날짜는 안 바꿈. 100개씩 나눠 바꾸고
+// 바뀐 줄 수를 확인(lib/bulkUpdate.ts) — 신고 끝난 해(097 SQL)의 거래처·카테고리는 DB가 막아서 그 안내가 그대로 보임.
+async function bulkUpdateTransactions(formData: FormData, patch: Record<string, unknown>) {
   const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
-  const projectId = String(formData.get("project_id") ?? "") || null;
   if (ids.length === 0) return { error: "선택된 거래가 없습니다." };
+  const supabase = await createClient();
+  const { error, changed } = await updateInChunks(ids, (chunk) =>
+    supabase.from("transactions").update(patch).in("id", chunk).select("id")
+  );
+  if (changed > 0) revalidateLedgerPages();
+  if (error) return { error };
+}
 
-  const { error } = await supabase
-    .from("transactions")
-    .update({ project_id: projectId, needs_classification: false })
-    .in("id", ids);
-  if (error) return { error: error.message };
-  revalidateLedgerPages();
+export async function bulkUpdateProjectId(formData: FormData) {
+  const projectId = String(formData.get("project_id") ?? "") || null;
+  return bulkUpdateTransactions(formData, { project_id: projectId, needs_classification: false });
 }
 
 // 거래처는 등록된 거래처(client_id)로 고르거나, 목록에 없으면 이름을 직접 적을 수 있다
 // (client_name_raw) — 둘 중 하나만 채우고 나머지는 비운다.
 export async function bulkUpdateClientId(formData: FormData) {
-  const supabase = await createClient();
-  const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
   const clientId = String(formData.get("client_id") ?? "") || null;
   const clientNameRaw = clientId ? null : String(formData.get("client_name_raw") ?? "").trim() || null;
-  if (ids.length === 0) return { error: "선택된 거래가 없습니다." };
-
-  const { error } = await supabase
-    .from("transactions")
-    .update({ client_id: clientId, client_name_raw: clientNameRaw })
-    .in("id", ids);
-  if (error) return { error: error.message };
-  revalidateLedgerPages();
+  return bulkUpdateTransactions(formData, { client_id: clientId, client_name_raw: clientNameRaw });
 }
 
 export async function bulkUpdateCategoryId(formData: FormData) {
-  const supabase = await createClient();
-  const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
   const categoryId = String(formData.get("category_id") ?? "") || null;
-  if (ids.length === 0) return { error: "선택된 거래가 없습니다." };
-
-  const { error } = await supabase.from("transactions").update({ category_id: categoryId }).in("id", ids);
-  if (error) return { error: error.message };
-  revalidateLedgerPages();
+  return bulkUpdateTransactions(formData, { category_id: categoryId });
 }
 
 export async function bulkUpdatePaymentMethodId(formData: FormData) {
-  const supabase = await createClient();
-  const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
   const paymentMethodId = String(formData.get("payment_method_id") ?? "") || null;
-  if (ids.length === 0) return { error: "선택된 거래가 없습니다." };
-
-  const { error } = await supabase.from("transactions").update({ payment_method_id: paymentMethodId }).in("id", ids);
-  if (error) return { error: error.message };
-  revalidateLedgerPages();
+  return bulkUpdateTransactions(formData, { payment_method_id: paymentMethodId });
 }
 
 export async function bulkUpdateItemName(formData: FormData) {
-  const supabase = await createClient();
-  const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
   const itemName = String(formData.get("item_name") ?? "").trim() || null;
-  if (ids.length === 0) return { error: "선택된 거래가 없습니다." };
-
-  const { error } = await supabase.from("transactions").update({ item_name: itemName }).in("id", ids);
-  if (error) return { error: error.message };
-  revalidateLedgerPages();
+  return bulkUpdateTransactions(formData, { item_name: itemName });
 }
 
 export async function deleteTransactionRecord(formData: FormData) {

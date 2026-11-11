@@ -232,6 +232,8 @@ export default async function ReportsPage({
   const clientNames = (clientRows ?? []).map((c) => c.name);
   const [fixedExpense, role] = await Promise.all([fixedExpensePromise, rolePromise]);
   const canEditFixedExpense = role === "admin" || role === "staff";
+  // 내역 표(거래처·카테고리·현장 내역, 매입 품목 검색, 분류 대기)의 체크칸·일괄 변경(11/11) — 바꿀 수 있는 관리자·직원만
+  const canBulkEdit = role === "admin" || role === "staff";
   const fixedExportHeaders = [
     "구분",
     "거래처·카테고리",
@@ -1328,7 +1330,7 @@ export default async function ReportsPage({
             rows: purchaseItemExportRows,
           })}
         >
-          <PurchaseItemSearchTable rows={purchaseItemRows} />
+          <PurchaseItemSearchTable rows={purchaseItemRows} canEdit={canBulkEdit} />
         </CollapsibleSection>
 
         <CollapsibleSection
@@ -1341,7 +1343,7 @@ export default async function ReportsPage({
             rows: classificationExportRows,
           })}
         >
-          <ClassificationPendingTable rows={classificationPendingRows} />
+          <ClassificationPendingTable rows={classificationPendingRows} canEdit={canBulkEdit} />
         </CollapsibleSection>
 
         <CollapsibleSection
@@ -1467,6 +1469,7 @@ export default async function ReportsPage({
               rows={vendorAllRows}
               closeHref={`/reports?year=${selectedYear}${includeVendorAgency ? "&vendorAgency=1" : ""}`}
               vendorAgency={includeVendorAgency}
+              canEdit={canBulkEdit}
             />
           </div>
         </div>
@@ -1483,6 +1486,7 @@ export default async function ReportsPage({
               categories={expenseCategories ?? []}
               clientNames={clientNames}
               closeHref={`/reports?year=${selectedYear}${site ? `&site=${site}` : ""}`}
+              canEdit={canBulkEdit}
             />
           </div>
         </div>
@@ -1496,6 +1500,7 @@ export default async function ReportsPage({
               year={selectedYear}
               rows={siteDetailRows}
               closeHref={`/reports?year=${selectedYear}`}
+              canEdit={canBulkEdit}
             />
           </div>
         </div>

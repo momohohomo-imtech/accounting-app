@@ -34,6 +34,7 @@ import {
 } from "@/components/ProjectsCombinedReportTables";
 import { ProjectsCombinedReportActions } from "@/components/ProjectsCombinedReportActions";
 import { PopupCloseLink } from "@/components/PopupCloseLink";
+import { getCurrentRole } from "@/lib/currentRole";
 
 export type CombinedReportProject = {
   id: string;
@@ -109,6 +110,9 @@ export async function ProjectsCombinedReport({
   listHref: string;
 }) {
   const supabase = await createClient();
+  // 매입내역 체크칸·일괄 변경(11/11) — 바꿀 수 있는 관리자·직원만(역할 조회는 한 요청에 한 번 — 레이아웃과 같이 씀)
+  const role = await getCurrentRole();
+  const canBulkEdit = role === "admin" || role === "staff";
   const ids = projects.map((p) => p.id);
   // 프로젝트가 수백 개여도 요청 주소가 너무 길어지지 않게 나눠 조회(fetchAllRowsIn). 서로 기다릴 필요가 없어 한꺼번에.
   const [txRows, agencyRows, workLogRows, tripDayRows] = ids.length
@@ -492,7 +496,7 @@ export async function ProjectsCombinedReport({
           {/* 내역은 기본 접힘 — 펼친 채로 인쇄하면 같이 나옴(늘 넣으면 프로젝트가 많을 때 인쇄가 길어짐). */}
           <CollapsibleSection title={`매입내역 (${purchaseTableRows.length}건)`} bare>
             <div className="space-y-2">
-              <ProjectPurchaseTable rows={purchaseTableRows} showProject />
+              <ProjectPurchaseTable rows={purchaseTableRows} showProject canEdit={canBulkEdit} />
               {unsettled.count > 0 && (
                 <p className="text-xs text-amber-600">
                   &quot;외상 미정산&quot; 항목은 참고용 표시이며, 정산 전까지 매입 합계·이익금 계산에는 포함되지 않습니다.

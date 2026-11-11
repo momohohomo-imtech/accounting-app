@@ -10,6 +10,8 @@ import { useEscapeKey } from "@/lib/useEscapeKey";
 import { projectStatusLabel } from "@/lib/projectStatus";
 import { PopupCloseLink } from "@/components/PopupCloseLink";
 import { closePopup } from "@/lib/popupNavigation";
+import { ReportBulkEditBar } from "@/components/ReportBulkEditBar";
+import { useRowSelection } from "@/lib/useRowSelection";
 
 type SiteDetailRow = {
   id: string;
@@ -42,16 +44,19 @@ function sortValue(r: SiteDetailRow, key: SortKey): string | number {
   }
 }
 
+// canEdit(관리자·직원): 보이는 매출·매입을 체크해서 프로젝트·거래처·카테고리·결제방식·품목을 한 번에(11/11, ReportBulkEditBar).
 export function SiteProfitReport({
   siteName,
   year,
   rows,
   closeHref,
+  canEdit = false,
 }: {
   siteName: string;
   year: number;
   rows: SiteDetailRow[];
   closeHref: string;
+  canEdit?: boolean;
 }) {
   const router = useRouter();
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
@@ -102,6 +107,8 @@ export function SiteProfitReport({
     return copy;
   }, [filteredRows, sortKey, sortDir]);
 
+  const selection = useRowSelection(useMemo(() => sortedRows.map((r) => r.id), [sortedRows]));
+
   function headerButton(key: SortKey, label: string) {
     return (
       <button type="button" onClick={() => handleSort(key)} className="inline-flex items-center gap-1 hover:text-slate-800">
@@ -147,15 +154,30 @@ export function SiteProfitReport({
         </div>
       </div>
 
+      {canEdit && selection.chosen.length > 0 && (
+        <ReportBulkEditBar selectedIds={selection.chosen} onDone={selection.clear} onClear={selection.clear} />
+      )}
+
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[600px] text-sm">
+        <table className="sticky-col-table w-full min-w-[600px] text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-left text-slate-500">
+              {canEdit && (
+                <th className="w-8 pb-2 pr-2 print:hidden">
+                  <input
+                    type="checkbox"
+                    aria-label="보이는 내역 전체 선택"
+                    checked={selection.allOn}
+                    onChange={selection.toggleAll}
+                    className="h-4 w-4 accent-slate-900"
+                  />
+                </th>
+              )}
               <th className="pb-2 pr-4">구분</th>
               <th className="pb-2 pr-4">{headerButton("trans_date", "날짜")}</th>
               <th className="pb-2 pr-4">{headerButton("project_name", "프로젝트")}</th>
               <th className="pb-2 pr-4">카테고리</th>
-              <th className="pb-2 pr-4">{headerButton("item_name", "품목")}</th>
+              <th className="sticky-col pb-2 pr-4">{headerButton("item_name", "품목")}</th>
               <th className="pb-2 pr-4">결제방식</th>
               <th className="pb-2 pr-4 text-right">{headerButton("amount", "금액")}</th>
               <th className="pb-2 text-right print:hidden">관리</th>
@@ -163,11 +185,25 @@ export function SiteProfitReport({
           </thead>
           <tbody>
             {sortedRows.map((r) => (
-              <tr key={`${r.kind}-${r.id}`} className="border-b border-slate-100 last:border-0">
+              <tr
+                key={`${r.kind}-${r.id}`}
+                className={`border-b border-slate-100 last:border-0 ${selection.selected.has(r.id) ? "bg-brand-soft" : ""}`}
+              >
+                {canEdit && (
+                  <td className="py-2 pr-2 print:hidden">
+                    <input
+                      type="checkbox"
+                      aria-label={`${r.item_name ?? r.kind} 선택`}
+                      checked={selection.selected.has(r.id)}
+                      onChange={() => selection.toggle(r.id)}
+                      className="h-4 w-4 accent-slate-900"
+                    />
+                  </td>
+                )}
                 <td className="py-2 pr-4">
                   <span className={r.kind === "매입" ? "text-slate-500" : "text-slate-700"}>{r.kind}</span>
                 </td>
-                <td className="py-2 pr-4 text-slate-600">{r.trans_date ? formatDate(r.trans_date) : "-"}</td>
+                <td className="whitespace-nowrap py-2 pr-4 text-slate-600">{r.trans_date ? formatDate(r.trans_date) : "-"}</td>
                 <td className="py-2 pr-4 text-slate-700">
                   {r.project_name ?? <span className="font-medium text-red-600">일반경비</span>}
                 </td>
@@ -177,7 +213,13 @@ export function SiteProfitReport({
                 >
                   {r.category_name ?? "-"}
                 </td>
-                <td className="py-2 pr-4 text-slate-700">{r.item_name ?? "-"}</td>
+                <td
+                  tabIndex={0}
+                  title={r.item_name ?? undefined}
+                  className="tap-full sticky-col py-2 pr-4 text-slate-700 max-md:max-w-[10rem] max-md:truncate print:max-w-none print:whitespace-normal print:overflow-visible"
+                >
+                  {r.item_name ?? "-"}
+                </td>
                 <td className="py-2 pr-4">
                   {r.payment_method_name ? (
                     <span
@@ -206,7 +248,7 @@ export function SiteProfitReport({
             ))}
             {sortedRows.length === 0 && (
               <tr>
-                <td colSpan={8} className="py-6 text-center text-slate-400">
+                <td colSpan={canEdit ? 9 : 8} className="py-6 text-center text-slate-400">
                   내역이 없습니다.
                 </td>
               </tr>
