@@ -11,6 +11,8 @@ import { useEscapeKey } from "@/lib/useEscapeKey";
 import { projectStatusLabel } from "@/lib/projectStatus";
 import { PopupCloseLink } from "@/components/PopupCloseLink";
 import { closePopup } from "@/lib/popupNavigation";
+import { ReportBulkEditBar } from "@/components/ReportBulkEditBar";
+import { useRowSelection } from "@/lib/useRowSelection";
 
 type VendorRow = {
   id: string;
@@ -44,18 +46,22 @@ function sortValue(r: VendorRow, key: SortKey): string | number {
   }
 }
 
+// canEdit(관리자·직원): 보이는 매입을 체크해서 프로젝트·거래처·카테고리·결제방식·품목을 한 번에(11/11, ReportBulkEditBar).
+// 대행구매 줄은 따로 저장되는 표라 체크칸 없음(사용자 결정 "매입·매출 거래만").
 export function VendorDetailReport({
   vendorName,
   year,
   rows,
   closeHref,
   vendorAgency,
+  canEdit = false,
 }: {
   vendorName: string;
   year: number;
   rows: VendorRow[];
   closeHref: string;
   vendorAgency?: boolean;
+  canEdit?: boolean;
 }) {
   const router = useRouter();
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
@@ -127,6 +133,12 @@ export function VendorDetailReport({
     });
     return copy;
   }, [filteredRows, sortKey, sortDir]);
+
+  const selection = useRowSelection(
+    useMemo(() => sortedRows.filter((r) => r.kind === "매입").map((r) => r.id), [sortedRows])
+  );
+  // 휴대폰에서 옆으로 넘겨도 어느 줄인지 보이게 고정할 칸 — 품목, 품목 칸을 껐으면 프로젝트
+  const stickyProject = !showItem && showProject;
 
   // 엑셀 다운로드가 화면에 보이는(정렬·구분/프로젝트/카테고리/품목 토글 반영) 내용과 항상 똑같게,
   // 인쇄 테이블과 동일한 컬럼 구성 + 정렬 순서(sortedRows)로 내보낸다.
@@ -217,31 +229,71 @@ export function VendorDetailReport({
         </div>
       </div>
 
+      {canEdit && selection.chosen.length > 0 && (
+        <ReportBulkEditBar selectedIds={selection.chosen} onDone={selection.clear} onClear={selection.clear} />
+      )}
+
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[500px] text-sm">
+        <table className="sticky-col-table w-full min-w-[500px] text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-left text-slate-500">
+              {canEdit && (
+                <th className="w-8 pb-2 pr-2 print:hidden">
+                  <input
+                    type="checkbox"
+                    aria-label="보이는 매입 전체 선택"
+                    checked={selection.allOn}
+                    onChange={selection.toggleAll}
+                    className="h-4 w-4 accent-slate-900"
+                  />
+                </th>
+              )}
               {hasAgency && <th className="pb-2 pr-4">구분</th>}
               <th className="pb-2 pr-4">{headerButton("trans_date", "날짜")}</th>
-              {showProject && <th className="pb-2 pr-4">{headerButton("project_name", "프로젝트")}</th>}
+              {showProject && (
+                <th className={`pb-2 pr-4 ${stickyProject ? "sticky-col" : ""}`}>{headerButton("project_name", "프로젝트")}</th>
+              )}
               {showCategory && <th className="pb-2 pr-4">카테고리</th>}
               {showPayment && <th className="pb-2 pr-4">결제방식</th>}
-              {showItem && <th className="pb-2 pr-4">{headerButton("item_name", "품목")}</th>}
+              {showItem && <th className="sticky-col pb-2 pr-4">{headerButton("item_name", "품목")}</th>}
               <th className="pb-2 text-right">{headerButton("amount", "금액")}</th>
               <th className="pb-2 pl-4 text-right print:hidden">관리</th>
             </tr>
           </thead>
           <tbody>
             {sortedRows.map((r) => (
-              <tr key={r.id} className="border-b border-slate-100 last:border-0">
+              <tr
+                key={r.id}
+                className={`border-b border-slate-100 last:border-0 ${selection.selected.has(r.id) ? "bg-brand-soft" : ""}`}
+              >
+                {canEdit && (
+                  <td className="py-2 pr-2 print:hidden">
+                    {r.kind === "매입" && (
+                      <input
+                        type="checkbox"
+                        aria-label={`${r.item_name ?? "매입"} 선택`}
+                        checked={selection.selected.has(r.id)}
+                        onChange={() => selection.toggle(r.id)}
+                        className="h-4 w-4 accent-slate-900"
+                      />
+                    )}
+                  </td>
+                )}
                 {hasAgency && (
                   <td className="py-2 pr-4">
                     <span className={r.kind === "대행구매" ? "text-slate-500" : "text-slate-700"}>{r.kind}</span>
                   </td>
                 )}
-                <td className="py-2 pr-4 text-slate-600">{r.trans_date ? formatDate(r.trans_date) : "-"}</td>
+                <td className="whitespace-nowrap py-2 pr-4 text-slate-600">{r.trans_date ? formatDate(r.trans_date) : "-"}</td>
                 {showProject && (
-                  <td className="py-2 pr-4 text-slate-700">
+                  <td
+                    className={`py-2 pr-4 text-slate-700 ${
+                      stickyProject
+                        ? "sticky-col max-md:max-w-[10rem] max-md:truncate print:max-w-none print:whitespace-normal print:overflow-visible"
+                        : ""
+                    }`}
+                    title={stickyProject ? (r.project_name ?? undefined) : undefined}
+                  >
                     {r.needs_classification ? (
                       <span className="inline-flex rounded-full bg-green-600 px-2 py-0.5 text-xs font-medium text-white">
                         분류 대기 중
@@ -276,7 +328,15 @@ export function VendorDetailReport({
                     )}
                   </td>
                 )}
-                {showItem && <td className="py-2 pr-4 text-slate-700">{r.item_name ?? "-"}</td>}
+                {showItem && (
+                  <td
+                    tabIndex={0}
+                    title={r.item_name ?? undefined}
+                    className="tap-full sticky-col py-2 pr-4 text-slate-700 max-md:max-w-[10rem] max-md:truncate print:max-w-none print:whitespace-normal print:overflow-visible"
+                  >
+                    {r.item_name ?? "-"}
+                  </td>
+                )}
                 <td className="py-2 text-right tabular-nums text-slate-900">{formatWon(r.amount)}</td>
                 <td className="py-2 pl-4 text-right print:hidden">
                   {r.kind === "매입" && (
@@ -295,6 +355,7 @@ export function VendorDetailReport({
                 <td
                   colSpan={
                     3 +
+                    (canEdit ? 1 : 0) +
                     (hasAgency ? 1 : 0) +
                     (showProject ? 1 : 0) +
                     (showCategory ? 1 : 0) +

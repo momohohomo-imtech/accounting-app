@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatWon, formatDate } from "@/lib/format";
 import { stickyHeadWrapClass } from "@/components/ui/Table";
+import { ReportBulkEditBar } from "@/components/ReportBulkEditBar";
+import { useRowSelection } from "@/lib/useRowSelection";
 
 export type PurchaseItemRow = {
   id: string;
@@ -22,7 +24,8 @@ function sortValue(r: PurchaseItemRow, key: SortKey): string | number {
   return key === "amount" ? r.amount : r[key];
 }
 
-export function PurchaseItemSearchTable({ rows }: { rows: PurchaseItemRow[] }) {
+// canEdit(관리자·직원): 찾은 매입을 체크해서 프로젝트·거래처·카테고리·결제방식·품목을 한 번에(11/11, ReportBulkEditBar).
+export function PurchaseItemSearchTable({ rows, canEdit = false }: { rows: PurchaseItemRow[]; canEdit?: boolean }) {
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("trans_date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -74,6 +77,7 @@ export function PurchaseItemSearchTable({ rows }: { rows: PurchaseItemRow[] }) {
   }, [filtered, sortKey, sortDir]);
 
   const total = sorted.reduce((s, r) => s + r.amount, 0);
+  const selection = useRowSelection(useMemo(() => sorted.map((r) => r.id), [sorted]));
 
   function headerButton(key: SortKey, label: string) {
     return (
@@ -98,59 +102,98 @@ export function PurchaseItemSearchTable({ rows }: { rows: PurchaseItemRow[] }) {
           8월&quot;) 그 달에 산 해당 품목만 찾습니다.
         </p>
       ) : (
-        <div className={stickyHeadWrapClass}>
-          <table className="w-full min-w-[700px] text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-left text-slate-500">
-                <th className="pb-2 pr-4">{headerButton("trans_date", "날짜")}</th>
-                <th className="pb-2 pr-4">{headerButton("clientName", "거래처")}</th>
-                <th className="pb-2 pr-4">{headerButton("projectName", "프로젝트")}</th>
-                <th className="pb-2 pr-4">{headerButton("categoryName", "카테고리")}</th>
-                <th className="pb-2 pr-4">{headerButton("itemName", "품목")}</th>
-                <th className="pb-2 pr-4 text-right">{headerButton("amount", "금액")}</th>
-                <th className="pb-2 text-right print:hidden">관리</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((r) => (
-                <tr key={r.id} className="border-b border-slate-100 last:border-0">
-                  <td className="py-2 pr-4 text-slate-600">{formatDate(r.trans_date)}</td>
-                  <td className="py-2 pr-4 text-slate-700">{r.clientName}</td>
-                  <td className="py-2 pr-4 text-slate-700">{r.projectName}</td>
-                  <td className="py-2 pr-4 text-slate-700">{r.categoryName}</td>
-                  <td className="py-2 pr-4 text-slate-700">{r.itemName}</td>
-                  <td className="py-2 pr-4 text-right tabular-nums text-slate-900">{formatWon(r.amount)}</td>
-                  <td className="py-2 text-right print:hidden">
-                    <Link
-                      href={r.editHref}
-                      className="text-xs text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
+        <>
+          {canEdit && selection.chosen.length > 0 && (
+            <div className="mb-3">
+              <ReportBulkEditBar selectedIds={selection.chosen} onDone={selection.clear} onClear={selection.clear} />
+            </div>
+          )}
+          <div className={stickyHeadWrapClass}>
+            <table className="sticky-col-table w-full min-w-[700px] text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-slate-500">
+                  {canEdit && (
+                    <th className="w-8 pb-2 pr-2 print:hidden">
+                      <input
+                        type="checkbox"
+                        aria-label="보이는 매입 전체 선택"
+                        checked={selection.allOn}
+                        onChange={selection.toggleAll}
+                        className="h-4 w-4 accent-slate-900"
+                      />
+                    </th>
+                  )}
+                  <th className="pb-2 pr-4">{headerButton("trans_date", "날짜")}</th>
+                  <th className="sticky-col pb-2 pr-4">{headerButton("clientName", "거래처")}</th>
+                  <th className="pb-2 pr-4">{headerButton("projectName", "프로젝트")}</th>
+                  <th className="pb-2 pr-4">{headerButton("categoryName", "카테고리")}</th>
+                  <th className="pb-2 pr-4">{headerButton("itemName", "품목")}</th>
+                  <th className="pb-2 pr-4 text-right">{headerButton("amount", "금액")}</th>
+                  <th className="pb-2 text-right print:hidden">관리</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map((r) => (
+                  <tr
+                    key={r.id}
+                    className={`border-b border-slate-100 last:border-0 ${selection.selected.has(r.id) ? "bg-brand-soft" : ""}`}
+                  >
+                    {canEdit && (
+                      <td className="py-2 pr-2 print:hidden">
+                        <input
+                          type="checkbox"
+                          aria-label={`${r.itemName} 선택`}
+                          checked={selection.selected.has(r.id)}
+                          onChange={() => selection.toggle(r.id)}
+                          className="h-4 w-4 accent-slate-900"
+                        />
+                      </td>
+                    )}
+                    <td className="whitespace-nowrap py-2 pr-4 text-slate-600">{formatDate(r.trans_date)}</td>
+                    <td
+                      tabIndex={0}
+                      title={r.clientName}
+                      className="tap-full sticky-col py-2 pr-4 text-slate-700 max-md:max-w-[10rem] max-md:truncate print:max-w-none print:whitespace-normal print:overflow-visible"
                     >
-                      수정
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-              {sorted.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-400">
-                    검색 결과가 없습니다.
-                  </td>
-                </tr>
+                      {r.clientName}
+                    </td>
+                    <td className="py-2 pr-4 text-slate-700">{r.projectName}</td>
+                    <td className="py-2 pr-4 text-slate-700">{r.categoryName}</td>
+                    <td className="py-2 pr-4 text-slate-700">{r.itemName}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums text-slate-900">{formatWon(r.amount)}</td>
+                    <td className="py-2 text-right print:hidden">
+                      <Link
+                        href={r.editHref}
+                        className="text-xs text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
+                      >
+                        수정
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+                {sorted.length === 0 && (
+                  <tr>
+                    <td colSpan={canEdit ? 8 : 7} className="py-8 text-center text-slate-400">
+                      검색 결과가 없습니다.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+              {sorted.length > 0 && (
+                <tfoot>
+                  <tr className="border-t-2 border-slate-300">
+                    {canEdit && <td className="print:hidden" />}
+                    <td colSpan={5} className="py-2 text-right font-semibold text-slate-900">
+                      {sorted.length}건 합계
+                    </td>
+                    <td className="py-2 text-right tabular-nums font-bold text-slate-900">{formatWon(total)}</td>
+                    <td className="print:hidden" />
+                  </tr>
+                </tfoot>
               )}
-            </tbody>
-            {sorted.length > 0 && (
-              <tfoot>
-                <tr className="border-t-2 border-slate-300">
-                  <td colSpan={5} className="py-2 text-right font-semibold text-slate-900">
-                    {sorted.length}건 합계
-                  </td>
-                  <td className="py-2 text-right tabular-nums font-bold text-slate-900">{formatWon(total)}</td>
-                  <td className="print:hidden" />
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </div>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );

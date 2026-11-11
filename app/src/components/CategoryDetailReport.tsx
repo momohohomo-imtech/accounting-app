@@ -17,6 +17,8 @@ import { MoneyInput } from "@/components/ui/MoneyInput";
 import { categoryReportHref } from "@/lib/reportLinks";
 import { PopupCloseLink } from "@/components/PopupCloseLink";
 import { closePopup } from "@/lib/popupNavigation";
+import { ReportBulkEditBar } from "@/components/ReportBulkEditBar";
+import { useRowSelection } from "@/lib/useRowSelection";
 
 type Category = { id: string; name: string; project_only: boolean; color: string | null };
 
@@ -62,11 +64,14 @@ function AgencyDetailRow({
   categories,
   clientNames,
   showCategory,
+  canEdit,
 }: {
   row: DetailRow;
   categories: Category[];
   clientNames: string[];
   showCategory: boolean;
+  // 일괄 변경 체크칸 자리(대행구매는 체크칸 없이 빈칸 — 사용자 결정 "매입·매출 거래만")
+  canEdit: boolean;
 }) {
   const confirm = useConfirm();
   const pending = useGlobalPending();
@@ -100,10 +105,11 @@ function AgencyDetailRow({
   if (editing) {
     return (
       <tr className="border-b border-slate-100 bg-slate-50 align-top last:border-0">
+        {canEdit && <td className="print:hidden" />}
         <td className="py-2 pr-4 text-slate-500">대행구매</td>
         {showCategory && <td className="py-2 pr-4 text-slate-700">{row.category_name ?? "-"}</td>}
         <td className="py-2 pr-4 text-slate-400">-</td>
-        <td className="py-2 pr-4">
+        <td className="sticky-col py-2 pr-4">
           <input
             list={`category-agency-clients-${row.id}`}
             value={clientName}
@@ -169,12 +175,19 @@ function AgencyDetailRow({
 
   return (
     <tr className="border-b border-slate-100 last:border-0">
+      {canEdit && <td className="print:hidden" />}
       <td className="py-2 pr-4">
         <span className="text-slate-500">대행구매</span>
       </td>
       {showCategory && <td className="py-2 pr-4 text-slate-700">{row.category_name ?? "-"}</td>}
       <td className="py-2 pr-4 text-slate-600">-</td>
-      <td className="py-2 pr-4 text-slate-700">{row.client_name ?? "-"}</td>
+      <td
+        tabIndex={0}
+        title={row.client_name ?? undefined}
+        className="tap-full sticky-col py-2 pr-4 text-slate-700 max-md:max-w-[10rem] max-md:truncate print:max-w-none print:whitespace-normal print:overflow-visible"
+      >
+        {row.client_name ?? "-"}
+      </td>
       <td className="py-2 pr-4 text-slate-700">
         {row.project_name ?? <span className="font-medium text-red-600">일반경비</span>}
       </td>
@@ -193,6 +206,8 @@ function AgencyDetailRow({
   );
 }
 
+// canEdit(관리자·직원): 보이는 매입을 체크해서 프로젝트·거래처·카테고리·결제방식·품목을 한 번에(11/11, ReportBulkEditBar).
+// 대행구매 줄은 따로 저장되는 표라 체크칸 없음 — 지금처럼 줄마다 "수정".
 export function CategoryDetailReport({
   categoryNames,
   year,
@@ -201,6 +216,7 @@ export function CategoryDetailReport({
   categories,
   clientNames,
   closeHref,
+  canEdit = false,
 }: {
   // 이름을 눌러 열면 하나, 체크해서 "선택한 카테고리 보기"로 열면 여러 개.
   categoryNames: string[];
@@ -210,6 +226,7 @@ export function CategoryDetailReport({
   categories: Category[];
   clientNames: string[];
   closeHref: string;
+  canEdit?: boolean;
 }) {
   const router = useRouter();
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
@@ -284,6 +301,10 @@ export function CategoryDetailReport({
     return copy;
   }, [combined, sortKey, sortDir]);
 
+  const selection = useRowSelection(
+    useMemo(() => sortedRows.filter((r) => r.kind === "매입").map((r) => r.id), [sortedRows])
+  );
+
   function headerButton(key: SortKey, label: string) {
     return (
       <button type="button" onClick={() => handleSort(key)} className="inline-flex items-center gap-1 hover:text-slate-800">
@@ -331,14 +352,29 @@ export function CategoryDetailReport({
         </div>
       </div>
 
+      {canEdit && selection.chosen.length > 0 && (
+        <ReportBulkEditBar selectedIds={selection.chosen} onDone={selection.clear} onClear={selection.clear} />
+      )}
+
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[600px] text-sm">
+        <table className="sticky-col-table w-full min-w-[600px] text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-left text-slate-500">
+              {canEdit && (
+                <th className="w-8 pb-2 pr-2 print:hidden">
+                  <input
+                    type="checkbox"
+                    aria-label="보이는 매입 전체 선택"
+                    checked={selection.allOn}
+                    onChange={selection.toggleAll}
+                    className="h-4 w-4 accent-slate-900"
+                  />
+                </th>
+              )}
               <th className="pb-2 pr-4">구분</th>
               {multi && <th className="pb-2 pr-4">{headerButton("category_name", "카테고리")}</th>}
               <th className="pb-2 pr-4">{headerButton("trans_date", "날짜")}</th>
-              <th className="pb-2 pr-4">{headerButton("client_name", "거래처")}</th>
+              <th className="sticky-col pb-2 pr-4">{headerButton("client_name", "거래처")}</th>
               <th className="pb-2 pr-4">{headerButton("project_name", "프로젝트")}</th>
               <th className="pb-2 pr-4">{headerButton("item_name", "품목")}</th>
               <th className="pb-2 pr-4 text-right">{headerButton("amount", "금액")}</th>
@@ -354,15 +390,36 @@ export function CategoryDetailReport({
                   categories={categories}
                   clientNames={clientNames}
                   showCategory={multi}
+                  canEdit={canEdit}
                 />
               ) : (
-                <tr key={`${r.kind}-${r.id}`} className="border-b border-slate-100 last:border-0">
+                <tr
+                  key={`${r.kind}-${r.id}`}
+                  className={`border-b border-slate-100 last:border-0 ${selection.selected.has(r.id) ? "bg-brand-soft" : ""}`}
+                >
+                  {canEdit && (
+                    <td className="py-2 pr-2 print:hidden">
+                      <input
+                        type="checkbox"
+                        aria-label={`${r.client_name ?? ""} ${r.item_name ?? "매입"} 선택`}
+                        checked={selection.selected.has(r.id)}
+                        onChange={() => selection.toggle(r.id)}
+                        className="h-4 w-4 accent-slate-900"
+                      />
+                    </td>
+                  )}
                   <td className="py-2 pr-4">
                     <span className="text-slate-700">{r.kind}</span>
                   </td>
                   {multi && <td className="py-2 pr-4 text-slate-700">{r.category_name ?? "-"}</td>}
-                  <td className="py-2 pr-4 text-slate-600">{r.trans_date ? formatDate(r.trans_date) : "-"}</td>
-                  <td className="py-2 pr-4 text-slate-700">{r.client_name ?? "-"}</td>
+                  <td className="whitespace-nowrap py-2 pr-4 text-slate-600">{r.trans_date ? formatDate(r.trans_date) : "-"}</td>
+                  <td
+                    tabIndex={0}
+                    title={r.client_name ?? undefined}
+                    className="tap-full sticky-col py-2 pr-4 text-slate-700 max-md:max-w-[10rem] max-md:truncate print:max-w-none print:whitespace-normal print:overflow-visible"
+                  >
+                    {r.client_name ?? "-"}
+                  </td>
                   <td className="py-2 pr-4 text-slate-700">
                     {r.project_name ?? <span className="font-medium text-red-600">일반경비</span>}
                   </td>
@@ -381,7 +438,7 @@ export function CategoryDetailReport({
             )}
             {sortedRows.length === 0 && (
               <tr>
-                <td colSpan={multi ? 8 : 7} className="py-6 text-center text-slate-400">
+                <td colSpan={(multi ? 8 : 7) + (canEdit ? 1 : 0)} className="py-6 text-center text-slate-400">
                   매입 내역이 없습니다.
                 </td>
               </tr>
