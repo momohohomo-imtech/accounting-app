@@ -192,7 +192,7 @@
   대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`), 메모 한 장 엑셀(`memoExport`), 공사 작업 순서
   일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내(`actionError`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`), 공구명세서 이름 [ ] 메모(`toolNameNote`), 같은 날 순서·한 번에 넣는 줄의 등록 시각·넣은 순서 id(`entryOrder`), 목록 기본 순서(`listOrder`),
   매입매출장 글자 검색(`ledgerSearch`), SQL 실행 상태(`sqlStatus`), 파일 저장 공간(`storageUsage`), 메모장 구분(`memoCategories`), 거래 일괄
-  변경 나눠 바꾸기(`bulkUpdate`)·일괄 변경 칸(`transactionBulkEdit`)의 검사가
+  변경 나눠 바꾸기(`bulkUpdate`)·일괄 변경 칸(`transactionBulkEdit`), 챙길 거래 창(`transactionWatch`)·수정 팝업 주소(`ledgerLinks`)의 검사가
   `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
@@ -327,6 +327,15 @@
   씀. 금액·날짜는 바꾸지 않음. 체크칸은 관리자·직원만, 대행구매 줄(따로 저장되는 표)은 체크칸 없음, 바꾸는 건 보이는(필터·검색된) 줄 중 체크한
   것만(`lib/useRowSelection.ts`), 체크칸·일괄 변경 칸은 인쇄에 안 나옴. 거래 내역 표를 새로 만들면 이 칸을 붙이고, 체크칸을 첫 칸에 두면 표에
   `sticky-col-table` + 알아보기 쉬운 칸에 `sticky-col`. 선택 목록·확인 문구 계산은 `lib/transactionBulkEdit.ts`.
+- **매입매출 "챙길 거래" 창**(11/11 사용자 요청 "매입장 메모 옆이나 아래 작은 창 — 체크하면 바로 올라가 보이고 필요 없으면 쉽게 지우게,
+  창 크기는 내용에 맞게", 사용자 결정 "모든 기기 공용" + "줄마다 짧은 메모", 105 SQL `transaction_watch` — 거래 하나당 한 줄·메모 100자,
+  거래를 지우면 같이 지워짐): 매입매출장 줄마다 📌(묶음 줄은 묶음 전체 — 하나라도 올라가 있으면 켜짐, 누르면 모두 빠짐 `watchToggle`)와
+  일괄 변경 칸의 "📌 챙길 거래로 올리기"로 올리고, 메모칸 바로 아래 창(`TransactionWatchPanel` — 위 줄과 따로 둬서 창이 길어져도 검색칸·
+  버튼 자리는 그대로)에 최근에 올린 순으로 보임(한 결제 묶음은 한 줄, 10건 넘으면 "N건 더 보기", 비면 창 없음, 달·필터와 상관없이 늘 보임).
+  줄을 누르면 거래 수정 팝업(`lib/ledgerLinks.ts`의 `ledgerEditHref` — 매입매출장 표와 같은 주소), ×는 창에서만 빼고 거래는 그대로, 메모는
+  입력칸에서 벗어나면 저장. 올리기·빼기·메모는 관리자·직원만(조회 전용은 보기만, 세무사는 창 없음). 105 실행 전엔 창·📌 칸 숨김. 계산
+  `lib/transactionWatch.ts`, 불러오기 `lib/transactionWatchLoad.ts`(표 없음은 숨김, 다른 오류는 창 자리에 안내), 저장
+  `lib/actions/transactionWatch.ts`(빼기·메모는 바뀐 줄이 없으면 안내). 금액·날짜 등 거래 자료는 이 창에서 바꾸지 않음.
 - **공구명세서 이름칸의 [ ]**(11/5 사용자 요청 — 스페너처럼 여러 종류를 챙길 때 "스페너 [13·17·19mm]"): [ ] 안 글자는 화성·동희
   반입반출증(화면 미리보기·인쇄·엑셀)에서만 빠지고 괄호 밖 이름만(`lib/toolNameNote.ts`의 `printToolName`). 공구명세서는 화면·인쇄·엑셀
   모두(체크 없는 전체 보기·"반입반출증용만 표시" 둘 다) 이름 아래 [ ] 작은 글씨(긴 글자는 칸 안에서 줄바꿈, 엑셀은 이름 칸에 적은 그대로) —
