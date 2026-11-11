@@ -354,6 +354,7 @@ async function TransactionListSection({
   }
 
   const selectedProjectNode = project_id ? projectNodes.find((p) => p.id === project_id) : undefined;
+  const showWatchPanel = Boolean(watch?.ready && (watchEntries.length > 0 || watch.error));
 
   return (
     <div className="space-y-4">
@@ -374,8 +375,26 @@ async function TransactionListSection({
         </div>
         <LedgerSearchBox key={searchText} initial={searchText} />
         <TransactionExportButtons transactions={transactions as Transaction[]} />
+      </div>
+      {/* 위쪽 정리(11/11 사용자 "화면 정리" — 메모칸이 고르는 칸 줄 끝에 붙고 "챙길 거래" 창만 오른쪽 끝으로 밀려 서로 어긋나고 왼쪽이
+          비었음): 고르는 칸·검색·인쇄·엑셀은 위 줄, 그 아래 줄은 왼쪽 = 필터된 전체 금액, 오른쪽 = 메모칸 + 바로 아래 챙길 거래 창(같은
+          폭). 노트북 폭(xl)보다 좁으면 메모칸 → 창 → 금액 줄 순서로 위아래(전체 폭). */}
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+        <p className="text-sm text-slate-600 xl:pt-2">
+          필터된 전체 금액{" "}
+          <span className={`tabular-nums font-semibold ${filteredNetTotal >= 0 ? "text-brand" : "text-red-600"}`}>
+            {filteredNetTotal >= 0 ? "+" : "-"}
+            {formatWon(Math.abs(filteredNetTotal))}
+          </span>
+          {" (매출 +, 매입 -)"}
+          {searchText && (
+            <span className="ml-2 font-medium text-slate-800">
+              · 검색 &ldquo;{searchText}&rdquo; {shownRowCount.toLocaleString("ko-KR")}건
+            </span>
+          )}
+        </p>
         {!readOnly && (
-          <div className="min-w-[16rem] max-w-2xl flex-1 print:hidden">
+          <div className="order-first w-full space-y-2 print:hidden xl:order-none xl:w-[34rem] xl:shrink-0 2xl:w-[40rem]">
             <PageMemo
               bare
               rows={2}
@@ -383,44 +402,24 @@ async function TransactionListSection({
               placeholder="매입매출 관련 메모..."
               save={updateTransactionsPageMemo}
             />
+            {showWatchPanel && watch && (
+              <TransactionWatchPanel
+                entries={watchEntries}
+                listParams={{ year: selectedYear, month: selectedMonth, type: type ?? "", project_id: project_id ?? "", q: searchText }}
+                canEdit={canEditWatch}
+                error={watch.error}
+                currentYear={currentYear}
+              />
+            )}
           </div>
         )}
       </div>
-      {/* "챙길 거래" 창 — 메모칸 바로 아래(오른쪽 정렬, 휴대폰은 메모 아래 전체 폭). 위 줄과 따로 둬서 창이 길어져도 검색칸·버튼
-          위치는 그대로, 비면 자리도 안 차지함 */}
-      {watch?.ready && (watchEntries.length > 0 || watch.error) && (
-        <div className="flex justify-end print:hidden">
-          <div className="w-full max-w-2xl">
-            <TransactionWatchPanel
-              entries={watchEntries}
-              listParams={{ year: selectedYear, month: selectedMonth, type: type ?? "", project_id: project_id ?? "", q: searchText }}
-              canEdit={canEditWatch}
-              error={watch.error}
-              currentYear={currentYear}
-            />
-          </div>
-        </div>
-      )}
       {yearLocked && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
           {selectedYear}년은 신고가 끝나 잠긴 해입니다 — 거래를 추가·삭제하거나 날짜·금액·거래처·카테고리·세금계산서·외상 여부를 바꿀
           수 없습니다(프로젝트·결제수단·품목·메모·외상 정산은 가능).
         </p>
       )}
-
-      <p className="text-sm text-slate-600">
-        필터된 전체 금액{" "}
-        <span className={`tabular-nums font-semibold ${filteredNetTotal >= 0 ? "text-brand" : "text-red-600"}`}>
-          {filteredNetTotal >= 0 ? "+" : "-"}
-          {formatWon(Math.abs(filteredNetTotal))}
-        </span>
-        {" (매출 +, 매입 -)"}
-        {searchText && (
-          <span className="ml-2 font-medium text-slate-800">
-            · 검색 &ldquo;{searchText}&rdquo; {shownRowCount.toLocaleString("ko-KR")}건
-          </span>
-        )}
-      </p>
 
       <Card>
         <TransactionTable
