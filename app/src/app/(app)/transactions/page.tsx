@@ -16,6 +16,9 @@ import { PaymentMethodFilter } from "@/components/PaymentMethodFilter";
 import { TransactionBulkImport } from "@/components/TransactionBulkImport";
 import { TransactionEditPopup } from "@/components/TransactionEditPopup";
 import { PageMemo } from "@/components/PageMemo";
+import { TransactionWatchPanel } from "@/components/TransactionWatchPanel";
+import { loadTransactionWatch } from "@/lib/transactionWatchLoad";
+import { buildWatchEntries } from "@/lib/transactionWatch";
 import { updateTransactionsPageMemo } from "@/lib/actions/transactionsPageMemo";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
@@ -273,6 +276,8 @@ async function TransactionListSection({
     { data: importExpenseCategories },
     pageMemo,
     locks,
+    watch,
+    role,
   ] = await Promise.all([
     loadLedgerTransactions(start, end, type ?? "", project_id ?? "", payment_method_id ?? ""),
     fetchAllData((from, to) =>
@@ -296,7 +301,13 @@ async function TransactionListSection({
         .select("year, locked_at, memo")
         .then(({ data, error }) => ({ data: data as LockedYear[] | null, error }))
     ),
+    // "챙길 거래" 창(105 SQL) — 세무사 계정은 안 봄, 표가 없으면(실행 전) ready=false라 창·📌 칸을 숨김.
+    readOnly ? Promise.resolve(null) : loadTransactionWatch(supabase),
+    getCurrentRole(),
   ]);
+  // 📌 올리기·빼기·메모는 관리자·직원만(조회 전용은 창을 보기만)
+  const canEditWatch = role === "admin" || role === "staff";
+  const watchEntries = watch ? buildWatchEntries(watch.rows) : [];
   const yearLocked = isYearLocked(locks.years, selectedYear);
   // 글자 검색(?q=, 11/7) — 고른 기간·필터의 거래 안에서 거래처·품목·메모 등으로 거름(한 결제 묶음은 묶음째)
   const searchText = q?.trim() ?? "";
@@ -375,6 +386,21 @@ async function TransactionListSection({
           </div>
         )}
       </div>
+      {/* "챙길 거래" 창 — 메모칸 바로 아래(오른쪽 정렬, 휴대폰은 메모 아래 전체 폭). 위 줄과 따로 둬서 창이 길어져도 검색칸·버튼
+          위치는 그대로, 비면 자리도 안 차지함 */}
+      {watch?.ready && (watchEntries.length > 0 || watch.error) && (
+        <div className="flex justify-end print:hidden">
+          <div className="w-full max-w-2xl">
+            <TransactionWatchPanel
+              entries={watchEntries}
+              listParams={{ year: selectedYear, month: selectedMonth, type: type ?? "", project_id: project_id ?? "", q: searchText }}
+              canEdit={canEditWatch}
+              error={watch.error}
+              currentYear={currentYear}
+            />
+          </div>
+        </div>
+      )}
       {yearLocked && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
           {selectedYear}년은 신고가 끝나 잠긴 해입니다 — 거래를 추가·삭제하거나 날짜·금액·거래처·카테고리·세금계산서·외상 여부를 바꿀
@@ -408,6 +434,8 @@ async function TransactionListSection({
           groupingReady={groupingReady}
           paidDateById={paidDateById}
           readOnly={readOnly}
+          watchReady={Boolean(watch?.ready && !watch.error) && canEditWatch}
+          watchedIds={watch?.rows.map((r) => r.transaction_id) ?? []}
           {...columnVisibility}
         />
       </Card>

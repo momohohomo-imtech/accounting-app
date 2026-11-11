@@ -7,6 +7,8 @@ import {
   groupTransactions,
   ungroupTransactions,
 } from "@/lib/actions/transactions";
+import { unwatchTransactions, watchTransactions } from "@/lib/actions/transactionWatch";
+import { watchToggle } from "@/lib/transactionWatch";
 import { formatWon, formatDate } from "@/lib/format";
 import { transactionTotal } from "@/lib/credit";
 import { dateSpan, groupKindLabel, groupLedgerRows, sameCommonFields, sortGroupLines, summaryLabel } from "@/lib/paymentGroup";
@@ -23,6 +25,7 @@ import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { TransactionBulkEditBar } from "@/components/TransactionBulkEditBar";
 import { bulkClientNameOptions, type BulkField, type TransactionBulkOptions } from "@/lib/transactionBulkEdit";
+import { ledgerEditHref, type LedgerListParams } from "@/lib/ledgerLinks";
 
 type SortKey =
   | "trans_date"
@@ -118,6 +121,9 @@ function groupHead(lines: Transaction[]): Transaction {
   };
 }
 
+// 📌 칸을 안 쓸 때 기본값 — 그릴 때마다 새 배열이 생기지 않게
+const NO_IDS: string[] = [];
+
 export function TransactionTable({
   transactions,
   projectNodes,
@@ -133,13 +139,15 @@ export function TransactionTable({
   groupingReady = false,
   paidDateById = {},
   readOnly = false,
+  watchReady = false,
+  watchedIds = NO_IDS,
 }: {
   transactions: Transaction[];
   projectNodes: ProjectTreeNode[];
   clients: { id: string; name: string }[];
   categories: { id: string; name: string }[];
   paymentMethods: { id: string; name: string; text_color?: string | null; background_color?: string | null }[];
-  listParams: { year: number; month: string; type: string; project_id: string; q?: string };
+  listParams: LedgerListParams;
   // 거래가 없을 때 문구(글자 검색 중이면 "검색에 맞는 거래가 없습니다")
   emptyText?: string;
   showProject?: boolean;
@@ -152,6 +160,10 @@ export function TransactionTable({
   paidDateById?: Record<string, string>;
   // 세무사 계정(읽기 전용) — 체크칸·일괄 변경·수정·삭제 칸 없이 장부만.
   readOnly?: boolean;
+  // "챙길 거래" 창(105 SQL) — 표가 있고 관리자·직원일 때만 줄마다 📌(누르면 메모칸 아래 창에 올라감·다시 누르면 빠짐)
+  watchReady?: boolean;
+  // 창에 올라간 거래 id
+  watchedIds?: string[];
 }) {
   const COLUMNS = ALL_COLUMNS.filter(
     (c) =>
@@ -160,17 +172,9 @@ export function TransactionTable({
       (c.key !== "item_name" || showItem) &&
       (c.key !== "memo" || showMemo)
   );
+  // 수정 팝업 주소 — 지금 목록(검색 포함) 그대로(lib/ledgerLinks.ts, "챙길 거래" 창과 같이 씀)
   function editHrefFor(id: string) {
-    const p = new URLSearchParams({
-      year: String(listParams.year),
-      month: listParams.month,
-      type: listParams.type,
-      project_id: listParams.project_id,
-      editTx: id,
-    });
-    // 글자 검색 중이면 수정 팝업 뒤 목록도 검색된 그대로(닫으면 뒤로 가기라 검색이 남음)
-    if (listParams.q) p.set("q", listParams.q);
-    return `/transactions?${p.toString()}`;
+    return ledgerEditHref(listParams, id);
   }
 
   const [sortKey, setSortKey] = useState<SortKey>("trans_date");
@@ -294,6 +298,38 @@ export function TransactionTable({
       return;
     }
     setSelected(new Set());
+  }
+
+  // 📌 — 묶음 줄은 묶음의 모든 거래(lib/transactionWatch.ts의 watchToggle: 하나라도 올라가 있으면 켜짐 → 누르면 모두 빠짐)
+  const watchOn = watchReady && !readOnly;
+  const watchedSet = useMemo(() => new Set(watchedIds), [watchedIds]);
+
+  async function toggleWatch(ids: string[]) {
+    const { action } = watchToggle(ids, watchedSet);
+    const fd = new FormData();
+    for (const id of action === "unwatch" ? ids.filter((id) => watchedSet.has(id)) : ids) fd.append("transaction_ids", id);
+    setBulkError(null);
+    const result = await pending.run(() => (action === "watch" ? watchTransactions(fd) : unwatchTransactions(fd)));
+    if (result?.error) setBulkError(result.error);
+  }
+
+  function watchCell(ids: string[]) {
+    if (!watchOn) return null;
+    const { on } = watchToggle(ids, watchedSet);
+    return (
+      <Td className="pr-2 print:hidden">
+        <button
+          type="button"
+          onClick={() => toggleWatch(ids)}
+          aria-pressed={on}
+          aria-label={on ? "챙길 거래에서 빼기" : "챙길 거래로 올리기"}
+          title={on ? "챙길 거래에서 빼기" : "챙길 거래로 올리기(메모칸 아래 창)"}
+          className={cx("text-base leading-none transition", on ? "" : "opacity-25 grayscale hover:opacity-70")}
+        >
+          📌
+        </button>
+      </Td>
+    );
   }
 
   function deleteFormData(ids: string[]) {
@@ -513,6 +549,7 @@ export function TransactionTable({
     return (
       <Tr key={t.id} className={selected.has(t.id) ? "bg-brand-soft" : "bg-slate-50/70"}>
         {checkboxCell([t.id])}
+        {watchCell([t.id])}
         <Td className="whitespace-nowrap pr-4 pl-3 text-xs text-slate-400">
           └ <span className="print:hidden">{formatDate(t.trans_date).slice(5)}</span>
           <span className="hidden print:inline">{formatDate(t.trans_date)}</span>
@@ -547,14 +584,19 @@ export function TransactionTable({
             setSelected(new Set());
           }}
         >
-          {groupingReady && (selected.size > 1 || selectedHasGroup) && (
+          {(watchOn || (groupingReady && (selected.size > 1 || selectedHasGroup))) && (
             <div className="flex flex-wrap items-center gap-2 border-slate-300 sm:border-l sm:pl-2">
-              {selected.size > 1 && (
+              {watchOn && (
+                <Button type="button" variant="secondary" size="sm" onClick={() => runGroupAction(watchTransactions)}>
+                  📌 챙길 거래로 올리기
+                </Button>
+              )}
+              {groupingReady && selected.size > 1 && (
                 <Button type="button" variant="secondary" size="sm" onClick={() => runGroupAction(groupTransactions)}>
                   한 결제로 묶기
                 </Button>
               )}
-              {selectedHasGroup && (
+              {groupingReady && selectedHasGroup && (
                 <Button type="button" variant="secondary" size="sm" onClick={() => runGroupAction(ungroupTransactions)}>
                   묶음 풀기
                 </Button>
@@ -577,6 +619,11 @@ export function TransactionTable({
                 onChange={toggleAll}
                 className="h-4 w-4 accent-slate-900"
               />
+            </th>
+          )}
+          {watchOn && (
+            <th className="w-8 pb-2 pr-2 font-medium print:hidden" title="챙길 거래 — 누르면 매입매출 메모칸 아래 창에 올라감">
+              📌
             </th>
           )}
           {COLUMNS.map((c) => (
@@ -607,6 +654,7 @@ export function TransactionTable({
               return (
                 <Tr key={item.key} className={selected.has(t.id) ? "bg-brand-soft" : undefined}>
                   {checkboxCell([t.id])}
+                  {watchCell([t.id])}
                   {mainCells(t)}
                   {actionsCell(t.id, t.id, [t.id])}
                 </Tr>
@@ -624,6 +672,7 @@ export function TransactionTable({
               <Fragment key={item.key}>
                 <Tr className={ids.every((id) => selected.has(id)) ? "bg-brand-soft" : undefined}>
                   {checkboxCell(ids)}
+                  {watchCell(ids)}
                   {mainCells(t, {
                     lead: (
                       <button
@@ -665,7 +714,7 @@ export function TransactionTable({
             );
           })}
           {sorted.length === 0 && (
-            <EmptyRow colSpan={COLUMNS.length + (readOnly ? 0 : 2)}>{emptyText ?? "거래 내역이 없습니다."}</EmptyRow>
+            <EmptyRow colSpan={COLUMNS.length + (readOnly ? 0 : 2) + (watchOn ? 1 : 0)}>{emptyText ?? "거래 내역이 없습니다."}</EmptyRow>
           )}
         </tbody>
       </Table>
