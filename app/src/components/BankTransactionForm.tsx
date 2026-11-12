@@ -19,10 +19,11 @@ type Row = {
   matched_client_id: string;
 };
 
+// 새 줄(첫 줄·"+ 추가 거래등록"·등록 뒤 비운 줄)의 구분은 출금이 기본 — 입금보다 출금을 훨씬 많이 적음(11/12 사용자 요청)
 function emptyRow(defaultAccountId: string): Row {
   return {
     bank_account_id: defaultAccountId,
-    direction: "입금",
+    direction: "출금",
     amount: "",
     description: "",
     matched_client_name_raw: "",

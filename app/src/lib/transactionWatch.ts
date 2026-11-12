@@ -2,6 +2,7 @@
 // 105 SQL transaction_watch, 사용자 결정 "모든 기기 공용" + "줄마다 짧은 메모") — 창에 보일 줄 만들기·순서·접기·메모 다듬기.
 // 저장은 lib/actions/transactionWatch.ts, 불러오기는 lib/transactionWatchLoad.ts, 화면은 components/TransactionWatchPanel.tsx.
 // 거래·금액은 바꾸지 않음(창에만 쓰는 표시). 검사: transactionWatch.test.ts
+import { formatDate, formatWon } from "@/lib/format";
 import { groupLedgerRows, summaryLabel } from "@/lib/paymentGroup";
 
 export const WATCH_MEMO_MAX = 100;
@@ -78,4 +79,35 @@ export function visibleWatchEntries<T>(entries: T[], expanded: boolean, limit = 
 export function watchToggle(ids: string[], watched: Set<string>): { on: boolean; action: "watch" | "unwatch" } {
   const on = ids.some((id) => watched.has(id));
   return { on, action: on ? "unwatch" : "watch" };
+}
+
+/** 창 줄의 날짜 — 올해면 월-일만 */
+export function watchDateLabel(date: string, currentYear: number): string {
+  const text = formatDate(date);
+  return text.startsWith(`${currentYear}-`) ? text.slice(5) : text;
+}
+
+/** 창 줄의 이름 — "거래처 · 품목" */
+export function watchLabel(entry: Pick<WatchEntry, "client" | "item">): string {
+  return `${entry.client || "-"} · ${entry.item}`;
+}
+
+/** 빼기 확인창 모양(창의 ×·매입장 📌 끄기 공용) */
+export const UNWATCH_CONFIRM = { title: "챙길 거래에서 빼기", confirmLabel: "빼기", danger: true } as const;
+
+/**
+ * 챙길 거래에서 빼기 전 확인 문구(11/12 사용자 요청 "삭제 전 확인") — 창의 ×와 매입장 📌 끄기가 같은 문구.
+ * 무엇을 빼는지(창 줄과 같은 글자) + 거래는 그대로 + 적어 둔 메모는 같이 지워짐. 어떤 줄인지 모르면 앞줄 없이.
+ */
+export function unwatchConfirmMessage(
+  entry: Pick<WatchEntry, "date" | "type" | "client" | "item" | "amount" | "memo"> | null,
+  currentYear: number
+): string {
+  const keep = "창에서만 빠지고 거래는 매입매출장에 그대로 남습니다.";
+  if (!entry) return `${keep}\n적어 둔 메모가 있으면 같이 지워집니다.`;
+  const memo = normalizeWatchMemo(entry.memo);
+  const head = [watchDateLabel(entry.date, currentYear), entry.type === "매출" ? "[매출]" : "", watchLabel(entry), formatWon(entry.amount)]
+    .filter(Boolean)
+    .join(" ");
+  return [head, "", keep, ...(memo ? [`적어 둔 메모 "${memo}"도 같이 지워집니다.`] : [])].join("\n");
 }
