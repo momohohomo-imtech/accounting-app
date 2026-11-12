@@ -4,6 +4,12 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { deleteBlockReason, deleteErrorMessage, BANK_ACCOUNT_LINKS } from "@/lib/deleteGuard";
 import { entryTimestamps } from "@/lib/entryOrder";
+import {
+  BANK_LEDGER_PAYMENT_METHOD,
+  isLedgerRowUntouched,
+  ledgerRowFromBank,
+  type BankTxForLedger,
+} from "@/lib/bankLedger";
 
 function parseAccount(formData: FormData) {
   return {
@@ -140,42 +146,18 @@ export async function createBankTransferRecord(formData: FormData) {
   revalidatePath("/bank");
 }
 
-type BankTxForLedger = {
-  trans_date: string;
-  direction: string;
-  amount: number;
-  description: string | null;
-  matched_client_id: string | null;
-  matched_client_name_raw: string | null;
-  bank_accounts?: { nickname: string | null; bank_name: string } | null;
-  clients?: { name: string } | null;
-};
-
 const BANK_TX_FOR_LEDGER_SELECT = "*, bank_accounts(nickname, bank_name), clients(name)";
 
-// 은행 거래 한 건을 매입/매출장에 "분류 대기 중"으로 올릴 때 넣는 값 — 등록할 때와, 나중에
-// "등록 당시 그대로인지" 비교할 때 둘 다 이 함수 하나로 만들어서 기준이 어긋나지 않게 한다.
-function ledgerRowFromBank(bankTx: BankTxForLedger) {
-  const isPurchase = bankTx.direction === "출금";
-  const accountName = bankTx.bank_accounts?.nickname ?? bankTx.bank_accounts?.bank_name ?? "";
-  // 매칭 거래처 이름을 품목으로 — 매칭 거래처가 없으면 내용(적요)으로 대신한다.
-  const matchedClientName = bankTx.clients?.name ?? bankTx.matched_client_name_raw ?? null;
-  return {
-    trans_date: bankTx.trans_date,
-    type: isPurchase ? "매입" : "매출",
-    client_id: bankTx.matched_client_id,
-    client_name_raw: bankTx.matched_client_name_raw,
-    item_name: matchedClientName ?? bankTx.description,
-    purchase_amount: isPurchase ? bankTx.amount : 0,
-    purchase_vat: 0,
-    sales_amount: isPurchase ? 0 : bankTx.amount,
-    sales_vat: 0,
-    payment_type: "immediate",
-    vat_included: false,
-    tax_invoice_issued: false,
-    needs_classification: true,
-    note1: `[은행] ${accountName}${bankTx.description ? ` · ${bankTx.description}` : ""}`,
-  };
+// 장부에 넣을 결제방식 "송금"의 id(lib/bankLedger.ts의 BANK_LEDGER_PAYMENT_METHOD) — 목록에 없거나 조회가 실패하면 null(결제방식 빈칸으로 등록,
+// 등록 취소·삭제 때는 빈칸인 줄만 그대로로 봄 — 지우지 않는 쪽).
+async function remitPaymentMethodId(supabase: Awaited<ReturnType<typeof createClient>>): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("payment_methods")
+    .select("id")
+    .eq("name", BANK_LEDGER_PAYMENT_METHOD)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data.id as string;
 }
 
 // 은행 거래내역 체크박스 ON — 매입/매출장(transactions)에 "분류 대기 중" 상태로 자동 등록.
@@ -193,9 +175,11 @@ export async function promoteBankTransactionToLedger(formData: FormData) {
   if (bankTx.promoted_transaction_id) return {};
   if (bankTx.transfer_group_id) return { error: "계좌 간 이체 내역은 매입/매출장으로 올릴 수 없습니다." };
 
+  // 결제방식은 송금이 기본(11/12 사용자 요청) — 목록에 송금이 없으면 예전처럼 빈칸
+  const paymentMethodId = await remitPaymentMethodId(supabase);
   const { data: inserted, error } = await supabase
     .from("transactions")
-    .insert(ledgerRowFromBank(bankTx))
+    .insert({ ...ledgerRowFromBank(bankTx), payment_method_id: paymentMethodId })
     .select("id")
     .single();
   if (error || !inserted) return { error: error?.message ?? "매입/매출장 등록에 실패했습니다." };
@@ -218,9 +202,7 @@ export async function promoteBankTransactionToLedger(formData: FormData) {
 const CLASSIFIED_LEDGER_ERROR =
   "매입/매출장 내역이 등록 당시와 달라져서 안전을 위해 지우지 않았습니다. 장부에서 분류·수정했거나, 등록 후 은행 쪽 내용·거래처·계좌 별칭을 바꾼 경우입니다. 매입/매출장에서 해당 내역을 직접 삭제한 뒤 다시 시도해주세요.";
 
-// 자동 등록된 장부 내역이 등록 당시 그대로인지 — 등록 때 넣은 값(ledgerRowFromBank)과 모든 칸이
-// 같고, 등록 때 비워둔 칸(프로젝트·카테고리·결제수단·메모2·수량·단가)도 여전히 비어 있을 때만
-// true. 하나라도 다르면 누군가 장부에서 손댄 것이라 은행 쪽 취소/삭제와 함께 지우지 않는다.
+// 자동 등록된 장부 내역이 등록 당시 그대로인지(lib/bankLedger.ts의 isLedgerRowUntouched — 결제방식은 송금 또는 빈칸).
 // 조회 자체가 실패하면 판단할 수 없으니 지우지 않는 쪽(false)으로.
 async function isLedgerUntouched(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -230,14 +212,8 @@ async function isLedgerUntouched(
   const { data: ledger, error } = await supabase.from("transactions").select("*").eq("id", ledgerId).maybeSingle();
   if (error) return false;
   if (!ledger) return true;
-  const expected = ledgerRowFromBank(bankTx);
-  const sameValue = (a: unknown, b: unknown) =>
-    typeof b === "number" ? Number(a) === b : (a ?? null) === (b ?? null);
-  const unchanged = (Object.keys(expected) as (keyof typeof expected)[]).every((k) => sameValue(ledger[k], expected[k]));
-  const stillEmpty = ["project_id", "category_id", "payment_method_id", "note2", "quantity", "unit_price"].every(
-    (k) => ledger[k] === null || ledger[k] === undefined
-  );
-  return unchanged && stillEmpty;
+  const remitId = ledger.payment_method_id ? await remitPaymentMethodId(supabase) : null;
+  return isLedgerRowUntouched(ledger, bankTx, remitId);
 }
 
 // 체크 해제 — 자동으로 만들어졌던 매입/매출장 내역을 같이 지운다(아직 손대지 않은 경우만).
