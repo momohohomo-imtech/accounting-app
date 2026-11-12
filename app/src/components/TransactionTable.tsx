@@ -8,7 +8,7 @@ import {
   ungroupTransactions,
 } from "@/lib/actions/transactions";
 import { unwatchTransactions, watchTransactions } from "@/lib/actions/transactionWatch";
-import { watchToggle } from "@/lib/transactionWatch";
+import { UNWATCH_CONFIRM, unwatchConfirmMessage, watchToggle, type WatchEntry } from "@/lib/transactionWatch";
 import { formatWon, formatDate } from "@/lib/format";
 import { transactionTotal } from "@/lib/credit";
 import { dateSpan, groupKindLabel, groupLedgerRows, sameCommonFields, sortGroupLines, summaryLabel } from "@/lib/paymentGroup";
@@ -122,7 +122,7 @@ function groupHead(lines: Transaction[]): Transaction {
 }
 
 // 📌 칸을 안 쓸 때 기본값 — 그릴 때마다 새 배열이 생기지 않게
-const NO_IDS: string[] = [];
+const NO_WATCH: WatchEntry[] = [];
 
 export function TransactionTable({
   transactions,
@@ -140,7 +140,8 @@ export function TransactionTable({
   paidDateById = {},
   readOnly = false,
   watchReady = false,
-  watchedIds = NO_IDS,
+  watchEntries = NO_WATCH,
+  currentYear = 0,
 }: {
   transactions: Transaction[];
   projectNodes: ProjectTreeNode[];
@@ -162,8 +163,10 @@ export function TransactionTable({
   readOnly?: boolean;
   // "챙길 거래" 창(105 SQL) — 표가 있고 관리자·직원일 때만 줄마다 📌(누르면 메모칸 아래 창에 올라감·다시 누르면 빠짐)
   watchReady?: boolean;
-  // 창에 올라간 거래 id
-  watchedIds?: string[];
+  // 창에 올라간 줄(창과 같은 것) — 📌 켜짐 표시와 빼기 확인창 문구(무엇을 빼는지·메모)에 씀
+  watchEntries?: WatchEntry[];
+  // 확인창 날짜를 창 줄처럼(올해면 월-일만)
+  currentYear?: number;
 }) {
   const COLUMNS = ALL_COLUMNS.filter(
     (c) =>
@@ -302,12 +305,22 @@ export function TransactionTable({
 
   // 📌 — 묶음 줄은 묶음의 모든 거래(lib/transactionWatch.ts의 watchToggle: 하나라도 올라가 있으면 켜짐 → 누르면 모두 빠짐)
   const watchOn = watchReady && !readOnly;
-  const watchedSet = useMemo(() => new Set(watchedIds), [watchedIds]);
+  const watchEntryById = useMemo(
+    () => new Map(watchEntries.flatMap((e) => e.transactionIds.map((id) => [id, e] as const))),
+    [watchEntries]
+  );
+  const watchedSet = useMemo(() => new Set(watchEntryById.keys()), [watchEntryById]);
 
   async function toggleWatch(ids: string[]) {
     const { action } = watchToggle(ids, watchedSet);
+    const targets = action === "unwatch" ? ids.filter((id) => watchedSet.has(id)) : ids;
+    // 빼기는 확인창(11/12 사용자 요청 "삭제 전 확인" — 휴대폰에서 다른 줄 📌를 잘못 눌러 메모째 사라지지 않게), 올리기는 바로
+    if (action === "unwatch") {
+      const entry = targets.map((id) => watchEntryById.get(id)).find((e) => e !== undefined) ?? null;
+      if (!(await confirm(unwatchConfirmMessage(entry, currentYear), UNWATCH_CONFIRM))) return;
+    }
     const fd = new FormData();
-    for (const id of action === "unwatch" ? ids.filter((id) => watchedSet.has(id)) : ids) fd.append("transaction_ids", id);
+    for (const id of targets) fd.append("transaction_ids", id);
     setBulkError(null);
     const result = await pending.run(() => (action === "watch" ? watchTransactions(fd) : unwatchTransactions(fd)));
     if (result?.error) setBulkError(result.error);

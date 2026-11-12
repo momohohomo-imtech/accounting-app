@@ -2,18 +2,29 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { formatDate, formatWon } from "@/lib/format";
+import { formatWon } from "@/lib/format";
 import { ledgerEditHref, type LedgerListParams } from "@/lib/ledgerLinks";
-import { visibleWatchEntries, WATCH_MEMO_MAX, WATCH_VISIBLE, type WatchEntry } from "@/lib/transactionWatch";
+import {
+  UNWATCH_CONFIRM,
+  unwatchConfirmMessage,
+  visibleWatchEntries,
+  watchDateLabel,
+  watchLabel,
+  WATCH_MEMO_MAX,
+  WATCH_VISIBLE,
+  type WatchEntry,
+} from "@/lib/transactionWatch";
 import { unwatchTransactions, updateTransactionWatchMemo } from "@/lib/actions/transactionWatch";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 const memoInputClass =
   "min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/10 sm:w-44 sm:flex-none";
 
 // 매입매출 "챙길 거래" 창(11/11, 105 SQL transaction_watch) — 메모칸 바로 아래. 매입장 📌로 올린 거래가 바로 보이고 ×로 빠짐(거래는
-// 그대로). 달·필터를 바꿔도 그대로, 내용만큼 늘고 줄고(비면 안 보임), 10건 넘으면 "N건 더 보기". 줄을 누르면 그 거래 수정 화면,
-// 줄마다 짧은 메모(입력칸에서 벗어나면 저장 — 매입매출 메모칸과 같게). 조회 전용 계정은 보기만. 계산은 lib/transactionWatch.ts.
+// 그대로, 빼기 전 확인창 — 11/12 사용자 요청). 달·필터를 바꿔도 그대로, 내용만큼 늘고 줄고(비면 안 보임), 10건 넘으면 "N건 더 보기".
+// 줄을 누르면 그 거래 수정 화면, 줄마다 짧은 메모(입력칸에서 벗어나면 저장 — 매입매출 메모칸과 같게). 조회 전용 계정은 보기만.
+// 계산은 lib/transactionWatch.ts.
 export function TransactionWatchPanel({
   entries,
   listParams,
@@ -80,11 +91,11 @@ function WatchLine({
   onError: (message: string | null) => void;
 }) {
   const pending = useGlobalPending();
+  const confirm = useConfirm();
   const [memo, setMemo] = useState(entry.memo);
   const lastSaved = useRef(entry.memo);
-  const date = formatDate(entry.date);
-  const dateLabel = date.startsWith(`${currentYear}-`) ? date.slice(5) : date;
-  const label = `${entry.client || "-"} · ${entry.item}`;
+  const dateLabel = watchDateLabel(entry.date, currentYear);
+  const label = watchLabel(entry);
 
   function formData() {
     const fd = new FormData();
@@ -106,6 +117,8 @@ function WatchLine({
   }
 
   async function remove() {
+    // 잘못 눌러 메모째 사라지지 않게 — 무엇을 빼는지·메모도 지워짐을 보여 주고 확인(매입장 📌 끄기와 같은 문구)
+    if (!(await confirm(unwatchConfirmMessage({ ...entry, memo }, currentYear), UNWATCH_CONFIRM))) return;
     const result = await pending.run(() => unwatchTransactions(formData()));
     onError(result?.error ?? null);
   }

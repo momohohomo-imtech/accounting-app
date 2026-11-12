@@ -2,11 +2,15 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  UNWATCH_CONFIRM,
   WATCH_MEMO_MAX,
   WATCH_VISIBLE,
   buildWatchEntries,
   normalizeWatchMemo,
+  unwatchConfirmMessage,
   visibleWatchEntries,
+  watchDateLabel,
+  watchLabel,
   watchToggle,
   type WatchRow,
 } from "@/lib/transactionWatch";
@@ -98,3 +102,40 @@ test("105 SQL: 메모 100자 제한이 앱과 같음, 거래 하나에 한 줄",
   assert.ok(sql.includes(`char_length(memo) <= ${WATCH_MEMO_MAX}`));
   assert.match(sql, /transaction_id\s+uuid not null unique references public\.transactions\(id\) on delete cascade/);
 });
+
+test("창 줄 날짜·이름: 올해면 월-일만, 거래처가 비면 -", () => {
+  assert.equal(watchDateLabel("2026-11-05", 2026), "11-05");
+  assert.equal(watchDateLabel("2025-12-30", 2026), "2025-12-30");
+  assert.equal(watchLabel({ client: "가짜상사", item: "가짜 품목" }), "가짜상사 · 가짜 품목");
+  assert.equal(watchLabel({ client: "", item: "가짜 품목" }), "- · 가짜 품목");
+});
+
+test("빼기 확인 문구: 무엇을 빼는지 + 거래는 그대로 + 메모도 지워짐(11/12 사용자 요청)", () => {
+  const entry = { date: "2026-11-05", type: "매입", client: "가짜상사", item: "가짜 품목", amount: 1234000, memo: "  가짜 현장 도착 확인 " };
+  assert.equal(
+    unwatchConfirmMessage(entry, 2026),
+    "11-05 가짜상사 · 가짜 품목 1,234,000원\n\n창에서만 빠지고 거래는 매입매출장에 그대로 남습니다.\n적어 둔 메모 \"가짜 현장 도착 확인\"도 같이 지워집니다."
+  );
+  // 메모가 없으면 메모 줄 없음, 매출은 [매출] 표시, 지난해는 연도까지
+  const sale = unwatchConfirmMessage({ ...entry, type: "매출", memo: "   ", date: "2025-12-30" }, 2026);
+  assert.equal(sale, "2025-12-30 [매출] 가짜상사 · 가짜 품목 1,234,000원\n\n창에서만 빠지고 거래는 매입매출장에 그대로 남습니다.");
+  // 어떤 줄인지 모르면 안내만
+  assert.equal(
+    unwatchConfirmMessage(null, 2026),
+    "창에서만 빠지고 거래는 매입매출장에 그대로 남습니다.\n적어 둔 메모가 있으면 같이 지워집니다."
+  );
+  // 확인창은 빨간 "빼기" 버튼
+  assert.deepEqual(UNWATCH_CONFIRM, { title: "챙길 거래에서 빼기", confirmLabel: "빼기", danger: true });
+});
+
+test("빼기 확인 문구: 묶음 줄은 창과 같은 한 줄(\"외 1곳\"·합계 금액)", () => {
+  const [entry] = buildWatchEntries([
+    row("a", { payment_group_id: "g1", client_name: "가짜상사", amount: 1000 }, { memo: "가짜 메모" }),
+    row("b", { payment_group_id: "g1", client_name: "가짜자재", amount: 2000 }),
+  ]);
+  const message = unwatchConfirmMessage(entry, 2026);
+  // "외 1곳"은 줄바꿈 안 되는 빈칸(summaryLabel)
+  assert.match(message.split("\n")[0], /^10-01 가짜상사 외\s1곳 · .+ 3,000원$/);
+  assert.ok(message.endsWith('적어 둔 메모 "가짜 메모"도 같이 지워집니다.'));
+});
+

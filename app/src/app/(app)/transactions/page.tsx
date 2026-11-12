@@ -434,7 +434,8 @@ async function TransactionListSection({
           paidDateById={paidDateById}
           readOnly={readOnly}
           watchReady={Boolean(watch?.ready && !watch.error) && canEditWatch}
-          watchedIds={watch?.rows.map((r) => r.transaction_id) ?? []}
+          watchEntries={watchEntries}
+          currentYear={currentYear}
           {...columnVisibility}
         />
       </Card>
