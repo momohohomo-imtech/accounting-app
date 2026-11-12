@@ -293,7 +293,7 @@ export function BankTransactionTable({
                     type="button"
                     onClick={() => handleTogglePromote(t.id, true)}
                     className="rounded-full border border-slate-300 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-100"
-                    title="눌러서 매입/매출장에 분류 대기 중으로 자동 등록합니다"
+                    title="눌러서 매입/매출장에 분류 대기 중으로 자동 등록합니다(결제방식 송금)"
                   >
                     등록
                   </button>

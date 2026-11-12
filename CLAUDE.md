@@ -192,7 +192,7 @@
   대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`), 메모 한 장 엑셀(`memoExport`), 공사 작업 순서
   일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내(`actionError`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`), 공구명세서 이름 [ ] 메모(`toolNameNote`), 같은 날 순서·한 번에 넣는 줄의 등록 시각·넣은 순서 id(`entryOrder`), 목록 기본 순서(`listOrder`),
   매입매출장 글자 검색(`ledgerSearch`), SQL 실행 상태(`sqlStatus`), 파일 저장 공간(`storageUsage`), 메모장 구분(`memoCategories`), 거래 일괄
-  변경 나눠 바꾸기(`bulkUpdate`)·일괄 변경 칸(`transactionBulkEdit`), 챙길 거래 창(`transactionWatch`)·수정 팝업 주소(`ledgerLinks`)의 검사가
+  변경 나눠 바꾸기(`bulkUpdate`)·일괄 변경 칸(`transactionBulkEdit`), 챙길 거래 창(`transactionWatch`)·수정 팝업 주소(`ledgerLinks`), 은행 → 장부 올리기·등록 취소 판단(`bankLedger`)의 검사가
   `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
@@ -339,6 +339,10 @@
   `unwatchConfirmMessage`: 창 줄과 같은 글자·거래는 그대로·적어 둔 메모도 지워짐, 빨간 "빼기"), 올리기는 확인 없이 바로. 올리기·빼기·메모는 관리자·직원만(조회 전용은 보기만, 세무사는 창 없음). 105 실행 전엔 창·📌 칸 숨김. 계산
   `lib/transactionWatch.ts`, 불러오기 `lib/transactionWatchLoad.ts`(표 없음은 숨김, 다른 오류는 창 자리에 안내), 저장
   `lib/actions/transactionWatch.ts`(빼기·메모는 바뀐 줄이 없으면 안내). 금액·날짜 등 거래 자료는 이 창에서 바꾸지 않음.
+- **은행 "등록"(매입/매출장으로 올리기)**: 출금 → 매입, 입금 → 매출, "분류 대기 중"으로 한 줄(`lib/bankLedger.ts`의 `ledgerRowFromBank`).
+  결제방식은 송금이 기본(11/12 사용자 요청 — 결제수단 목록에서 이름 "송금"으로 찾고, 없으면 예전처럼 빈칸, 이미 올린 줄은 안 바꿈).
+  등록 취소·은행 거래 삭제 때 장부 줄은 등록 당시 그대로일 때만 같이 지움(`isLedgerRowUntouched` — 결제방식은 송금 또는 빈칸(예전에 올린
+  줄)이면 그대로, 다른 결제방식·분류·수정한 줄은 지우지 않고 안내). 장부에 넣는 칸을 바꾸면 이 비교도 같이 바꿀 것.
 - **공구명세서 이름칸의 [ ]**(11/5 사용자 요청 — 스페너처럼 여러 종류를 챙길 때 "스페너 [13·17·19mm]"): [ ] 안 글자는 화성·동희
   반입반출증(화면 미리보기·인쇄·엑셀)에서만 빠지고 괄호 밖 이름만(`lib/toolNameNote.ts`의 `printToolName`). 공구명세서는 화면·인쇄·엑셀
   모두(체크 없는 전체 보기·"반입반출증용만 표시" 둘 다) 이름 아래 [ ] 작은 글씨(긴 글자는 칸 안에서 줄바꿈, 엑셀은 이름 칸에 적은 그대로) —
