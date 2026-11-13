@@ -151,6 +151,15 @@ export function formatWorkDays(w: WorkDaySplit): string {
   return workDayParts(w).join(", ");
 }
 
+/**
+ * 근무일당 이익금(11/13 사용자 요청 "근무일 대비 이익금") — 이익금 ÷ 총 근무일수(작업일지 날짜, 같은 날은 하루 — 위 작업일수 나눔의
+ * total), 원 단위 반올림. 이익금이 없거나(발주액 미입력) 근무일이 0이면 null("-"). 이익금이 마이너스면 마이너스 그대로.
+ */
+export function profitPerWorkDay(profit: number | null, workDays: number): number | null {
+  if (profit === null || !(workDays > 0)) return null;
+  return Math.round(profit / workDays);
+}
+
 export type TripTotals = Headcount & {
   /** 출장 날짜 수 */
   days: number;

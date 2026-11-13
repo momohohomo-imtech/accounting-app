@@ -15,9 +15,22 @@ type ProjectRow = {
   contractMismatch?: boolean;
   // 남은 금액(미수) — 진행중·공사 완료·수금 대기가 아니거나 발주액이 없으면 null("-").
   receivable: number | null;
+  // 근무일수(작업일지 날짜, 같은 날은 하루)와 근무일당 이익금(손익 ÷ 근무일수 — 근무일이 없거나 발주액이 없으면 null "-", 11/13 사용자 요청)
+  workDays: number;
+  profitPerDay: number | null;
 };
 
-type SortKey = "name" | "progress_pct" | "quoteAmount" | "profitRate" | "sales" | "receivable" | "purchase" | "profit";
+type SortKey =
+  | "name"
+  | "progress_pct"
+  | "quoteAmount"
+  | "profitRate"
+  | "sales"
+  | "receivable"
+  | "purchase"
+  | "profit"
+  | "workDays"
+  | "profitPerDay";
 
 function sortValue(p: ProjectRow & { profitRate: number }, key: SortKey): string | number {
   switch (key) {
@@ -37,6 +50,11 @@ function sortValue(p: ProjectRow & { profitRate: number }, key: SortKey): string
       return p.purchase;
     case "profit":
       return p.profit;
+    case "workDays":
+      return p.workDays;
+    case "profitPerDay":
+      // "-"(계산 못 함)는 가장 작은 값으로 — 처음 누르면(큰 순) 맨 아래
+      return p.profitPerDay ?? Number.NEGATIVE_INFINITY;
   }
 }
 
@@ -89,7 +107,8 @@ export function ProjectProfitTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[860px] text-sm">
+      {/* 1280부터는 상자 폭에 맞춤 — 맨 오른쪽 근무일당 이익금이 잘리지 않게(TransactionTable과 같은 방식), 그보다 좁으면 가로 스크롤 */}
+      <table className="w-full min-w-[1040px] text-sm xl:min-w-0">
         <thead>
           <tr className="border-b border-slate-200 text-left text-slate-500">
             <th className="pb-2 pr-4">{headerButton("name", "프로젝트")}</th>
@@ -99,7 +118,9 @@ export function ProjectProfitTable({
             <th className="pb-2 pr-4 text-right">{headerButton("sales", "매출(VAT제외)")}</th>
             <th className="pb-2 pr-4 text-right">{headerButton("receivable", "남은 금액")}</th>
             <th className="pb-2 pr-4 text-right">{headerButton("purchase", "매입(VAT제외)")}</th>
-            <th className="pb-2 text-right">{headerButton("profit", "손익")}</th>
+            <th className="pb-2 pr-4 text-right">{headerButton("profit", "손익")}</th>
+            <th className="pb-2 pr-4 text-right">{headerButton("workDays", "근무일수")}</th>
+            <th className="pb-2 text-right">{headerButton("profitPerDay", "근무일당 이익금")}</th>
           </tr>
         </thead>
         <tbody>
@@ -116,19 +137,29 @@ export function ProjectProfitTable({
                 </Link>
               </td>
               <td className="py-2 pr-4 text-right tabular-nums text-slate-700">{p.progress_pct ?? 0}%</td>
-              <td className="py-2 pr-4 text-right tabular-nums text-slate-700">{formatWon(p.quoteAmount)}</td>
+              <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums text-slate-700">{formatWon(p.quoteAmount)}</td>
               <td className="py-2 pr-4 text-right tabular-nums text-slate-700">{p.profitRate.toFixed(1)}%</td>
-              <td className="py-2 pr-4 text-right tabular-nums text-slate-700">{formatWon(p.sales)}</td>
+              <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums text-slate-700">{formatWon(p.sales)}</td>
               <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums text-slate-900">
                 {p.receivable === null ? <span className="text-slate-400">-</span> : formatWon(p.receivable)}
               </td>
-              <td className="py-2 pr-4 text-right tabular-nums text-slate-700">{formatWon(p.purchase)}</td>
-              <td className="py-2 text-right tabular-nums text-slate-700">{formatWon(p.profit)}</td>
+              <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums text-slate-700">{formatWon(p.purchase)}</td>
+              <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums text-slate-700">{formatWon(p.profit)}</td>
+              <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums text-slate-700">
+                {p.workDays > 0 ? `${p.workDays.toLocaleString("ko-KR")}일` : <span className="text-slate-400">-</span>}
+              </td>
+              <td
+                className={`whitespace-nowrap py-2 text-right tabular-nums ${
+                  p.profitPerDay !== null && p.profitPerDay < 0 ? "text-red-600" : "text-slate-900"
+                }`}
+              >
+                {p.profitPerDay === null ? <span className="text-slate-400">-</span> : formatWon(p.profitPerDay)}
+              </td>
             </tr>
           ))}
           {sorted.length === 0 && (
             <tr>
-              <td colSpan={8} className="py-8 text-center text-slate-400">
+              <td colSpan={10} className="py-8 text-center text-slate-400">
                 {year}년 프로젝트가 없습니다.
               </td>
             </tr>
