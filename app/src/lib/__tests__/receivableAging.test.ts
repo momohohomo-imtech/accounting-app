@@ -39,3 +39,18 @@ test("오래된 외상매출금: 윤년·연도가 바뀌어도 날 수가 맞�
   assert.equal(r.items.find((i) => i.id === "leap")?.days, 2);
   assert.equal(r.items.find((i) => i.id === "future")?.days, 0);
 });
+
+test("오래된 외상매출금: 마이너스 잔액(할인·단수 조정 줄)도 넣어 구간 합계 = 외상매출금 합계", () => {
+  const inputs = [
+    { id: "sale", trans_date: "2026-08-01", client: "가짜 갑", item: "가짜 공사", amount: 1_000_000 }, // 91일
+    { id: "discount", trans_date: "2026-08-01", client: "가짜 갑", item: "가짜 할인", amount: -50_000 }, // 91일
+    { id: "settled", trans_date: "2026-07-01", client: "가짜 을", item: null, amount: 0 },
+  ];
+  const r = receivableAging(inputs, "2026-10-31");
+  const over90 = r.buckets.find((b) => b.key === "over90")!;
+  assert.equal(over90.count, 2);
+  assert.equal(over90.amount, 950_000);
+  assert.equal(r.buckets.reduce((s, b) => s + b.amount, 0), inputs.reduce((s, i) => s + i.amount, 0));
+  // 같은 날이면 큰 금액 먼저, 마이너스 줄은 그 뒤
+  assert.deepEqual(r.over60.map((i) => i.id), ["sale", "discount"]);
+});

@@ -58,7 +58,8 @@ export function PieChart({ data, total }: { data: CategoryAmount[]; total: numbe
     (acc, d, i) => {
       const pct = total > 0 ? d.amount / total : 0;
       const startAngle = acc.length > 0 ? acc[acc.length - 1].endAngle : 0;
-      const endAngle = startAngle + pct * 360;
+      // 합계가 마이너스인 카테고리(할인·단수 조정 줄만 있는 경우, 11/14)는 조각 없이 아래 목록에만 — 각도가 거꾸로 가면 다른 조각을 덮음
+      const endAngle = startAngle + Math.max(0, pct) * 360;
       acc.push({ ...d, pct, startAngle, endAngle, isTop: i === 0 && d.name !== REMAINDER_LABEL });
       return acc;
     },
@@ -121,7 +122,8 @@ export function BarChart({ data, max: maxOverride }: { data: CategoryAmount[]; m
           <div className="h-5 flex-1 overflow-hidden rounded bg-slate-100 print:h-3">
             <div
               className="h-full rounded"
-              style={{ width: `${(d.amount / barMax) * 100}%`, backgroundColor: sliceColor(d.name) }}
+              // 마이너스 합계는 막대 없이 금액만(마이너스 폭은 브라우저가 버려서 막대가 꽉 차 보임)
+              style={{ width: `${Math.max(0, (d.amount / barMax) * 100)}%`, backgroundColor: sliceColor(d.name) }}
             />
           </div>
           <span className="w-24 shrink-0 text-right tabular-nums text-sm font-semibold text-slate-900 print:text-[10px]">

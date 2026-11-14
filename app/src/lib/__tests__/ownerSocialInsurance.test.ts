@@ -8,7 +8,7 @@ import {
   pensionRateFor,
 } from "@/lib/ownerSocialInsurance";
 
-// 아래 금액 검사는 2027년 요율(국민연금 10%·상한 659만원·하한 41만원, 건강보험 7.19%, 장기요양 13.14%) 기준.
+// 아래 금액 검사는 2027년 요율(국민연금 10%·상한 659만원·하한 41만원, 건강보험 7.19%, 장기요양 13.90%) 기준.
 const R2027 = insuranceRatesFor(2027);
 const estimateOwnerInsurance = (profit: number, months = 12) => estimate(profit, months, R2027);
 const ownerHealthSettlement = (profit: number, months: number, paid: number) => settlement(profit, months, paid, R2027);
@@ -19,10 +19,10 @@ test("국민연금은 기준소득월액 상한(659만원)까지만 — 이익�
   assert.equal(r.pensionYearly, 7_908_000);
 });
 
-test("건강보험은 월소득 × 7.19%, 장기요양은 그 13.14% — 10원 미만 버림", () => {
-  // 월 1,000만원: 건강 719,000 + 장기요양 94,476.6 → 94,470
+test("건강보험은 월소득 × 7.19%, 장기요양은 그 13.90% — 10원 미만 버림", () => {
+  // 월 1,000만원: 건강 719,000 + 장기요양 99,941 → 99,940
   const r = estimateOwnerInsurance(120_000_000);
-  assert.equal(r.healthMonthly, 719_000 + 94_470);
+  assert.equal(r.healthMonthly, 719_000 + 99_940);
   assert.equal(r.pensionMonthly, 659_000);
 });
 
@@ -35,13 +35,13 @@ test("상한 아래면 소득 그대로, 하한(41만원) 아래면 하한 적�
 });
 
 test("사업 기간이 12개월보다 짧으면 이익 ÷ 개월수로 월 소득을 잡음", () => {
-  // 6개월에 6,000만원 → 월 1,000만원 → 건강 719,000 + 장기요양 94,470
-  assert.equal(estimateOwnerInsurance(60_000_000, 6).healthMonthly, 813_470);
+  // 6개월에 6,000만원 → 월 1,000만원 → 건강 719,000 + 장기요양 99,940
+  assert.equal(estimateOwnerInsurance(60_000_000, 6).healthMonthly, 818_940);
 });
 
 test("건강보험 정산 = (올해 이익 기준 월 보험료 − 매달 낸 금액) × 개월수", () => {
-  // 월 1,000만원 소득(12개월) → 월 813,470, 매달 300,000 냈으면 차액 513,470 × 12
-  assert.equal(ownerHealthSettlement(120_000_000, 12, 300_000), 513_470 * 12);
+  // 월 1,000만원 소득(12개월) → 월 818,940, 매달 300,000 냈으면 차액 518,940 × 12
+  assert.equal(ownerHealthSettlement(120_000_000, 12, 300_000), 518_940 * 12);
   // 이미 더 많이 냈으면 음수(돌려받음)
   assert.ok(ownerHealthSettlement(12_000_000, 12, 300_000) < 0);
 });
@@ -70,10 +70,14 @@ test("요율 표: 연도마다 그 해 값, 상·하한은 그 해 1~6월에 쓰
   assert.equal(R2027.pensionMonthlyCap, 6_590_000);
   assert.equal(R2027.pensionMonthlyFloor, 410_000);
   assert.equal(R2027.healthRate, 0.0719);
-  // 2027년 장기요양 요율은 아직 미정 → 2026년 요율로 추정하고 화면에 표시
-  assert.equal(R2027.longTermCareOfHealth, 0.1314);
-  assert.deepEqual(R2027.estimated, [{ item: "longTermCare", fromYear: 2026 }]);
-  assert.equal(estimatedRatesNote(R2027), "장기요양 2027년 요율 미확정 — 2026년 요율 적용");
+  // 2027년 장기요양 요율(건강보험료의 13.90%)은 2026년 10월 30일 결정 → 추정 표시 없음
+  assert.equal(R2027.longTermCareOfHealth, 0.139);
+  assert.deepEqual(R2027.estimated, []);
+  assert.equal(estimatedRatesNote(R2027), "");
+  // 2028년은 건강보험·장기요양이 아직 미정 → 2027년 요율로 추정하고 화면에 표시(상·하한은 2027년 7월 고시 전)
+  const r2028 = insuranceRatesFor(2028);
+  assert.deepEqual(r2028.estimated.map((e) => `${e.item}:${e.fromYear}`), ["pensionLimits:2026", "health:2027", "longTermCare:2027"]);
+  assert.match(estimatedRatesNote(r2028), /장기요양 2028년 요율 미확정 — 2027년 요율 적용/);
 });
 
 test("요율 표: 표에 없는 먼 해는 가장 최근 값으로 추정하고 무엇을 추정했는지 남김", () => {
@@ -82,7 +86,7 @@ test("요율 표: 표에 없는 먼 해는 가장 최근 값으로 추정하고 
   assert.equal(r.pensionMonthlyCap, 6_590_000);
   assert.deepEqual(
     r.estimated.map((e) => `${e.item}:${e.fromYear}`),
-    ["pensionLimits:2026", "health:2027", "longTermCare:2026"]
+    ["pensionLimits:2026", "health:2027", "longTermCare:2027"]
   );
   assert.match(estimatedRatesNote(r), /국민연금 기준소득월액 상·하한 2029년 7월 고시 전 — 2026년 7월 기준 적용 · 건강보험 2030년 요율 미확정 — 2027년 요율 적용/);
   // 표보다 이른 해는 가장 이른 값

@@ -48,6 +48,20 @@ test("숫자만 적으면 합계 금액이 같은 거래도(쉼표 있어도)", 
   assert.ok(matchesLedgerSearch(tx("d", { item_name: "가짜 2x4 각재 12개" }), searchTerms("12")), "글자에 숫자가 있으면 그것도");
 });
 
+test("마이너스 금액 줄(할인·단수 조정)도 금액으로 찾음 — 부호 없이 적어도, \"-\"를 붙이면 마이너스만", () => {
+  const minus = tx("m", { item_name: "가짜 단수 조정", purchase_amount: -7000, purchase_vat: 0 });
+  const plus = tx("p", { item_name: "가짜 볼트", purchase_amount: 7000, purchase_vat: 0 });
+  assert.ok(matchesLedgerSearch(minus, searchTerms("7000")));
+  assert.ok(matchesLedgerSearch(minus, searchTerms("7,000")));
+  assert.ok(matchesLedgerSearch(minus, searchTerms("-7000")));
+  assert.ok(matchesLedgerSearch(minus, searchTerms("-7,000")));
+  assert.ok(matchesLedgerSearch(plus, searchTerms("7000")));
+  assert.ok(!matchesLedgerSearch(plus, searchTerms("-7000")), "\"-\"를 붙이면 플러스 금액은 안 찾음");
+  assert.ok(!matchesLedgerSearch(minus, searchTerms("700")), "금액은 같을 때만");
+  // 부가세가 붙은 마이너스 줄은 합계(공급가 + 부가세)로
+  assert.ok(matchesLedgerSearch(tx("v", { purchase_amount: -105, purchase_vat: -11 }), searchTerms("116")));
+});
+
 test("한 결제 묶음은 한 줄만 맞아도 묶음 전체, 검색어가 없으면 그대로", () => {
   const rows = [
     tx("g1", { payment_group_id: "G", item_name: "가짜 페인트" }),

@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { formatWon, moneyClass } from "@/lib/format";
-import { remainingBalance, isLedgerVisible, transactionTotal } from "@/lib/credit";
+import { remainingBalance, isLedgerVisible, transactionTotal, isCreditSettled } from "@/lib/credit";
 import type { ExpenseCategory, Transaction } from "@/lib/types";
 import { vatOf, salesSupplyOf, purchaseCostOf } from "@/lib/vatBasis";
 import {
@@ -317,7 +317,9 @@ export default async function DashboardPage({
   // 받을 돈(외상 매출)과 줄 돈(외상 매입)은 반드시 따로 — 예전엔 둘을 더한 한 숫자로 보여줬음.
   const creditReceivable = creditTx.filter((t) => t.type === "매출").reduce((s, t) => s + remainingBalance(t, payments), 0);
   const creditPayable = creditTx.filter((t) => t.type === "매입").reduce((s, t) => s + remainingBalance(t, payments), 0);
-  const creditReceivableCount = creditTx.filter((t) => t.type === "매출" && remainingBalance(t, payments) > 0).length;
+  // 건수는 외상관리 탭의 미정산과 같은 기준(정산 이력이 없거나 잔액이 남은 것) — 마이너스 금액 줄(할인·단수 조정, 11/14)도 정산 전엔
+  // 미정산 1건. 예전엔 잔액이 0보다 큰 것만 세서, 마이너스 줄이 합계에는 들어가고 건수에서만 빠졌음.
+  const creditReceivableCount = creditTx.filter((t) => t.type === "매출" && !isCreditSettled(t, payments)).length;
   // 오래된 외상매출금 — 세금계산서(거래일)부터 오늘까지 지난 날(lib/receivableAging.ts), 잔액은 외상매출금 합계와 같은 기준.
   const aging = receivableAging(
     creditTx
@@ -335,7 +337,7 @@ export default async function DashboardPage({
   // 이번 달 신고·납부 일정(lib/annualTasks.ts), 1~5월엔 전년도 신고 자료 바로가기.
   const monthTasks = tasksForMonth(today.year, today.month);
   const showPrevYearFiling = today.month <= 5 && selectedYear === today.year;
-  const creditPayableCount = creditTx.filter((t) => t.type === "매입" && remainingBalance(t, payments) > 0).length;
+  const creditPayableCount = creditTx.filter((t) => t.type === "매입" && !isCreditSettled(t, payments)).length;
 
   const yearSales = yearTx.reduce((s, t) => s + t.sales_amount + t.sales_vat, 0);
   const yearPurchase = yearTx.reduce((s, t) => s + t.purchase_amount + t.purchase_vat, 0);

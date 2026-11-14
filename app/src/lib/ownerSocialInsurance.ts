@@ -27,6 +27,7 @@ const HEALTH_RATE: Record<number, number> = {
 const LONG_TERM_CARE_OF_HEALTH: Record<number, number> = {
   2025: 0.1295,
   2026: 0.1314,
+  2027: 0.139, // 2027: 소득 대비 0.9994% = 건강보험료 대비 13.90%(2026년 10월 30일 장기요양위원회 결정)
 };
 
 export type EstimatedRate = { item: "pensionLimits" | "health" | "longTermCare"; fromYear: number };
