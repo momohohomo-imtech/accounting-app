@@ -39,6 +39,7 @@ import { buildWorkLogSummary } from "@/lib/workLogSummary";
 import {
   formatTripPeriod,
   headcountForProjects,
+  profitPerWorkDay,
   tripProjectLabel,
   workDaySplitForProjects,
   type TripDayRow,
@@ -382,7 +383,11 @@ export default async function ReportsPage({
     // 단, 결산 정리가 끝난 프로젝트는 목록에서 일반 검정으로 되돌림(보고서 팝업 안 경고는 별개, 항상 유지).
     const contractMismatch =
       !p.settlement_finalized && (p.contract_amount ?? 0) > 0 && quoteAmount - (p.contract_amount ?? 0) - agencyAmount !== 0;
-    return { ...p, quoteAmount, sales, purchase, profit, contractMismatch, receivable: receivableAmount([p]) };
+    // 근무일수(이 프로젝트 작업일지 날짜, 같은 날은 하루 — 출장 날짜 포함)와 근무일당 이익금(11/13 사용자 요청). 줄마다 자기 것
+    // (손익 칸과 같게), 발주액이 없으면 이익을 알 수 없어 "-"(손익보고서 팝업의 "발주액 미입력"과 같게).
+    const workDays = workDaySplitForProjects(projectWorkLogRows, projectTripDays, [p.id]).total;
+    const profitPerDay = profitPerWorkDay(quoteAmount > 0 ? profit : null, workDays);
+    return { ...p, quoteAmount, sales, purchase, profit, workDays, profitPerDay, contractMismatch, receivable: receivableAmount([p]) };
   });
   // 묶음(맨 위 어미 + 귀속 하위 — 예전 3단 자료도 맨 위 어미로)과 "타 프로젝트 귀속" 하위가 물려받는 어미 상태 — 대시보드
   // 이익 예상·프로젝트 목록과 같은 기준(lib/projectProfit.ts).
@@ -911,6 +916,8 @@ export default async function ReportsPage({
     p.purchase,
     p.profit,
     p.quoteAmount > 0 ? Math.round((p.profit / p.quoteAmount) * 1000) / 10 : 0,
+    p.workDays,
+    p.profitPerDay ?? "",
   ]);
 
   const revenueExportRows = revenueVerificationRows.map((r) => [
@@ -1178,7 +1185,7 @@ export default async function ReportsPage({
             "projects",
             {
               filename: `프로젝트별_손익_${selectedYear}.xlsx`,
-              headers: ["프로젝트", "진행률", "발주액", "매출(VAT제외)", "남은 금액", "매입(VAT제외)", "이익금", "이익율"],
+              headers: ["프로젝트", "진행률", "발주액", "매출(VAT제외)", "남은 금액", "매입(VAT제외)", "이익금", "이익율", "근무일수", "근무일당 이익금"],
               rows: projectExportRows,
             },
             <>

@@ -184,7 +184,7 @@
 - **금액 계산을 바꾸면 `npm test`(app 폴더)로 자동 검사를 돌릴 것.** 부가세 분리(`vatBasis`),
   외상 잔액(`credit`), 종합소득세(`tax`), 견적 금액·한글 금액(`quoteCalc`·`numberToKorean`),
   예상 미수액·프로젝트 받은 돈(`expectedReceivable`), 이익 예상(`projectProfit` — 대시보드·보고서 공통, 남은 달 고정지출 포함), 프로젝트 목록 하단 합계·통합
-  보고서(`projectListTotals`), 엑셀 거래 읽기(`transactionExcel`), 작업일지 집계(`workLogSummary`), 출장일지 합계·보고서 작업일수 나눔·출장 투입 인원(`tripLog`), 보고서 출장 현황(`tripOverview`), 매입장 한 결제 묶기(`paymentGroup`), 장부 점검(`ledgerCheck`), 거래 수정 이력 표시·일괄 변경 접기(`transactionHistory`), 백업
+  보고서(`projectListTotals`), 엑셀 거래 읽기(`transactionExcel`), 작업일지 집계(`workLogSummary`), 출장일지 합계·보고서 작업일수 나눔·출장 투입 인원·근무일당 이익금(`tripLog`), 보고서 출장 현황(`tripOverview`), 매입장 한 결제 묶기(`paymentGroup`), 장부 점검(`ledgerCheck`), 거래 수정 이력 표시·일괄 변경 접기(`transactionHistory`), 백업
   끝까지 담기(`backup`), 복원 막기·표 목록·나눠 올리기(`restore`), 백업 상태(`backupStatus`), 삭제 막기(`deleteGuard`), 급여 중복
   확인(`payrollDuplicates`), 긴 ID 목록 나눠 조회·자동완성 기간(`supabaseFetchAll`), 파일 올리기 규칙(`fileUpload`), 백업 자동
   정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
@@ -339,6 +339,9 @@
   `unwatchConfirmMessage`: 창 줄과 같은 글자·거래는 그대로·적어 둔 메모도 지워짐, 빨간 "빼기"), 올리기는 확인 없이 바로. 올리기·빼기·메모는 관리자·직원만(조회 전용은 보기만, 세무사는 창 없음). 105 실행 전엔 창·📌 칸 숨김. 계산
   `lib/transactionWatch.ts`, 불러오기 `lib/transactionWatchLoad.ts`(표 없음은 숨김, 다른 오류는 창 자리에 안내), 저장
   `lib/actions/transactionWatch.ts`(빼기·메모는 바뀐 줄이 없으면 안내). 금액·날짜 등 거래 자료는 이 창에서 바꾸지 않음.
+- **근무일당 이익금**(11/13 사용자 요청 "근무일 대비 이익금"): 이익금 ÷ 총 근무일수(작업일지 날짜 — 같은 날은 하루, 출장 날짜 포함,
+  손익보고서 팝업 "근무일수"의 총과 같은 기준), `lib/tripLog.ts`의 `profitPerWorkDay`로만. 보고서 "프로젝트별 손익" 표·엑셀은 줄마다 자기
+  것(손익 칸과 같게, 발주액이 없으면 "-"), 손익보고서 팝업은 귀속 하위까지 합친 묶음(이익금 ÷ 총 근무일) — 근무일이 없으면 "-".
 - **은행 "등록"(매입/매출장으로 올리기)**: 출금 → 매입, 입금 → 매출, "분류 대기 중"으로 한 줄(`lib/bankLedger.ts`의 `ledgerRowFromBank`).
   결제방식은 송금이 기본(11/12 사용자 요청 — 결제수단 목록에서 이름 "송금"으로 찾고, 없으면 예전처럼 빈칸, 이미 올린 줄은 안 바꿈).
   등록 취소·은행 거래 삭제 때 장부 줄은 등록 당시 그대로일 때만 같이 지움(`isLedgerRowUntouched` — 결제방식은 송금 또는 빈칸(예전에 올린

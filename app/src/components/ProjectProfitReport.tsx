@@ -29,6 +29,7 @@ import {
   formatWorkDays,
   headcountForProjects,
   tripTotals,
+  profitPerWorkDay,
   workDaySplitForProjects,
   workLogContentsByProjectDate,
   type TripDayRow,
@@ -241,6 +242,8 @@ export async function ProjectProfitReport({
   const profit = quoteTotal ? quoteTotal - purchaseTotal - agencyTotal : null;
   // 이익율은 발주액 대비 비율
   const margin = quoteTotal && profit !== null ? (profit / quoteTotal) * 100 : null;
+  // 근무일당 이익금 = 이익금 ÷ 총 근무일수(위 "근무일수"의 총 — 작업일지 날짜, 같은 날은 하루, 11/13 사용자 요청 "근무일 대비 이익금")
+  const profitPerDay = profitPerWorkDay(profit, workDays.total);
   // 외상 미정산(완납 전) 매입은 위 매입 합계·이익금에서 빠져 있음 — 따로 합산해서 보여주고, 이익금에서 뺀
   // 금액을 노란 글씨로(사용자 요청). 정산되면 매입 합계로 옮겨 가서 두 번 빠지지 않음.
   const unsettled = unsettledCreditPurchase(purchaseRowsRaw, creditPayments);
@@ -323,6 +326,7 @@ export async function ProjectProfitReport({
       ? ([["이익금 − 외상 미정산분", formatWon(profitAfterUnsettled)]] as [string, string][])
       : []),
     ["이익율", margin === null ? "-" : `${margin.toFixed(2)}%`],
+    [`근무일당 이익금 (총 근무일 ${workDays.total}일)`, profitPerDay === null ? "-" : formatWon(profitPerDay)],
     ["받은 금액 (부가세 제외)", formatWon(receipts.received)],
     ["남은 금액 (받을 금액, 부가세 제외)", receivableLabel],
     ...(receivable && receivable.quote > 0 && receivable.amount > 0 && finalProfit !== null && finalProfit < 0
@@ -490,6 +494,19 @@ export async function ProjectProfitReport({
           <p className="text-xs text-slate-500 print:text-[9px]">이익율</p>
           <p className={`tabular-nums text-sm font-bold whitespace-nowrap print:text-xs ${margin === null ? "text-slate-400" : margin >= 0 ? "text-slate-900" : "text-red-600"}`}>
             {margin === null ? "-" : `${margin.toFixed(2)}%`}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-500 print:text-[9px]">근무일당 이익금</p>
+          <p
+            className={`tabular-nums text-sm font-bold whitespace-nowrap print:text-xs ${
+              profitPerDay === null ? "text-slate-400" : profitPerDay >= 0 ? "text-slate-900" : "text-red-600"
+            }`}
+          >
+            {profitPerDay === null ? "-" : formatWon(profitPerDay)}
+          </p>
+          <p className="mt-0.5 text-[11px] text-slate-400 print:text-[8px]">
+            {workDays.total > 0 ? `이익금 ÷ 총 근무일 ${workDays.total.toLocaleString("ko-KR")}일` : "작업일지 근무일 없음"}
           </p>
         </div>
         <div>

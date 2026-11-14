@@ -11,6 +11,7 @@ import {
   inputToTripDayFields,
   latestTripContents,
   parseCount,
+  profitPerWorkDay,
   sumHeadcount,
   tripDayToInput,
   tripTotals,
@@ -193,3 +194,18 @@ test("날짜별 작업 내용: 작업 집계와 같은 이어받기, 해마다 1
   assert.equal(map.get("p1|2026-01-06"), "전기");
   assert.equal(map.get("p2|2026-01-06"), "가짜 점검");
 });
+
+test("근무일당 이익금: 이익금 ÷ 총 근무일수(원 단위 반올림), 근무일 0·이익금 없음은 null", () => {
+  assert.equal(profitPerWorkDay(1_000_000, 4), 250_000);
+  assert.equal(profitPerWorkDay(1_000_000, 3), 333_333);
+  assert.equal(profitPerWorkDay(200, 3), 67); // 66.67 → 67
+  assert.equal(profitPerWorkDay(-900_000, 3), -300_000); // 손해도 그대로
+  assert.equal(profitPerWorkDay(0, 5), 0);
+  assert.equal(profitPerWorkDay(1_000_000, 0), null); // 작업일지 없음
+  assert.equal(profitPerWorkDay(null, 5), null); // 발주액 미입력
+  // 보고서와 같은 근무일수(작업일지 날짜, 같은 날은 하루, 출장 날짜 포함)
+  const days = workDaySplit(["2026-11-02", "2026-11-02", "2026-11-03"], ["2026-11-04"]).total;
+  assert.equal(days, 3);
+  assert.equal(profitPerWorkDay(3_000_000, days), 1_000_000);
+});
+
