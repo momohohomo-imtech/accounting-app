@@ -62,12 +62,12 @@ export async function CreditSection() {
   // 092 SQL 실행 전에는 거래에 묶음 번호 칸이 없음 → 정산할 때 묶기 체크를 숨김.
   const groupingReady = hasPaymentGroupColumn(txs);
 
-  // remaining > 0이면 당연히 미정산. remaining이 0이어도 정산 이력이 아예 없으면
+  // remaining이 0이 아니면 당연히 미정산(마이너스 줄 — 단수 조정·할인 — 도 정산 전엔 마이너스 잔액). remaining이 0이어도 정산 이력이 아예 없으면
   // (금액을 0원으로 입력한 외상 건 등) 계속 목록에 보여줘야 수정/삭제할 수 있음 —
   // 실제로 정산돼서 0원이 된 건만(결제 이력 있음) 목록에서 빠져야 함.
   const outstanding = txs
     .map((tx) => ({ tx, remaining: remainingBalance(tx, pays) }))
-    .filter((item) => item.remaining > 0 || !pays.some((p) => p.transaction_id === item.tx.id));
+    .filter((item) => item.remaining !== 0 || !pays.some((p) => p.transaction_id === item.tx.id));
 
   const totalOutstanding = outstanding.reduce((s, item) => s + item.remaining, 0);
 
@@ -141,7 +141,7 @@ export async function CreditSection() {
     }
     let status: VendorHistoryItem["status"];
     if (tx.payment_type === "credit") {
-      status = remainingBalance(tx, pays) > 0 ? "미정산" : "정산완료";
+      status = remainingBalance(tx, pays) !== 0 ? "미정산" : "정산완료";
     } else if (tx.item_name?.startsWith("외상 정산")) {
       status = "정산 합계";
     } else {

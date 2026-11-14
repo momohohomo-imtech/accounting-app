@@ -256,6 +256,8 @@ export function TransactionBulkImport({
                       <MoneyInput
                         value={r.amount}
                         onValueChange={(v) => updateRow(i, { amount: Number(v) || 0 })}
+                        // 엑셀의 마이너스 금액(단수 조정·할인 줄)도 고칠 때 부호가 지워지지 않게
+                        allowNegative
                         className={cx(fieldClass, "w-28 text-right")}
                       />
                     </td>

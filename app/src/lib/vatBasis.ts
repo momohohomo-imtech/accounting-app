@@ -28,9 +28,22 @@ export function isVatExemptCategory(category: CategoryInfo | null | undefined) {
   return Boolean(category.vat_exempt);
 }
 
+/**
+ * 원 단위 반올림 — 마이너스 금액(단수 조정·할인 줄, 11/14 사용자 요청)도 플러스와 똑같이(−105의 10%는 −11, Math.round만 쓰면 −10).
+ * 플러스 금액은 Math.round와 결과가 같아서 지금까지의 숫자는 그대로.
+ */
+export function roundWon(value: number) {
+  return value < 0 ? -Math.round(-value) : Math.round(value);
+}
+
+/** 등록 화면 "부가세 별도(10% 더하기)" 체크 때 얹는 부가세 — 서버 저장(computeAmounts)과 화면 미리보기 합계가 같은 계산 */
+export function addedVat(amount: number) {
+  return roundWon(amount * 0.1);
+}
+
 export function supplyOf(row: VatBasisRow) {
   const gross = transactionTotal(row);
-  return isVatExemptCategory(one(row.expense_categories)) ? gross : Math.round(gross / 1.1);
+  return isVatExemptCategory(one(row.expense_categories)) ? gross : roundWon(gross / 1.1);
 }
 
 export function vatOf(row: VatBasisRow) {
