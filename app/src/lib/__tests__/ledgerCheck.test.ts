@@ -1,6 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { findDuplicateCandidates, taxFinanceKind, uncategorizedPurchases, type LedgerCheckRow } from "@/lib/ledgerCheck";
+import {
+  duplicateKey,
+  findDuplicateCandidates,
+  splitDismissed,
+  taxFinanceKind,
+  uncategorizedPurchases,
+  type LedgerCheckRow,
+} from "@/lib/ledgerCheck";
 
 // 가짜 거래(실제 회사 자료 아님)
 let seq = 0;
@@ -98,3 +105,24 @@ test("카테고리 빈 매입: 매출·카테고리 있는 매입은 빼고, 세
     ]
   );
 });
+
+test("중복 의심 숨기기 열쇠: 거래 id를 정렬해 이음 — 순서·겹침과 상관없이 같은 묶음이면 같은 열쇠(11/14)", () => {
+  assert.equal(duplicateKey(["b", "a", "c"]), "a,b,c");
+  assert.equal(duplicateKey(["c", "a", "b", "a"]), "a,b,c");
+  // 같은 거래가 하나 더 들어오면 열쇠가 달라짐 → 다시 보임
+  assert.notEqual(duplicateKey(["a", "b"]), duplicateKey(["a", "b", "c"]));
+  const a = tx("2026-10-01", 5_000);
+  const b = tx("2026-10-01", 5_000);
+  const [group] = findDuplicateCandidates([b, a]);
+  assert.equal(group.key, duplicateKey([a.id, b.id])); // 묶음 열쇠 = 숨김 열쇠
+});
+
+test("중복 의심 숨기기: 숨긴 열쇠의 묶음만 hidden, 나머지는 순서 그대로 shown", () => {
+  const groups = [{ key: "a,b" }, { key: "c,d" }, { key: "e,f" }];
+  assert.deepEqual(splitDismissed(groups, new Set(["c,d", "x,y"])), {
+    shown: [{ key: "a,b" }, { key: "e,f" }],
+    hidden: [{ key: "c,d" }],
+  });
+  assert.deepEqual(splitDismissed(groups, new Set()), { shown: groups, hidden: [] });
+});
+

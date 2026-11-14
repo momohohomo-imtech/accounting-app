@@ -6,7 +6,7 @@ import type { ExpenseCategory, PaymentMethod, Transaction } from "@/lib/types";
 import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components/ProjectPicker";
 import { bulkImportTransactions, saveTransactionGroup, type BulkTransactionInput } from "@/lib/actions/transactions";
 import { formatWon, todayString } from "@/lib/format";
-import { isVatExemptCategory } from "@/lib/vatBasis";
+import { addedVat, isVatExemptCategory } from "@/lib/vatBasis";
 import { resolveCategoryColor } from "@/lib/categoryColor";
 import { paymentMethodColorStyle } from "@/lib/paymentMethodColors";
 import { useEscapeKey } from "@/lib/useEscapeKey";
@@ -134,9 +134,11 @@ export function TransactionForm({
   // 실제 저장 시 각 줄마다 VAT를 반올림해서 더하는 computeAmounts와 동일한 방식으로 미리보기 합계를 계산.
   const grandTotal = lineItems.reduce((s, li) => {
     const base = Number(li.subtotal) || 0;
-    const vat = vatAppliesNow ? Math.round(base * 0.1) : 0;
+    const vat = vatAppliesNow ? addedVat(base) : 0;
     return s + base + vat;
   }, 0);
+  // 마이너스 줄(단수 조정·할인 — 11/14 사용자 요청 "실제 금액을 적고 마이너스로 빼려고")이 있으면 합계 옆에 표시
+  const negativeLineCount = lineItems.filter((li) => (Number(li.subtotal) || 0) < 0).length;
 
   function set<K extends keyof typeof values>(key: K, v: (typeof values)[K]) {
     setValues((prev) => ({ ...prev, [key]: v }));
@@ -167,6 +169,17 @@ export function TransactionForm({
         }
         return next;
       })
+    );
+  }
+
+  // 줄의 + / − 바꾸기 — 소계(와 단가가 있으면 단가도)의 부호를 뒤집음. 휴대폰 숫자 자판에는 "-"가 없어서 버튼으로. 빈 소계에서
+  // 누르면 "-"만 들어가 그다음 친 숫자가 마이너스가 됨.
+  function toggleLineSign(i: number) {
+    const flip = (raw: string) => (raw.startsWith("-") ? raw.slice(1) : `-${raw}`);
+    setLineItems((prev) =>
+      prev.map((li, idx) =>
+        idx !== i ? li : { ...li, subtotal: flip(li.subtotal), unit_price: li.unit_price ? flip(li.unit_price) : li.unit_price }
+      )
     );
   }
 
@@ -368,7 +381,8 @@ export function TransactionForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    const validItems = lineItems.filter((li) => li.subtotal);
+    // "-"만 있는 줄(마이너스 버튼만 누르고 숫자를 안 친 줄)은 빈 줄과 같게
+    const validItems = lineItems.filter((li) => li.subtotal && li.subtotal !== "-");
     if (validItems.length === 0) {
       setError("최소 한 개 항목의 소계(금액)를 입력해주세요.");
       return;
@@ -746,18 +760,36 @@ export function TransactionForm({
                       type="text"
                       inputMode="decimal"
                       value={formatThousands(li.unit_price)}
-                      onChange={(e) => handleLineUnitPrice(i, parseNumericInput(e.target.value))}
+                      onChange={(e) => handleLineUnitPrice(i, parseNumericInput(e.target.value, { allowNegative: true }))}
                       className={inputClass}
+                      style={li.unit_price.startsWith("-") ? { color: "#dc2626" } : undefined}
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <span className="text-xs font-medium text-slate-500">소계</span>
+                    <span className="flex items-center justify-between gap-2 text-xs font-medium text-slate-500">
+                      소계
+                      <button
+                        type="button"
+                        onClick={() => toggleLineSign(i)}
+                        aria-pressed={li.subtotal.startsWith("-")}
+                        aria-label={`${i + 1}번째 줄 마이너스(빼는 금액)로 바꾸기`}
+                        title="단수 조정·할인처럼 빼는 금액이면 누르세요(누를 때마다 + / − 바뀜)"
+                        className={`rounded border px-1.5 text-[11px] font-semibold leading-5 ${
+                          li.subtotal.startsWith("-")
+                            ? "border-red-300 bg-red-50 text-red-600"
+                            : "border-slate-300 text-slate-500 hover:bg-slate-100"
+                        }`}
+                      >
+                        − 마이너스
+                      </button>
+                    </span>
                     <input
                       type="text"
                       inputMode="decimal"
                       value={formatThousands(li.subtotal)}
-                      onChange={(e) => updateLineItem(i, { subtotal: parseNumericInput(e.target.value) })}
+                      onChange={(e) => updateLineItem(i, { subtotal: parseNumericInput(e.target.value, { allowNegative: true }) })}
                       className={inputClass}
+                      style={li.subtotal.startsWith("-") ? { color: "#dc2626" } : undefined}
                     />
                   </div>
                 </div>
@@ -790,6 +822,9 @@ export function TransactionForm({
           )}
           <p className="ml-auto whitespace-nowrap text-right text-sm font-semibold text-slate-900">
             합계{vatAppliesNow && <span className="ml-1 text-xs font-normal text-slate-400">(VAT 포함)</span>}
+            {negativeLineCount > 0 && (
+              <span className="ml-1 text-xs font-normal text-red-600">(마이너스 {negativeLineCount}줄 포함)</span>
+            )}
             <span className="ml-1 tabular-nums text-base">{formatWon(grandTotal)}</span>
           </p>
         </div>

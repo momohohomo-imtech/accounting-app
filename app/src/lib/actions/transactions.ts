@@ -6,6 +6,7 @@ import { remainingBalance } from "@/lib/credit";
 import { fetchAllRowsIn } from "@/lib/supabaseFetchAll";
 import { entryTimestamps } from "@/lib/entryOrder";
 import { updateInChunks } from "@/lib/bulkUpdate";
+import { addedVat } from "@/lib/vatBasis";
 import type { CreditPayment, Transaction } from "@/lib/types";
 
 // 거래가 바뀌면 금액이 보이는 모든 화면을 새로 그리게 한다.
@@ -19,8 +20,9 @@ function revalidateLedgerPages() {
 // addVat 체크 시에만 입력 금액의 10%를 얹어서 합계에 더함. 체크 안 하면(기본값) 입력한 금액이
 // 곧 최종 합계이고 부가세는 0 — "얼마인지 모르니 자동으로 계산해준다"는 동작은 없음, 항상 사용자가
 // 명시적으로 체크해야만 10%가 붙음.
+// 마이너스 금액(단수 조정·할인 줄 — 11/14 사용자 요청)도 그대로 저장, 부가세도 마이너스로 대칭(lib/vatBasis.ts의 addedVat).
 function computeAmounts(type: string, amount: number, addVat: boolean) {
-  const vat = addVat ? Math.round(amount * 0.1) : 0;
+  const vat = addVat ? addedVat(amount) : 0;
   if (type === "매출") {
     return { sales_amount: amount, sales_vat: vat, purchase_amount: 0, purchase_vat: 0 };
   }

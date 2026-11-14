@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { kstDateTime } from "@/lib/kstDate";
 import { RestoreBackupButton } from "@/components/RestoreBackupButton";
 import { DeleteBackupButton } from "@/components/DeleteBackupButton";
+import { BackupDownloadLink } from "@/components/BackupFolderControls";
 
 type BackupRow = {
   id: string;
@@ -104,14 +105,7 @@ export function BackupsTable({ backups }: { backups: BackupRow[] }) {
             <td className="whitespace-nowrap py-2 pr-4 tabular-nums text-slate-600">{kstDateTime(b.created_at)}</td>
             <td className="py-2 text-right">
               <div className="flex justify-end gap-2">
-                {b.signedUrl && (
-                  <a
-                    href={b.signedUrl}
-                    className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-100"
-                  >
-                    다운로드
-                  </a>
-                )}
+                {b.signedUrl && <BackupDownloadLink fileName={b.file_name} url={b.signedUrl} />}
                 <RestoreBackupButton fileName={b.file_name} />
                 <DeleteBackupButton id={b.id} fileName={b.file_name} />
               </div>

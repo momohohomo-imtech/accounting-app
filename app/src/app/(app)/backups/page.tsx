@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { BackupNowButton } from "@/components/BackupNowButton";
+import { BackupFolderControls } from "@/components/BackupFolderControls";
 import { BackupsTable } from "@/components/BackupsTable";
 import { AccountPanel } from "@/components/AccountPanel";
 import { getAccounts } from "@/lib/actions/accounts";
@@ -113,6 +114,8 @@ export default async function BackupsPage() {
         <h1 className="text-2xl font-bold text-slate-900">백업</h1>
         <BackupNowButton />
       </div>
+      {/* 수동 백업을 PC의 정한 폴더(예: E:\문서\…\back up)에 바로 저장 — PC 크롬·엣지(11/14 사용자 요청) */}
+      <BackupFolderControls />
 
       {status.autoStale && (
         <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">

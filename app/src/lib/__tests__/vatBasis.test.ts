@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isVatExemptCategory, supplyOf, vatOf, salesSupplyOf, purchaseCostOf } from "@/lib/vatBasis";
+import { addedVat, isVatExemptCategory, roundWon, supplyOf, vatOf, salesSupplyOf, purchaseCostOf } from "@/lib/vatBasis";
 
 const sale = (total: number, category?: { name: string; vat_exempt?: boolean | null; vat_non_deductible?: boolean | null }) => ({
   type: "매출",
@@ -70,3 +70,28 @@ test("매출 공급가는 매출에만", () => {
   assert.equal(salesSupplyOf(sale(1_100_000)), 1_000_000);
   assert.equal(salesSupplyOf(purchase(1_000_000, 100_000)), 0);
 });
+
+test("마이너스 금액(단수 조정·할인 줄, 11/14): 반올림·부가세가 플러스와 대칭, 플러스는 예전과 같음", () => {
+  // 원 단위 반올림 — .5는 0에서 먼 쪽으로(플러스는 Math.round와 같음)
+  assert.equal(roundWon(10.5), 11);
+  assert.equal(roundWon(-10.5), -11);
+  assert.equal(roundWon(-10.4), -10);
+  assert.equal(roundWon(12.49), Math.round(12.49));
+  // "부가세 별도" 체크 때 얹는 부가세
+  assert.equal(addedVat(105), 11);
+  assert.equal(addedVat(-105), -11);
+  assert.equal(addedVat(-7), -1);
+  assert.equal(addedVat(0), 0);
+  // 공급가·부가세 나누기 — 마이너스 줄은 같은 금액 플러스 줄의 정확히 반대(합치면 0)
+  const row = (total: number) => ({ type: "매입", purchase_amount: total, purchase_vat: 0, sales_amount: 0, sales_vat: 0 });
+  for (const total of [11, 1_100, 5_005, 7, 116, 1_234_567]) {
+    assert.equal(supplyOf(row(-total)), -supplyOf(row(total)), `공급가 ${total}`);
+    assert.equal(vatOf(row(-total)), -vatOf(row(total)), `부가세 ${total}`);
+    assert.equal(purchaseCostOf(row(total)) + purchaseCostOf(row(-total)), 0);
+  }
+  // 플러스 금액은 예전 계산(Math.round(총액 ÷ 1.1))과 같음 — 지금까지의 숫자는 안 바뀜
+  for (const total of [1, 5, 16, 116, 5_005, 99_999, 1_234_567]) {
+    assert.equal(supplyOf(row(total)), Math.round(total / 1.1));
+  }
+});
+

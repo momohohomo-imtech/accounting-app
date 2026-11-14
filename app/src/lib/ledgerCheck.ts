@@ -25,6 +25,23 @@ export const clientLabel = (t: Pick<LedgerCheckRow, "clients" | "client_name_raw
 
 const normalize = (s: string | null | undefined) => (s ?? "").replace(/\s+/g, "").toLowerCase();
 
+/**
+ * 중복 의심 묶음의 열쇠 — 묶음 거래 id를 정렬해 쉼표로 이음. "숨기기"(106 SQL duplicate_dismissals.dup_key, 11/14 사용자 요청 "실제로
+ * 두 번 산 게 맞는 묶음은 표에서 안 보이게")가 이 열쇠로 저장됨 — 같은 거래들로 다시 묶이면 계속 숨김, 같은 거래가 하나 더 들어오거나
+ * 빠져 묶음이 바뀌면 열쇠가 달라져 다시 보임(새로 확인할 것이 생긴 것).
+ */
+export function duplicateKey(ids: string[]): string {
+  return Array.from(new Set(ids)).sort().join(",");
+}
+
+/** 숨긴 묶음 나누기 — 열쇠가 숨김 목록에 있으면 hidden, 아니면 shown(순서는 그대로) */
+export function splitDismissed<T extends { key: string }>(groups: T[], dismissed: ReadonlySet<string>): { shown: T[]; hidden: T[] } {
+  const shown: T[] = [];
+  const hidden: T[] = [];
+  for (const g of groups) (dismissed.has(g.key) ? hidden : shown).push(g);
+  return { shown, hidden };
+}
+
 // 중복 의심 — 같은 날·같은 구분(매입/매출)·같은 거래처·같은 품목·같은 금액(부가세 포함 총액) 거래가 2건 이상. 한 결제로 묶은
 // 줄끼리(같은 묶음 번호)는 일부러 나눈 것이라 한 건으로 셈. 0원은 뺌. 날짜 최근 순.
 export function findDuplicateCandidates<T extends LedgerCheckRow>(rows: T[]) {
@@ -39,7 +56,7 @@ export function findDuplicateCandidates<T extends LedgerCheckRow>(rows: T[]) {
   return Array.from(byKey.values())
     .filter((list) => new Set(list.map((t) => t.payment_group_id ?? t.id)).size > 1)
     .map((list) => ({
-      key: list.map((t) => t.id).join(","),
+      key: duplicateKey(list.map((t) => t.id)),
       date: list[0].trans_date,
       type: list[0].type,
       client: clientLabel(list[0]),

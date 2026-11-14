@@ -552,7 +552,9 @@ export function TransactionTable({
         <Td className="whitespace-nowrap pr-4">
           {t.tax_invoice_issued ? <Badge variant="emerald">발행</Badge> : <span className="text-slate-300">-</span>}
         </Td>
-        <Td className="whitespace-nowrap pr-4 text-right font-medium text-slate-900">{formatWon(transactionTotal(t))}</Td>
+        <Td className={cx("whitespace-nowrap pr-4 text-right font-medium", transactionTotal(t) < 0 ? "text-red-600" : "text-slate-900")}>
+          {formatWon(transactionTotal(t))}
+        </Td>
       </>
     );
   }
@@ -575,7 +577,9 @@ export function TransactionTable({
         {showMemo && memoCell(t)}
         <Td className="pr-4" />
         <Td className="pr-4" />
-        <Td className="whitespace-nowrap pr-4 text-right text-slate-700">{formatWon(transactionTotal(t))}</Td>
+        <Td className={cx("whitespace-nowrap pr-4 text-right", transactionTotal(t) < 0 ? "text-red-600" : "text-slate-700")}>
+          {formatWon(transactionTotal(t))}
+        </Td>
         {actionsCell(t.id, t.id, [t.id])}
       </Tr>
     );
