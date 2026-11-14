@@ -2964,13 +2964,12 @@ DB 변경 없음. 일용직 관리 → 출입명단 → "출입신청서"(`Acces
 - 점검 도구 위치(작업 환경 임시 폴더 — 없어지면 다시 만들 것): `full1114/` — `mkdb.sh`(SQL 순서대로), `schema.json`(구조), `qlint.cjs`·
   `schemacheck.cjs`(조회문 비교), `lists-check.mjs`, `rls-matrix.cjs`, `test106.sql`, `e2e1114.ts`(백업·복원), `sweep.cjs`·`seed1114.cjs`
   (전 화면 훑기), `regress*.sh`(예전 스크립트 한꺼번에), `fake9/server2.mjs`.
+- 조회 전용 계정의 공사 메모(점검에서 찾음): 084 SQL의 읽기 허용 목록에 `construction_memos`가 빠져 조회 전용(viewer) 계정에는 공사
+  메모가 비어 보임(관리자·직원은 정상, 자료는 그대로). 읽기 규칙 한 줄 SQL `107_viewer_read_construction_memos.sql`을 만들어 PR #110으로
+  머지했지만 **사용자 결정(11/14 "SQL 107은 사용 안 할게요"): 실행하지 않음** — 조회 전용 계정에는 공사 메모가 안 보이는 채로 둠.
+  실행을 다시 권하지 말 것. 파일은 남겨 둠(나중에 필요하다고 하면 그대로 실행 — 자료 변경 없음, 두 번 실행해도 됨, 로컬 DB에서 확인함).
 
 ### 열려 있는 것
-- **SQL 107 실행(11/14, 조회 전용 계정의 공사 메모 — 조회 전용 계정을 쓸 때만)**: 조회 전용(viewer) 계정은 공사 관리 → 공사 메모가 비어
-  보였음 — 084 SQL의 읽기 허용 목록에 `construction_memos`가 빠져 있었음(자료는 그대로, 관리자·직원은 정상). 사용자 "네"로
-  `107_viewer_read_construction_memos.sql`(읽기 규칙 한 줄, 자료 변경 없음, 두 번 실행해도 됨)을 만듦 — Supabase SQL Editor에서 실행하면
-  조회 전용 계정에도 공사 메모가 보임. 로컬 DB 확인: 실행 전 0줄 → 실행 후 읽기만(고치기·지우기 0줄, 넣기 거절), 세무사·로그인 안 함은
-  그대로 못 봄. 표·칸이 없는 SQL이라 "SQL 실행 상태"에는 안 나옴(안내 글에 번호만).
 - **SQL 106 실행(11/14, 중복 의심 숨기기)**: Supabase SQL Editor에서 `106_duplicate_dismissals.sql` 실행 — 실행 전엔 "숨기기" 버튼이 안 보임.
   실행 뒤 백업 화면 "SQL 실행 상태"에서 106이 "실행됨"인지 확인.
 - **SQL 105 실행(11/11, 매입매출 챙길 거래 창)**: Supabase SQL Editor에서 `105_transaction_watch.sql` 실행 — 실행 전엔 창과 📌 칸이 안 보임.
