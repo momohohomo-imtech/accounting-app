@@ -5,12 +5,17 @@ import { createClient } from "@/lib/supabase/server";
 import { decodeBackupFile, runBackup } from "@/lib/backup";
 import { restoreFromBackup } from "@/lib/restore";
 
-export async function createManualBackup(): Promise<{ error?: string; fileName?: string }> {
+// signedUrl — 백업 화면이 PC의 정한 폴더에 바로 저장할 때 파일을 받는 주소(10분, 못 만들면 null — 저장소 백업은 그대로 완료).
+export async function createManualBackup(): Promise<{ error?: string; fileName?: string; signedUrl?: string | null }> {
   const supabase = await createClient();
   try {
     const { fileName } = await runBackup(supabase, "manual");
     revalidatePath("/backups");
-    return { fileName };
+    const { data } = await supabase.storage
+      .from("backups")
+      .createSignedUrl(fileName, 600)
+      .catch(() => ({ data: null }));
+    return { fileName, signedUrl: data?.signedUrl ?? null };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "백업 생성에 실패했습니다." };
   }
