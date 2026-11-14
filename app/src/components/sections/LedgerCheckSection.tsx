@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
 import { transactionTotal } from "@/lib/credit";
-import { clientLabel, findDuplicateCandidates, uncategorizedPurchases, type LedgerCheckRow } from "@/lib/ledgerCheck";
+import { clientLabel, findDuplicateCandidates, splitDismissed, uncategorizedPurchases, type LedgerCheckRow } from "@/lib/ledgerCheck";
+import { loadDuplicateDismissals } from "@/lib/duplicateDismissalLoad";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { YearFilter } from "@/components/YearFilter";
 import { DuplicateCandidatesTable, type DuplicateGroup } from "@/components/DuplicateCandidatesTable";
@@ -24,7 +25,7 @@ type CheckTx = LedgerCheckRow & {
 // 카테고리 지정으로(계산은 lib/ledgerCheck.ts). 외상 정산 전 거래도 포함(장부 표시와 상관없이 등록된 거래 전부).
 export async function LedgerCheckSection({ year, years }: { year: number; years: number[] }) {
   const supabase = await createClient();
-  const [rows, { data: categories }, history, locks, role] = await Promise.all([
+  const [rows, { data: categories }, history, locks, role, dismissals] = await Promise.all([
     fetchAllRows<CheckTx>((from, to) =>
       supabase
         .from("transactions")
@@ -46,9 +47,11 @@ export async function LedgerCheckSection({ year, years }: { year: number; years:
         .then(({ data, error }) => ({ data: data as LockedYear[] | null, error }))
     ),
     getCurrentRole(),
+    // 중복 의심 숨긴 묶음(106 SQL) — 실행 전이면 숨기기 버튼 없이 다 보임
+    loadDuplicateDismissals(supabase),
   ]);
 
-  const duplicateGroups: DuplicateGroup[] = findDuplicateCandidates(rows).map((g) => ({
+  const allDuplicateGroups: DuplicateGroup[] = findDuplicateCandidates(rows).map((g) => ({
     key: g.key,
     date: g.date,
     type: g.type,
@@ -65,6 +68,8 @@ export async function LedgerCheckSection({ year, years }: { year: number; years:
         createdAt: t.created_at,
       })),
   }));
+  // 실제로 두 번 산 게 맞다고 숨긴 묶음은 표에서 빼고 아래 "숨긴 묶음"으로(11/14 사용자 요청)
+  const { shown: duplicateGroups, hidden: hiddenDuplicateGroups } = splitDismissed(allDuplicateGroups, dismissals.keys);
   const uncategorized: UncategorizedRow[] = uncategorizedPurchases(rows).map((t) => ({
     id: t.id,
     date: t.trans_date,
@@ -88,11 +93,23 @@ export async function LedgerCheckSection({ year, years }: { year: number; years:
         defaultOpen
         title={
           <span>
-            중복 의심 거래 <span className="text-sm font-normal text-slate-500">{duplicateGroups.length}묶음</span>
+            중복 의심 거래{" "}
+            <span className="text-sm font-normal text-slate-500">
+              {duplicateGroups.length}묶음{hiddenDuplicateGroups.length > 0 && ` · 숨김 ${hiddenDuplicateGroups.length}묶음`}
+            </span>
           </span>
         }
       >
-        <DuplicateCandidatesTable groups={duplicateGroups} year={year} />
+        {dismissals.error && (
+          <p className="mb-2 text-xs text-red-600">숨긴 묶음을 불러오지 못해 전부 보여 드려요: {dismissals.error}</p>
+        )}
+        <DuplicateCandidatesTable
+          groups={duplicateGroups}
+          hiddenGroups={hiddenDuplicateGroups}
+          year={year}
+          dismissReady={dismissals.ready && !dismissals.error}
+          canEdit={role === "admin" || role === "staff"}
+        />
       </CollapsibleSection>
       <CollapsibleSection
         defaultOpen

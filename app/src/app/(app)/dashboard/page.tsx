@@ -47,7 +47,8 @@ import { tasksForMonth, tasksSummary } from "@/lib/annualTasks";
 import { one } from "@/lib/relations";
 import { ReceivableAgingTable } from "@/components/ReceivableAgingTable";
 import { RecentTransactionsTable, type RecentTxRow } from "@/components/RecentTransactionsTable";
-import { findDuplicateCandidates, uncategorizedPurchases } from "@/lib/ledgerCheck";
+import { findDuplicateCandidates, splitDismissed, uncategorizedPurchases } from "@/lib/ledgerCheck";
+import { loadDuplicateDismissals } from "@/lib/duplicateDismissalLoad";
 import { unbilledRemainingByGroup } from "@/lib/projectProfit";
 import { businessMonthsIn, firstBusinessYear } from "@/lib/businessYear";
 
@@ -193,6 +194,7 @@ export default async function DashboardPage({
     backupRecords,
     { data: firstSale },
     groupedRows,
+    duplicateDismissals,
   ] = await Promise.all([
     fetchAllRows<Transaction>((from, to) =>
       supabase
@@ -277,6 +279,8 @@ export default async function DashboardPage({
         .order("id", { ascending: true })
         .range(from, to)
     ).catch(() => [] as { id: string; payment_group_id: string }[]),
+    // 장부 점검 탭에서 "실제로 두 번 산 게 맞다"고 숨긴 중복 의심 묶음(106 SQL) — 알림 건수에서도 뺌. 실행 전·못 읽으면 숨김 없이 셈.
+    loadDuplicateDismissals(supabase),
   ]);
   const yearProjects = yearProjectRows ?? [];
   const categoryById = new Map(((categoryRows ?? []) as ExpenseCategory[]).map((c) => [c.id, c]));
@@ -487,7 +491,7 @@ export default async function DashboardPage({
   // 장부 점검: 그 해 등록된 거래 전부(외상 미정산 포함 — 장부 점검 탭과 같게)의 중복 의심 묶음·카테고리 빈 매입.
   const groupIdOf = new Map(groupedRows.map((r) => [r.id, r.payment_group_id]));
   const checkRows = yearTxRaw.map((t) => ({ ...t, clients: one(t.clients), payment_group_id: groupIdOf.get(t.id) ?? null }));
-  const duplicateGroupCount = findDuplicateCandidates(checkRows).length;
+  const duplicateGroupCount = splitDismissed(findDuplicateCandidates(checkRows), duplicateDismissals.keys).shown.length;
   const uncategorized = uncategorizedPurchases(checkRows);
   const uncategorizedFlagged = uncategorized.filter((t) => t.kind).length;
   // 연말 점검: 프로젝트 목록과 같은 때(그 해 10월부터, 지난 해는 늘)·같은 계산(unbilledRemainingByGroup).
