@@ -1,6 +1,6 @@
 // 매입매출장 글자 검색(사용자 요청 11/7 "추가 2") — 지금 고른 기간·필터의 거래 안에서 거래처·품목·메모(메모1·2)·프로젝트·카테고리
 // 글자로 찾음. 띄어 쓴 낱말은 모두 들어 있어야 하고(그리고), 띄어쓰기·대소문자는 무시("현대기계" = "현대 기계").
-// 숫자만 적으면 금액(합계)이 같은 거래도 찾음(쉼표 있어도 됨 — "150,000"). 한 결제로 묶인 거래는 한 줄만 맞아도 묶음 전체를 보여 줌
+// 숫자만 적으면 금액(합계)이 같은 거래도 찾음(쉼표 있어도 됨 — "150,000", 마이너스 금액 줄도). 한 결제로 묶인 거래는 한 줄만 맞아도 묶음 전체를 보여 줌
 // (매입장에서 묶음이 한 줄로 보이므로 — 합계가 쪼개지지 않게). 주소 ?q= 로 남겨 상단 합계·목록·엑셀·인쇄가 같은 거래를 씀.
 // 검사: ledgerSearch.test.ts
 
@@ -46,8 +46,10 @@ export function matchesLedgerSearch(row: LedgerSearchRow, terms: string[]): bool
     (row.sales_amount ?? 0) + (row.sales_vat ?? 0) + (row.purchase_amount ?? 0) + (row.purchase_vat ?? 0);
   return terms.every((term) => {
     if (text.includes(term)) return true;
+    // 숫자만 적으면 합계 금액 — 마이너스 금액 줄(할인·단수 조정, 11/14)은 "7000"으로도 "-7000"으로도 찾음("-"를 붙이면 마이너스만)
     const digits = term.replace(/,/g, "");
-    return /^\d+$/.test(digits) && Number(digits) === total;
+    if (/^\d+$/.test(digits)) return Number(digits) === Math.abs(total);
+    return /^-\d+$/.test(digits) && Number(digits) === total;
   });
 }
 

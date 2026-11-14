@@ -13,8 +13,10 @@ export type AgingItem = AgingInput & { days: number };
 const dayNumber = (ymd: string) => Date.UTC(+ymd.slice(0, 4), +ymd.slice(5, 7) - 1, +ymd.slice(8, 10)) / 86_400_000;
 
 export function receivableAging(inputs: AgingInput[], todayYmd: string) {
+  // 잔액이 남은 것 전부 — 마이너스 잔액(매출 할인·단수 조정 줄, 11/14)도 넣어야 구간 합계가 외상매출금 합계와 맞음(예전엔 0보다
+  // 큰 것만 넣어서 마이너스 줄이 있으면 합계보다 크게 나왔음).
   const items: AgingItem[] = inputs
-    .filter((r) => r.amount > 0)
+    .filter((r) => r.amount !== 0)
     .map((r) => ({ ...r, days: Math.max(0, dayNumber(todayYmd) - dayNumber(r.trans_date)) }))
     .sort((a, b) => b.days - a.days || b.amount - a.amount);
   const buckets = AGING_BUCKETS.map((b, i) => {

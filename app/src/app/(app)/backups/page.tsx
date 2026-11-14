@@ -239,7 +239,8 @@ export default async function BackupsPage() {
           )}
           <p className="mb-3 mt-1 text-xs text-slate-500">
             실행 필요인 번호는 Supabase → SQL Editor에서 그 번호의 SQL 파일 내용을 붙여 넣고 Run(작은 번호부터 차례로). 확인은 표·칸이
-            있는지만 읽어 봅니다. 084(조회 전용 계정)·091(견적·발주 번호 — 097에 다시 들어 있음)은 표·칸이 없어 여기서 확인할 수 없습니다.
+            있는지만 읽어 봅니다. 084(조회 전용 계정)·091(견적·발주 번호 — 097에 다시 들어 있음)·107(조회 전용 계정의 공사 메모 읽기)은 표·칸이
+            없어 여기서 확인할 수 없습니다.
           </p>
           <SqlStatusTable rows={sqlRows} />
         </div>
