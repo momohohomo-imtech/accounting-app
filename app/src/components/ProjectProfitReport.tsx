@@ -347,7 +347,12 @@ export async function ProjectProfitReport({
   ];
 
   return (
-    <ProjectMemoProvider projectId={project.id} initialMemo={project.memo ?? ""} closeHref={closeHref}>
+    <ProjectMemoProvider
+      projectId={project.id}
+      initialMemo={project.memo ?? ""}
+      closeHref={closeHref}
+      label={`${project.project_code ? `${project.project_code} ` : ""}${project.name} 메모`}
+    >
     <ReportChartProvider>
     <div className="flex flex-col gap-4 print:gap-2 print:text-[11px] print:leading-snug">
       <div className="order-1 flex flex-wrap items-start justify-between gap-2">

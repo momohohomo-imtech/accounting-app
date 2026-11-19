@@ -1,14 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { formatDate } from "@/lib/format";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { Button } from "@/components/ui/Button";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { useUnsavedGuard } from "@/components/UnsavedChangesProvider";
 import { MemoCategorySelect } from "@/components/MemoCategorySelect";
 import { MEMO_UNCATEGORIZED, memoCategoryBadge, type MemoCategory } from "@/lib/memoCategories";
 
 type Memo = { id: string; title: string; content: string | null; category?: string | null; created_at: string; updated_at: string };
+
+/** 고치는 폼에 지금 적힌 값 — 처음 값과 비교해 저장 안 한 변경이 있는지 봄 */
+function readEdit(form: HTMLFormElement | null, memo: Memo) {
+  const fd = form ? new FormData(form) : null;
+  const read = (name: string, fallback: string) => (fd && fd.has(name) ? String(fd.get(name)) : fallback);
+  return `${read("category", memo.category ?? "")}\n${read("title", memo.title)}\n${read("content", memo.content ?? "")}`;
+}
 
 export function MemoCard({
   memo,
@@ -38,6 +46,19 @@ export function MemoCard({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const original = `${memo.category ?? ""}\n${memo.title}\n${memo.content ?? ""}`;
+  const [editValue, setEditValue] = useState(original);
+
+  function startEdit() {
+    setEditValue(original);
+    setEditing(true);
+  }
+
+  function stopEdit() {
+    setEditing(false);
+    setError(null);
+  }
 
   // 실패하면 카드에 오류를 보여 주고 true(성공) 대신 false
   async function run(action: (fd: FormData) => unknown, fd: FormData) {
@@ -49,6 +70,25 @@ export function MemoCard({
     setError(null);
     return true;
   }
+
+  async function saveEdit(fd: FormData): Promise<boolean> {
+    if (!String(fd.get("title") ?? "").trim()) {
+      setError("제목을 입력해야 저장할 수 있습니다.");
+      return false;
+    }
+    if (!(await run(updateAction, fd))) return false;
+    setEditing(false);
+    return true;
+  }
+
+  // 고치는 중에 취소·화면 이동·뒤로가기를 하면 저장할지 물어봄(사용자 요청 11/19)
+  const leave = useUnsavedGuard({
+    dirty: editing && editValue !== original,
+    value: editValue,
+    label: `메모 "${memo.title}"`,
+    save: () => (formRef.current ? saveEdit(new FormData(formRef.current)) : Promise.resolve(true)),
+    discard: stopEdit,
+  });
 
   async function handleMove(direction: "up" | "down") {
     const fd = new FormData();
@@ -68,10 +108,11 @@ export function MemoCard({
     return (
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <form
+          ref={formRef}
+          onChange={(e) => setEditValue(readEdit(e.currentTarget, memo))}
           onSubmit={async (e) => {
             e.preventDefault();
-            const fd = new FormData(e.currentTarget);
-            if (await run(updateAction, fd)) setEditing(false);
+            await saveEdit(new FormData(e.currentTarget));
           }}
           className="space-y-3"
         >
@@ -94,9 +135,8 @@ export function MemoCard({
               type="button"
               variant="secondary"
               size="sm"
-              onClick={() => {
-                setEditing(false);
-                setError(null);
+              onClick={async () => {
+                if (await leave()) stopEdit();
               }}
             >
               취소
@@ -183,7 +223,7 @@ export function MemoCard({
               </div>
             ) : (
               <>
-                <Button type="button" variant="secondary" size="xs" onClick={() => setEditing(true)}>
+                <Button type="button" variant="secondary" size="xs" onClick={startEdit}>
                   수정
                 </Button>
                 <Button type="button" variant="danger" size="xs" onClick={() => setConfirmingDelete(true)}>

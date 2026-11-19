@@ -60,6 +60,21 @@
     부를 것(그래야 뒤로 가도 Next.js가 캐시를 비워 새 자료로 그림).
   - 팝업을 여는 링크는 push(휴대폰 뒤로가기로 팝업이 닫히게). 팝업 위에 팝업을 겹쳐 여는 링크(보고서 팝업 → 거래 수정)도 push — 위
     팝업의 닫은 주소 = 아래 팝업 주소. 팝업 안에서 다른 팝업·화면으로 "바꿔" 가는 링크는 `replace`(작업일지 날짜 팝업 → 출장일지).
+- **메모칸은 저장하지 않고 떠날 때 저장할지 물을 것**(사용자 요청 11/19 "모든 메모장에 작성 중에 나가거나 뒤로가기·닫기 할 경우 저장할지
+  물어보기"). 새 메모칸도 예외 없이 `components/UnsavedChangesProvider.tsx`의 `useUnsavedGuard({ dirty, value, label, save, discard })`로 등록:
+  - 확인창은 하나(저장·저장 안 함·계속 작성 — ESC·바깥을 누르면 계속 작성). 링크(메뉴·탭·팝업 링크)·브라우저/휴대폰 뒤로가기·앞으로가기·
+    로그아웃 단추(`data-leave-guard` 폼)는 앱 전체에서 한꺼번에 가로챔 — 링크는 창에서 먼저 받아 막고 떠나기로 하면 같은 링크를 다시 누름,
+    뒤로가기는 Next.js가 화면을 바꾸기 전에 원래 기록으로 되돌리고 물은 뒤 같은 칸만큼 다시 감(`lib/unsavedChanges.ts`). 탭 닫기·새로고침·
+    주소창 이동은 브라우저 기본 확인창(저장 단추 없음). 칸의 닫기·취소·ESC는 훅이 돌려준 함수로(`if (await leave()) 닫기()`) — 저장 안 한
+    내용을 `useConfirm`·`window.confirm`으로 따로 묻지 말 것. `popstate`·`beforeunload` 리스너를 따로 붙이지 말 것(순서가 꼬임).
+  - `save`는 저장되면 true, 못 하면 칸에 이유를 보여 주고 false(떠나지 않음) — 칸의 저장 단추와 같은 저장이되 "저장하시겠습니까?"는 다시 묻지
+    않음. `discard`는 저장된 내용으로 되돌리거나 폼을 닫음. 아무것도 안 쓴 새 폼·손대지 않은 새 순서표/복사본은 `dirty`가 아님(묻지 않음).
+  - 입력칸에서 벗어나면 자동 저장하는 칸(`PageMemo`·통장 메모·챙길 거래 메모)은 `dirty`에서 저장 중을 빼고, `onBlur`에서
+    `isLeaveDialogFocus(e.relatedTarget)`이면 저장하지 않음(확인창이 뜨며 벗어난 것 — 확인창에서 정함).
+  - `router.push`만 부르는 단추는 가로채지 못하니 메모칸이 있는 화면의 이동은 링크로. 30분 자동 로그아웃(`IdleLogout`)은 묻지 않음.
+  - 지금 등록된 칸: `PageMemo`(대시보드·매입매출·프로젝트·공사 관리), 메모장(새 메모·메모 수정), 공사 메모 팝업, 품질관리 노하우·공구 관련
+    메모, 프로젝트 보고서 메모(닫기 단추는 "닫기" — 예전 "저장 후 닫기"는 묻지 않고 저장했음), 보고서 프로젝트 요약 메모, 통장 메모, 챙길
+    거래 메모, 공사 작업 순서표, 작업일지 내역 팝업 날짜 메모. 거래·견적·급여 등 문서 폼의 메모 칸은 아직 대상 아님(사용자에게 물어보고 넓힐 것).
 - **서버 액션은 실패를 `{ error }`로 돌려주고 화면에 보여 줄 것**(오류를 버리지 말 것 — 예전엔 직원·급여·메모 등에서 저장이
   실패해도 된 것처럼 보였음). 폼은 실패하면 닫지 말고 입력한 내용을 그대로 둘 것(`form action`은 끝나면 입력칸을 비우므로
   `onSubmit` + `preventDefault`, `MemoCreateForm` 예시). 체크칸처럼 바로 저장하는 칸은 실패하면 원래 값으로 되돌릴 것.
@@ -161,7 +176,8 @@
 - **새 SQL을 만들면 `lib/sqlStatus.ts`의 `SQL_ITEMS`에도 한 줄**(그 SQL이 만든 표나 칸 하나 — 백업 화면 "SQL 실행 상태"가 1줄씩 읽어
   보고 실행됐는지 보여 줌, 11/7). 실행 전엔 기능을 숨기는 방식이라 사용자가 안 돌린 SQL을 여기서 찾음. 표·칸을 안 만드는 SQL(정책·함수만)은
   확인할 수 없어 목록에 없음(084·091·107 — 백업 화면 안내 글에 번호만). 새 표를 만드는 SQL에는 조회 전용(viewer) 읽기 규칙도 같이 넣을지
-  정할 것(개인정보 표가 아니면 넣음 — 공사 메모 표가 084 목록에서 빠져 조회 전용 계정에 비어 보였음, 107 SQL로 추가).
+  정할 것(개인정보 표가 아니면 넣음 — 공사 메모 표가 084 목록에서 빠져 조회 전용 계정에 비어 보였음. 107 SQL을 만들었지만 사용자 결정
+  11/14로 실행 안 함 — 다시 권하지 말 것).
 - **새 표를 만들면 백업·복원 목록에 같이 넣을 것**: `lib/backup.ts`의 `BACKUP_TABLES` + `supabase/096_atomic_restore.sql`의
   `restore_allowed_tables()`(새 SQL에서 함수를 다시 만들어 목록 추가 — `restore.test.ts`가 앱 목록과 비교). 예전엔 공사 메모·일용직
   사용내역 등이 빠져 있어 백업으로 못 되살렸고, 복원 때 프로젝트·일용직을 지우면서 같이 지워졌음. 복원은 DB 함수
@@ -190,7 +206,7 @@
   확인(`payrollDuplicates`), 긴 ID 목록 나눠 조회·자동완성 기간(`supabaseFetchAll`), 파일 올리기 규칙(`fileUpload`), 백업 자동
   정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
   해 잠금 불러오기(`yearLock`), 오래된 외상매출금(`receivableAging`), 이번 달 신고·납부 일정(`annualTasks`), 홈택스 세금계산서
-  대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`), 메모 한 장 엑셀(`memoExport`), 공사 작업 순서
+  대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`), 메모 저장 확인(`unsavedChanges` — 떠나는 링크 판단·뒤로가기 되돌리기), 메모 한 장 엑셀(`memoExport`), 공사 작업 순서
   일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내(`actionError`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`), 공구명세서 이름 [ ] 메모(`toolNameNote`), 같은 날 순서·한 번에 넣는 줄의 등록 시각·넣은 순서 id(`entryOrder`), 목록 기본 순서(`listOrder`),
   매입매출장 글자 검색(`ledgerSearch`), SQL 실행 상태(`sqlStatus`), 파일 저장 공간(`storageUsage`), 메모장 구분(`memoCategories`), 거래 일괄
   변경 나눠 바꾸기(`bulkUpdate`)·일괄 변경 칸(`transactionBulkEdit`), 챙길 거래 창(`transactionWatch`)·수정 팝업 주소(`ledgerLinks`), 은행 → 장부 올리기·등록 취소 판단(`bankLedger`)의 검사가

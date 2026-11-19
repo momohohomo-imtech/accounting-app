@@ -16,20 +16,23 @@ import { downloadXlsx } from "@/lib/xlsxExport";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { useConfirmLeaveAll, useUnsavedGuard } from "@/components/UnsavedChangesProvider";
 
 function formatMonthDay(dateKey: string) {
   const [, m, d] = dateKey.split("-");
   return `${Number(m)}월${Number(d)}일`;
 }
 
-function MemoRow({ entry }: { entry: WorkLogDetailEntry }) {
+function MemoRow({ entry, onSaved }: { entry: WorkLogDetailEntry; onSaved: (id: string, content: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [memo, setMemo] = useState(entry.content ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pending = useGlobalPending();
+  const saved = entry.content ?? "";
 
-  async function save() {
+  // 저장되면 true — 내역 목록(화면·엑셀)에도 바로 반영(예전엔 팝업을 다시 열어야 보였음)
+  async function save(): Promise<boolean> {
     setSaving(true);
     setError(null);
     const fd = new FormData();
@@ -39,10 +42,30 @@ function MemoRow({ entry }: { entry: WorkLogDetailEntry }) {
     setSaving(false);
     if (result?.error) {
       setError(result.error);
-      return;
+      return false;
     }
+    // 서버도 앞뒤 빈칸을 빼고 저장함
+    const content = memo.trim();
+    onSaved(entry.id, content);
+    setMemo(content);
+    setEditing(false);
+    return true;
+  }
+
+  function stopEdit() {
+    setMemo(saved);
+    setError(null);
     setEditing(false);
   }
+
+  // 고치는 중에 취소·팝업 닫기·뒤로가기를 하면 저장할지 물어봄(사용자 요청 11/19)
+  const leave = useUnsavedGuard({
+    dirty: editing && memo !== saved && !saving,
+    value: memo,
+    label: `${formatMonthDay(entry.log_date)} 메모`,
+    save,
+    discard: stopEdit,
+  });
 
   return (
     <div className="rounded-lg border border-slate-200 p-3">
@@ -64,10 +87,18 @@ function MemoRow({ entry }: { entry: WorkLogDetailEntry }) {
             className={`${fieldClass} min-w-0 flex-1`}
           />
           <div className="flex shrink-0 flex-col gap-1">
-            <Button type="button" size="xs" disabled={saving} onClick={save}>
+            <Button type="button" size="xs" disabled={saving} onClick={() => void save()}>
               저장
             </Button>
-            <Button type="button" variant="secondary" size="xs" disabled={saving} onClick={() => setEditing(false)}>
+            <Button
+              type="button"
+              variant="secondary"
+              size="xs"
+              disabled={saving}
+              onClick={async () => {
+                if (await leave()) stopEdit();
+              }}
+            >
               취소
             </Button>
           </div>
@@ -103,7 +134,12 @@ export function WorkLogGroupDetailPopup({
   const [titleDraft, setTitleDraft] = useState(title);
   const [renaming, setRenaming] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
-  useEscapeKey(true, () => (editingTitle ? setEditingTitle(false) : onClose()));
+  // 날짜 메모를 고치는 중이면 닫기 전에 저장할지 물어봄
+  const confirmLeaveAll = useConfirmLeaveAll();
+  const requestClose = async () => {
+    if (await confirmLeaveAll()) onClose();
+  };
+  useEscapeKey(true, () => (editingTitle ? setEditingTitle(false) : void requestClose()));
 
   useEffect(() => {
     let cancelled = false;
@@ -216,7 +252,7 @@ export function WorkLogGroupDetailPopup({
             <Button type="button" variant="secondary" size="xs" disabled={!entries} onClick={handleExcel}>
               엑셀
             </Button>
-            <button type="button" onClick={onClose} className="text-sm text-slate-500 hover:text-slate-800 print:hidden">
+            <button type="button" onClick={requestClose} className="text-sm text-slate-500 hover:text-slate-800 print:hidden">
               닫기
             </button>
           </div>
@@ -227,7 +263,11 @@ export function WorkLogGroupDetailPopup({
         ) : (
           <div className="space-y-2">
             {entries.map((e) => (
-              <MemoRow key={e.id} entry={e} />
+              <MemoRow
+                key={e.id}
+                entry={e}
+                onSaved={(id, content) => setEntries((prev) => prev?.map((x) => (x.id === id ? { ...x, content } : x)) ?? prev)}
+              />
             ))}
             {entries.length === 0 && <p className="py-8 text-center text-sm text-slate-400">내역이 없습니다.</p>}
           </div>

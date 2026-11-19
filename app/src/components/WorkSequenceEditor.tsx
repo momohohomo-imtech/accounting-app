@@ -11,6 +11,7 @@ import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components
 import { chartLegendTeams, WorkSequenceChart } from "@/components/WorkSequenceChart";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { useUnsavedGuard } from "@/components/UnsavedChangesProvider";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 import { closePopup } from "@/lib/popupNavigation";
 import { moveListItem } from "@/lib/listMove";
@@ -175,11 +176,17 @@ export function WorkSequenceEditor({
   const [data, setData] = useState<WorkSequenceData>(() => (isNew ? freshCopy(initial) : initial));
   // 마지막으로 저장된 내용(새 순서표는 아직 없음) — 저장 안 한 변경이 있는지 비교용
   const [saved, setSaved] = useState<WorkSequenceData | null>(() => (isNew ? null : initial));
+  // 연 때의 내용(새로 쓰기·복사본) — 아직 저장 안 한 순서표를 닫을 때 바꾼 게 있는지 비교용
+  const [openedJson] = useState(() => JSON.stringify(data));
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   // 한국 시각 지금 — 진행 상태·오늘 선 기준(기기 시간대와 상관없이)
   const [today] = useState<Today>(nowKstParts);
-  const dirty = !saved || JSON.stringify(data) !== JSON.stringify(saved);
+  const dataJson = JSON.stringify(data);
+  const savedJson = saved ? JSON.stringify(saved) : null;
+  const dirty = savedJson === null || dataJson !== savedJson;
+  // 닫기·뒤로가기·링크 때 저장할지 물을 기준 — 저장한 뒤 바꿨거나, 저장 안 한 새 순서표(복사본 포함)를 연 뒤 바꿨을 때
+  const changed = dataJson !== (savedJson ?? openedJson);
   // 팀: 팀별 보기(팀 id·NO_TEAM_FOCUS, null = 전체), 고치는 중인 팀, 새 팀 이름 칸
   const [focusRaw, setFocus] = useState<string | null>(null);
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
@@ -328,31 +335,47 @@ export function WorkSequenceEditor({
     setSaved((s) => (s ? apply(s, next) : s));
   }
 
-  async function save() {
+  // 저장되면 true. stay: 저장 단추(새 순서표는 주소를 저장된 순서표로) — 닫거나 떠나면서 저장할 땐 주소를 안 바꿈
+  async function save(stay = true): Promise<boolean> {
     setError(null);
+    if (!data.project_id || !data.title.trim()) {
+      setError("프로젝트와 제목을 넣어야 저장할 수 있습니다.");
+      return false;
+    }
     const teamProblem = teamsReady ? teamNameProblem(data.teams) : null;
     if (teamProblem) {
       setError(teamProblem);
-      return;
+      return false;
     }
     const result = await pending.run(() =>
       saveWorkSequence({ ...data, with_dependency: dependencyReady, with_teams: teamsReady, with_memo: memoReady })
     );
     if (result?.error) {
       setError(result.error);
-      return;
+      return false;
     }
     setSaved(data);
     setSavedAt(new Date().toTimeString().slice(0, 5));
     // 새 순서표는 주소를 저장된 순서표로 바꿈(기록은 안 쌓음) — 다시 저장하면 같은 순서표를 고치게
-    if (isNew) router.replace(`${savedHref}${data.id}`, { scroll: false });
+    if (isNew && stay) router.replace(`${savedHref}${data.id}`, { scroll: false });
+    return true;
   }
 
+  // 바꾼 채 닫기·ESC·뒤로가기·링크를 누르면 저장할지 물어봄(저장·저장 안 함·계속 작성 — 사용자 요청 11/19, 예전엔 "저장하지 않고
+  // 닫을까요?"만 물었고 새 순서표는 아무것도 안 써도 물었음)
+  const leave = useUnsavedGuard({
+    dirty: changed,
+    value: dataJson,
+    label: data.title.trim() ? `공사 작업 순서표 "${data.title.trim()}"` : "공사 작업 순서표",
+    save: () => save(false),
+    discard: () => setData(saved ?? (JSON.parse(openedJson) as WorkSequenceData)),
+  });
+
   async function close() {
-    if (dirty && !(await confirm("저장하지 않은 내용이 있습니다. 저장하지 않고 닫을까요?"))) return;
+    if (!(await leave())) return;
     closePopup(router, closeHref);
   }
-  useEscapeKey(true, close);
+  useEscapeKey(true, () => void close());
 
   async function copy() {
     if (dirty && !(await confirm("저장하지 않은 변경은 복사본에 들어가지 않습니다(저장된 내용으로 복사). 계속할까요?"))) return;
@@ -1038,7 +1061,7 @@ export function WorkSequenceEditor({
 
           {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 print:hidden">{error}</p>}
           <div className="flex items-center gap-2 print:hidden">
-            <Button type="button" onClick={save} disabled={!data.project_id || !data.title.trim()}>
+            <Button type="button" onClick={() => void save()} disabled={!data.project_id || !data.title.trim()}>
               저장
             </Button>
             <Button type="button" variant="secondary" onClick={close}>

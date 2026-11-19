@@ -400,6 +400,7 @@ async function TransactionListSection({
               rows={2}
               initialContent={pageMemo?.content ?? ""}
               placeholder="매입매출 관련 메모..."
+              label="매입매출 메모"
               save={updateTransactionsPageMemo}
             />
             {showWatchPanel && watch && (
