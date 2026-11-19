@@ -293,7 +293,11 @@ export function ProjectSummaryReport({ rows }: { rows: ProjectSummaryRow[] }) {
                 </div>
               </div>
 
-              <ProjectSummaryMemoEditor projectId={p.id} initialMemo={p.memo} />
+              <ProjectSummaryMemoEditor
+                projectId={p.id}
+                initialMemo={p.memo}
+                label={`${p.projectCode ? `${p.projectCode} ` : ""}${p.name} 메모`}
+              />
             </div>
           );
         })}

@@ -529,6 +529,7 @@ export default async function DashboardPage({
         rows={3}
         initialContent={pageMemo?.content ?? ""}
         placeholder="메모를 입력하세요"
+        label="대시보드 메모"
         save={updateDashboardPageMemo}
       />
 

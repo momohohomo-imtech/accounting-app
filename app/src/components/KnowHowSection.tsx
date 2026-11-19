@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
+import { useUnsavedGuard } from "@/components/UnsavedChangesProvider";
 import { kstDate, knowHowFields, knowHowFileName } from "@/lib/memoExport";
 import { downloadMemoXlsx } from "@/lib/xlsxExport";
 
@@ -18,11 +19,14 @@ function NoteForm({
   onCancel,
   onSubmit,
   submitLabel,
+  label,
 }: {
   defaultValues?: Partial<Note>;
   onCancel: () => void;
   onSubmit: Action;
   submitLabel: string;
+  /** 저장 확인창에 보일 이름 */
+  label: string;
 }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -32,10 +36,15 @@ function NoteForm({
   const [memo, setMemo] = useState(defaultValues?.memo ?? "");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const initialValue = `${defaultValues?.title ?? ""}\n${defaultValues?.content ?? ""}\n${defaultValues?.memo ?? ""}`;
+  const value = `${title}\n${content ?? ""}\n${memo ?? ""}`;
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!(await confirm(`${submitLabel}하시겠습니까?`))) return;
+  // 저장되면 폼을 닫고 true — 못 하면 이유를 보여 주고 false(쓴 글은 그대로)
+  async function persist(): Promise<boolean> {
+    if (!title.trim()) {
+      setError("제목을 입력해야 저장할 수 있습니다.");
+      return false;
+    }
     setPending(true);
     setError(null);
     const fd = new FormData();
@@ -46,10 +55,20 @@ function NoteForm({
     setPending(false);
     if (result && "error" in result && result.error) {
       setError(result.error);
-      return;
+      return false;
     }
     router.refresh();
     onCancel();
+    return true;
+  }
+
+  // 작성 중에 취소·화면 이동·뒤로가기를 하면 저장할지 물어봄(사용자 요청 11/19)
+  const leave = useUnsavedGuard({ dirty: value !== initialValue, value, label, save: persist, discard: onCancel });
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!(await confirm(`${submitLabel}하시겠습니까?`))) return;
+    await persist();
   }
 
   return (
@@ -71,7 +90,14 @@ function NoteForm({
         <Button type="submit" size="sm" disabled={pending}>
           {submitLabel}
         </Button>
-        <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={async () => {
+            if (await leave()) onCancel();
+          }}
+        >
           취소
         </Button>
       </div>
@@ -148,6 +174,7 @@ function KnowHowItem({
             <NoteForm
               defaultValues={note}
               submitLabel="저장"
+              label={`${sectionTitle} — ${note.title}`}
               onCancel={() => setEditing(false)}
               onSubmit={async (fd) => {
                 fd.append("id", note.id);
@@ -206,7 +233,9 @@ export function KnowHowSection({
         )}
       </div>
 
-      {adding && <NoteForm submitLabel="추가" onCancel={() => setAdding(false)} onSubmit={createAction} />}
+      {adding && (
+        <NoteForm submitLabel="추가" label={`${title} — 새 ${itemLabel}`} onCancel={() => setAdding(false)} onSubmit={createAction} />
+      )}
 
       <div className="space-y-2">
         {notes.map((n) => (

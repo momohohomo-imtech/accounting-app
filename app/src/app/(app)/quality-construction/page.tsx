@@ -64,6 +64,7 @@ export default async function QualityConstructionPage({
       <PageMemo
         initialContent={pageMemo?.content ?? ""}
         placeholder="프로젝트 관련 메모..."
+        label="프로젝트 관련 메모"
         save={updateProjectsPageMemo}
       />
       <div className="print:hidden">

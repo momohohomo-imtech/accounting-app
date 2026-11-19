@@ -5,6 +5,7 @@ import { SidebarNav, MobileNav } from "@/components/AppNav";
 import { IdleLogout } from "@/components/IdleLogout";
 import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { GlobalPendingProvider } from "@/components/GlobalPendingProvider";
+import { UnsavedChangesProvider } from "@/components/UnsavedChangesProvider";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [user, role] = await Promise.all([getCurrentUser(), getCurrentRole()]);
@@ -12,6 +13,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <ConfirmProvider>
     <GlobalPendingProvider>
+    <UnsavedChangesProvider>
     <div className="app-backdrop flex min-h-screen bg-slate-50 print:bg-white">
       <IdleLogout />
       <aside className="brand-sidebar hidden w-60 shrink-0 bg-brand-navy md:sticky md:top-0 md:flex md:h-screen md:flex-col print:hidden">
@@ -23,7 +25,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
         <SidebarNav role={role} />
-        <form action={signOut} className="border-t border-white/[0.08] px-6 py-4">
+        {/* data-leave-guard: 작성 중인 메모가 있으면 로그아웃 전에 저장할지 물어봄(UnsavedChangesProvider) */}
+        <form action={signOut} data-leave-guard="" className="border-t border-white/[0.08] px-6 py-4">
           <p className="flex items-center gap-1.5 truncate text-xs text-white/50">
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-green shadow-[0_0_0_3px_rgb(14_159_110/0.2)]" aria-hidden />
             <span className="truncate">{user?.email}</span>
@@ -43,7 +46,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Image src="/logo-icon.png" alt="" width={22} height={22} className="rounded-md" />
             <p className="text-sm font-bold text-white">IM테크 회계 관리 시스템</p>
           </div>
-          <form action={signOut}>
+          <form action={signOut} data-leave-guard="">
             <button className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs text-white/60 transition-colors hover:bg-white/10 hover:text-white">
               로그아웃
             </button>
@@ -59,6 +62,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <MobileNav role={role} />
       </div>
     </div>
+    </UnsavedChangesProvider>
     </GlobalPendingProvider>
     </ConfirmProvider>
   );

@@ -208,7 +208,7 @@ export default async function BankPage({
                     rows={checksByAccount.get(a.id) ?? []}
                   />
                 )}
-                <BankAccountMemo accountId={a.id} initialMemo={a.memo ?? ""} />
+                <BankAccountMemo accountId={a.id} initialMemo={a.memo ?? ""} label={`${a.nickname ?? a.bank_name} 통장 메모`} />
               </div>
             );
           })}

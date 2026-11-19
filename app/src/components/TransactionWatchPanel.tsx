@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { formatWon } from "@/lib/format";
 import { ledgerEditHref, type LedgerListParams } from "@/lib/ledgerLinks";
@@ -17,6 +17,7 @@ import {
 import { unwatchTransactions, updateTransactionWatchMemo } from "@/lib/actions/transactionWatch";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { isLeaveDialogFocus, useUnsavedGuard } from "@/components/UnsavedChangesProvider";
 
 const memoInputClass =
   "min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/10 sm:w-44 sm:flex-none";
@@ -93,7 +94,8 @@ function WatchLine({
   const pending = useGlobalPending();
   const confirm = useConfirm();
   const [memo, setMemo] = useState(entry.memo);
-  const lastSaved = useRef(entry.memo);
+  const [lastSaved, setLastSaved] = useState(entry.memo);
+  const [saving, setSaving] = useState(false);
   const dateLabel = watchDateLabel(entry.date, currentYear);
   const label = watchLabel(entry);
 
@@ -103,18 +105,30 @@ function WatchLine({
     return fd;
   }
 
-  async function saveMemo() {
-    if (memo.trim() === lastSaved.current.trim()) return;
+  // 저장됐으면 true — 입력칸에서 벗어나면 저장, 쓰는 중에 화면을 떠나면 저장할지 물어봄(useUnsavedGuard)
+  async function saveMemo(): Promise<boolean> {
+    if (memo.trim() === lastSaved.trim()) return true;
     const fd = formData();
     fd.append("memo", memo);
+    setSaving(true);
     const result = await pending.run(() => updateTransactionWatchMemo(fd));
+    setSaving(false);
     if (result?.error) {
       onError(result.error);
-      return;
+      return false;
     }
     onError(null);
-    lastSaved.current = memo;
+    setLastSaved(memo);
+    return true;
   }
+
+  useUnsavedGuard({
+    dirty: canEdit && memo.trim() !== lastSaved.trim() && !saving,
+    value: memo,
+    label: `챙길 거래 메모(${label})`,
+    save: saveMemo,
+    discard: () => setMemo(lastSaved),
+  });
 
   async function remove() {
     // 잘못 눌러 메모째 사라지지 않게 — 무엇을 빼는지·메모도 지워짐을 보여 주고 확인(매입장 📌 끄기와 같은 문구)
@@ -142,7 +156,10 @@ function WatchLine({
           <input
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
-            onBlur={saveMemo}
+            onBlur={(e) => {
+              if (isLeaveDialogFocus(e.relatedTarget)) return;
+              void saveMemo();
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.nativeEvent.isComposing) e.currentTarget.blur();
             }}
