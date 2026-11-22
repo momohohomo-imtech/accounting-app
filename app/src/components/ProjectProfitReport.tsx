@@ -37,6 +37,8 @@ import {
 import type { WorkLogTitleRow } from "@/lib/workLogSummary";
 import { ProjectTripDetailTable } from "@/components/ProjectTripDetailTable";
 import { ProjectReceiptsTable } from "@/components/ProjectReceiptsTable";
+import { WorkCalendarButton } from "@/components/WorkCalendarButton";
+import { workCalendarDays } from "@/lib/workCalendar";
 import { getCurrentRole } from "@/lib/currentRole";
 
 // ownOnly: 귀속 하위가 있는 어미 프로젝트를 하위 없이 자기 것만(프로젝트 목록에서 묶음을 펼친 어미 줄의 "보고서").
@@ -167,6 +169,8 @@ export async function ProjectProfitReport({
   ]);
   const workDays = workDaySplitForProjects(workLogDateRows, tripDayRows, groupIds);
   const headcount = headcountForProjects(tripDayRows, groupIds);
+  // 근무일수 옆 "달력"(사내 노랑·출장 빨강 + 그날 투입 인원, 11/22) — 근무일수와 같은 날짜들
+  const calendarDays = workCalendarDays(workLogDateRows, tripDayRows, groupIds);
 
   // 출장 내역(출장 업무 내역서와 같은 날짜 줄) — 귀속 하위까지 묶은 보고서면 어느 프로젝트 출장인지도 같이.
   const projectLabelById = new Map(group.map((p) => [p.id, p.project_code ? `${p.project_code} ${p.name}` : p.name]));
@@ -338,10 +342,11 @@ export async function ProjectProfitReport({
     ? `${parentProject.project_code ? `${parentProject.project_code} ` : ""}${parentProject.name}`
     : null;
 
+  const workDaysLine = `근무일수: ${formatWorkDays(workDays)}`;
   const infoLines = [
     `현장: ${siteName ?? "-"}    상태: ${projectStatusLabel(project.status)}`,
     `기간: ${formatDate(project.start_date)} ~ ${formatDate(project.end_date)}    발주서일자: ${formatDate(project.order_date)}`,
-    `근무일수: ${formatWorkDays(workDays)}`,
+    workDaysLine,
     `출장 투입 인원: ${formatHeadcount(headcount)}`,
     ...(parentLabel ? [`귀속 프로젝트: ${parentLabel}`] : []),
   ];
@@ -374,7 +379,12 @@ export async function ProjectProfitReport({
           </h2>
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500 print:text-[10px]">
             {infoLines.map((line) => (
-              <span key={line}>{line}</span>
+              <span key={line}>
+                {line}
+                {line === workDaysLine && (
+                  <WorkCalendarButton title={`${project.project_code ?? ""} ${project.name}`.trim()} days={calendarDays} />
+                )}
+              </span>
             ))}
           </div>
         </div>

@@ -201,7 +201,7 @@
 - **금액 계산을 바꾸면 `npm test`(app 폴더)로 자동 검사를 돌릴 것.** 부가세 분리·마이너스 금액 반올림(`vatBasis`),
   외상 잔액(`credit`), 종합소득세(`tax`), 견적 금액·한글 금액(`quoteCalc`·`numberToKorean`),
   예상 미수액·프로젝트 받은 돈(`expectedReceivable`), 이익 예상(`projectProfit` — 대시보드·보고서 공통, 남은 달 고정지출 포함), 프로젝트 목록 하단 합계·통합
-  보고서(`projectListTotals`), 엑셀 거래 읽기(`transactionExcel`), 작업일지 집계(`workLogSummary`), 출장일지 합계·보고서 작업일수 나눔·출장 투입 인원·근무일당 이익금(`tripLog`), 보고서 출장 현황(`tripOverview`), 매입장 한 결제 묶기(`paymentGroup`), 장부 점검(`ledgerCheck`), 거래 수정 이력 표시·일괄 변경 접기(`transactionHistory`), 백업
+  보고서(`projectListTotals`), 엑셀 거래 읽기(`transactionExcel`), 작업일지 집계(`workLogSummary`), 출장일지 합계·보고서 작업일수 나눔·출장 투입 인원·근무일당 이익금(`tripLog`), 보고서 출장 현황(`tripOverview`), 프로젝트 보고서 근무 달력(`workCalendar`), 매입장 한 결제 묶기(`paymentGroup`), 장부 점검(`ledgerCheck`), 거래 수정 이력 표시·일괄 변경 접기(`transactionHistory`), 백업
   끝까지 담기(`backup`), 복원 막기·표 목록·나눠 올리기(`restore`), 백업 상태(`backupStatus`), 삭제 막기(`deleteGuard`), 급여 중복
   확인(`payrollDuplicates`), 긴 ID 목록 나눠 조회·자동완성 기간(`supabaseFetchAll`), 파일 올리기 규칙(`fileUpload`), 백업 자동
   정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
@@ -361,6 +361,15 @@
 - **근무일당 이익금**(11/13 사용자 요청 "근무일 대비 이익금"): 이익금 ÷ 총 근무일수(작업일지 날짜 — 같은 날은 하루, 출장 날짜 포함,
   손익보고서 팝업 "근무일수"의 총과 같은 기준), `lib/tripLog.ts`의 `profitPerWorkDay`로만. 보고서 "프로젝트별 손익" 표·엑셀은 줄마다 자기
   것(손익 칸과 같게, 발주액이 없으면 "-"), 손익보고서 팝업은 귀속 하위까지 합친 묶음(이익금 ÷ 총 근무일) — 근무일이 없으면 "-".
+- **프로젝트 보고서 근무 달력**(11/22 사용자 요청 "근무일수 옆 달력 — 사내 노랑·출장 빨강 동그라미, 출장일 아래 투입 인원, A4 한 장",
+  사용자 결정 "조공으로 표기" + "작업한 달만 — 2달 작업에 12달은 필요 없고 글씨도 작아짐", DB 변경 없음): 근무일수 줄 끝 "📅 달력"
+  (`WorkCalendarButton` — 상태로 여는 팝업, 보고서 위 z-[60], ESC·닫기는 달력만, 근무일이 없으면 버튼 없음). 날짜·인원은
+  `lib/workCalendar.ts`의 `workCalendarDays`로만 — 근무일수(`workDaySplitForProjects`)·출장 투입 인원(`headcountForProjects`)과 같은
+  기준(작업일지 ∪ 출장 날짜, 출장 체크한 날은 출장, 귀속 하위 포함 — 같은 날 인원은 합, 보고서와 같은 `groupIds`). 작업한 달만(해를
+  넘겨도 이어서, 빠진 달은 "작업 없는 달은 뺌(…)"), 출장일 아래 "사2 조1"(0명인 쪽은 뺌). 인쇄는 달력만 A4 세로 한 장 — 달 수에 따라
+  7단계 크기(`calendarPrintTier` + 컴포넌트의 `PRINT_SIZE`, mm 단위 — 6주짜리 달이 줄마다 와도 16달까지 한 장, 단계를 바꾸면 가장 긴
+  경우로 장 수를 다시 확인). `usePrintFitToPage`는 인쇄 직전 화면 배치 높이를 재서 이 달력은 쓸데없이 줄이므로 쓰지 않음. 목록형 표가
+  아니라 달력 칸(grid)이라 머리글 정렬·표 가로 스크롤 규칙 대상 아님.
 - **매입장 마이너스 금액**(11/14 사용자 요청 "단수 조정·할인 — 실제 금액을 적고 마이너스로 빼려고", DB 변경 없음 — 금액 칸에 제약 없음):
   거래 등록 줄마다 "− 마이너스" 버튼(휴대폰 숫자 자판엔 "-"가 없어서 — 소계·단가 부호를 바꿈, 빈 소계에서 누르면 그다음 친 숫자가
   마이너스), 단가·소계·엑셀 일괄 등록 금액 칸 마이너스 입력, 합계 옆 "마이너스 N줄 포함", 마이너스 소계·매입장 금액은 빨간 글씨.
