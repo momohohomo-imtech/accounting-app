@@ -160,6 +160,29 @@ export function profitPerWorkDay(profit: number | null, workDays: number): numbe
   return Math.round(profit / workDays);
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const dayIndex = (date: string) => Math.round(Date.parse(`${String(date).slice(0, 10)}T00:00:00Z`) / DAY_MS);
+
+/**
+ * 출장 횟수 — 달력에서 이어진 출장 날짜는 한 번(사용자 요청 11/23 "연속일은 1회"). 같은 날은 한 번만, 날짜 사이가 하루라도 비면
+ * 따로 셈(금요일·월요일처럼 주말을 사이에 두면 2회 — 사용자 결정 "추천대로"). 날짜가 아닌 값은 뺌.
+ */
+export function tripRunCount(tripDates: Iterable<string>): number {
+  const days = [...new Set([...tripDates].map(dayIndex).filter(Number.isFinite))].sort((a, b) => a - b);
+  let runs = 0;
+  for (let i = 0; i < days.length; i++) if (i === 0 || days[i] - days[i - 1] > 1) runs += 1;
+  return runs;
+}
+
+/** 프로젝트(+귀속 하위) 묶음의 출장 횟수 — 묶음 안 프로젝트들의 출장 날짜를 합쳐 이어진 날은 1회. 출장일지 표(090)가 없으면 0. */
+export function tripCountForProjects(
+  tripDays: Pick<TripDayRow, "project_id" | "work_date">[] | null,
+  projectIds: Iterable<string>
+): number {
+  const ids = new Set(projectIds);
+  return tripRunCount((tripDays ?? []).filter((d) => ids.has(d.project_id)).map((d) => d.work_date));
+}
+
 export type TripTotals = Headcount & {
   /** 출장 날짜 수 */
   days: number;

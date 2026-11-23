@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { formatWon, formatDate } from "@/lib/format";
+import { cx } from "@/lib/cx";
 import { ProjectProfitReport } from "@/components/ProjectProfitReport";
 import { VendorDetailReport } from "@/components/VendorDetailReport";
 import { YearFilter } from "@/components/YearFilter";
@@ -25,6 +26,8 @@ import { ClassificationPendingTable } from "@/components/ClassificationPendingTa
 import { CategoryAggregateTable } from "@/components/CategoryAggregateTable";
 import { CategoryDetailReport } from "@/components/CategoryDetailReport";
 import { ProjectProfitTable } from "@/components/ProjectProfitTable";
+import { ProjectOverview } from "@/components/ProjectOverview";
+import { projectOverviewRows, projectOverviewTotals } from "@/lib/projectOverview";
 import { SiteProfitTable } from "@/components/SiteProfitTable";
 import { SiteProfitReport } from "@/components/SiteProfitReport";
 import { SortableSimpleTable } from "@/components/SortableSimpleTable";
@@ -541,6 +544,19 @@ export default async function ReportsPage({
     receivable: receivableOf(byProject, agencyByProject, receivedByProject)?.amount ?? 0,
   };
 
+  // 프로젝트 한눈에 보기(11/23 사용자 요청) — 줄 = 어미 + 귀속 하위 묶음(줄을 누르면 여는 프로젝트 보고서와 같게), 합계는 위
+  // projectSummary(검토중 발주액 제외)와 같은 숫자. 기본 순서 = 프로젝트 번호 최신순(프로젝트별 손익 표와 같게). lib/projectOverview.ts
+  const overviewRows = projectOverviewRows({
+    projects: byProject,
+    purchaseByProject: new Map(byProject.map((p) => [p.id, p.purchase])),
+    agencyByProject,
+    isReview,
+    workLogs: projectWorkLogRows,
+    tripDays: projectTripDays,
+  }).sort((a, b) => compareProjectCodeDesc(a.code, b.code));
+  const overviewTotals = projectOverviewTotals(overviewRows);
+  const overviewSiteLabel = site ? projectSiteOptions.find((o) => o.value === site)?.label ?? null : null;
+
   // 상단 박스의 "예상 순이익율" — 대시보드 "프로젝트 기준 예상 이익"과 같은 계산(lib/projectProfit.ts의
   // projectBasedProfit: 연도 전체, site 필터와 무관, 세금계산서 기준이라 외상 미정산 포함, 검토중 발주액 제외,
   // 발행 세금계산서가 더 많거나 발주액이 없으면 실제 매출, 프로젝트 없는 매출 포함) ÷ 발주액 합계(검토중 제외).
@@ -899,12 +915,58 @@ export default async function ReportsPage({
   // 항목이 많아서 성격별로 구역을 나누고, 각 구역 자체를 드롭다운(기본 숨김)으로
   // 묶음 — 단, 그 구역 안의 항목을 개별 인쇄하는 중이면 그 구역은 열려 있어야
   // 인쇄될 내용이 실제로 화면(DOM)에 존재하게 됨.
+  // 항목 하나만 인쇄할 때는 구역 제목(재무 개요·프로젝트 등)도 인쇄에서 뺌 — 예전엔 인쇄한 항목 위아래에 다른 구역 제목만
+  // 덩그러니 찍혔음(11/23 프로젝트 한눈에 보기 인쇄 확인 때 발견). 그 항목이 든 구역은 열려 있어야 내용이 DOM에 있음.
   function groupTitle(label: string) {
-    return <span className="text-base font-bold text-black">{label}</span>;
+    return <span className={cx("text-base font-bold text-black", isolate && "print:hidden")}>{label}</span>;
   }
   function groupDefaultOpen(keys: string[]) {
     return Boolean(printSection && keys.includes(printSection));
   }
+  function groupPrintClass(keys: string[]) {
+    return popupOpen || (isolate && !keys.includes(printSection ?? "")) ? "print:hidden" : "";
+  }
+
+  // 프로젝트 한눈에 보기 엑셀 — 화면 표와 같은 칸 + 합계 줄(이익율은 소수 둘째 자리)
+  const overviewRate = (rate: number | null) => (rate === null ? "" : Math.round(rate * 100) / 100);
+  const overviewExportRows: (string | number)[][] = [
+    ...overviewRows.map((r) => [
+      r.code ?? "",
+      r.name,
+      r.review ? "검토중" : "",
+      r.memberCount > 1 ? r.memberCount - 1 : "",
+      r.quote,
+      r.reviewQuote || "",
+      r.agency,
+      r.contract,
+      r.purchase,
+      r.profit,
+      overviewRate(r.profitRate),
+      r.profitPerDay ?? "",
+      r.workDays.inhouse,
+      r.workDays.trip,
+      r.workDays.total,
+      r.tripCount,
+    ]),
+    [
+      "합계",
+      `${overviewTotals.count}건`,
+      overviewTotals.reviewCount ? `${overviewTotals.reviewCount}건` : "",
+      "",
+      overviewTotals.quote,
+      "",
+      overviewTotals.agency,
+      overviewTotals.contract,
+      overviewTotals.purchase,
+      overviewTotals.profit,
+      overviewRate(overviewTotals.profitRate),
+      overviewTotals.profitPerDay ?? "",
+      overviewTotals.workDays.inhouse,
+      overviewTotals.workDays.trip,
+      overviewTotals.workDays.total,
+      overviewTotals.tripCount,
+    ],
+  ];
 
   // 프로젝트별 손익 엑셀용 행 — 화면 표(ProjectProfitTable)와 같은 컬럼 구성.
   const projectExportRows = byProject.map((p) => [
@@ -1079,6 +1141,7 @@ export default async function ReportsPage({
       <CollapsibleSection
         title={groupTitle("재무 개요")}
         bare
+        className={groupPrintClass(["currentFunds", "quarterly", "monthly", "bySite"])}
         defaultOpen={groupDefaultOpen(["currentFunds", "quarterly", "monthly", "bySite"])}
       >
        <div className="space-y-6 mt-3">
@@ -1173,9 +1236,52 @@ export default async function ReportsPage({
       <CollapsibleSection
         title={groupTitle("프로젝트")}
         bare
-        defaultOpen={groupDefaultOpen(["projects", "revenue", "projectSummary"])}
+        className={groupPrintClass(["projectOverview", "projects", "revenue", "projectSummary"])}
+        defaultOpen={groupDefaultOpen(["projectOverview", "projects", "revenue", "projectSummary"])}
       >
        <div className="space-y-6 mt-3">
+
+        <CollapsibleSection
+          className={hiddenClass("projectOverview")}
+          title="프로젝트 한눈에 보기 — 전체 요약과 프로젝트별 손익·근무"
+          defaultOpen
+          headerExtra={sectionControls(
+            "projectOverview",
+            {
+              filename: `프로젝트_한눈에_보기_${selectedYear}.xlsx`,
+              headers: [
+                "프로젝트번호",
+                "프로젝트",
+                "검토중",
+                "합친 하위",
+                "발주액",
+                "검토중이라 뺀 발주액",
+                "대행구매",
+                "수주액(발주액-대행구매)",
+                "매입(공급가액)",
+                "이익금",
+                "이익율(%)",
+                "근무일당 이익금",
+                "근무일(사내)",
+                "근무일(출장)",
+                "근무일(총)",
+                "출장 횟수",
+              ],
+              rows: overviewExportRows,
+            },
+            projectSiteOptions.length > 0 ? (
+              <ReportProjectSiteFilter year={selectedYear} siteOptions={projectSiteOptions} selectedSite={site} />
+            ) : undefined
+          )}
+        >
+          <ProjectOverview
+            rows={overviewRows}
+            totals={overviewTotals}
+            year={selectedYear}
+            site={site}
+            siteLabel={overviewSiteLabel}
+          />
+        </CollapsibleSection>
 
         <CollapsibleSection
           className={hiddenClass("projects")}
@@ -1217,21 +1323,6 @@ export default async function ReportsPage({
             {formatWon(projectSummary.purchase)} · 남은 금액 {formatWon(projectSummary.receivable)} · 이익금 {formatWon(projectSummary.profit)} · 이익율{" "}
             {projectSummary.profitRate === null ? "-" : `${projectSummary.profitRate.toFixed(2)}%`}
           </p>
-
-          <div className="mb-4 grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 print:mb-2 print:grid-cols-2 print:gap-2 print:break-inside-avoid">
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:border-0 print:p-0 print:shadow-none">
-              <p className="text-sm text-slate-500 print:text-xs">총 발주액</p>
-              <p className="mt-1 whitespace-nowrap tabular-nums text-xl font-bold sm:text-2xl text-slate-900 print:text-lg">
-                {formatWon(projectSummary.quoteAmount)}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:border-0 print:p-0 print:shadow-none">
-              <p className="text-sm text-slate-500 print:text-xs">총 이익금</p>
-              <p className="mt-1 whitespace-nowrap tabular-nums text-xl font-bold sm:text-2xl text-slate-900 print:text-lg">
-                {formatWon(projectSummary.profit)}
-              </p>
-            </div>
-          </div>
 
           <ProjectProfitTable rows={byProject} year={selectedYear} site={site} />
       </CollapsibleSection>
@@ -1288,6 +1379,7 @@ export default async function ReportsPage({
       <CollapsibleSection
         title={groupTitle("거래처·카테고리 집계")}
         bare
+        className={groupPrintClass(["vendors", "fixedExpense", "purchaseItems", "classification", "categories", "customers"])}
         defaultOpen={groupDefaultOpen(["vendors", "fixedExpense", "purchaseItems", "classification", "categories", "customers"])}
       >
        <div className="space-y-6 mt-3">
@@ -1392,6 +1484,7 @@ export default async function ReportsPage({
       <CollapsibleSection
         title={groupTitle("작업일지·출장")}
         bare
+        className={groupPrintClass(["trips", "worklog", "unassigned"])}
         defaultOpen={groupDefaultOpen(["trips", "worklog", "unassigned"])}
       >
        <div className="space-y-6 mt-3">
