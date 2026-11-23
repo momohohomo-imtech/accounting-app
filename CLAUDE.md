@@ -49,6 +49,14 @@
   `AttachmentList`). 예전엔 예외가 그대로 튀어 나가 `setPending(false)`가 안 불려서 저장 버튼이 비활성에 갇히고 안내도 없었음
   (11/4 공구명세서 "수정 저장"). 서버 렌더링 폼(`<form action={서버액션}>`)이라 `run()`을
   못 쓰면 제출 버튼에서 `useFormStatus()`의 `pending`일 때 `PendingOverlay`를 띄울 것(`AccessListSubmitButton`).
+  같은 요청을 다시 보내도 되는 저장만 `run(fn, { retry: true })`(연결 끊김·서버 오류 화면이면 1초·2.5초 뒤 자동으로 다시 —
+  `callWithRetry`, 화면엔 "연결이 끊겨 다시 보내는 중...", 11/23 사용자 "저장을 두 번 누르거나 인터넷 연결이 끊겼다는 안내"): 새로 넣는
+  등록은 화면에서 정한 새 id로 넣을 때만(`lib/idempotentSave.ts` — `createNewIdKeeper`로 같은 내용이면 다시 눌러도 같은 id, 폼은 `new_id`
+  칸·여러 줄은 줄마다 `new_id`, 서버는 `insertOnce`로 id가 이미 있으면 앞서 보낸 같은 요청이 저장한 것으로 보고 다시 안 넣음). 지금:
+  매입매출 새 등록(한 줄·여러 줄·여러 날짜), 고정지출 항목 추가(`CreatePanel`의 `idempotent`), 고정지출 지금 올리기(같은 달은 DB가 한 번만).
+  휴대폰에서 입력을 오래 한 뒤 저장하면 끊긴 연결로 나가 실패하거나 서버는 저장했는데 응답만 끊겨, 다시 누르면 두 번 들어갔음. 수정·삭제·
+  다른 추가·엑셀 일괄 등록에 retry를 켜면 두 번 들어갈 수 있음(새 등록을 이 방식으로 바꿀 땐 서버 동작부터). 저장 실패 안내는 저장 단추
+  가까이에 — 휴대폰은 긴 폼 맨 위 안내가 화면 밖이라 저장이 안 된 줄 모르고 다시 누름(`TransactionForm`의 `submitError`).
 
 - **팝업은 ESC로 닫히고, 닫을 때 뒤로가기 기록을 쌓지 말 것**(사용자 요청 11/1 "모든 팝업창은 esc누르면 닫게", "뒤로가기로 이전 팝업
   창으로 갈 수 없게"). 새 팝업도 예외 없이:
@@ -207,7 +215,7 @@
   정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
   해 잠금 불러오기(`yearLock`), 오래된 외상매출금(`receivableAging`), 이번 달 신고·납부 일정(`annualTasks`), 홈택스 세금계산서
   대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`), 메모 저장 확인(`unsavedChanges` — 떠나는 링크 판단·뒤로가기 되돌리기), 메모 한 장 엑셀(`memoExport`), 공사 작업 순서
-  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 고정지출 자동 등록 결제일·이번 달 상태·은행 겹침(`recurringExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내(`actionError`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`), 공구명세서 이름 [ ] 메모(`toolNameNote`), 같은 날 순서·한 번에 넣는 줄의 등록 시각·넣은 순서 id(`entryOrder`), 매입매출 등록 여러 날짜(`multiDate`), 목록 기본 순서(`listOrder`),
+  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 고정지출 자동 등록 결제일·이번 달 상태·은행 겹침(`recurringExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내·자동으로 다시 보내기(`actionError`), 연결 끊김에 두 번 저장 막기(`idempotentSave`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`), 공구명세서 이름 [ ] 메모(`toolNameNote`), 같은 날 순서·한 번에 넣는 줄의 등록 시각·넣은 순서 id(`entryOrder`), 매입매출 등록 여러 날짜(`multiDate`), 목록 기본 순서(`listOrder`),
   매입매출장 글자 검색(`ledgerSearch`), SQL 실행 상태(`sqlStatus`), 파일 저장 공간(`storageUsage`), 메모장 구분(`memoCategories`), 거래 일괄
   변경 나눠 바꾸기(`bulkUpdate`)·일괄 변경 칸(`transactionBulkEdit`), 챙길 거래 창(`transactionWatch`)·수정 팝업 주소(`ledgerLinks`), 은행 → 장부 올리기·등록 취소 판단(`bankLedger`)의 검사가
   `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이

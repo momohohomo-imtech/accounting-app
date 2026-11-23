@@ -6,7 +6,7 @@ import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { postRecurringExpensesNow } from "@/lib/actions/recurringExpenses";
 
 // 고정지출 탭 "지금 올리기" — 올릴 차례인 항목(결제일이 됐는데 아직 안 올라간 것)을 바로 매입장에 "분류 대기"로. 매일 아침 서버가 하는
-// 것과 같은 일이라 두 번 눌러도 같은 달은 한 번만 올라감.
+// 것과 같은 일이라 두 번 눌러도 같은 달은 한 번만 올라감 — 그래서 연결이 끊기면 자동으로 다시 보냄(run의 retry).
 export function RecurringPostNowButton({ dueCount }: { dueCount: number }) {
   const pending = useGlobalPending();
   const [message, setMessage] = useState<string | null>(null);
@@ -20,7 +20,7 @@ export function RecurringPostNowButton({ dueCount }: { dueCount: number }) {
         onClick={async () => {
           setMessage(null);
           setError(null);
-          const result = await pending.run(() => postRecurringExpensesNow());
+          const result = await pending.run(() => postRecurringExpensesNow(), { retry: true });
           if (result?.error) setError(result.error);
           else setMessage(result?.message ?? null);
         }}

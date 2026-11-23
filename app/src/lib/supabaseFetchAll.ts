@@ -46,6 +46,18 @@ export async function fetchAllRowsIn<T>(
   return parts.flat();
 }
 
+/** 표에 이 id들이 몇 개 있는지 — 화면에서 정한 새 id로 넣다가 겹쳤을 때 앞서 보낸 같은 요청이 저장했는지 확인(lib/idempotentSave.ts). */
+export async function countSavedIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  table: string,
+  ids: string[]
+): Promise<number> {
+  const rows = await fetchAllRowsIn<{ id: string }>(ids, (chunk, from, to) =>
+    supabase.from(table).select("id").in("id", chunk).order("id", { ascending: true }).range(from, to)
+  );
+  return rows.length;
+}
+
 // 해마다 늘어나는 목록(거래처·프로젝트·현장·메모)을 끝까지 — 선택칸·보고서가 1,000줄에서 조용히 잘리지 않게. 기존
 // 호출부의 `{ data }` 모양 그대로 돌려줌. 이름순처럼 겹칠 수 있는 정렬이면 마지막에 id 정렬을 붙여 페이지가 겹치거나
 // 빠지지 않게 할 것.
