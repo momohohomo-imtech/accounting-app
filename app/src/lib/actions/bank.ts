@@ -10,6 +10,7 @@ import {
   ledgerRowFromBank,
   type BankTxForLedger,
 } from "@/lib/bankLedger";
+import { isRecurringDuplicate } from "@/lib/recurringExpense";
 
 function parseAccount(formData: FormData) {
   return {
@@ -174,6 +175,22 @@ export async function promoteBankTransactionToLedger(formData: FormData) {
   if (!bankTx) return { error: "거래내역을 찾을 수 없습니다." };
   if (bankTx.promoted_transaction_id) return {};
   if (bankTx.transfer_group_id) return { error: "계좌 간 이체 내역은 매입/매출장으로 올릴 수 없습니다." };
+
+  // 고정지출 자동 등록과 겹침(11/23 사용자 결정 "같은 날·같은 금액이면 알림") — 출금을 매입으로 올릴 때 같은 날·같은 합계의 자동 등록
+  // 줄이 이미 매입장에 있으면 한 번 더 물음(force=1이면 그대로 등록). 확인 조회가 실패하면 예전처럼 등록.
+  if (bankTx.direction === "출금" && formData.get("force") !== "1") {
+    const { data: sameDay } = await supabase
+      .from("transactions")
+      .select("type, trans_date, purchase_amount, purchase_vat, note1")
+      .eq("trans_date", bankTx.trans_date)
+      .eq("type", "매입");
+    const dup = (sameDay ?? []).find((r) => isRecurringDuplicate(r, { trans_date: bankTx.trans_date, amount: bankTx.amount }));
+    if (dup) {
+      return {
+        confirmDuplicate: `같은 날 같은 금액(${Number(bankTx.amount).toLocaleString("ko-KR")}원)의 고정지출 자동 등록 줄이 이미 매입장에 있습니다(${dup.note1}). 그래도 등록하면 같은 지출이 두 번 들어갑니다. 등록할까요?`,
+      };
+    }
+  }
 
   // 결제방식은 송금이 기본(11/12 사용자 요청) — 목록에 송금이 없으면 예전처럼 빈칸
   const paymentMethodId = await remitPaymentMethodId(supabase);

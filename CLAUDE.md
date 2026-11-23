@@ -207,7 +207,7 @@
   정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
   해 잠금 불러오기(`yearLock`), 오래된 외상매출금(`receivableAging`), 이번 달 신고·납부 일정(`annualTasks`), 홈택스 세금계산서
   대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`), 메모 저장 확인(`unsavedChanges` — 떠나는 링크 판단·뒤로가기 되돌리기), 메모 한 장 엑셀(`memoExport`), 공사 작업 순서
-  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내(`actionError`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`), 공구명세서 이름 [ ] 메모(`toolNameNote`), 같은 날 순서·한 번에 넣는 줄의 등록 시각·넣은 순서 id(`entryOrder`), 목록 기본 순서(`listOrder`),
+  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 고정지출 자동 등록 결제일·이번 달 상태·은행 겹침(`recurringExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내(`actionError`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`), 공구명세서 이름 [ ] 메모(`toolNameNote`), 같은 날 순서·한 번에 넣는 줄의 등록 시각·넣은 순서 id(`entryOrder`), 목록 기본 순서(`listOrder`),
   매입매출장 글자 검색(`ledgerSearch`), SQL 실행 상태(`sqlStatus`), 파일 저장 공간(`storageUsage`), 메모장 구분(`memoCategories`), 거래 일괄
   변경 나눠 바꾸기(`bulkUpdate`)·일괄 변경 칸(`transactionBulkEdit`), 챙길 거래 창(`transactionWatch`)·수정 팝업 주소(`ledgerLinks`), 은행 → 장부 올리기·등록 취소 판단(`bankLedger`)의 검사가
   `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
@@ -460,6 +460,19 @@
   포함)으로 다시 계산해서 씀 — 조회는 `lib/fixedExpenseLoad.ts` 하나로(보고서 칸 `loadFixedExpense`, 대시보드 `loadFixedCostRows`는
   지정한 곳이 없으면 매입을 조회하지 않고, 못 불러오면 반영 없이 "미반영" 안내). 몇 달(3달 이상) 나오다 최근 4달·이번 달에 매입이
   없는 지정 줄(`stoppedFixedRow` — 석 달마다 내는 곳은 안 걸림)은 대시보드 일정·확인 사항에 "지정 해제" 알림만(해제는 사용자가).
+- **고정지출 자동 등록**(11/23 사용자 요청 "매달 고정 지출 작성 항 → 결제일에 자동으로 매입장에, 올릴 때는 분류대기", 사용자 결정 "추천대로",
+  108 SQL `recurring_expenses`·`recurring_expense_posts`·함수 `post_recurring_expense`): 매입매출 "고정지출" 탭(`RecurringExpensesSection` — `CreatePanel` +
+  `EntityTable`, 108 실행 전엔 탭을 숨김)에 항목(결제일·거래처·품목·금액·부가세 별도·세금계산서·결제수단·카테고리·시작일·끝나는 날·일시 중지·메모).
+  매일 아침 6시(한국 시각, `vercel.json` 크론 `/api/cron/recurring-expenses` — CRON_SECRET 필요, 자동 백업과 같은 확인)와 탭의 "지금 올리기"가
+  `lib/recurringExpensePost.ts`의 `postDueRecurring` 하나로 올림. 언제 어느 달 몫을 올릴지는 `lib/recurringExpense.ts`로만: 결제일 = 매달 ○일(없는
+  날은 말일), 주말·공휴일도 그날 날짜, 오늘이 결제일이거나 지났으면 올림(서버가 며칠 못 돌아도 그 결제일 날짜로, 지난달 몫까지 — 그 전 달은 자동으로
+  안 올리고 탭에 안내), 시작일(비우면 항목을 만든 날) 전 결제일·끝나는 날 뒤·일시 중지는 안 올림, 금액은 예상 금액(매달 다르면 분류할 때 고침 —
+  사용자 결정), 부가세 별도면 `addedVat`(거래 등록과 같은 계산). 올리기는 DB 함수로만(올린 기록 + 매입 한 줄 "분류 대기"·즉시결제·메모1
+  `RECURRING_NOTE_PREFIX` "[고정지출 자동] 이름"·메모2 = 항목 메모를 한 번에 — 같은 항목·같은 달은 한 번만, 앱에서 기록·거래를 따로 넣지 말 것).
+  장부 줄을 지워도 기록은 남아 그 달은 다시 안 올림, 항목을 지워도 이미 올린 매입 줄은 그대로. 은행 "등록"(출금 → 매입) 때 같은 날·같은 합계의 자동
+  줄이 있으면 서버가 `confirmDuplicate`로 한 번 더 묻고 "그래도 등록"이면 `force=1`(`isRecurringDuplicate` — 메모1 표시로 찾으니 표시 글자를 바꾸면
+  이것도). 보고서 "고정지출"(지정 거래처·카테고리 달 평균)과는 별개 — 자동으로 올린 줄도 다른 매입처럼 달 평균에 들어감. 항목이 쓰는 거래처·결제수단·
+  카테고리는 지우려 하면 삭제 막기 안내에 "고정지출 자동 등록 N건"(`*_LINKS` — DB 규칙은 그 칸만 빈칸).
 - **백업 상태**(10/29 사용자 요청 "A"): 대시보드 "일정·확인 사항" 안 "백업" 한 줄(11/4 정돈 전엔 접힘 목록 맨 아래 따로) + 마지막 자동 백업 후 7일이 넘을 때만(일요일 백업이
   빠지면 월요일부터 — 11/3 8일에서 앞당김) 맨 위 카드에 경고 한 줄(`lib/backupStatus.ts`, 관리자·직원만 — 백업 기록은 그 두 역할만
   읽음). 자동 백업 주기(vercel.json 크론)를 바꾸면 `AUTO_BACKUP_STALE_DAYS`·`nextAutoBackupAt`도 같이.

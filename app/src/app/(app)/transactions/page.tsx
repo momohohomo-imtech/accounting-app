@@ -6,6 +6,8 @@ import { CreditSection } from "@/components/sections/CreditSection";
 import { ClientsSection } from "@/components/sections/ClientsSection";
 import { PaymentMethodsSection } from "@/components/sections/PaymentMethodsSection";
 import { ExpenseCategoriesSection } from "@/components/sections/ExpenseCategoriesSection";
+import { RecurringExpensesSection } from "@/components/sections/RecurringExpensesSection";
+import { recurringTableReady } from "@/lib/recurringExpensePost";
 import { YearMonthFilter } from "@/components/YearMonthFilter";
 import { TransactionTable } from "@/components/TransactionTable";
 import { TransactionColumnToggles } from "@/components/TransactionColumnToggles";
@@ -39,6 +41,8 @@ import { nowKst } from "@/lib/kstDate";
 const TABS = [
   { key: "list", label: "매입매출" },
   { key: "credit", label: "외상관리" },
+  // 고정지출 자동 등록(108 SQL) — 표가 없으면(실행 전) 탭을 숨김
+  { key: "fixed", label: "고정지출" },
   { key: "clients", label: "거래처" },
   { key: "payment-methods", label: "결제수단" },
   { key: "expense-categories", label: "지출카테고리" },
@@ -87,6 +91,7 @@ export default async function TransactionsPage({
 
   const totals =
     active === "list" ? await fetchTransactionTotals({ year, month, type, project_id, payment_method_id, q }) : null;
+  const tabs = ledgerOnly || (await recurringTableReady(await createClient())) ? TABS : TABS.filter((t) => t.key !== "fixed");
 
   return (
     <div className="space-y-6">
@@ -109,9 +114,10 @@ export default async function TransactionsPage({
         {active === "list" && !ledgerOnly && <LinkButton href="/transactions/new">+ 거래 등록</LinkButton>}
       </div>
 
-      {!ledgerOnly && <PageTabs basePath="/transactions" tabs={TABS} active={active} />}
+      {!ledgerOnly && <PageTabs basePath="/transactions" tabs={tabs} active={active} />}
 
       {active === "credit" && <CreditSection />}
+      {active === "fixed" && <RecurringExpensesSection />}
       {active === "clients" && <ClientsSection />}
       {active === "payment-methods" && <PaymentMethodsSection />}
       {active === "expense-categories" && <ExpenseCategoriesSection />}

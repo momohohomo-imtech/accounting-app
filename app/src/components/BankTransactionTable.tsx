@@ -148,9 +148,15 @@ export function BankTransactionTable({
     setActionError(null);
     const fd = new FormData();
     fd.append("id", id);
-    const result = await pending.run(() =>
+    let result = await pending.run(() =>
       Promise.resolve(checked ? promoteBankTransactionToLedger(fd) : unpromoteBankTransactionFromLedger(fd))
     );
+    // 고정지출 자동 등록 줄과 같은 날·같은 금액이면 서버가 한 번 더 물음(두 번 들어가지 않게, 11/23)
+    if (result && "confirmDuplicate" in result && result.confirmDuplicate) {
+      if (!(await confirm(result.confirmDuplicate, { confirmLabel: "그래도 등록" }))) return;
+      fd.set("force", "1");
+      result = await pending.run(() => Promise.resolve(promoteBankTransactionToLedger(fd)));
+    }
     if (result?.error) setActionError(result.error);
   }
 

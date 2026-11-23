@@ -25,6 +25,8 @@ export const CLIENT_LINKS: LinkedRef[] = [
   { table: "quotes", column: "client_id", label: "견적서" },
   { table: "purchase_orders", column: "client_id", label: "발주서" },
   { table: "bank_transactions", column: "matched_client_id", label: "통장 거래" },
+  // 108 SQL 고정지출 자동 등록 항목(지우면 그 항목의 거래처가 빈칸이 됨)
+  { table: "recurring_expenses", column: "client_id", label: "고정지출 자동 등록" },
 ];
 export const EMPLOYEE_LINKS: LinkedRef[] = [
   { table: "payroll", column: "employee_id", label: "급여 기록" },
@@ -48,8 +50,12 @@ export const SITE_LINKS: LinkedRef[] = [
 export const CATEGORY_LINKS: LinkedRef[] = [
   { table: "transactions", column: "category_id", label: "거래" },
   { table: "project_agency_purchases", column: "category_id", label: "대행구매" },
+  { table: "recurring_expenses", column: "category_id", label: "고정지출 자동 등록" },
 ];
-export const PAYMENT_METHOD_LINKS: LinkedRef[] = [{ table: "transactions", column: "payment_method_id", label: "거래" }];
+export const PAYMENT_METHOD_LINKS: LinkedRef[] = [
+  { table: "transactions", column: "payment_method_id", label: "거래" },
+  { table: "recurring_expenses", column: "payment_method_id", label: "고정지출 자동 등록" },
+];
 export const OFFICE_LINKS: LinkedRef[] = [{ table: "daily_workers", column: "office_id", label: "일용직" }];
 
 // SQL 실행 전이라 아직 없는 표는 0건으로

@@ -62,6 +62,9 @@ export const BACKUP_TABLES = [
   "transaction_watch",
   // 106 SQL — 장부 점검 "중복 의심" 숨긴 묶음(거래 id들을 이은 글자, 거래와 연결 없음).
   "duplicate_dismissals",
+  // 108 SQL — 고정지출 자동 등록 항목 + 달마다 올린 기록(같은 달 두 번 안 올리는 표시 — 복원 뒤에도 이미 올린 달은 다시 안 올라감).
+  "recurring_expenses",
+  "recurring_expense_posts",
 ];
 
 // 표마다 겹치지 않게 나눠 받을 고유 칸(대부분 id).
