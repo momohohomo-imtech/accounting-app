@@ -476,7 +476,9 @@
 - **고정지출 자동 등록**(11/23 사용자 요청 "매달 고정 지출 작성 항 → 결제일에 자동으로 매입장에, 올릴 때는 분류대기", 사용자 결정 "추천대로",
   108 SQL `recurring_expenses`·`recurring_expense_posts`·함수 `post_recurring_expense`): 매입매출 "고정지출" 탭(`RecurringExpensesSection` — `CreatePanel` +
   `EntityTable`, 108 실행 전엔 탭을 숨김)에 항목(결제일·거래처·품목·금액·부가세 별도·세금계산서·결제수단·카테고리·시작일·끝나는 날·일시 중지·메모).
-  매일 아침 6시(한국 시각, `vercel.json` 크론 `/api/cron/recurring-expenses` — CRON_SECRET 필요, 자동 백업과 같은 확인)와 탭의 "지금 올리기"가
+  매일 아침 5시(한국 시각, `vercel.json` 크론 `/api/cron/recurring-expenses` "0 20 * * *" — CRON_SECRET 필요, 자동 백업과 같은 확인. 일요일 6시 주간
+  자동 백업과 같은 시각이면 백업이 거래 표를 읽은 뒤 올라간 줄 때문에 백업 안 "올린 기록"이 없는 거래를 가리켜 그 백업 복원이 통째로 실패할 수 있어
+  한 시간 앞 — 크론 시각을 바꿀 땐 백업과 겹치지 않게)와 탭의 "지금 올리기"가
   `lib/recurringExpensePost.ts`의 `postDueRecurring` 하나로 올림. 언제 어느 달 몫을 올릴지는 `lib/recurringExpense.ts`로만: 결제일 = 매달 ○일(없는
   날은 말일), 주말·공휴일도 그날 날짜, 오늘이 결제일이거나 지났으면 올림(서버가 며칠 못 돌아도 그 결제일 날짜로, 지난달 몫까지 — 그 전 달은 자동으로
   안 올리고 탭에 안내), 시작일(비우면 항목을 만든 날) 전 결제일·끝나는 날 뒤·일시 중지는 안 올림, 금액은 예상 금액(매달 다르면 분류할 때 고침 —
