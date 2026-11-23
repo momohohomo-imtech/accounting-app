@@ -4,7 +4,8 @@ import { postDueRecurring } from "@/lib/recurringExpensePost";
 import { nowKstParts } from "@/lib/kstDate";
 import { sendEmail } from "@/lib/email";
 
-// 고정지출 자동 등록(108 SQL) — 매일 아침 6시(한국 시각, vercel.json 크론 "0 21 * * *" = UTC 21시)에 결제일이 된 항목을 매입장에
+// 고정지출 자동 등록(108 SQL) — 매일 아침 5시(한국 시각, vercel.json 크론 "0 20 * * *" = UTC 20시 — 일요일 6시 주간 자동 백업과 겹치지
+// 않게: 백업이 거래 표를 읽은 뒤 올라가면 백업 안 "올린 기록"이 백업에 없는 거래를 가리켜 그 백업은 복원이 통째로 실패함)에 결제일이 된 항목을 매입장에
 // "분류 대기"로 올림. 같은 달 두 번 안 올라감(DB 함수), 서버가 며칠 못 돌아도 다음 실행 때 그 달 결제일 날짜로 올림(지난달 몫까지).
 export const maxDuration = 60;
 

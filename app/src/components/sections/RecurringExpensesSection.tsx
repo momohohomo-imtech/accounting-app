@@ -101,7 +101,7 @@ export async function RecurringExpensesSection() {
       </div>
       <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
         <p>
-          매달 결제일에 매입장으로 자동으로 올라갑니다(매일 아침 6시 확인). 상태는 <b>분류 대기</b>로 올라가니 매입장에서 분류해 주세요.
+          매달 결제일에 매입장으로 자동으로 올라갑니다(매일 아침 5시 확인). 상태는 <b>분류 대기</b>로 올라가니 매입장에서 분류해 주세요.
         </p>
         <details className="mt-1">
           <summary className="cursor-pointer text-xs text-slate-500">자세히</summary>
