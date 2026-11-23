@@ -24,7 +24,7 @@
   `UncategorizedPurchasesTable`, `TransactionHistoryTable`, `ProjectReceiptsTable`, 통합 보고서의 `ProjectsCombinedTable`·
   `CombinedCategorySection`·`CombinedAgencyTable`, `BankBalanceCheckPopup`(통장 잔액 확인 기록), `YearLockPanel`(잠긴 해),
   `ReceivableAgingTable`(오래된 외상매출금), `HometaxReconcilePanel`(홈택스 대조 결과), `ConstructionMemoList`(공사 메모),
-  `WorkSequenceList`(공사 작업 순서표), `FixedExpensePanel`(고정지출 지정 거래처·카테고리·후보), `RecentTransactionsTable`(대시보드 최근 등록 거래), `SortableSimpleTable`(보고서 분기별·월별 손익·매출처별 집계), `SqlStatusTable`(백업 화면 SQL 실행 상태))에
+  `WorkSequenceList`(공사 작업 순서표), `FixedExpensePanel`(고정지출 지정 거래처·카테고리·후보), `RecentTransactionsTable`(대시보드 최근 등록 거래), `SortableSimpleTable`(보고서 분기별·월별 손익·매출처별 집계), `SqlStatusTable`(백업 화면 SQL 실행 상태), `ProjectOverview`(보고서 프로젝트 한눈에 보기의 프로젝트별 표))에
   이 패턴이 적용돼 있음 — 새 표를 추가할 때 이 목록도 같이 업데이트할 것.
   (예외: `DailyWorkerUsageStatementTable`은 세무사 제출용 사용내역서 문서라
   근로자별 연속일 소계 순서가 고정돼야 해서 임의 정렬을 지원하지 않음 —
@@ -201,7 +201,7 @@
 - **금액 계산을 바꾸면 `npm test`(app 폴더)로 자동 검사를 돌릴 것.** 부가세 분리·마이너스 금액 반올림(`vatBasis`),
   외상 잔액(`credit`), 종합소득세(`tax`), 견적 금액·한글 금액(`quoteCalc`·`numberToKorean`),
   예상 미수액·프로젝트 받은 돈(`expectedReceivable`), 이익 예상(`projectProfit` — 대시보드·보고서 공통, 남은 달 고정지출 포함), 프로젝트 목록 하단 합계·통합
-  보고서(`projectListTotals`), 엑셀 거래 읽기(`transactionExcel`), 작업일지 집계(`workLogSummary`), 출장일지 합계·보고서 작업일수 나눔·출장 투입 인원·근무일당 이익금(`tripLog`), 보고서 출장 현황(`tripOverview`), 프로젝트 보고서 근무 달력(`workCalendar`), 매입장 한 결제 묶기(`paymentGroup`), 장부 점검(`ledgerCheck`), 거래 수정 이력 표시·일괄 변경 접기(`transactionHistory`), 백업
+  보고서(`projectListTotals`), 엑셀 거래 읽기(`transactionExcel`), 작업일지 집계(`workLogSummary`), 출장일지 합계·보고서 작업일수 나눔·출장 투입 인원·근무일당 이익금·출장 횟수(`tripLog`), 보고서 출장 현황(`tripOverview`), 프로젝트 보고서 근무 달력(`workCalendar`), 보고서 프로젝트 한눈에 보기(`projectOverview`), 매입장 한 결제 묶기(`paymentGroup`), 장부 점검(`ledgerCheck`), 거래 수정 이력 표시·일괄 변경 접기(`transactionHistory`), 백업
   끝까지 담기(`backup`), 복원 막기·표 목록·나눠 올리기(`restore`), 백업 상태(`backupStatus`), 삭제 막기(`deleteGuard`), 급여 중복
   확인(`payrollDuplicates`), 긴 ID 목록 나눠 조회·자동완성 기간(`supabaseFetchAll`), 파일 올리기 규칙(`fileUpload`), 백업 자동
   정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
@@ -370,6 +370,15 @@
   7단계 크기(`calendarPrintTier` + 컴포넌트의 `PRINT_SIZE`, mm 단위 — 6주짜리 달이 줄마다 와도 16달까지 한 장, 단계를 바꾸면 가장 긴
   경우로 장 수를 다시 확인). `usePrintFitToPage`는 인쇄 직전 화면 배치 높이를 재서 이 달력은 쓸데없이 줄이므로 쓰지 않음. 목록형 표가
   아니라 달력 칸(grid)이라 머리글 정렬·표 가로 스크롤 규칙 대상 아님.
+- **보고서 "프로젝트 한눈에 보기"**(11/23 사용자 요청 "전체 프로젝트 요약 — 첫 줄 발주액·수주액·매입·이익금·이익율, 둘째 줄 근무일당 이익금·
+  근무일·출장 횟수(연속일은 1회)" + "프로젝트마다 한눈에" + "인쇄", 사용자 결정 "추천대로", DB 변경 없음): "프로젝트" 구역 맨 위 칸(`ProjectOverview`) —
+  위 = 요약 칸(휴대폰은 한 줄에 하나, PC·인쇄는 칸 — 휴대폰용 max-md:가 인쇄에도 걸려서 두 모양을 따로 그림), 아래 = 프로젝트별 표(머리글 정렬,
+  이름을 누르면 프로젝트 보고서, 합계 줄 = 위 요약), 연도·현장 필터를 따름, 엑셀·인쇄(`printSection=projectOverview`). 계산은
+  `lib/projectOverview.ts`로만: 줄 = 어미 + 귀속 하위 묶음(`projectGroups` — 누르면 여는 보고서와 같은 묶음), 수주액 = 발주액 − 대행구매(수기
+  입력 수주액 아님 — 이익금 = 수주액 − 매입), 검토중 발주액은 빼고 이미 쓴 매입·대행구매만(= "프로젝트별 손익" 머리 요약과 같은 합계), 이익율 =
+  이익금 ÷ 발주액, 근무일은 묶음 안에서 같은 날 하루(`workDaySplitForProjects`), 출장 횟수는 묶음의 출장 날짜 중 달력상 이어진 날은 1회
+  (`tripRunCount` — 주말을 사이에 두면 2회), 근무일·출장 횟수 합계 = 줄 합(같은 날 두 프로젝트면 2일 — 표 합계가 줄 합과 같게). 예전
+  "프로젝트별 손익" 안 총 발주액·총 이익금 카드는 겹쳐서 뺌. 항목 하나만 인쇄할 때는 구역 제목(재무 개요 등)도 인쇄에서 뺌(`groupPrintClass`).
 - **매입장 마이너스 금액**(11/14 사용자 요청 "단수 조정·할인 — 실제 금액을 적고 마이너스로 빼려고", DB 변경 없음 — 금액 칸에 제약 없음):
   거래 등록 줄마다 "− 마이너스" 버튼(휴대폰 숫자 자판엔 "-"가 없어서 — 소계·단가 부호를 바꿈, 빈 소계에서 누르면 그다음 친 숫자가
   마이너스), 단가·소계·엑셀 일괄 등록 금액 칸 마이너스 입력, 합계 옆 "마이너스 N줄 포함", 마이너스 소계·매입장 금액은 빨간 글씨.

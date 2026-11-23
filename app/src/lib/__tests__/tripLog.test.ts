@@ -13,7 +13,9 @@ import {
   parseCount,
   profitPerWorkDay,
   sumHeadcount,
+  tripCountForProjects,
   tripDayToInput,
+  tripRunCount,
   tripTotals,
   workDayParts,
   workDaySplit,
@@ -209,3 +211,30 @@ test("근무일당 이익금: 이익금 ÷ 총 근무일수(원 단위 반올림
   assert.equal(profitPerWorkDay(3_000_000, days), 1_000_000);
 });
 
+
+test("출장 횟수: 이어진 날은 1회, 하루라도 비면 따로(주말 사이도 따로), 같은 날·순서 무관", () => {
+  assert.equal(tripRunCount([]), 0);
+  assert.equal(tripRunCount(["2026-11-03"]), 1);
+  // 3~5일 이어짐 + 7일 하루 → 2회, 같은 날 두 번·순서 뒤섞임도 같음
+  assert.equal(tripRunCount(["2026-11-05", "2026-11-03", "2026-11-04", "2026-11-04", "2026-11-07"]), 2);
+  // 금요일(11/6)·월요일(11/9) — 주말을 사이에 두면 2회
+  assert.equal(tripRunCount(["2026-11-06", "2026-11-09"]), 2);
+  // 달·해를 넘겨 이어진 날은 1회
+  assert.equal(tripRunCount(["2026-10-31", "2026-11-01"]), 1);
+  assert.equal(tripRunCount(["2025-12-31", "2026-01-01", "2026-01-02"]), 1);
+  // 날짜에 시각이 붙어도 날짜만, 날짜가 아닌 값은 뺌
+  assert.equal(tripRunCount(["2026-11-03T09:00:00", "2026-11-04", "잘못된 값"]), 1);
+});
+
+test("출장 횟수: 묶음 안 프로젝트의 출장 날짜를 합쳐서 셈, 묶음 밖은 빠짐, 표가 없으면 0", () => {
+  const days = [
+    { project_id: "a", work_date: "2026-11-03" },
+    { project_id: "b", work_date: "2026-11-04" }, // 하위 프로젝트가 이어서 → 같은 출장
+    { project_id: "a", work_date: "2026-11-10" },
+    { project_id: "x", work_date: "2026-11-05" }, // 다른 프로젝트 — 빠짐
+  ];
+  assert.equal(tripCountForProjects(days, ["a", "b"]), 2);
+  assert.equal(tripCountForProjects(days, ["a"]), 2);
+  assert.equal(tripCountForProjects(days, ["x"]), 1);
+  assert.equal(tripCountForProjects(null, ["a"]), 0);
+});
