@@ -207,7 +207,7 @@
   정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
   해 잠금 불러오기(`yearLock`), 오래된 외상매출금(`receivableAging`), 이번 달 신고·납부 일정(`annualTasks`), 홈택스 세금계산서
   대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`), 메모 저장 확인(`unsavedChanges` — 떠나는 링크 판단·뒤로가기 되돌리기), 메모 한 장 엑셀(`memoExport`), 공사 작업 순서
-  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 고정지출 자동 등록 결제일·이번 달 상태·은행 겹침(`recurringExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내(`actionError`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`), 공구명세서 이름 [ ] 메모(`toolNameNote`), 같은 날 순서·한 번에 넣는 줄의 등록 시각·넣은 순서 id(`entryOrder`), 목록 기본 순서(`listOrder`),
+  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 고정지출 자동 등록 결제일·이번 달 상태·은행 겹침(`recurringExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내(`actionError`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`), 공구명세서 이름 [ ] 메모(`toolNameNote`), 같은 날 순서·한 번에 넣는 줄의 등록 시각·넣은 순서 id(`entryOrder`), 매입매출 등록 여러 날짜(`multiDate`), 목록 기본 순서(`listOrder`),
   매입매출장 글자 검색(`ledgerSearch`), SQL 실행 상태(`sqlStatus`), 파일 저장 공간(`storageUsage`), 메모장 구분(`memoCategories`), 거래 일괄
   변경 나눠 바꾸기(`bulkUpdate`)·일괄 변경 칸(`transactionBulkEdit`), 챙길 거래 창(`transactionWatch`)·수정 팝업 주소(`ledgerLinks`), 은행 → 장부 올리기·등록 취소 판단(`bankLedger`)의 검사가
   `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
@@ -389,6 +389,11 @@
   (구간 합계 = 외상매출금 합계), 매입매출장 금액 검색 = 부호 없이 적으면 마이너스 줄도·"-"를 붙이면 마이너스만(`lib/ledgerSearch.ts`),
   프로젝트 매입 그래프 = 합계가 마이너스인 카테고리는 조각·막대 없이 목록에 금액만(`ProjectPurchaseChartButton` — 마이너스 폭·각도는
   막대가 꽉 차거나 조각이 거꾸로 그려짐).
+- **매입매출 등록 "여러 날짜에 같은 내용으로"**(11/23 사용자 요청 "한 번에 여러 날짜를 선택해서 한 번에 여러 건(내용은 동일)", DB 변경 없음):
+  새로 등록할 때만(수정 화면엔 없음) 날짜 칸 아래 체크 → 달력(`MultiDatePicker` — 누르면 넣고 다시 누르면 뺌, ◀ ▶로 다른 달, 한 번에
+  `MAX_MULTI_DATES` 62일까지). 고른 날짜마다 아래 줄 전부를 그대로 한 건씩 — `bulkImportTransactions` 한 번에(하나라도 실패하면 전부 안 들어감,
+  줄마다 다른 등록 시각 `entryTimestamps`), "한 결제로 묶기"는 날짜마다(`groupPerDate` — 날짜가 다르면 다른 결제). 확인창에 날짜·건수·합계(× 날짜
+  수), 합계 옆 "× N일 = 모두". 날짜 고르기·줄 만들기·글자는 `lib/multiDate.ts`.
 - **은행 "등록"(매입/매출장으로 올리기)**: 출금 → 매입, 입금 → 매출, "분류 대기 중"으로 한 줄(`lib/bankLedger.ts`의 `ledgerRowFromBank`).
   결제방식은 송금이 기본(11/12 사용자 요청 — 결제수단 목록에서 이름 "송금"으로 찾고, 없으면 예전처럼 빈칸, 이미 올린 줄은 안 바꿈).
   등록 취소·은행 거래 삭제 때 장부 줄은 등록 당시 그대로일 때만 같이 지움(`isLedgerRowUntouched` — 결제방식은 송금 또는 빈칸(예전에 올린
