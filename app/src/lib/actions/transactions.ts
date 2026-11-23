@@ -7,6 +7,7 @@ import { fetchAllRowsIn } from "@/lib/supabaseFetchAll";
 import { entryTimestamps } from "@/lib/entryOrder";
 import { updateInChunks } from "@/lib/bulkUpdate";
 import { addedVat } from "@/lib/vatBasis";
+import { groupIdsPerDate } from "@/lib/multiDate";
 import type { CreditPayment, Transaction } from "@/lib/types";
 
 // 거래가 바뀌면 금액이 보이는 모든 화면을 새로 그리게 한다.
@@ -130,10 +131,11 @@ export type BulkTransactionInput = {
 };
 
 // 한 결제로 묶기(092 SQL) — group: 새로 등록하는 이 줄들을 한 결제로 묶음. joinGroupOf: 수정 중인 거래에 줄을 더할 때
-// 그 거래와 같은 묶음으로(그 거래에 묶음 번호가 없으면 새로 만들어 그 거래에도 붙임). 둘 다 없으면 예전처럼 따로 등록.
+// 그 거래와 같은 묶음으로(그 거래에 묶음 번호가 없으면 새로 만들어 그 거래에도 붙임). groupPerDate: "여러 날짜에 같은 내용으로"
+// 등록(11/23) — 같은 날짜 줄끼리만 묶음(날짜가 다르면 다른 결제, lib/multiDate.ts). 셋 다 없으면 예전처럼 따로 등록.
 export async function bulkImportTransactions(
   rows: BulkTransactionInput[],
-  options: { group?: boolean; joinGroupOf?: string } = {}
+  options: { group?: boolean; joinGroupOf?: string; groupPerDate?: boolean } = {}
 ) {
   const supabase = await createClient();
   const {
@@ -161,6 +163,7 @@ export async function bulkImportTransactions(
   } else if (options.group && rows.length > 1) {
     paymentGroupId = crypto.randomUUID();
   }
+  const groupByDate = options.groupPerDate ? groupIdsPerDate(rows, () => crypto.randomUUID()) : null;
 
   // 한 번에 넣는 줄은 DB가 모두 같은 등록 시각을 넣어 순서가 사라짐 → 줄마다 1/1000초씩 다르게(lib/entryOrder.ts — 같은 날짜 안의
   // 목록 순서가 엑셀·입력한 줄 순서대로 나오게).
@@ -187,7 +190,11 @@ export async function bulkImportTransactions(
     note2: r.note2,
     created_by: user?.id ?? null,
     // 묶지 않을 때는 칸을 아예 안 보냄 — 092 SQL 실행 전에도 등록이 깨지지 않게.
-    ...(paymentGroupId ? { payment_group_id: paymentGroupId } : {}),
+    ...(groupByDate?.get(r.trans_date)
+      ? { payment_group_id: groupByDate.get(r.trans_date) }
+      : paymentGroupId
+        ? { payment_group_id: paymentGroupId }
+        : {}),
   }));
 
   const { error } = await supabase.from("transactions").insert(inserts);

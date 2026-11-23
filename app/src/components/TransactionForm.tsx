@@ -15,6 +15,8 @@ import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { formatThousands, parseNumericInput } from "@/lib/numberInput";
 import { postFileToApi } from "@/lib/postFileToApi";
 import { closePopup } from "@/lib/popupNavigation";
+import { MultiDatePicker } from "@/components/MultiDatePicker";
+import { MAX_MULTI_DATES, multiDateLabel, multiDateRows } from "@/lib/multiDate";
 
 type Option = { id: string; name: string };
 type ClientOption = Option & { default_item_name?: string | null; default_category_id?: string | null };
@@ -120,6 +122,9 @@ export function TransactionForm({
   );
   // 한 결제로 묶기 — 품목이 2줄 이상일 때. 사진을 여러 장 올리면 영수증이 따로라서 끔.
   const [groupPayment, setGroupPayment] = useState(true);
+  // 여러 날짜에 같은 내용으로(11/23 사용자 요청) — 새로 등록할 때만, 달력에서 고른 날짜마다 같은 줄을 한 번에(lib/multiDate.ts)
+  const [multiDate, setMultiDate] = useState(false);
+  const [dates, setDates] = useState<string[]>([]);
   const [ocrExtracted, setOcrExtracted] = useState<Record<string, unknown> | null>(
     (initial?.ocr_extracted_raw as Record<string, unknown>) ?? null
   );
@@ -142,6 +147,13 @@ export function TransactionForm({
 
   function set<K extends keyof typeof values>(key: K, v: (typeof values)[K]) {
     setValues((prev) => ({ ...prev, [key]: v }));
+  }
+
+  // 켜면 지금 날짜를 첫 날짜로, 끄면 고른 날짜 중 첫 날짜를 날짜 칸으로
+  function toggleMultiDate(on: boolean) {
+    if (on) setDates(values.trans_date ? [values.trans_date] : []);
+    else if (dates[0]) set("trans_date", dates[0]);
+    setMultiDate(on);
   }
 
   function handleCategorySelect(categoryId: string) {
@@ -393,7 +405,20 @@ export function TransactionForm({
       ? initialGroup!.map((t) => t.id).filter((id) => !validItems.some((li) => li.id === id))
       : [];
     const willGroup = groupingReady && groupPayment && validItems.length > 1;
-    const confirmMessage = isGroupEdit
+    const multi = multiDate && !initial;
+    if (multi && dates.length === 0) {
+      setError("등록할 날짜를 달력에서 하나 이상 골라 주세요.");
+      return;
+    }
+    if (multi && dates.length > MAX_MULTI_DATES) {
+      setError(`한 번에 ${MAX_MULTI_DATES}일까지 등록할 수 있습니다.`);
+      return;
+    }
+    const confirmMessage = multi
+      ? `같은 내용을 ${dates.length}개 날짜에 등록하시겠습니까?\n${multiDateLabel(dates)}\n날짜마다 ${validItems.length}건 · 모두 ${
+          dates.length * validItems.length
+        }건 · 합계 ${formatWon(grandTotal * dates.length)}${willGroup ? "\n(날짜마다 한 결제로 묶음)" : ""}`
+      : isGroupEdit
       ? `수정 내용을 저장하시겠습니까?${removedIds.length > 0 ? ` (줄 ${removedIds.length}개 삭제)` : ""}`
       : initial
         ? "수정 내용을 저장하시겠습니까?"
@@ -449,6 +474,18 @@ export function TransactionForm({
       fd.append("is_verified_ai", "on");
       fd.append("ocr_extracted_raw", ocrExtracted ? JSON.stringify(ocrExtracted) : "");
       return pending.run(() => action(fd));
+    }
+
+    if (multi) {
+      // 여러 날짜 — 날짜마다 같은 줄들을 한 번에(한 결제로 묶기는 날짜마다, 날짜가 다르면 다른 결제)
+      const rows = multiDateRows(dates, validItems, (li, date) => ({ ...buildRow(li), trans_date: date }));
+      const result = await pending.run(() => bulkImportTransactions(rows, { groupPerDate: willGroup }));
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+      leaveAfterSave();
+      return;
     }
 
     if (isGroupEdit) {
@@ -537,14 +574,39 @@ export function TransactionForm({
 
       <div className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-2 lg:grid-cols-3">
         <Field label="날짜" required>
-          <input
-            type="date"
-            required
-            value={values.trans_date}
-            onChange={(e) => set("trans_date", e.target.value)}
-            className={inputClass}
-          />
+          {multiDate ? (
+            <p className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-600">
+              {dates.length > 0 ? `${multiDateLabel(dates, 3)} (${dates.length}일)` : "아래 달력에서 날짜를 고르세요"}
+            </p>
+          ) : (
+            <input
+              type="date"
+              required
+              value={values.trans_date}
+              onChange={(e) => set("trans_date", e.target.value)}
+              className={inputClass}
+            />
+          )}
+          {!initial && (
+            <label className="flex w-fit cursor-pointer items-center gap-1.5 text-xs text-slate-600">
+              <input
+                type="checkbox"
+                checked={multiDate}
+                onChange={(e) => toggleMultiDate(e.target.checked)}
+                className="h-3.5 w-3.5"
+              />
+              여러 날짜에 같은 내용으로
+            </label>
+          )}
         </Field>
+        {multiDate && (
+          <div className="sm:col-span-2 lg:col-span-3">
+            <p className="mb-1.5 text-xs text-slate-500">
+              날짜를 눌러 고르세요(다시 누르면 빠짐, ◀ ▶로 다른 달). 아래 내용이 고른 날짜마다 한 건씩 등록됩니다.
+            </p>
+            <MultiDatePicker dates={dates} onChange={setDates} />
+          </div>
+        )}
         <Field label="구분">
           <select value={values.type} onChange={(e) => set("type", e.target.value as "매입" | "매출")} className={inputClass}>
             <option value="매입">매입</option>
@@ -826,6 +888,11 @@ export function TransactionForm({
               <span className="ml-1 text-xs font-normal text-red-600">(마이너스 {negativeLineCount}줄 포함)</span>
             )}
             <span className="ml-1 tabular-nums text-base">{formatWon(grandTotal)}</span>
+            {multiDate && dates.length > 1 && (
+              <span className="block text-xs font-normal text-slate-500">
+                × {dates.length}일 = 모두 <span className="tabular-nums font-semibold text-slate-900">{formatWon(grandTotal * dates.length)}</span>
+              </span>
+            )}
           </p>
         </div>
       </div>
