@@ -17,6 +17,7 @@ import { postFileToApi } from "@/lib/postFileToApi";
 import { closePopup } from "@/lib/popupNavigation";
 import { MultiDatePicker } from "@/components/MultiDatePicker";
 import { MAX_MULTI_DATES, multiDateLabel, multiDateRows } from "@/lib/multiDate";
+import { NEW_ID_FIELD, createNewIdKeeper } from "@/lib/idempotentSave";
 
 type Option = { id: string; name: string };
 type ClientOption = Option & { default_item_name?: string | null; default_category_id?: string | null };
@@ -93,6 +94,12 @@ export function TransactionForm({
   const router = useRouter();
   const confirm = useConfirm();
   const pending = useGlobalPending();
+  // 새로 넣는 줄의 id를 화면에서 정함 — 같은 내용이면 다시 눌러도·연결이 끊겨 자동으로 다시 보내도 같은 id라 두 번 들어가지 않음
+  // (11/23 사용자 "저장을 두 번 누르거나 인터넷 연결이 끊겼다는 안내", lib/idempotentSave.ts). 저장이 끝나면 비움.
+  const [newIdKeeper] = useState(() => createNewIdKeeper());
+  // 저장(거래 등록·수정 저장) 실패·확인 안내 — 저장 단추 바로 위에(휴대폰에선 폼이 길어 맨 위 안내가 화면 밖이라, 저장이 안 된 줄 모르고
+  // 다시 누르는 일이 있었음). 맨 위 error는 영수증·엑셀 인식 안내.
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const clientNameSuggestions = Array.from(new Set([...clients.map((c) => c.name), ...rawClientNames])).sort((a, b) =>
     a.localeCompare(b, "ko")
   );
@@ -396,7 +403,7 @@ export function TransactionForm({
     // "-"만 있는 줄(마이너스 버튼만 누르고 숫자를 안 친 줄)은 빈 줄과 같게
     const validItems = lineItems.filter((li) => li.subtotal && li.subtotal !== "-");
     if (validItems.length === 0) {
-      setError("최소 한 개 항목의 소계(금액)를 입력해주세요.");
+      setSubmitError("최소 한 개 항목의 소계(금액)를 입력해주세요.");
       return;
     }
 
@@ -407,11 +414,11 @@ export function TransactionForm({
     const willGroup = groupingReady && groupPayment && validItems.length > 1;
     const multi = multiDate && !initial;
     if (multi && dates.length === 0) {
-      setError("등록할 날짜를 달력에서 하나 이상 골라 주세요.");
+      setSubmitError("등록할 날짜를 달력에서 하나 이상 골라 주세요.");
       return;
     }
     if (multi && dates.length > MAX_MULTI_DATES) {
-      setError(`한 번에 ${MAX_MULTI_DATES}일까지 등록할 수 있습니다.`);
+      setSubmitError(`한 번에 ${MAX_MULTI_DATES}일까지 등록할 수 있습니다.`);
       return;
     }
     const confirmMessage = multi
@@ -424,7 +431,7 @@ export function TransactionForm({
         ? "수정 내용을 저장하시겠습니까?"
         : `이 거래를 등록하시겠습니까? (${validItems.length}건${willGroup ? " · 한 결제로 묶음" : ""})`;
     if (!(await confirm(confirmMessage))) return;
-    setError(null);
+    setSubmitError(null);
 
     // 종류구분이 비과세면 체크박스 state가(예전 데이터 등으로) true로 남아있어도 무조건 무시 —
     // 화면에서 비활성화만 하고 state는 안 건드렸던 게 "체크 안 보이는데 10%가 붙는" 원인이었음.
@@ -473,15 +480,25 @@ export function TransactionForm({
       fd.append("amount", li.subtotal);
       fd.append("is_verified_ai", "on");
       fd.append("ocr_extracted_raw", ocrExtracted ? JSON.stringify(ocrExtracted) : "");
-      return pending.run(() => action(fd));
+      if (id) return pending.run(() => action(fd));
+      // 새 등록 — 화면에서 정한 id로(이미 들어갔으면 서버가 다시 넣지 않음) → 연결이 끊기면 자동으로 다시 보냄
+      fd.append(NEW_ID_FIELD, newIdKeeper.idsFor({ kind: "single", row: buildRow(li) }, 1)[0]);
+      return pending.run(() => action(fd), { retry: true });
+    }
+
+    // 새로 넣는 여러 줄 — 같은 내용이면 같은 id(lib/idempotentSave.ts), 연결이 끊기면 자동으로 다시 보냄
+    function bulkInsert(rows: BulkTransactionInput[], options: Parameters<typeof bulkImportTransactions>[1], kind: string) {
+      const ids = newIdKeeper.idsFor({ kind, rows, options }, rows.length);
+      const withIds = rows.map((r, i) => ({ ...r, new_id: ids[i] }));
+      return pending.run(() => bulkImportTransactions(withIds, options), { retry: true });
     }
 
     if (multi) {
       // 여러 날짜 — 날짜마다 같은 줄들을 한 번에(한 결제로 묶기는 날짜마다, 날짜가 다르면 다른 결제)
       const rows = multiDateRows(dates, validItems, (li, date) => ({ ...buildRow(li), trans_date: date }));
-      const result = await pending.run(() => bulkImportTransactions(rows, { groupPerDate: willGroup }));
+      const result = await bulkInsert(rows, { groupPerDate: willGroup }, "multiDate");
       if (result?.error) {
-        setError(result.error);
+        setSubmitError(result.error);
         return;
       }
       leaveAfterSave();
@@ -499,20 +516,20 @@ export function TransactionForm({
         })
       );
       if (result?.error) {
-        setError(result.error);
+        setSubmitError(result.error);
         return;
       }
     } else if (validItems.length === 1) {
       const result = await saveSingle(validItems[0], initial?.id);
       if (result?.error) {
-        setError(result.error);
+        setSubmitError(result.error);
         return;
       }
     } else if (!initial) {
       // 신규 등록, 여러 줄 → 전부 새 거래로 일괄 등록(한 결제로 묶기를 켜면 같은 묶음 번호).
-      const result = await pending.run(() => bulkImportTransactions(validItems.map(buildRow), { group: willGroup }));
+      const result = await bulkInsert(validItems.map(buildRow), { group: willGroup }, "lines");
       if (result?.error) {
-        setError(result.error);
+        setSubmitError(result.error);
         return;
       }
     } else {
@@ -521,15 +538,13 @@ export function TransactionForm({
       const [first, ...rest] = validItems;
       const firstResult = await saveSingle(first, initial.id);
       if (firstResult?.error) {
-        setError(firstResult.error);
+        setSubmitError(firstResult.error);
         return;
       }
       if (rest.length > 0) {
-        const bulkResult = await pending.run(() =>
-          bulkImportTransactions(rest.map(buildRow), willGroup ? { joinGroupOf: initial.id } : {})
-        );
+        const bulkResult = await bulkInsert(rest.map(buildRow), willGroup ? { joinGroupOf: initial.id } : {}, `split:${initial.id}`);
         if (bulkResult?.error) {
-          setError(bulkResult.error);
+          setSubmitError(bulkResult.error);
           return;
         }
       }
@@ -540,6 +555,7 @@ export function TransactionForm({
 
   // 저장 뒤 — 팝업이면 닫기(저장 동작이 revalidatePath를 불러서 뒤로 가도 새 자료로 그려짐), 화면이면 목록으로 이동.
   function leaveAfterSave() {
+    newIdKeeper.reset();
     if (asPopup) {
       closePopup(router, redirectTo);
       return;
@@ -928,6 +944,11 @@ export function TransactionForm({
         </div>
       )}
 
+      {submitError && (
+        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+          {submitError}
+        </p>
+      )}
       <div className="flex items-center gap-2">
         <button
           type="submit"

@@ -97,7 +97,7 @@ export async function RecurringExpensesSection() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-slate-900">고정지출 자동 등록</h2>
-        {canEdit && <CreatePanel title="고정지출" fields={fields} createAction={createRecurringExpense} />}
+        {canEdit && <CreatePanel title="고정지출" fields={fields} createAction={createRecurringExpense} idempotent />}
       </div>
       <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
         <p>

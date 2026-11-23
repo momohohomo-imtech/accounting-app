@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { remainingBalance } from "@/lib/credit";
-import { fetchAllRowsIn } from "@/lib/supabaseFetchAll";
+import { countSavedIds, fetchAllRowsIn } from "@/lib/supabaseFetchAll";
+import { NEW_ID_FIELD, insertOnce, validNewIds } from "@/lib/idempotentSave";
 import { entryTimestamps } from "@/lib/entryOrder";
 import { updateInChunks } from "@/lib/bulkUpdate";
 import { addedVat } from "@/lib/vatBasis";
@@ -43,8 +44,11 @@ export async function createTransactionRecord(formData: FormData) {
   const amounts = computeAmounts(type, amount, vatIncluded);
 
   const ocrRaw = String(formData.get("ocr_extracted_raw") ?? "");
+  // 화면에서 정한 새 id(lib/idempotentSave.ts) — 연결이 끊겨 다시 보내도(자동·다시 누름) 같은 거래가 두 번 들어가지 않게
+  const newIds = validNewIds([formData.get(NEW_ID_FIELD)]);
 
-  const { error } = await supabase.from("transactions").insert({
+  const row = {
+    ...(newIds ? { id: newIds[0] } : {}),
     trans_date: String(formData.get("trans_date")),
     type,
     client_id: String(formData.get("client_id") ?? "") || null,
@@ -66,9 +70,13 @@ export async function createTransactionRecord(formData: FormData) {
     note1: String(formData.get("note1") ?? "") || null,
     note2: String(formData.get("note2") ?? "") || null,
     created_by: user?.id ?? null,
-  });
-
-  if (error) return { error: error.message };
+  };
+  const result = await insertOnce(
+    newIds,
+    () => supabase.from("transactions").insert(row),
+    (ids) => countSavedIds(supabase, "transactions", ids)
+  );
+  if (result.error) return { error: result.error };
 
   revalidateLedgerPages();
 }
@@ -128,6 +136,8 @@ export type BulkTransactionInput = {
   amount: number;
   note1: string | null;
   note2: string | null;
+  /** 화면에서 정한 새 id(lib/idempotentSave.ts) — 모든 줄에 있을 때만 그 id로 넣고, 이미 있으면 다시 넣지 않음(없으면 DB가 정함) */
+  new_id?: string;
 };
 
 // 한 결제로 묶기(092 SQL) — group: 새로 등록하는 이 줄들을 한 결제로 묶음. joinGroupOf: 수정 중인 거래에 줄을 더할 때
@@ -168,7 +178,10 @@ export async function bulkImportTransactions(
   // 한 번에 넣는 줄은 DB가 모두 같은 등록 시각을 넣어 순서가 사라짐 → 줄마다 1/1000초씩 다르게(lib/entryOrder.ts — 같은 날짜 안의
   // 목록 순서가 엑셀·입력한 줄 순서대로 나오게).
   const stamps = rows.length > 1 ? entryTimestamps(rows.map((r) => r.trans_date), Date.now()) : null;
+  // 화면에서 정한 새 id(매입매출 등록 — 연결이 끊겨 다시 보내도 두 번 안 들어가게). 엑셀 일괄 등록 등 id가 없으면 예전처럼.
+  const newIds = validNewIds(rows.map((r) => r.new_id));
   const inserts = rows.map((r, i) => ({
+    ...(newIds ? { id: newIds[i] } : {}),
     ...(stamps ? { created_at: stamps[i] } : {}),
     trans_date: r.trans_date,
     type: r.type,
@@ -197,8 +210,12 @@ export async function bulkImportTransactions(
         : {}),
   }));
 
-  const { error } = await supabase.from("transactions").insert(inserts);
-  if (error) return { error: error.message };
+  const result = await insertOnce(
+    newIds,
+    () => supabase.from("transactions").insert(inserts),
+    (ids) => countSavedIds(supabase, "transactions", ids)
+  );
+  if (result.error) return { error: result.error };
 
   revalidateLedgerPages();
 }

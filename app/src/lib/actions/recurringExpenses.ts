@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentRole } from "@/lib/currentRole";
 import { nowKstParts } from "@/lib/kstDate";
 import { postDueRecurring } from "@/lib/recurringExpensePost";
+import { countSavedIds } from "@/lib/supabaseFetchAll";
+import { NEW_ID_FIELD, insertOnce, validNewIds } from "@/lib/idempotentSave";
 
 // 매입매출 "고정지출" 탭(108 SQL recurring_expenses) — 항목 추가·수정·삭제와 "지금 올리기". 자동으로 올린 매입 줄은 장부 자료라
 // 여기서 지우지 않음(항목을 지워도 이미 올린 줄은 매입장에 그대로).
@@ -56,8 +58,15 @@ export async function createRecurringExpense(formData: FormData) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const { error } = await supabase.from("recurring_expenses").insert({ ...parsed.row, created_by: user?.id ?? null });
-  if (error) return { error: error.message };
+  // 화면(CreatePanel idempotent)에서 정한 새 id — 연결이 끊겨 다시 보내도 같은 항목이 두 번 생기지 않게(lib/idempotentSave.ts)
+  const newIds = validNewIds([formData.get(NEW_ID_FIELD)]);
+  const row = { ...(newIds ? { id: newIds[0] } : {}), ...parsed.row, created_by: user?.id ?? null };
+  const result = await insertOnce(
+    newIds,
+    () => supabase.from("recurring_expenses").insert(row),
+    (ids) => countSavedIds(supabase, "recurring_expenses", ids)
+  );
+  if (result.error) return { error: result.error };
   revalidateAll();
 }
 
