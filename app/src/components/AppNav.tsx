@@ -18,6 +18,8 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/transactions", label: "매입매출·외상", short: "매입매출" },
       { href: "/bank", label: "은행 거래내역" },
       { href: "/reports", label: "보고서" },
+      // 세무사가 필요한 자료를 모은 읽기 전용 화면(11/26 사용자 요청) — 세무사 계정 메뉴에도
+      { href: "/tax-review", label: "세무사 열람" },
     ],
   },
   {
@@ -59,8 +61,16 @@ function groupsFor(role: string | null): NavGroup[] {
     );
   }
   if (role !== "tax_agent") return NAV_GROUPS;
-  // 세무사 계정은 매입매출장(매입매출 목록)만(사용자 요청 10/28 — 예전엔 대시보드·외상 등도). 화면 제목과 같은 이름으로.
-  return [{ title: "회계", items: [{ href: "/transactions", label: "매입매출" }] }];
+  // 세무사 계정은 매입매출장(매입매출 목록)과 세무사 열람만(사용자 요청 10/28·11/26 — 예전엔 대시보드·외상 등도). 화면 제목과 같은 이름으로.
+  return [
+    {
+      title: "회계",
+      items: [
+        { href: "/transactions", label: "매입매출" },
+        { href: "/tax-review", label: "세무사 열람" },
+      ],
+    },
+  ];
 }
 
 function GroupedLinks({
@@ -138,7 +148,9 @@ export function MobileNav({ role }: { role: string | null }) {
 
   const groups = groupsFor(role);
   const all = groups.flatMap((g) => g.items);
-  const tabs = all.filter((i) => MOBILE_TAB_HREFS.includes(i.href));
+  // 세무사 계정은 메뉴가 둘뿐이라 둘 다 하단 탭에 바로
+  const tabHrefs = role === "tax_agent" ? ["/transactions", "/tax-review"] : MOBILE_TAB_HREFS;
+  const tabs = all.filter((i) => tabHrefs.includes(i.href));
   const hasMore = all.length > tabs.length;
   const moreActive = !tabs.some((t) => isActive(pathname, t.href));
 

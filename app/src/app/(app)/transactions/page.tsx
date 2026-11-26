@@ -37,6 +37,7 @@ import { LedgerCheckSection } from "@/components/sections/LedgerCheckSection";
 import { getCurrentRole } from "@/lib/currentRole";
 import { isYearLocked, loadLockedYears, type LockedYear } from "@/lib/yearLock";
 import { nowKst } from "@/lib/kstDate";
+import { taxInvoiceHalfSummary, type HalfInvoiceTotals, type TaxInvoiceHalfSummary, type TaxInvoiceRow } from "@/lib/taxInvoiceSummary";
 
 const TABS = [
   { key: "list", label: "매입매출" },
@@ -89,13 +90,18 @@ export default async function TransactionsPage({
     return qs ? `/transactions?${qs}` : "/transactions";
   })();
 
-  const totals =
-    active === "list" ? await fetchTransactionTotals({ year, month, type, project_id, payment_method_id, q }) : null;
+  // 상단: 고른 기간·필터의 총 매입액·총 매출액 + 그 아래 줄에 그 해 상반기·하반기 세금계산서 발행(11/26 사용자 요청 — 필터와 상관없이 그 해 전체)
+  const invoiceYear = year ? Number(year) : nowKst().year;
+  const [totals, invoiceHalves] =
+    active === "list"
+      ? await Promise.all([fetchTransactionTotals({ year, month, type, project_id, payment_method_id, q }), fetchTaxInvoiceHalves(invoiceYear)])
+      : [null, null];
   const tabs = ledgerOnly || (await recurringTableReady(await createClient())) ? TABS : TABS.filter((t) => t.key !== "fixed");
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0 space-y-1">
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <h1 className="text-2xl font-bold text-slate-900">{ledgerOnly ? "매입매출" : "매입매출·외상"}</h1>
           {totals && (
@@ -110,6 +116,8 @@ export default async function TransactionsPage({
               </span>
             </div>
           )}
+        </div>
+        {invoiceHalves && <TaxInvoiceHalves year={invoiceYear} summary={invoiceHalves} />}
         </div>
         {active === "list" && !ledgerOnly && <LinkButton href="/transactions/new">+ 거래 등록</LinkButton>}
       </div>
@@ -202,6 +210,55 @@ const loadLedgerTransactions = cache(
     return { rows: rawTransactions.filter((t) => isLedgerVisible(t, relevantPayments)), paidDateById };
   }
 );
+
+// 그 해 세금계산서 발행 거래(외상 미정산 포함 — 부가세와 같은 세금계산서 기준, lib/taxInvoiceSummary.ts)
+async function fetchTaxInvoiceHalves(year: number): Promise<TaxInvoiceHalfSummary> {
+  const supabase = await createClient();
+  const rows = await fetchAllRows<TaxInvoiceRow>((from, to) =>
+    supabase
+      .from("transactions")
+      .select("id, type, trans_date, tax_invoice_issued, payment_group_id, sales_amount, sales_vat, purchase_amount, purchase_vat")
+      .eq("tax_invoice_issued", true)
+      .gte("trans_date", `${year}-01-01`)
+      .lte("trans_date", `${year}-12-31`)
+      .order("id", { ascending: true })
+      .range(from, to)
+  );
+  return taxInvoiceHalfSummary(rows);
+}
+
+function InvoicePart({ label, totals }: { label: string; totals: { count: number; amount: number } }) {
+  return (
+    <span className="whitespace-nowrap">
+      {label} <span className="tabular-nums font-semibold text-slate-800">{totals.count}건</span>{" "}
+      <span className="tabular-nums font-semibold text-slate-800">{formatWon(totals.amount)}</span>
+    </span>
+  );
+}
+
+function InvoiceHalf({ label, half }: { label: string; half: HalfInvoiceTotals }) {
+  return (
+    <span className="flex flex-wrap items-baseline gap-x-2">
+      <span className="font-medium text-slate-600">{label}</span>
+      <InvoicePart label="매입" totals={half.purchase} />
+      <span className="text-slate-300">·</span>
+      <InvoicePart label="매출" totals={half.sales} />
+    </span>
+  );
+}
+
+// 총 매입액·총 매출액 아래 줄 — 그 해 상반기·하반기 세금계산서 발행 매입·매출(건수·합계). 휴대폰에선 반기마다 한 줄.
+function TaxInvoiceHalves({ year, summary }: { year: number; summary: TaxInvoiceHalfSummary }) {
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-slate-500 sm:text-sm">
+      <span className="font-medium text-slate-600" title="세금계산서 발행으로 체크한 거래 — 거래일 기준, 외상 미정산 포함, 금액은 부가세 포함">
+        {year}년 세금계산서 발행 <span className="font-normal text-slate-400">(외상 미정산 포함)</span>
+      </span>
+      <InvoiceHalf label="상반기" half={summary.h1} />
+      <InvoiceHalf label="하반기" half={summary.h2} />
+    </div>
+  );
+}
 
 async function fetchTransactionTotals({
   year,

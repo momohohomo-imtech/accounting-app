@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ExpenseCategory, PaymentMethod, Transaction } from "@/lib/types";
 import { ProjectPicker, type ProjectOption, type SiteOption } from "@/components/ProjectPicker";
@@ -18,6 +18,8 @@ import { closePopup } from "@/lib/popupNavigation";
 import { MultiDatePicker } from "@/components/MultiDatePicker";
 import { MAX_MULTI_DATES, multiDateLabel, multiDateRows } from "@/lib/multiDate";
 import { NEW_ID_FIELD, createNewIdKeeper } from "@/lib/idempotentSave";
+import { loadClientItemHistory } from "@/lib/actions/clientItemHistory";
+import { suggestionLabel, type ClientItemSuggestion } from "@/lib/clientItemHistory";
 
 type Option = { id: string; name: string };
 type ClientOption = Option & { default_item_name?: string | null; default_category_id?: string | null };
@@ -97,6 +99,10 @@ export function TransactionForm({
   // 새로 넣는 줄의 id를 화면에서 정함 — 같은 내용이면 다시 눌러도·연결이 끊겨 자동으로 다시 보내도 같은 id라 두 번 들어가지 않음
   // (11/23 사용자 "저장을 두 번 누르거나 인터넷 연결이 끊겼다는 안내", lib/idempotentSave.ts). 저장이 끝나면 비움.
   const [newIdKeeper] = useState(() => createNewIdKeeper());
+  // 고른 거래처에서 예전에 쓴 품목(11/26 사용자 요청 — 그 거래처 건만) — 품목 칸을 누르면 골라 쓰기, 금액은 자동으로 안 넣음
+  const itemHistoryListId = useId();
+  const [itemHistory, setItemHistory] = useState<ClientItemSuggestion[]>([]);
+  const itemHistoryRequest = useRef(0);
   // 저장(거래 등록·수정 저장) 실패·확인 안내 — 저장 단추 바로 위에(휴대폰에선 폼이 길어 맨 위 안내가 화면 밖이라, 저장이 안 된 줄 모르고
   // 다시 누르는 일이 있었음). 맨 위 error는 영수증·엑셀 인식 안내.
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -240,6 +246,33 @@ export function TransactionForm({
   function removeLineItem(i: number) {
     applyLines(lineItems.filter((_, idx) => idx !== i));
   }
+
+  const historyClientId = values.client_id;
+  const historyClientName = values.client_name_raw.trim();
+  useEffect(() => {
+    const request = ++itemHistoryRequest.current;
+    const useName = !historyClientId && historyClientName.length >= 2;
+    if (!historyClientId && !useName) {
+      const clear = setTimeout(() => {
+        if (request === itemHistoryRequest.current) setItemHistory([]);
+      }, 0);
+      return () => clearTimeout(clear);
+    }
+    const timer = setTimeout(
+      async () => {
+        try {
+          const result = await loadClientItemHistory(historyClientId ? { clientId: historyClientId } : { clientName: historyClientName });
+          // 그사이 거래처를 또 바꿨으면 늦게 온 결과는 버림
+          if (request === itemHistoryRequest.current) setItemHistory(result.items);
+        } catch {
+          // 고르기 목록은 거들 뿐 — 못 불러오면 그냥 빈 목록(직접 쓰면 됨)
+          if (request === itemHistoryRequest.current) setItemHistory([]);
+        }
+      },
+      historyClientId ? 0 : 400
+    );
+    return () => clearTimeout(timer);
+  }, [historyClientId, historyClientName]);
 
   function handleClientSelect(clientId: string) {
     const client = clients.find((c) => c.id === clientId);
@@ -771,6 +804,16 @@ export function TransactionForm({
             + 물품 종류 추가
           </button>
         </div>
+        {itemHistory.length > 0 && (
+          <p className="mb-2 text-xs text-slate-500">
+            이 거래처에서 쓴 품목 {itemHistory.length}개 — 품목칸을 누르면 골라 쓸 수 있어요(금액은 직접 입력).
+          </p>
+        )}
+        <datalist id={itemHistoryListId}>
+          {itemHistory.map((h) => (
+            <option key={h.name} value={h.name} label={suggestionLabel(h)} />
+          ))}
+        </datalist>
         {isGroupEdit ? (
           <p className="mb-2 text-xs text-slate-400">
             한 결제로 묶인 {initialGroup!.length}줄을 함께 수정해요. 줄을 지우거나 소계를 비우면 저장할 때 그 거래가 삭제돼요.
@@ -798,6 +841,8 @@ export function TransactionForm({
                     value={li.item_name}
                     onChange={(e) => updateLineItem(i, { item_name: e.target.value })}
                     placeholder="품목명"
+                    list={itemHistory.length > 0 ? itemHistoryListId : undefined}
+                    autoComplete="off"
                     className={`${inputClass} min-w-0 flex-1`}
                   />
                   {lineItems.length > 1 && (
