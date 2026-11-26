@@ -78,6 +78,7 @@ type Row = {
   purchase_amount: number;
   purchase_vat: number;
   needs_classification: boolean;
+  tax_invoice_issued: boolean;
   clients: { name: string } | { name: string }[] | null;
   projects:
     | { name: string; status: string | null; sites: { name: string } | { name: string }[] | null }
@@ -828,6 +829,7 @@ export default async function ReportsPage({
             project_name: proj?.name ?? null,
             project_status: proj?.status ?? null,
             needs_classification: t.needs_classification,
+            tax_invoice_issued: Boolean(t.tax_invoice_issued),
             category_name: category?.name ?? null,
             category_project_only: category?.project_only ?? false,
             category_color: category?.color ?? null,
@@ -854,6 +856,7 @@ export default async function ReportsPage({
               project_name: proj?.name ?? null,
               project_status: proj?.status ?? null,
               needs_classification: false,
+              tax_invoice_issued: null,
               category_name: category?.name ?? null,
               category_project_only: category?.project_only ?? false,
               category_color: category?.color ?? null,
@@ -890,6 +893,7 @@ export default async function ReportsPage({
             project_name: proj?.name ?? null,
             project_status: proj?.status ?? null,
             needs_classification: t.needs_classification,
+            tax_invoice_issued: Boolean(t.tax_invoice_issued),
             category_name: category?.name ?? null,
             category_project_only: category?.project_only ?? false,
             category_color: category?.color ?? null,
