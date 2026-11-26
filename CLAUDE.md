@@ -24,7 +24,7 @@
   `UncategorizedPurchasesTable`, `TransactionHistoryTable`, `ProjectReceiptsTable`, 통합 보고서의 `ProjectsCombinedTable`·
   `CombinedCategorySection`·`CombinedAgencyTable`, `BankBalanceCheckPopup`(통장 잔액 확인 기록), `YearLockPanel`(잠긴 해),
   `ReceivableAgingTable`(오래된 외상매출금), `HometaxReconcilePanel`(홈택스 대조 결과), `ConstructionMemoList`(공사 메모),
-  `WorkSequenceList`(공사 작업 순서표), `FixedExpensePanel`(고정지출 지정 거래처·카테고리·후보), `RecentTransactionsTable`(대시보드 최근 등록 거래), `SortableSimpleTable`(보고서 분기별·월별 손익·매출처별 집계, 세무사 열람 표들 — 합계 줄은 `footer`), `SqlStatusTable`(백업 화면 SQL 실행 상태), `ProjectOverview`(보고서 프로젝트 한눈에 보기의 프로젝트별 표))에
+  `WorkSequenceList`(공사 작업 순서표), `FixedExpensePanel`(고정지출 지정 거래처·카테고리·후보), `RecentTransactionsTable`(대시보드 최근 등록 거래), `SortableSimpleTable`(보고서 분기별·월별 손익·매출처별 집계, 세무사 열람 표들·매입처 상세 팝업 — 합계 줄은 `footer`, 팝업 여는 이름 링크는 칸의 `href`, 휴대폰 고정 칸은 `stickyCol`), `SqlStatusTable`(백업 화면 SQL 실행 상태), `ProjectOverview`(보고서 프로젝트 한눈에 보기의 프로젝트별 표))에
   이 패턴이 적용돼 있음 — 새 표를 추가할 때 이 목록도 같이 업데이트할 것.
   (예외: `DailyWorkerUsageStatementTable`은 세무사 제출용 사용내역서 문서라
   근로자별 연속일 소계 순서가 고정돼야 해서 임의 정렬을 지원하지 않음 —
@@ -515,13 +515,19 @@
   열람" 둘(`AppNav`, 휴대폰 하단 탭에 둘 다). 새 화면·탭을 세무사에게 열려면 미들웨어부터 고칠 것.
 - **세무사 열람**(11/26 사용자 요청 "대메뉴에 세무사가 볼 수 있는 창 — 회계사가 필요로 할 만한 내용", DB 변경 없음): 회계 > "세무사 열람"
   (`/tax-review` — 관리자·직원·조회 전용·세무사, 읽기만). 세무사 계정이 읽을 수 있는 표(거래·거래처·카테고리·결제수단·외상 정산·부가세
-  예정고지액)로만 — 급여·일용직·은행은 세무사 계정에 DB 읽기 권한이 없어 빠짐(넣으려면 SQL로 권한부터 — 개인정보라 사용자와 먼저 상의).
+  예정고지액)로만 — 급여·일용직·은행은 세무사 계정에 DB 읽기 권한이 없어 빠짐(11/26 사용자 결정 "아니요" — 넣지 않음, 메뉴 이름·세무사 첫 화면도
+  그대로. 나중에 넣으려면 SQL로 권한부터 — 개인정보라 사용자와 먼저 상의).
   계산은 `lib/taxReview.ts`로만(부가세 기준은 `lib/vatBasis.ts` — 대시보드 분기별 부가세와 같은 숫자, 거래일 기준·외상 미정산 포함): 1기·2기 카드
   (매출세액·공제 매입세액·예상 납부(환급)세액·4월/10월 예정고지액), 분기별 부가세, 세금계산서 발행·수취(한 결제 묶음은 한 건), 세금계산서 없는
-  과세 매입 결제수단별(카드 등 다른 증빙 확인용, 비과세 뺌), 거래처별 세금계산서(매출처·매입처, 1기·2기·연간), 카테고리별 경비(비용 =
-  `purchaseCostOf`)와 매출·경비·차액, 월별 매출·매입, 외상 잔액(기준일 = 그해 12월 31일, 올해면 오늘 — 기준일까지 정산만, 지난해 외상 포함).
-  표는 `SortableSimpleTable`(합계 줄 `footer`), 표마다 엑셀 + "전체 엑셀"(장마다 표 하나, `TaxReviewExcelAll`), 인쇄(접힌 칸도 — `printAlways`),
-  1~5월엔 작년 자료 바로가기 한 줄.
+  과세 매입 결제수단별(카드 등 다른 증빙 확인용, 비과세 뺌), 매입처별 정리, 카테고리별 경비(비용 = `purchaseCostOf`)와 매출·경비·차액, 월별
+  매출·매입, 외상 잔액(기준일 = 그해 12월 31일, 올해면 오늘 — 기준일까지 정산만, 지난해 외상 포함).
+  매입처별 정리(11/26 사용자 요청 — 예전 "거래처별 세금계산서 합계"(매출처·매입처)는 세무사가 홈택스에서 보므로 뺌): 그해 매입 전부(세금계산서
+  여부와 상관없이), 매입처 = 등록 거래처 이름 → 직접 입력 이름 → "(거래처 없음)"(같은 이름은 한 곳 — `vendorPurchaseRows`), 건수(한 결제 묶음은
+  한 건)·합계(부가세 포함)·공급가액·부가세·세금계산서 수취/없음. 이름을 누르면 `?vendor=` 상세 팝업(`TaxReviewVendorPopup` — 줄마다 날짜·품목·
+  카테고리(비과세·불공제 표시)·결제(외상)·세금계산서·금액, 매입매출장처럼 최신순, 엑셀·인쇄는 팝업만, ESC·닫기는 `closePopup`, 읽기만 —
+  `vendorPurchaseDetail`).
+  표는 `SortableSimpleTable`(합계 줄 `footer`), 표마다 엑셀 + "전체 엑셀"(장마다 표 하나, `TaxReviewExcelAll`), 인쇄(접힌 칸도 — `printAlways`,
+  A4 가로 — 이 화면의 `<style>` 이름 없는 @page. 세로 A4 폭(약 718px)이면 8칸 표의 오른쪽 칸이 잘렸음), 1~5월엔 작년 자료 바로가기 한 줄.
 - **11/26 사용자 요청(매입매출)**: 매입매출 위 "총 매입액·총 매출액" 아래 줄에 그 해 상반기·하반기 세금계산서 발행 매입·매출 건수·합계
   (`lib/taxInvoiceSummary.ts` — 고른 달·필터와 상관없이 그 해 전체, 거래일 기준·외상 미정산 포함이라 바로 위 총액(정산 전 외상은 뺌)과 다를 수
   있어 "(외상 미정산 포함)" 표시, 한 결제 묶음은 한 건, 세무사 계정도 보임). 거래 등록 품목칸은 고른 거래처(등록 거래처, 없으면 직접 입력한
