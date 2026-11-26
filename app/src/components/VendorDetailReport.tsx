@@ -13,6 +13,7 @@ import { PopupCloseLink } from "@/components/PopupCloseLink";
 import { closePopup } from "@/lib/popupNavigation";
 import { ReportBulkEditBar } from "@/components/ReportBulkEditBar";
 import { useRowSelection } from "@/lib/useRowSelection";
+import { Badge } from "@/components/ui/Badge";
 
 type VendorRow = {
   id: string;
@@ -29,9 +30,15 @@ type VendorRow = {
   payment_method_name: string | null;
   payment_method_text_color: string | null;
   payment_method_background_color: string | null;
+  /** 세금계산서 발행 여부 — 대행구매 줄은 따로 저장되는 표라 칸이 없어 null("-") */
+  tax_invoice_issued: boolean | null;
 };
 
-type SortKey = "trans_date" | "project_name" | "item_name" | "amount";
+type SortKey = "trans_date" | "project_name" | "item_name" | "tax_invoice" | "amount";
+
+function invoiceLabel(r: VendorRow): string {
+  return r.tax_invoice_issued == null ? "-" : r.tax_invoice_issued ? "발행" : "미발행";
+}
 
 function sortValue(r: VendorRow, key: SortKey): string | number {
   switch (key) {
@@ -41,6 +48,8 @@ function sortValue(r: VendorRow, key: SortKey): string | number {
       return r.project_name ?? "";
     case "item_name":
       return r.item_name ?? "";
+    case "tax_invoice":
+      return r.tax_invoice_issued == null ? -1 : r.tax_invoice_issued ? 1 : 0;
     case "amount":
       return r.amount;
   }
@@ -50,6 +59,8 @@ function sortValue(r: VendorRow, key: SortKey): string | number {
 // 대행구매 줄은 따로 저장되는 표라 체크칸 없음(사용자 결정 "매입·매출 거래만").
 // side="매출": 보고서 "매출처별 집계"에서 거래처 이름을 누르면 같은 모양으로 그 거래처 매출 내역(11/26 사용자 요청) — 주소 ?customer=,
 // 수정 링크·일괄 변경·엑셀·인쇄 그대로(대행구매 없음).
+// 세금계산서 칸(11/26 사용자 요청 "매입내역서에 계산서 발행 유무 — 매출 역시"): 줄마다 발행/미발행(대행구매는 "-"), 기본으로 보이고 체크로
+// 숨김, 발행/미발행 고르기, 합계 아래 발행·미발행 금액 — 엑셀·인쇄도 화면에 보이는 그대로.
 export function VendorDetailReport({
   vendorName,
   year,
@@ -72,7 +83,9 @@ export function VendorDetailReport({
   const [showProject, setShowProject] = useState(true);
   const [showCategory, setShowCategory] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
+  const [showInvoice, setShowInvoice] = useState(true);
   const [paymentFilter, setPaymentFilter] = useState("");
+  const [invoiceFilter, setInvoiceFilter] = useState<"" | "1" | "0">("");
   const [statusFilter, setStatusFilter] = useState("");
   useEscapeKey(true, () => closePopup(router, closeHref));
   const [showItem, setShowItem] = useState(true);
@@ -98,9 +111,10 @@ export function VendorDetailReport({
       rows.filter(
         (r) =>
           (!paymentFilter || r.payment_method_name === paymentFilter) &&
-          (!statusFilter || r.project_status === statusFilter)
+          (!statusFilter || r.project_status === statusFilter) &&
+          (!invoiceFilter || r.tax_invoice_issued === (invoiceFilter === "1"))
       ),
-    [rows, paymentFilter, statusFilter]
+    [rows, paymentFilter, statusFilter, invoiceFilter]
   );
   // 매입(부가세 포함 총액)과 대행구매(부가세 제외)는 기준이 달라서 합계를 따로 낸다.
   const purchaseTotal = filteredRows.filter((r) => r.kind !== "대행구매").reduce((s, r) => s + r.amount, 0);
@@ -111,6 +125,15 @@ export function VendorDetailReport({
         ["대행구매 합계(부가세 제외)", agencyTotal],
       ]
     : [["합계", purchaseTotal]];
+  // 합계 아래 세금계산서 발행·미발행 금액(매입·매출 줄만 — 발행 + 미발행 = 위 매입(매출) 합계). 칸을 숨기면 같이 숨김.
+  const hasLedgerRows = rows.some((r) => r.kind !== "대행구매");
+  const issuedTotal = filteredRows.filter((r) => r.tax_invoice_issued === true).reduce((s, r) => s + r.amount, 0);
+  const unissuedTotal = filteredRows.filter((r) => r.tax_invoice_issued === false).reduce((s, r) => s + r.amount, 0);
+  const showInvoiceTotals = showInvoice && hasLedgerRows;
+  const invoiceTotalLabel = hasAgency ? "매입 중 세금계산서 발행" : "세금계산서 발행";
+  const exportTotals: [string, number][] = showInvoiceTotals
+    ? [...totals, [invoiceTotalLabel, issuedTotal], ["세금계산서 미발행", unissuedTotal]]
+    : totals;
 
   // 수정 팝업은 이 팝업 위에 겹쳐 열림(push) — 닫으면 이 팝업으로(보고서의 TransactionEditPopup redirectTo와 같은 주소)
   function editHrefFor(id: string) {
@@ -154,6 +177,7 @@ export function VendorDetailReport({
     ...(showCategory ? ["카테고리"] : []),
     ...(showPayment ? ["결제방식"] : []),
     ...(showItem ? ["품목"] : []),
+    ...(showInvoice ? ["세금계산서"] : []),
     "금액",
   ];
   const exportRows = sortedRows.map((r) => [
@@ -163,6 +187,7 @@ export function VendorDetailReport({
     ...(showCategory ? [r.category_name ?? "-"] : []),
     ...(showPayment ? [r.payment_method_name ?? "-"] : []),
     ...(showItem ? [r.item_name ?? "-"] : []),
+    ...(showInvoice ? [invoiceLabel(r)] : []),
     r.amount,
   ]);
 
@@ -182,7 +207,7 @@ export function VendorDetailReport({
           {vendorName} {side === "매출" ? "매출 내역" : hasAgency ? "매입/대행구매 내역" : "매입 내역"}{" "}
           <span className="tabular-nums text-sm font-normal text-slate-400">{year}년</span>
         </h2>
-        <div className="flex items-center gap-3 max-md:flex-wrap print:hidden">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 print:hidden">
           <label className="flex items-center gap-1.5 text-xs text-slate-600">
             <input type="checkbox" checked={showProject} onChange={(e) => setShowProject(e.target.checked)} className="h-3.5 w-3.5" />
             프로젝트
@@ -199,6 +224,10 @@ export function VendorDetailReport({
             <input type="checkbox" checked={showPayment} onChange={(e) => setShowPayment(e.target.checked)} className="h-3.5 w-3.5" />
             결제방식
           </label>
+          <label className="flex items-center gap-1.5 text-xs text-slate-600">
+            <input type="checkbox" checked={showInvoice} onChange={(e) => setShowInvoice(e.target.checked)} className="h-3.5 w-3.5" />
+            세금계산서
+          </label>
           {paymentMethodOptions.length > 0 && (
             <select
               value={paymentFilter}
@@ -211,6 +240,18 @@ export function VendorDetailReport({
                   {name}
                 </option>
               ))}
+            </select>
+          )}
+          {hasLedgerRows && (
+            <select
+              value={invoiceFilter}
+              onChange={(e) => setInvoiceFilter(e.target.value as "" | "1" | "0")}
+              aria-label="세금계산서 발행 여부로 거르기"
+              className="rounded-lg border border-slate-300 px-2 py-1 text-xs focus:border-slate-500 focus:outline-none"
+            >
+              <option value="">세금계산서 전체</option>
+              <option value="1">발행만</option>
+              <option value="0">미발행만</option>
             </select>
           )}
           {statusOptions.length > 0 && (
@@ -232,7 +273,7 @@ export function VendorDetailReport({
             year={year}
             headers={exportHeaders}
             rows={exportRows}
-            totals={totals}
+            totals={exportTotals}
             label={side === "매출" ? "매출내역" : "매입내역"}
           />
           <PopupCloseLink href={closeHref} className="text-sm text-slate-500 hover:text-slate-800">
@@ -268,6 +309,7 @@ export function VendorDetailReport({
               {showCategory && <th className="pb-2 pr-4">카테고리</th>}
               {showPayment && <th className="pb-2 pr-4">결제방식</th>}
               {showItem && <th className="sticky-col pb-2 pr-4">{headerButton("item_name", "품목")}</th>}
+              {showInvoice && <th className="whitespace-nowrap pb-2 pr-4">{headerButton("tax_invoice", "세금계산서")}</th>}
               <th className="pb-2 text-right">{headerButton("amount", "금액")}</th>
               <th className="pb-2 pl-4 text-right print:hidden">관리</th>
             </tr>
@@ -349,6 +391,17 @@ export function VendorDetailReport({
                     {r.item_name ?? "-"}
                   </td>
                 )}
+                {showInvoice && (
+                  <td className="whitespace-nowrap py-2 pr-4">
+                    {r.tax_invoice_issued == null ? (
+                      <span className="text-slate-300">-</span>
+                    ) : r.tax_invoice_issued ? (
+                      <Badge variant="emerald">발행</Badge>
+                    ) : (
+                      <span className="text-xs text-slate-400">미발행</span>
+                    )}
+                  </td>
+                )}
                 <td className="py-2 text-right tabular-nums text-slate-900">{formatWon(r.amount)}</td>
                 <td className="py-2 pl-4 text-right print:hidden">
                   {r.kind !== "대행구매" && (
@@ -372,7 +425,8 @@ export function VendorDetailReport({
                     (showProject ? 1 : 0) +
                     (showCategory ? 1 : 0) +
                     (showPayment ? 1 : 0) +
-                    (showItem ? 1 : 0)
+                    (showItem ? 1 : 0) +
+                    (showInvoice ? 1 : 0)
                   }
                   className="py-6 text-center text-slate-400"
                 >
@@ -384,13 +438,23 @@ export function VendorDetailReport({
         </table>
       </div>
 
-      <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 border-t border-slate-100 pt-4">
-        {totals.map(([label, value]) => (
-          <span key={label} className="text-sm font-semibold text-slate-900">
-            {label}{" "}
-            <span className="ml-2 whitespace-nowrap tabular-nums text-xl font-bold text-slate-900">{formatWon(value)}</span>
-          </span>
-        ))}
+      <div className="space-y-1 border-t border-slate-100 pt-4">
+        <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1">
+          {totals.map(([label, value]) => (
+            <span key={label} className="text-sm font-semibold text-slate-900">
+              {label}{" "}
+              <span className="ml-2 whitespace-nowrap tabular-nums text-xl font-bold text-slate-900">{formatWon(value)}</span>
+            </span>
+          ))}
+        </div>
+        {showInvoiceTotals && (
+          <p className="text-right text-xs text-slate-500">
+            {invoiceTotalLabel}{" "}
+            <span className="whitespace-nowrap font-semibold tabular-nums text-slate-700">{formatWon(issuedTotal)}</span>
+            {" · "}미발행{" "}
+            <span className="whitespace-nowrap font-semibold tabular-nums text-slate-700">{formatWon(unissuedTotal)}</span>
+          </p>
+        )}
       </div>
     </div>
   );
