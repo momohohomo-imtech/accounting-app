@@ -210,24 +210,29 @@ export function TransactionTable({
 
   // 한 결제 묶음에서 줄마다 다르던 프로젝트·품목명을 한 값으로 덮으면 나눠 둔 게 사라짐 — 묶음 줄을 체크하면 그 묶음의
   // 줄이 모두 선택되므로, 바꾸기 전에 한 번 확인.
-  async function confirmSplitGroups(bulkField: BulkField) {
-    if (bulkField !== "project" && bulkField !== "item_name") return true;
-    const field = bulkField === "project" ? "project_id" : "item_name";
-    const valuesByGroup = new Map<string, Set<string>>();
-    for (const t of transactions) {
-      if (!t.payment_group_id || !selected.has(t.id)) continue;
-      const values = valuesByGroup.get(t.payment_group_id) ?? new Set<string>();
-      values.add(t[field] ?? "");
-      valuesByGroup.set(t.payment_group_id, values);
+  // 일괄 변경으로 바꿀 칸 중 프로젝트·품목은 줄마다 다르게 나눠 둔 묶음(한 결제)이 있으면 한 번 더 확인(두 칸을 같이 바꾸면 한 번에)
+  async function confirmSplitGroups(bulkFields: BulkField[]) {
+    const lines: string[] = [];
+    for (const bulkField of bulkFields) {
+      if (bulkField !== "project" && bulkField !== "item_name") continue;
+      const field = bulkField === "project" ? "project_id" : "item_name";
+      const valuesByGroup = new Map<string, Set<string>>();
+      for (const t of transactions) {
+        if (!t.payment_group_id || !selected.has(t.id)) continue;
+        const values = valuesByGroup.get(t.payment_group_id) ?? new Set<string>();
+        values.add(t[field] ?? "");
+        valuesByGroup.set(t.payment_group_id, values);
+      }
+      const splitGroups = Array.from(valuesByGroup.values()).filter((v) => v.size > 1).length;
+      if (splitGroups === 0) continue;
+      lines.push(
+        bulkField === "project"
+          ? `프로젝트별로 나눠 둔 묶음(한 결제) ${splitGroups}개가 선택돼 있어요. 줄마다 다르던 프로젝트가 모두 같은 프로젝트로 바뀝니다.`
+          : `품목명이 줄마다 다른 묶음(한 결제) ${splitGroups}개가 선택돼 있어요. 모든 줄의 품목명이 같은 이름으로 바뀝니다.`
+      );
     }
-    const splitGroups = Array.from(valuesByGroup.values()).filter((v) => v.size > 1).length;
-    if (splitGroups === 0) return true;
-    return confirm(
-      bulkField === "project"
-        ? `프로젝트별로 나눠 둔 묶음(한 결제) ${splitGroups}개가 선택돼 있어요. 줄마다 다르던 프로젝트가 모두 같은 프로젝트로 바뀝니다. 그래도 바꿀까요?`
-        : `품목명이 줄마다 다른 묶음(한 결제) ${splitGroups}개가 선택돼 있어요. 모든 줄의 품목명이 같은 이름으로 바뀝니다. 그래도 바꿀까요?`,
-      { confirmLabel: "모두 바꾸기" }
-    );
+    if (lines.length === 0) return true;
+    return confirm(`${lines.join("\n")}\n그래도 바꿀까요?`, { confirmLabel: "모두 바꾸기" });
   }
 
   function handleSort(key: SortKey) {

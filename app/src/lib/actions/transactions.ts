@@ -9,6 +9,13 @@ import { entryTimestamps } from "@/lib/entryOrder";
 import { updateInChunks } from "@/lib/bulkUpdate";
 import { addedVat } from "@/lib/vatBasis";
 import { groupIdsPerDate } from "@/lib/multiDate";
+import {
+  bulkPatchFromForm,
+  exemptInvoiceConflicts,
+  exemptInvoiceMessage,
+  needsExemptInvoiceCheck,
+  type InvoiceCheckRow,
+} from "@/lib/transactionBulkEdit";
 import type { CreditPayment, Transaction } from "@/lib/types";
 
 // 거래가 바뀌면 금액이 보이는 모든 화면을 새로 그리게 한다.
@@ -340,8 +347,8 @@ export async function ungroupTransactions(formData: FormData) {
   revalidateLedgerPages();
 }
 
-// 일괄 변경(매입매출장·보고서 내역 표 — 11/11) — 고른 거래의 한 칸만 같은 값으로. 금액·날짜는 안 바꿈. 100개씩 나눠 바꾸고
-// 바뀐 줄 수를 확인(lib/bulkUpdate.ts) — 신고 끝난 해(097 SQL)의 거래처·카테고리는 DB가 막아서 그 안내가 그대로 보임.
+// 일괄 변경(매입매출장·보고서 내역 표 — 11/11) — 고른 거래의 칸을 같은 값으로. 금액·날짜는 안 바꿈. 100개씩 나눠 바꾸고
+// 바뀐 줄 수를 확인(lib/bulkUpdate.ts) — 신고 끝난 해(097 SQL)의 거래처·카테고리·세금계산서는 DB가 막아서 그 안내가 그대로 보임.
 async function bulkUpdateTransactions(formData: FormData, patch: Record<string, unknown>) {
   const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
   if (ids.length === 0) return { error: "선택된 거래가 없습니다." };
@@ -353,32 +360,42 @@ async function bulkUpdateTransactions(formData: FormData, patch: Record<string, 
   if (error) return { error };
 }
 
-export async function bulkUpdateProjectId(formData: FormData) {
-  const projectId = String(formData.get("project_id") ?? "") || null;
-  return bulkUpdateTransactions(formData, { project_id: projectId, needs_classification: false });
+// 일괄 변경 칸(11/26 — 바꿀 칸만 골라 한 번에: 프로젝트·거래처·카테고리·결제방식·세금계산서·품목, 고른 칸이 없는 칸은 그대로).
+// 100건마다 고른 칸을 한 번에 바꿈. 바꾸면 "비과세 카테고리 + 세금계산서 발행"이 되는 거래가 있으면 아무것도 안 바꾸고 막음(거래 등록
+// 화면과 같은 규칙 — 비과세 카테고리는 세금계산서 칸을 못 켬). 거래처는 등록 거래처(client_id) 또는 직접 입력 이름(client_name_raw) 하나만.
+export async function bulkUpdateTransactionFields(formData: FormData) {
+  const ids = formData.getAll("transaction_ids").map(String).filter(Boolean);
+  if (ids.length === 0) return { error: "선택된 거래가 없습니다." };
+  const { patch, fields } = bulkPatchFromForm((key) => (formData.has(key) ? String(formData.get(key) ?? "") : null));
+  if (fields.length === 0) return { error: "바꿀 칸을 하나 이상 고르세요." };
+  if (needsExemptInvoiceCheck(patch)) {
+    const supabase = await createClient();
+    try {
+      const [rows, { data: categories, error: categoryError }] = await Promise.all([
+        fetchAllRowsIn<InvoiceCheckRow>(ids, (chunk, from, to) =>
+          supabase
+            .from("transactions")
+            .select("id, trans_date, item_name, category_id, tax_invoice_issued")
+            .in("id", chunk)
+            .order("id", { ascending: true })
+            .range(from, to)
+        ),
+        supabase.from("expense_categories").select("id, name, vat_exempt"),
+      ]);
+      if (categoryError) return { error: `카테고리를 확인하지 못해 바꾸지 않았습니다: ${categoryError.message}` };
+      const conflicts = exemptInvoiceConflicts(rows, categories ?? [], patch);
+      if (conflicts.length > 0) return { error: exemptInvoiceMessage(conflicts, patch) };
+    } catch (err) {
+      return { error: `거래를 확인하지 못해 바꾸지 않았습니다: ${err instanceof Error ? err.message : String(err)}` };
+    }
+  }
+  return bulkUpdateTransactions(formData, patch);
 }
 
-// 거래처는 등록된 거래처(client_id)로 고르거나, 목록에 없으면 이름을 직접 적을 수 있다
-// (client_name_raw) — 둘 중 하나만 채우고 나머지는 비운다.
-export async function bulkUpdateClientId(formData: FormData) {
-  const clientId = String(formData.get("client_id") ?? "") || null;
-  const clientNameRaw = clientId ? null : String(formData.get("client_name_raw") ?? "").trim() || null;
-  return bulkUpdateTransactions(formData, { client_id: clientId, client_name_raw: clientNameRaw });
-}
-
+// 카테고리 빈 매입 표(장부 점검)의 카테고리 한 번에 지정 — 일괄 변경 칸과 같은 저장
 export async function bulkUpdateCategoryId(formData: FormData) {
   const categoryId = String(formData.get("category_id") ?? "") || null;
   return bulkUpdateTransactions(formData, { category_id: categoryId });
-}
-
-export async function bulkUpdatePaymentMethodId(formData: FormData) {
-  const paymentMethodId = String(formData.get("payment_method_id") ?? "") || null;
-  return bulkUpdateTransactions(formData, { payment_method_id: paymentMethodId });
-}
-
-export async function bulkUpdateItemName(formData: FormData) {
-  const itemName = String(formData.get("item_name") ?? "").trim() || null;
-  return bulkUpdateTransactions(formData, { item_name: itemName });
 }
 
 export async function deleteTransactionRecord(formData: FormData) {
