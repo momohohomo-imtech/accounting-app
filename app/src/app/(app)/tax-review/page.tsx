@@ -9,7 +9,7 @@ import { SortableSimpleTable, type SortableCell } from "@/components/SortableSim
 import { ReportExcelButton } from "@/components/ReportExcelButton";
 import { PrintButton } from "@/components/PrintButton";
 import { TaxReviewExcelAll } from "@/components/TaxReviewExcelAll";
-import { TaxReviewVendorPopup } from "@/components/TaxReviewVendorPopup";
+import { TaxReviewPartnerPopup } from "@/components/TaxReviewPartnerPopup";
 import type { XlsxSheet } from "@/lib/xlsxExport";
 import {
   categoryExpenseRows,
@@ -20,12 +20,14 @@ import {
   monthlyRows,
   nonInvoicePurchaseByMethod,
   noticeFor,
+  partnerDetail,
+  partnerRows,
   vatPeriodRows,
-  vendorPurchaseDetail,
-  vendorPurchaseRows,
   type Amounts,
   type CreditPaymentLite,
   type NamedRef,
+  type PartnerRow,
+  type PartnerSide,
   type TaxCategory,
   type TaxReviewTx,
 } from "@/lib/taxReview";
@@ -33,7 +35,7 @@ import {
 // 대메뉴 "세무사 열람"(11/26 사용자 요청 "세무사가 볼 수 있는 창 — 회계사가 필요로 할 만한 내용 정리") — 세무사 계정도 열 수 있는 화면
 // (미들웨어가 세무사에겐 매입매출 목록과 이 화면만 열어 줌). 세무사 계정이 읽을 수 있는 표로만 — 계산은 lib/taxReview.ts.
 // 읽기만(저장·수정 없음). 표마다 엑셀, 위에 전체 엑셀(장마다 표 하나)·인쇄(접힌 칸도 다 나옴).
-// 매입처별 정리의 이름을 누르면 ?vendor=로 상세 팝업(열려 있으면 인쇄는 팝업만).
+// 매출처별·매입처별 정리의 이름을 누르면 ?customer=·?vendor=로 상세 팝업(열려 있으면 인쇄는 팝업만).
 
 const TX_SELECT =
   "id, type, trans_date, client_id, client_name_raw, category_id, payment_method_id, payment_type, tax_invoice_issued, payment_group_id, item_name, created_at, sales_amount, sales_vat, purchase_amount, purchase_vat";
@@ -50,10 +52,18 @@ const sumAmounts = (list: Amounts[]): Amounts =>
 export default async function TaxReviewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string | string[]; vendor?: string | string[] }>;
+  searchParams: Promise<{ year?: string | string[]; vendor?: string | string[]; customer?: string | string[] }>;
 }) {
-  const { year: yearParam, vendor: vendorParam } = await searchParams;
-  const vendor = typeof vendorParam === "string" && vendorParam.trim() ? vendorParam : null;
+  const { year: yearParam, vendor: vendorParam, customer: customerParam } = await searchParams;
+  const param = (v: string | string[] | undefined) => (typeof v === "string" && v.trim() ? v : null);
+  const vendor = param(vendorParam);
+  const customer = param(customerParam);
+  // 열린 상세 팝업(둘 다 있으면 매입처 — 한 번에 하나만)
+  const popup: { side: PartnerSide; name: string } | null = vendor
+    ? { side: "매입", name: vendor }
+    : customer
+      ? { side: "매출", name: customer }
+      : null;
   const { year: currentYear, month: currentMonth } = nowKst();
   const today = nowKstParts().date;
   const year = Number(yearParam) || currentYear;
@@ -118,8 +128,9 @@ export default async function TaxReviewPage({
   const invoiceQuarters = invoices.filter((v) => !v.total);
   const invoiceYear = invoices.find((v) => v.key === "year")!;
   const methodRows = nonInvoicePurchaseByMethod(rows, categories, methods);
-  const vendorRows = vendorPurchaseRows(rows, categories, clients);
-  const vendorDetail = vendor ? vendorPurchaseDetail(rows, categories, clients, methods, vendor) : [];
+  const salesPartners = partnerRows(rows, categories, clients, "매출");
+  const purchasePartners = partnerRows(rows, categories, clients, "매입");
+  const popupDetail = popup ? partnerDetail(rows, categories, clients, methods, popup.name, popup.side) : [];
   const categoryRows = categoryExpenseRows(rows, categories);
   const income = incomeSummary(rows, categories);
   const months = monthlyRows(rows, categories);
@@ -161,9 +172,19 @@ export default async function TaxReviewPage({
   ];
   const methodTotal = { h1: sumAmounts(methodRows.map((m) => m.h1)), h2: sumAmounts(methodRows.map((m) => m.h2)), year: sumAmounts(methodRows.map((m) => m.year)) };
   const closeHref = `/tax-review?year=${year}`;
-  const vendorHeaders = ["매입처", "건수", "합계(부가세 포함)", "공급가액", "부가세", "세금계산서 수취", "세금계산서 없음"];
-  const vendorCells = (v: (typeof vendorRows)[number]): Cell[] => [
-    { ...txt(v.name), href: `${closeHref}&vendor=${encodeURIComponent(v.name)}` },
+  // 매출처별·매입처별 정리 — 같은 칸, 이름을 누르면 ?customer=(매출처)·?vendor=(매입처) 상세 팝업
+  const partnerLabel = (side: PartnerSide) => (side === "매출" ? "매출처" : "매입처");
+  const partnerHeaders = (side: PartnerSide) => [
+    partnerLabel(side),
+    "건수",
+    "합계(부가세 포함)",
+    "공급가액",
+    "부가세",
+    side === "매출" ? "세금계산서 발행" : "세금계산서 수취",
+    "세금계산서 없음",
+  ];
+  const partnerCells = (side: PartnerSide) => (v: PartnerRow): Cell[] => [
+    { ...txt(v.name), href: `${closeHref}&${side === "매출" ? "customer" : "vendor"}=${encodeURIComponent(v.name)}` },
     cnt(v.count),
     won(v.total),
     won(v.supply),
@@ -171,27 +192,28 @@ export default async function TaxReviewPage({
     won(v.invoiceTotal),
     won(v.otherTotal),
   ];
-  const vendorTotal = {
-    count: sumOf(vendorRows, (v) => v.count),
-    total: sumOf(vendorRows, (v) => v.total),
-    supply: sumOf(vendorRows, (v) => v.supply),
-    vat: sumOf(vendorRows, (v) => v.vat),
-    invoiceTotal: sumOf(vendorRows, (v) => v.invoiceTotal),
-    otherTotal: sumOf(vendorRows, (v) => v.otherTotal),
-  };
-  // 매입처 상세 팝업 칸(날짜·품목·카테고리(비고)·결제(외상)·세금계산서·금액)
+  const partnerFooter = (list: PartnerRow[]): Cell[] => [
+    txt(`합계(${list.length}곳)`),
+    cnt(sumOf(list, (v) => v.count)),
+    won(sumOf(list, (v) => v.total)),
+    won(sumOf(list, (v) => v.supply)),
+    won(sumOf(list, (v) => v.vat)),
+    won(sumOf(list, (v) => v.invoiceTotal)),
+    won(sumOf(list, (v) => v.otherTotal)),
+  ];
+  // 상세 팝업 칸(날짜·품목·카테고리(비고)·결제(외상)·세금계산서·금액)
   const detailHeaders = ["날짜", "품목", "카테고리", "결제", "세금계산서", "공급가액", "부가세", "합계"];
-  const detailCells = (d: (typeof vendorDetail)[number]): Cell[] => [
+  const detailCells = (side: PartnerSide) => (d: (typeof popupDetail)[number]): Cell[] => [
     txt(d.date),
     txt(d.item || "-", d.item),
     txt(d.note ? `${d.category || "-"} (${d.note})` : d.category || "-", d.category),
     txt(d.credit ? (d.method ? `외상 · ${d.method}` : "외상") : d.method || "-"),
-    txt(d.invoice ? "수취" : "-"),
+    txt(d.invoice ? (side === "매출" ? "발행" : "수취") : "-"),
     won(d.supply),
     won(d.vat),
     won(d.total),
   ];
-  const vendorRow = vendor ? vendorRows.find((v) => v.name === vendor) : undefined;
+  const popupRow = popup ? (popup.side === "매출" ? salesPartners : purchasePartners).find((v) => v.name === popup.name) : undefined;
   const categoryHeaders = ["카테고리", "비고", "건수", "합계", "공급가액", "부가세", "비용(소득세 기준)"];
   const categoryCells = (c: (typeof categoryRows)[number]): Cell[] => [
     txt(c.name),
@@ -227,7 +249,8 @@ export default async function TaxReviewPage({
     { name: "부가세 기간별", headers: vatHeaders, rows: vat.map((v) => plain(vatCells(v))) },
     { name: "세금계산서 기간별", headers: invoiceHeaders, rows: invoices.map((v) => plain(invoiceCells(v))) },
     { name: "세금계산서 없는 매입", headers: methodHeaders, rows: methodRows.map((m) => plain(methodCells(m))) },
-    { name: "매입처별 정리", headers: vendorHeaders, rows: vendorRows.map((v) => plain(vendorCells(v))) },
+    { name: "매출처별 정리", headers: partnerHeaders("매출"), rows: salesPartners.map((v) => plain(partnerCells("매출")(v))) },
+    { name: "매입처별 정리", headers: partnerHeaders("매입"), rows: purchasePartners.map((v) => plain(partnerCells("매입")(v))) },
     { name: "카테고리별 경비", headers: categoryHeaders, rows: categoryRows.map((c) => plain(categoryCells(c))) },
     { name: "월별 매출매입", headers: monthHeaders, rows: months.map((m) => plain(monthCells(m))) },
     { name: "외상 잔액", headers: creditHeaders, rows: credit.map((c) => plain(creditCells(c))), leadingRows: [[`기준일 ${asOf}`]] },
@@ -265,6 +288,39 @@ export default async function TaxReviewPage({
     );
   };
 
+  const partnerSection = (side: PartnerSide, list: PartnerRow[]) => {
+    const label = partnerLabel(side);
+    return (
+      <CollapsibleSection
+        title={
+          <span>
+            {label}별 정리{" "}
+            <span className="text-sm font-normal text-slate-500">
+              {list.length}곳 · {formatWon(sumOf(list, (v) => v.total))}
+            </span>
+          </span>
+        }
+        defaultOpen={popup?.side === side}
+        printAlways
+        headerExtra={<div className="flex flex-wrap items-center gap-2 print:hidden">{excel(`${label}별 정리`)}</div>}
+      >
+        <div className="mt-4 space-y-3">
+          <p className="text-xs text-slate-500">
+            그해 {side} 전부(세금계산서 여부와 상관없이) — {label} 이름을 누르면 거래 내역이 열립니다. 금액은 부가세 포함 장부 금액, 한
+            결제로 묶은 줄은 한 건.
+          </p>
+          <SortableSimpleTable
+            headers={partnerHeaders(side)}
+            rows={list.map(partnerCells(side))}
+            footer={partnerFooter(list)}
+            minWidthClass="min-w-[820px]"
+            empty={`${side}이 없습니다.`}
+          />
+        </div>
+      </CollapsibleSection>
+    );
+  };
+
   const filingSeason = currentMonth <= 5 && year === currentYear;
 
   return (
@@ -272,7 +328,7 @@ export default async function TaxReviewPage({
       {/* 인쇄는 A4 가로 — 칸이 많은 표(분기별 부가세 8칸 등)가 세로 A4 폭(약 718px)을 넘어 오른쪽 칸이 잘렸음. 이 화면에 있을 때만 쓰는
           이름 없는 @page(공사 작업 순서표 WorkSequenceEditor와 같은 방식 — 이름 붙인 페이지는 빈 장이 생겨서 안 씀). */}
       <style>{"@media print { @page { size: A4 landscape; margin: 10mm; } }"}</style>
-      <div className={vendor ? "space-y-6 print:hidden" : "space-y-6"}>
+      <div className={popup ? "space-y-6 print:hidden" : "space-y-6"}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 space-y-1">
             <h1 className="text-2xl font-bold text-slate-900">세무사 열람</h1>
@@ -344,41 +400,9 @@ export default async function TaxReviewPage({
           </div>
         </CollapsibleSection>
 
-        <CollapsibleSection
-          title={
-            <span>
-              매입처별 정리{" "}
-              <span className="text-sm font-normal text-slate-500">
-                {vendorRows.length}곳 · {formatWon(vendorTotal.total)}
-              </span>
-            </span>
-          }
-          defaultOpen={Boolean(vendor)}
-          printAlways
-          headerExtra={<div className="flex flex-wrap items-center gap-2 print:hidden">{excel("매입처별 정리")}</div>}
-        >
-          <div className="mt-4 space-y-3">
-            <p className="text-xs text-slate-500">
-              그해 매입 전부(세금계산서 여부와 상관없이) — 매입처 이름을 누르면 거래 내역이 열립니다. 금액은 부가세 포함 장부 금액, 한 결제로
-              묶은 줄은 한 건.
-            </p>
-            <SortableSimpleTable
-              headers={vendorHeaders}
-              rows={vendorRows.map(vendorCells)}
-              footer={[
-                txt(`합계(${vendorRows.length}곳)`),
-                cnt(vendorTotal.count),
-                won(vendorTotal.total),
-                won(vendorTotal.supply),
-                won(vendorTotal.vat),
-                won(vendorTotal.invoiceTotal),
-                won(vendorTotal.otherTotal),
-              ]}
-              minWidthClass="min-w-[820px]"
-              empty="매입이 없습니다."
-            />
-          </div>
-        </CollapsibleSection>
+        {partnerSection("매출", salesPartners)}
+
+        {partnerSection("매입", purchasePartners)}
 
         <CollapsibleSection
           title={
@@ -472,31 +496,32 @@ export default async function TaxReviewPage({
         </CollapsibleSection>
       </div>
 
-      {vendor && (
+      {popup && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-brand-ink/50 p-4 py-10 print:static print:bg-transparent print:p-0">
           <div className="w-full max-w-4xl rounded-2xl bg-white p-6 shadow-xl max-md:p-4 print:max-w-none print:rounded-none print:p-0 print:shadow-none">
-            <TaxReviewVendorPopup
-              vendor={vendor}
+            <TaxReviewPartnerPopup
+              side={popup.side}
+              name={popup.name}
               year={year}
               closeHref={closeHref}
               headers={detailHeaders}
-              rows={vendorDetail.map(detailCells)}
+              rows={popupDetail.map(detailCells(popup.side))}
               footer={[
-                txt(`합계(${(vendorRow?.count ?? 0).toLocaleString("ko-KR")}건)`),
+                txt(`합계(${(popupRow?.count ?? 0).toLocaleString("ko-KR")}건)`),
                 blank(),
                 blank(),
                 blank(),
                 blank(),
-                won(sumOf(vendorDetail, (d) => d.supply)),
-                won(sumOf(vendorDetail, (d) => d.vat)),
-                won(sumOf(vendorDetail, (d) => d.total)),
+                won(sumOf(popupDetail, (d) => d.supply)),
+                won(sumOf(popupDetail, (d) => d.vat)),
+                won(sumOf(popupDetail, (d) => d.total)),
               ]}
               summary={{
-                count: vendorRow?.count ?? 0,
-                lines: vendorDetail.length,
-                total: vendorRow?.total ?? 0,
-                invoiceTotal: vendorRow?.invoiceTotal ?? 0,
-                otherTotal: vendorRow?.otherTotal ?? 0,
+                count: popupRow?.count ?? 0,
+                lines: popupDetail.length,
+                total: popupRow?.total ?? 0,
+                invoiceTotal: popupRow?.invoiceTotal ?? 0,
+                otherTotal: popupRow?.otherTotal ?? 0,
               }}
             />
           </div>

@@ -16,7 +16,7 @@ import { useRowSelection } from "@/lib/useRowSelection";
 
 type VendorRow = {
   id: string;
-  kind: "매입" | "대행구매";
+  kind: "매입" | "매출" | "대행구매";
   trans_date: string | null;
   item_name: string | null;
   amount: number;
@@ -48,20 +48,23 @@ function sortValue(r: VendorRow, key: SortKey): string | number {
 
 // canEdit(관리자·직원): 보이는 매입을 체크해서 프로젝트·거래처·카테고리·결제방식·품목을 한 번에(11/11, ReportBulkEditBar).
 // 대행구매 줄은 따로 저장되는 표라 체크칸 없음(사용자 결정 "매입·매출 거래만").
+// side="매출": 보고서 "매출처별 집계"에서 거래처 이름을 누르면 같은 모양으로 그 거래처 매출 내역(11/26 사용자 요청) — 주소 ?customer=,
+// 수정 링크·일괄 변경·엑셀·인쇄 그대로(대행구매 없음).
 export function VendorDetailReport({
   vendorName,
   year,
   rows,
   closeHref,
-  vendorAgency,
   canEdit = false,
+  side = "매입",
 }: {
   vendorName: string;
   year: number;
   rows: VendorRow[];
+  /** 닫은 뒤 주소 — 수정 팝업 주소도 이 뒤에 거래처(vendor/customer)·editTx를 붙여 만듦 */
   closeHref: string;
-  vendorAgency?: boolean;
   canEdit?: boolean;
+  side?: "매입" | "매출";
 }) {
   const router = useRouter();
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
@@ -100,7 +103,7 @@ export function VendorDetailReport({
     [rows, paymentFilter, statusFilter]
   );
   // 매입(부가세 포함 총액)과 대행구매(부가세 제외)는 기준이 달라서 합계를 따로 낸다.
-  const purchaseTotal = filteredRows.filter((r) => r.kind === "매입").reduce((s, r) => s + r.amount, 0);
+  const purchaseTotal = filteredRows.filter((r) => r.kind !== "대행구매").reduce((s, r) => s + r.amount, 0);
   const agencyTotal = filteredRows.filter((r) => r.kind === "대행구매").reduce((s, r) => s + r.amount, 0);
   const totals: [string, number][] = hasAgency
     ? [
@@ -109,8 +112,9 @@ export function VendorDetailReport({
       ]
     : [["합계", purchaseTotal]];
 
+  // 수정 팝업은 이 팝업 위에 겹쳐 열림(push) — 닫으면 이 팝업으로(보고서의 TransactionEditPopup redirectTo와 같은 주소)
   function editHrefFor(id: string) {
-    return `/reports?year=${year}${vendorAgency ? "&vendorAgency=1" : ""}&vendor=${encodeURIComponent(vendorName)}&editTx=${id}`;
+    return `${closeHref}&${side === "매출" ? "customer" : "vendor"}=${encodeURIComponent(vendorName)}&editTx=${id}`;
   }
 
   function handleSort(key: SortKey) {
@@ -135,10 +139,11 @@ export function VendorDetailReport({
   }, [filteredRows, sortKey, sortDir]);
 
   const selection = useRowSelection(
-    useMemo(() => sortedRows.filter((r) => r.kind === "매입").map((r) => r.id), [sortedRows])
+    useMemo(() => sortedRows.filter((r) => r.kind !== "대행구매").map((r) => r.id), [sortedRows])
   );
   // 휴대폰에서 옆으로 넘겨도 어느 줄인지 보이게 고정할 칸 — 품목, 품목 칸을 껐으면 프로젝트
   const stickyProject = !showItem && showProject;
+  const noProjectLabel = side === "매출" ? "프로젝트 없음" : "일반경비";
 
   // 엑셀 다운로드가 화면에 보이는(정렬·구분/프로젝트/카테고리/품목 토글 반영) 내용과 항상 똑같게,
   // 인쇄 테이블과 동일한 컬럼 구성 + 정렬 순서(sortedRows)로 내보낸다.
@@ -154,7 +159,7 @@ export function VendorDetailReport({
   const exportRows = sortedRows.map((r) => [
     ...(hasAgency ? [r.kind] : []),
     r.trans_date ? formatDate(r.trans_date) : "-",
-    ...(showProject ? [r.needs_classification ? "분류 대기 중" : (r.project_name ?? "일반경비")] : []),
+    ...(showProject ? [r.needs_classification ? "분류 대기 중" : (r.project_name ?? noProjectLabel)] : []),
     ...(showCategory ? [r.category_name ?? "-"] : []),
     ...(showPayment ? [r.payment_method_name ?? "-"] : []),
     ...(showItem ? [r.item_name ?? "-"] : []),
@@ -174,7 +179,7 @@ export function VendorDetailReport({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-slate-900">
-          {vendorName} {hasAgency ? "매입/대행구매 내역" : "매입 내역"}{" "}
+          {vendorName} {side === "매출" ? "매출 내역" : hasAgency ? "매입/대행구매 내역" : "매입 내역"}{" "}
           <span className="tabular-nums text-sm font-normal text-slate-400">{year}년</span>
         </h2>
         <div className="flex items-center gap-3 max-md:flex-wrap print:hidden">
@@ -222,7 +227,14 @@ export function VendorDetailReport({
               ))}
             </select>
           )}
-          <VendorReportActions vendorName={vendorName} year={year} headers={exportHeaders} rows={exportRows} totals={totals} />
+          <VendorReportActions
+            vendorName={vendorName}
+            year={year}
+            headers={exportHeaders}
+            rows={exportRows}
+            totals={totals}
+            label={side === "매출" ? "매출내역" : "매입내역"}
+          />
           <PopupCloseLink href={closeHref} className="text-sm text-slate-500 hover:text-slate-800">
             닫기
           </PopupCloseLink>
@@ -241,7 +253,7 @@ export function VendorDetailReport({
                 <th className="w-8 pb-2 pr-2 print:hidden">
                   <input
                     type="checkbox"
-                    aria-label="보이는 매입 전체 선택"
+                    aria-label={`보이는 ${side} 전체 선택`}
                     checked={selection.allOn}
                     onChange={selection.toggleAll}
                     className="h-4 w-4 accent-slate-900"
@@ -268,10 +280,10 @@ export function VendorDetailReport({
               >
                 {canEdit && (
                   <td className="py-2 pr-2 print:hidden">
-                    {r.kind === "매입" && (
+                    {r.kind !== "대행구매" && (
                       <input
                         type="checkbox"
-                        aria-label={`${r.item_name ?? "매입"} 선택`}
+                        aria-label={`${r.item_name ?? side} 선택`}
                         checked={selection.selected.has(r.id)}
                         onChange={() => selection.toggle(r.id)}
                         className="h-4 w-4 accent-slate-900"
@@ -299,7 +311,7 @@ export function VendorDetailReport({
                         분류 대기 중
                       </span>
                     ) : (
-                      (r.project_name ?? <span className="font-medium text-red-600">일반경비</span>)
+                      (r.project_name ?? <span className="font-medium text-red-600">{noProjectLabel}</span>)
                     )}
                   </td>
                 )}
@@ -339,7 +351,7 @@ export function VendorDetailReport({
                 )}
                 <td className="py-2 text-right tabular-nums text-slate-900">{formatWon(r.amount)}</td>
                 <td className="py-2 pl-4 text-right print:hidden">
-                  {r.kind === "매입" && (
+                  {r.kind !== "대행구매" && (
                     <Link
                       href={editHrefFor(r.id)}
                       className="text-xs text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"

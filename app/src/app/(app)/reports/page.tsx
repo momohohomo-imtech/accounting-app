@@ -125,6 +125,8 @@ export default async function ReportsPage({
     project?: string;
     vendor?: string;
     vendorAgency?: string;
+    // 매출처별 집계 팝업(거래처 이름)
+    customer?: string;
     // 카테고리별 집계 팝업 — 여러 개를 체크해서 열면 category가 반복돼 배열로 옴.
     category?: string | string[];
     site?: string;
@@ -141,6 +143,7 @@ export default async function ReportsPage({
     project,
     vendor,
     vendorAgency,
+    customer,
     category,
     site,
     siteReport,
@@ -863,7 +866,41 @@ export default async function ReportsPage({
 
   const vendorAllRows = [...vendorRows, ...vendorAgencyRows];
 
-  const popupOpen = Boolean(project || vendor || categoryNames.length);
+  // 매출처별 집계에서 거래처 이름을 누르면 여는 매출 내역(11/26 사용자 요청) — 집계와 같은 거래·같은 이름 기준(clientBreakdown)이라
+  // 팝업 합계 = 그 줄의 매출 합계. 현장 필터는 닫아도 그대로 남게 주소에 붙임.
+  const customerCloseHref = `/reports?year=${selectedYear}${site ? `&site=${site}` : ""}`;
+  const customerHref = (name: string) => `${customerCloseHref}&customer=${encodeURIComponent(name)}`;
+  const customerRows = customer
+    ? transactions
+        .filter((t) => t.type === "매출" && ((one(t.clients) as { name: string } | null)?.name ?? t.client_name_raw ?? "미지정") === customer)
+        .map((t) => {
+          const category = one(t.expense_categories) as { name: string; project_only: boolean; color: string | null } | null;
+          const proj = one(t.projects) as { name: string; status: string | null } | null;
+          const pm = one(t.payment_methods) as {
+            name: string;
+            text_color: string | null;
+            background_color: string | null;
+          } | null;
+          return {
+            id: t.id,
+            kind: "매출" as const,
+            trans_date: t.trans_date as string | null,
+            item_name: t.item_name,
+            amount: t.sales_amount + t.sales_vat,
+            project_name: proj?.name ?? null,
+            project_status: proj?.status ?? null,
+            needs_classification: t.needs_classification,
+            category_name: category?.name ?? null,
+            category_project_only: category?.project_only ?? false,
+            category_color: category?.color ?? null,
+            payment_method_name: pm?.name ?? null,
+            payment_method_text_color: pm?.text_color ?? null,
+            payment_method_background_color: pm?.background_color ?? null,
+          };
+        })
+    : [];
+
+  const popupOpen = Boolean(project || vendor || customer || categoryNames.length);
   const isolate = Boolean(printSection);
 
   // 항목별 "인쇄" 버튼 — 해당 항목 하나만 남기고 나머지는 인쇄에서 숨긴 채로
@@ -1470,7 +1507,7 @@ export default async function ReportsPage({
         >
           <SortableSimpleTable
             rows={byCustomer.map((v) => [
-              { text: v.name, value: v.name },
+              { text: v.name, value: v.name, href: customerHref(v.name) },
               { text: `${v.count}건`, value: v.count },
               { text: formatWon(v.amount), value: v.amount },
             ])}
@@ -1568,7 +1605,21 @@ export default async function ReportsPage({
               year={selectedYear}
               rows={vendorAllRows}
               closeHref={`/reports?year=${selectedYear}${includeVendorAgency ? "&vendorAgency=1" : ""}`}
-              vendorAgency={includeVendorAgency}
+              canEdit={canBulkEdit}
+            />
+          </div>
+        </div>
+      )}
+
+      {customer && !vendor && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-brand-ink/50 p-4 py-10 print:static print:bg-transparent print:p-0">
+          <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
+            <VendorDetailReport
+              side="매출"
+              vendorName={customer}
+              year={selectedYear}
+              rows={customerRows}
+              closeHref={customerCloseHref}
               canEdit={canBulkEdit}
             />
           </div>
@@ -1613,7 +1664,9 @@ export default async function ReportsPage({
             ? categoryReportHref(selectedYear, categoryNames)
             : siteReport
               ? `/reports?year=${selectedYear}&siteReport=${encodeURIComponent(siteReport)}`
-              : `/reports?year=${selectedYear}${includeVendorAgency ? "&vendorAgency=1" : ""}&vendor=${encodeURIComponent(vendor ?? "")}`
+              : customer && !vendor
+                ? customerHref(customer)
+                : `/reports?year=${selectedYear}${includeVendorAgency ? "&vendorAgency=1" : ""}&vendor=${encodeURIComponent(vendor ?? "")}`
         }
       />
     </div>

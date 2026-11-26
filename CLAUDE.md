@@ -24,7 +24,7 @@
   `UncategorizedPurchasesTable`, `TransactionHistoryTable`, `ProjectReceiptsTable`, 통합 보고서의 `ProjectsCombinedTable`·
   `CombinedCategorySection`·`CombinedAgencyTable`, `BankBalanceCheckPopup`(통장 잔액 확인 기록), `YearLockPanel`(잠긴 해),
   `ReceivableAgingTable`(오래된 외상매출금), `HometaxReconcilePanel`(홈택스 대조 결과), `ConstructionMemoList`(공사 메모),
-  `WorkSequenceList`(공사 작업 순서표), `FixedExpensePanel`(고정지출 지정 거래처·카테고리·후보), `RecentTransactionsTable`(대시보드 최근 등록 거래), `SortableSimpleTable`(보고서 분기별·월별 손익·매출처별 집계, 세무사 열람 표들·매입처 상세 팝업 — 합계 줄은 `footer`, 팝업 여는 이름 링크는 칸의 `href`, 휴대폰 고정 칸은 `stickyCol`), `SqlStatusTable`(백업 화면 SQL 실행 상태), `ProjectOverview`(보고서 프로젝트 한눈에 보기의 프로젝트별 표))에
+  `WorkSequenceList`(공사 작업 순서표), `FixedExpensePanel`(고정지출 지정 거래처·카테고리·후보), `RecentTransactionsTable`(대시보드 최근 등록 거래), `SortableSimpleTable`(보고서 분기별·월별 손익·매출처별 집계, 세무사 열람 표들·거래처 상세 팝업 — 합계 줄은 `footer`, 팝업 여는 이름 링크는 칸의 `href`, 휴대폰 고정 칸은 `stickyCol`), `SqlStatusTable`(백업 화면 SQL 실행 상태), `ProjectOverview`(보고서 프로젝트 한눈에 보기의 프로젝트별 표))에
   이 패턴이 적용돼 있음 — 새 표를 추가할 때 이 목록도 같이 업데이트할 것.
   (예외: `DailyWorkerUsageStatementTable`은 세무사 제출용 사용내역서 문서라
   근로자별 연속일 소계 순서가 고정돼야 해서 임의 정렬을 지원하지 않음 —
@@ -215,7 +215,7 @@
   정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
   해 잠금 불러오기(`yearLock`), 오래된 외상매출금(`receivableAging`), 이번 달 신고·납부 일정(`annualTasks`), 홈택스 세금계산서
   대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`), 메모 저장 확인(`unsavedChanges` — 떠나는 링크 판단·뒤로가기 되돌리기), 메모 한 장 엑셀(`memoExport`), 공사 작업 순서
-  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 고정지출 자동 등록 결제일·이번 달 상태·은행 겹침(`recurringExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내·자동으로 다시 보내기(`actionError`), 연결 끊김에 두 번 저장 막기(`idempotentSave`), 매입매출 위 반기 세금계산서(`taxInvoiceSummary`), 거래처별 이전 품목(`clientItemHistory`), 세무사 열람(`taxReview`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`), 공구명세서 이름 [ ] 메모(`toolNameNote`), 같은 날 순서·한 번에 넣는 줄의 등록 시각·넣은 순서 id(`entryOrder`), 매입매출 등록 여러 날짜(`multiDate`), 목록 기본 순서(`listOrder`),
+  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 고정지출 자동 등록 결제일·이번 달 상태·은행 겹침(`recurringExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내·자동으로 다시 보내기(`actionError`), 연결 끊김에 두 번 저장 막기(`idempotentSave`), 엑셀 장 이름 다듬기(`sheetName` — 거래처 이름에 "/" 등이 있으면 엑셀 받기가 아무 말 없이 안 됐음, `xlsxExport`가 모든 장에), 매입매출 위 반기 세금계산서(`taxInvoiceSummary`), 거래처별 이전 품목(`clientItemHistory`), 세무사 열람(`taxReview`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`), 공구명세서 이름 [ ] 메모(`toolNameNote`), 같은 날 순서·한 번에 넣는 줄의 등록 시각·넣은 순서 id(`entryOrder`), 매입매출 등록 여러 날짜(`multiDate`), 목록 기본 순서(`listOrder`),
   매입매출장 글자 검색(`ledgerSearch`), SQL 실행 상태(`sqlStatus`), 파일 저장 공간(`storageUsage`), 메모장 구분(`memoCategories`), 거래 일괄
   변경 나눠 바꾸기(`bulkUpdate`)·일괄 변경 칸(`transactionBulkEdit`), 챙길 거래 창(`transactionWatch`)·수정 팝업 주소(`ledgerLinks`), 은행 → 장부 올리기·등록 취소 판단(`bankLedger`)의 검사가
   `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
@@ -349,7 +349,7 @@
   구분 관리 칸은 숨김. 색은 `MEMO_CATEGORY_COLORS`(이름은 `EntityTable` 점 색과 같게, 배지는 예전 5개 색 그대로) — `lib/memoCategories.ts`.
 - **거래 일괄 변경**(11/11 사용자 요청 "보고서에서 보는 내역들을 선택 후 카테고리·품목·프로젝트·거래처 등 일괄 수정", 사용자 결정 "매입·매출
   거래만"): 매입매출장과 보고서 내역 표(거래처·카테고리·현장 내역 팝업, 매입 품목 검색, 프로젝트 분류 대기, 프로젝트 보고서·통합 보고서
-  매입내역)는 같은 일괄 변경 칸(`TransactionBulkEditBar` — 보고서는 체크했을 때 선택 목록을 불러오고 바꾸기 전 확인창을 띄우는
+  매입내역, 11/26부터 보고서 매출처별 집계의 매출 내역 팝업도)는 같은 일괄 변경 칸(`TransactionBulkEditBar` — 보고서는 체크했을 때 선택 목록을 불러오고 바꾸기 전 확인창을 띄우는
   `ReportBulkEditBar`)과 같은 저장(`bulkUpdate*` → `lib/bulkUpdate.ts`의 `updateInChunks`: 100개씩 나눠 바꾸고 바뀐 줄 수 확인 — 모자라면 안내)을
   씀. 금액·날짜는 바꾸지 않음. 체크칸은 관리자·직원만, 대행구매 줄(따로 저장되는 표)은 체크칸 없음, 바꾸는 건 보이는(필터·검색된) 줄 중 체크한
   것만(`lib/useRowSelection.ts`), 체크칸·일괄 변경 칸은 인쇄에 안 나옴. 거래 내역 표를 새로 만들면 이 칸을 붙이고, 체크칸을 첫 칸에 두면 표에
@@ -519,13 +519,13 @@
   그대로. 나중에 넣으려면 SQL로 권한부터 — 개인정보라 사용자와 먼저 상의).
   계산은 `lib/taxReview.ts`로만(부가세 기준은 `lib/vatBasis.ts` — 대시보드 분기별 부가세와 같은 숫자, 거래일 기준·외상 미정산 포함): 1기·2기 카드
   (매출세액·공제 매입세액·예상 납부(환급)세액·4월/10월 예정고지액), 분기별 부가세, 세금계산서 발행·수취(한 결제 묶음은 한 건), 세금계산서 없는
-  과세 매입 결제수단별(카드 등 다른 증빙 확인용, 비과세 뺌), 매입처별 정리, 카테고리별 경비(비용 = `purchaseCostOf`)와 매출·경비·차액, 월별
+  과세 매입 결제수단별(카드 등 다른 증빙 확인용, 비과세 뺌), 매출처별·매입처별 정리, 카테고리별 경비(비용 = `purchaseCostOf`)와 매출·경비·차액, 월별
   매출·매입, 외상 잔액(기준일 = 그해 12월 31일, 올해면 오늘 — 기준일까지 정산만, 지난해 외상 포함).
-  매입처별 정리(11/26 사용자 요청 — 예전 "거래처별 세금계산서 합계"(매출처·매입처)는 세무사가 홈택스에서 보므로 뺌): 그해 매입 전부(세금계산서
-  여부와 상관없이), 매입처 = 등록 거래처 이름 → 직접 입력 이름 → "(거래처 없음)"(같은 이름은 한 곳 — `vendorPurchaseRows`), 건수(한 결제 묶음은
-  한 건)·합계(부가세 포함)·공급가액·부가세·세금계산서 수취/없음. 이름을 누르면 `?vendor=` 상세 팝업(`TaxReviewVendorPopup` — 줄마다 날짜·품목·
-  카테고리(비과세·불공제 표시)·결제(외상)·세금계산서·금액, 매입매출장처럼 최신순, 엑셀·인쇄는 팝업만, ESC·닫기는 `closePopup`, 읽기만 —
-  `vendorPurchaseDetail`).
+  매출처별·매입처별 정리(11/26 사용자 요청 — 예전 "거래처별 세금계산서 합계"(매출처·매입처)는 세무사가 홈택스에서 보므로 뺌, 매입처 먼저 만들고
+  같은 날 "매출처별도"): 그해 매출(매입) 전부(세금계산서 여부와 상관없이), 거래처 = 등록 거래처 이름 → 직접 입력 이름(앞뒤 빈칸 뺌) → "(거래처
+  없음)"(같은 이름은 한 곳 — `partnerRows`), 건수(한 결제 묶음은 한 건)·합계(부가세 포함)·공급가액·부가세·세금계산서 발행(수취)/없음. 이름을
+  누르면 `?customer=`(매출처)·`?vendor=`(매입처) 상세 팝업(`TaxReviewPartnerPopup` — 줄마다 날짜·품목·카테고리(비과세·불공제 표시)·결제(외상)·
+  세금계산서·금액, 매입매출장처럼 최신순, 엑셀·인쇄는 팝업만, ESC·닫기는 `closePopup`, 읽기만 — `partnerDetail`).
   표는 `SortableSimpleTable`(합계 줄 `footer`), 표마다 엑셀 + "전체 엑셀"(장마다 표 하나, `TaxReviewExcelAll`), 인쇄(접힌 칸도 — `printAlways`,
   A4 가로 — 이 화면의 `<style>` 이름 없는 @page. 세로 A4 폭(약 718px)이면 8칸 표의 오른쪽 칸이 잘렸음), 1~5월엔 작년 자료 바로가기 한 줄.
 - **11/26 사용자 요청(매입매출)**: 매입매출 위 "총 매입액·총 매출액" 아래 줄에 그 해 상반기·하반기 세금계산서 발행 매입·매출 건수·합계
