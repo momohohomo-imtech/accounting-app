@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { loginErrorCode } from "@/lib/loginError";
 
 export async function signIn(formData: FormData) {
   const email = String(formData.get("email"));
@@ -10,7 +11,8 @@ export async function signIn(formData: FormData) {
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
-    redirect(`/login?error=${encodeURIComponent(error.message)}`);
+    // 주소에는 정해 둔 코드만(로그인 화면이 코드에 맞는 문구를 보여 줌 — lib/loginError.ts)
+    redirect(`/login?error=${loginErrorCode(error)}`);
   }
   redirect("/dashboard");
 }

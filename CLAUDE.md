@@ -217,7 +217,7 @@
   대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`), 메모 저장 확인(`unsavedChanges` — 떠나는 링크 판단·뒤로가기 되돌리기), 메모 한 장 엑셀(`memoExport`), 공사 작업 순서
   일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 고정지출 자동 등록 결제일·이번 달 상태·은행 겹침(`recurringExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내·자동으로 다시 보내기(`actionError`), 연결 끊김에 두 번 저장 막기(`idempotentSave`), 엑셀 장 이름 다듬기(`sheetName` — 거래처 이름에 "/" 등이 있으면 엑셀 받기가 아무 말 없이 안 됐음, `xlsxExport`가 모든 장에), 매입매출 위 반기 세금계산서(`taxInvoiceSummary`), 거래처별 이전 품목(`clientItemHistory`), 세무사 열람(`taxReview`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`), 공구명세서 이름 [ ] 메모(`toolNameNote`), 같은 날 순서·한 번에 넣는 줄의 등록 시각·넣은 순서 id(`entryOrder`), 매입매출 등록 여러 날짜(`multiDate`), 목록 기본 순서(`listOrder`),
   매입매출장 글자 검색(`ledgerSearch`), SQL 실행 상태(`sqlStatus`), 파일 저장 공간(`storageUsage`), 메모장 구분(`memoCategories`), 거래 일괄
-  변경 나눠 바꾸기(`bulkUpdate`)·일괄 변경 칸(`transactionBulkEdit`), 챙길 거래 창(`transactionWatch`)·수정 팝업 주소(`ledgerLinks`), 은행 → 장부 올리기·등록 취소 판단(`bankLedger`)의 검사가
+  변경 나눠 바꾸기(`bulkUpdate`)·일괄 변경 칸(`transactionBulkEdit`), 챙길 거래 창(`transactionWatch`)·수정 팝업 주소(`ledgerLinks`), 은행 → 장부 올리기·등록 취소 판단(`bankLedger`), 크론 비밀값 비교(`cronAuth`), 로그인 안내 문구(`loginError`)의 검사가
   `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
   Node 내장 `node:test`로 .ts를 바로 실행(`app/scripts/test-hooks.mjs`가 `@/` 경로 연결).
   계산 함수를 새로 만들거나 화면 안에 있던 계산을 `lib/`로 옮기면 검사도 같이 추가할 것.
@@ -524,6 +524,16 @@
   Node 26엔 `SlowBuffer`가 없어 `buffer-equal-constant-time`(제미나이 라이브러리 안쪽 jws → jwa)을 불러오면 오류지만 jwa 2.0.1은
   `crypto.timingSafeEqual`을 써서 그 파일을 안 불러옴 — 라이브러리를 올리거나 바꿀 때 Node 26에서 한 번 실행해 볼 것.
 
+- **보안(11/26 보안 점검 — 사용자 "보안 부분 각별히")**: 권한은 DB 규칙(RLS)이 기본 — 저장·수정·삭제는 관리자·직원만, 표 54개 모두 RLS(새 표도
+  꼭 RLS + 역할 확인 정책, 로컬 DB에서 역할별로 직접 시험함). 앱 쪽 덧문: 보안 헤더는 `next.config.ts`(다른 사이트 iframe 막기·nosniff·
+  Referrer-Policy·Permissions-Policy, X-Powered-By 끔 — iframe·외부 스크립트·플러그인을 새로 쓰려면 여기부터 고칠 것, 카메라는 영수증 사진 때문에
+  안 막음), 역할 없는 계정(public.users 줄이 없거나 관리자·직원·세무사·조회 전용 밖 글자)은 미들웨어가 로그인을 끊고 `/login?error=norole`(역할 조회
+  자체가 실패하면 통과 — 자료는 RLS가 막음), 로그인 화면은 주소 글자를 그대로 보여 주지 않고 `lib/loginError.ts`의 정해 둔 문구만(새 안내는 코드를
+  추가), API 주소(인식·엑셀 읽기)는 안에서 한 번 더 관리자·직원 확인(`lib/apiAuth.ts`의 `requireWriterForApi` — 새 API 주소도 이것부터), 크론은
+  `lib/cronAuth.ts`(시간이 같은 비교, CRON_SECRET 없으면 거부). 서비스 키(RLS 우회) 클라이언트는 크론과 계정 관리(`requireAdmin`)에서만 — 다른
+  서버 액션은 로그인한 사람 권한으로. **Supabase 설정 "새 사용자 가입 허용(Allow new users to sign up)"은 꺼 둘 것** — 켜져 있으면 앱에 들어 있는
+  공개 주소·키로 누구나 가입할 수 있고, 가입하면 019 SQL의 기본 역할(staff)로 모든 자료를 읽고 쓸 수 있음(로컬 DB에서 재현함). 계정은 계정 관리
+  (관리자 전용 서비스 키 방식)로만 만듦.
 - **세무사(tax_agent) 계정은 매입매출장(매입매출 목록)과 세무사 열람만**(사용자 요청 10/28·11/26): 미들웨어(`lib/supabase/middleware.ts`)가
   `/transactions` 목록과 `/tax-review` 외 경로·다른 탭·`editTx`를 목록으로 돌려보내고, 화면은 `getCurrentRole()`(`lib/currentRole.ts`)로 탭·
   "+ 거래 등록"·메모·엑셀 일괄 등록·수정 팝업을 숨기고 표는 `TransactionTable`의 `readOnly`(체크칸·관리 칸 없음). 메뉴도 "매입매출"·"세무사

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { isCronAuthorized } from "@/lib/cronAuth";
 import { postDueRecurring } from "@/lib/recurringExpensePost";
 import { nowKstParts } from "@/lib/kstDate";
 import { sendEmail } from "@/lib/email";
@@ -13,8 +14,7 @@ const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;")
 
 export async function GET(req: NextRequest) {
   // 자동 백업 크론과 같은 확인 — Vercel 환경변수 CRON_SECRET이 없거나 다르면 거부(주소만 알면 누구나 부르지 못하게).
-  const secret = process.env.CRON_SECRET;
-  if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!isCronAuthorized(req.headers.get("authorization"), process.env.CRON_SECRET)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const today = nowKstParts().date;

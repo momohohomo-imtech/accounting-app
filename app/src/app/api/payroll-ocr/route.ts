@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireWriterForApi } from "@/lib/apiAuth";
 import { extractJson, generateGeminiText, geminiErrorMessage, geminiModel } from "@/lib/gemini";
 import ExcelJS from "exceljs";
 
@@ -33,6 +34,9 @@ async function excelToCsv(file: File): Promise<string> {
 }
 
 export async function POST(req: NextRequest) {
+  // 관리자·직원만(앞단 proxy도 막지만 여기서 한 번 더 — 부를 때마다 제미나이 요금이 나감, lib/apiAuth.ts)
+  const denied = await requireWriterForApi();
+  if (denied) return denied;
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "GEMINI_API_KEY가 설정되지 않았습니다." }, { status: 500 });

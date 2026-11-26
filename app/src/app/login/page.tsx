@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { fieldClass } from "@/components/ui/field";
 import { ClearIdleLogoutMark } from "@/components/ClearIdleLogoutMark";
+import { loginErrorMessage } from "@/lib/loginError";
 
 export default async function LoginPage({
   searchParams,
@@ -11,6 +12,8 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string; reason?: string }>;
 }) {
   const params = await searchParams;
+  // 주소의 글자를 그대로 보여 주지 않고 정해 둔 문구만(lib/loginError.ts)
+  const errorMessage = loginErrorMessage(params.error);
 
   return (
     <div className="brand-login flex min-h-screen flex-col items-center justify-center bg-brand-navy px-4 py-10">
@@ -32,9 +35,7 @@ export default async function LoginPage({
             30분 이상 사용하지 않아 자동으로 로그아웃됐어요. 다시 로그인해 주세요.
           </p>
         )}
-        {params.error && (
-          <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{params.error}</p>
-        )}
+        {errorMessage && <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{errorMessage}</p>}
 
         <form action={signIn} className="mt-6 space-y-4">
           <div>

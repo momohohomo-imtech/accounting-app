@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireWriterForApi } from "@/lib/apiAuth";
 import { extractJson, generateGeminiText, geminiErrorMessage, geminiModel } from "@/lib/gemini";
 
 // 제미나이 응답을 기다리는 시간(lib/gemini.ts의 시도 시간·재시도와 맞춤).
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
+  // 관리자·직원만(앞단 proxy도 막지만 여기서 한 번 더 — 부를 때마다 제미나이 요금이 나감, lib/apiAuth.ts)
+  const denied = await requireWriterForApi();
+  if (denied) return denied;
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "GEMINI_API_KEY가 설정되지 않았습니다." }, { status: 500 });
