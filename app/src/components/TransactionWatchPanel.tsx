@@ -19,8 +19,9 @@ import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { isLeaveDialogFocus, useUnsavedGuard } from "@/components/UnsavedChangesProvider";
 
+// 메모칸은 남은 폭 전부(11/26 사용자 "금액을 옆으로, 메모 내용이 길게 보이게" — 예전엔 폭 11rem이라 긴 메모가 잘렸음)
 const memoInputClass =
-  "min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/10 sm:w-44 sm:flex-none";
+  "min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/10";
 
 // 매입매출 "챙길 거래" 창(11/11, 105 SQL transaction_watch) — 메모칸 바로 아래. 매입장 📌로 올린 거래가 바로 보이고 ×로 빠짐(거래는
 // 그대로, 빼기 전 확인창 — 11/12 사용자 요청). 달·필터를 바꿔도 그대로, 내용만큼 늘고 줄고(비면 안 보임), 10건 넘으면 "N건 더 보기".
@@ -137,12 +138,13 @@ function WatchLine({
     onError(result?.error ?? null);
   }
 
+  // 줄 배치: 휴대폰은 거래·금액 한 줄 + 메모 아래 줄. sm부터는 거래(날짜·이름, 폭 1/3) → 금액(줄마다 같은 자리) → 메모칸(남은 폭 전부)
   return (
     <li className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1.5">
       <Link
         href={href}
         title={`${label}${entry.project ? ` · ${entry.project}` : ""} — 누르면 거래 수정`}
-        className="flex min-w-0 flex-1 items-baseline gap-2 text-sm text-slate-800 hover:underline"
+        className="flex min-w-0 flex-1 items-baseline gap-2 text-sm text-slate-800 hover:underline sm:w-1/3 sm:flex-none"
       >
         <span className="shrink-0 tabular-nums text-xs text-slate-500">{dateLabel}</span>
         {entry.type === "매출" && (
@@ -150,9 +152,11 @@ function WatchLine({
         )}
         <span className="truncate">{label}</span>
       </Link>
-      <span className="shrink-0 whitespace-nowrap text-sm font-medium tabular-nums text-slate-900">{formatWon(entry.amount)}</span>
+      <span className="shrink-0 whitespace-nowrap text-sm font-medium tabular-nums text-slate-900 sm:min-w-[7.5rem] sm:text-right">
+        {formatWon(entry.amount)}
+      </span>
       {canEdit ? (
-        <div className="flex basis-full items-center gap-1 sm:basis-auto">
+        <div className="flex basis-full items-center gap-1 sm:min-w-0 sm:flex-1 sm:basis-auto">
           <input
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
@@ -179,7 +183,7 @@ function WatchLine({
           </button>
         </div>
       ) : (
-        entry.memo && <span className="basis-full text-xs text-slate-600 sm:basis-auto">{entry.memo}</span>
+        entry.memo && <span className="basis-full text-xs text-slate-600 sm:min-w-0 sm:flex-1 sm:basis-auto">{entry.memo}</span>
       )}
     </li>
   );
