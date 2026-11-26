@@ -10,9 +10,9 @@ import {
   monthlyRows,
   noticeFor,
   nonInvoicePurchaseByMethod,
+  partnerDetail,
+  partnerRows,
   vatPeriodRows,
-  vendorPurchaseDetail,
-  vendorPurchaseRows,
   type TaxCategory,
   type TaxReviewTx,
 } from "@/lib/taxReview";
@@ -111,7 +111,7 @@ test("매입처별 정리: 매입만, 등록 거래처·직접 입력 이름이 
     ...ROWS,
     tx({ type: "매입", trans_date: "2026-07-01", total: 330000, client_name_raw: " 가짜 자재상 ", category_id: "cat-mat", payment_method_id: "pm-card" }),
   ];
-  const rows = vendorPurchaseRows(list, CATS, CLIENTS);
+  const rows = partnerRows(list, CATS, CLIENTS, "매입");
   assert.deepEqual(
     rows.map((r) => [r.name, r.count, r.total, r.invoiceTotal, r.otherTotal]),
     [
@@ -140,16 +140,37 @@ test("매입처 상세: 그 매입처 매입만, 최신순(같은 날은 나중�
     tx({ id: "d5", type: "매입", trans_date: "2026-06-01", total: 1000, client_id: "c1" }),
     tx({ id: "d6", type: "매입", trans_date: "2026-06-02", total: 2000000, category_id: "cat-pay" }),
   ];
-  const d = vendorPurchaseDetail(list, CATS, CLIENTS, METHODS, "가짜 자재상");
+  const d = partnerDetail(list, CATS, CLIENTS, METHODS, "가짜 자재상", "매입");
   assert.deepEqual(d.map((r) => r.id), ["d3", "d2", "d1"]);
   assert.deepEqual(
     [d[0].method, d[0].credit, d[0].category, d[0].note, d[0].invoice, d[0].supply, d[0].vat, d[0].total],
     ["가짜 카드", true, "가짜 차량", "불공제", false, 300000, 30000, 330000]
   );
   assert.deepEqual([d[1].item, d[1].invoice, d[1].credit, d[1].method], ["가짜 볼트", true, false, ""]);
-  const none = vendorPurchaseDetail(list, CATS, CLIENTS, METHODS, "(거래처 없음)");
+  const none = partnerDetail(list, CATS, CLIENTS, METHODS, "(거래처 없음)", "매입");
   assert.deepEqual(none.map((r) => [r.id, r.note, r.vat]), [["d6", "비과세", 0]]);
-  assert.equal(vendorPurchaseDetail(list, CATS, CLIENTS, METHODS, "없는 매입처").length, 0);
+  assert.equal(partnerDetail(list, CATS, CLIENTS, METHODS, "없는 매입처", "매입").length, 0);
+  // 같은 이름이라도 매출은 매입처 상세에 안 나옴(d4) — 매출처 상세에만
+  assert.deepEqual(partnerDetail(list, CATS, CLIENTS, METHODS, "가짜 자재상", "매출").map((r) => r.id), ["d4"]);
+});
+
+test("매출처별 정리: 매출만, 세금계산서 발행·그 외, 합계 = 그해 매출 공급가액, 상세는 최신순", () => {
+  const rows = partnerRows(ROWS, CATS, CLIENTS, "매출");
+  assert.deepEqual(
+    rows.map((r) => [r.name, r.count, r.total, r.supply, r.vat, r.invoiceTotal, r.otherTotal]),
+    [
+      ["가짜 원청", 2, 11000000 + 5500000, 10000000 + 5000000, 1000000 + 500000, 16500000, 0],
+      ["가짜 개인 고객", 1, 110000, 100000, 10000, 0, 110000],
+    ]
+  );
+  const year = vatPeriodRows(ROWS, CATS).find((v) => v.key === "year")!;
+  assert.equal(rows.reduce((s, r) => s + r.supply, 0), year.salesSupply);
+  assert.equal(rows.reduce((s, r) => s + r.vat, 0), year.salesVat);
+  const d = partnerDetail(ROWS, CATS, CLIENTS, METHODS, "가짜 원청", "매출");
+  assert.deepEqual(d.map((r) => [r.date, r.invoice, r.total]), [
+    ["2026-08-10", true, 5500000],
+    ["2026-02-10", true, 11000000],
+  ]);
 });
 
 test("카테고리별 경비: 비용 = 공급가액(불공제는 총액, 비과세는 총액), 비고, 카테고리 없음 따로", () => {

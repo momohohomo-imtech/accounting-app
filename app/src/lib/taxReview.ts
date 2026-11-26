@@ -184,31 +184,35 @@ export function nonInvoicePurchaseByMethod(rows: TaxReviewTx[], categories: TaxC
   return [...byName.values()].sort((a, b) => b.year.supply - a.year.supply);
 }
 
-// ── ④ 매입처별 정리 + 매입처 상세(팝업) ─────────────────────────────
-// 11/26 사용자 요청 "매입처별 정리항 — 이름을 누르면 팝업으로 상세 내역". 예전 "거래처별 세금계산서 합계"(매출처·매입처)는
-// 세무사가 홈택스에서 보므로 뺌(같은 날 사용자 요청). 세금계산서 여부와 상관없이 그해 매입 전부를 매입처별로 — 합계 = 장부 금액
-// (부가세 포함), 공급가액·부가세는 위 부가세 계산과 같은 기준, 세금계산서 받은 매입과 그 밖(카드·현금 등)을 나눔.
+// ── ④ 매출처별·매입처별 정리 + 거래처 상세(팝업) ─────────────────────
+// 11/26 사용자 요청 "매입처별 정리항 — 이름을 누르면 팝업으로 상세 내역" → 같은 날 "매출처별도"(둘 다 같은 모양). 예전 "거래처별 세금계산서
+// 합계"(매출처·매입처)는 세무사가 홈택스에서 보므로 뺌. 세금계산서 여부와 상관없이 그해 매출(매입) 전부를 거래처별로 — 합계 = 장부 금액
+// (부가세 포함), 공급가액·부가세는 위 부가세 계산과 같은 기준, 세금계산서 발행(수취)한 것과 그 밖(카드·현금 등)을 나눔.
 
-export type VendorPurchaseRow = {
+export type PartnerSide = "매출" | "매입";
+
+export type PartnerRow = {
   name: string;
   /** 한 결제로 묶은 줄은 한 건 */
   count: number;
   total: number;
   supply: number;
   vat: number;
-  /** 세금계산서 받은 매입 합계(부가세 포함) */
+  /** 세금계산서 발행(매출)·수취(매입) 합계(부가세 포함) */
   invoiceTotal: number;
-  /** 세금계산서 없는 매입 합계(카드·현금영수증·송금 등) */
+  /** 세금계산서 없는 합계(카드·현금영수증·송금 등) */
   otherTotal: number;
 };
 
-export function vendorPurchaseRows(rows: TaxReviewTx[], categories: TaxCategory[], clients: NamedRef[]): VendorPurchaseRow[] {
+const isSide = (t: TaxReviewTx, side: PartnerSide) => (t.type === "매출") === (side === "매출");
+
+export function partnerRows(rows: TaxReviewTx[], categories: TaxCategory[], clients: NamedRef[], side: PartnerSide): PartnerRow[] {
   const catOf = categoryLookup(categories);
   const nameOf = vendorNamer(clients);
-  const byName = new Map<string, VendorPurchaseRow>();
+  const byName = new Map<string, PartnerRow>();
   const count = counter();
   for (const t of rows) {
-    if (t.type === "매출") continue;
+    if (!isSide(t, side)) continue;
     const name = nameOf(t);
     const r = byName.get(name) ?? { name, count: 0, total: 0, supply: 0, vat: 0, invoiceTotal: 0, otherTotal: 0 };
     byName.set(name, r);
@@ -224,7 +228,7 @@ export function vendorPurchaseRows(rows: TaxReviewTx[], categories: TaxCategory[
   return [...byName.values()].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, "ko"));
 }
 
-export type VendorDetailRow = {
+export type PartnerDetailRow = {
   id: string;
   date: string;
   item: string;
@@ -239,19 +243,20 @@ export type VendorDetailRow = {
   total: number;
 };
 
-/** 매입처 한 곳의 그해 매입 — 줄마다(한 결제 묶음도 줄마다), 매입매출장처럼 최신순·같은 날은 나중에 등록한 것이 위. */
-export function vendorPurchaseDetail(
+/** 거래처 한 곳의 그해 매출(매입) — 줄마다(한 결제 묶음도 줄마다), 매입매출장처럼 최신순·같은 날은 나중에 등록한 것이 위. */
+export function partnerDetail(
   rows: TaxReviewTx[],
   categories: TaxCategory[],
   clients: NamedRef[],
   methods: NamedRef[],
-  vendor: string
-): VendorDetailRow[] {
+  name: string,
+  side: PartnerSide
+): PartnerDetailRow[] {
   const catOf = categoryLookup(categories);
   const nameOf = vendorNamer(clients);
   const methodName = new Map(methods.map((m) => [m.id, m.name]));
   return rows
-    .filter((t) => t.type !== "매출" && nameOf(t) === vendor)
+    .filter((t) => isSide(t, side) && nameOf(t) === name)
     .sort(newestFirst)
     .map((t) => {
       const cat = catOf(t);

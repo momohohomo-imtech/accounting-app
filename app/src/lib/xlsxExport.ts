@@ -4,6 +4,7 @@ import { WEEKDAY_LABELS } from "@/lib/calendar";
 import { workLogColorExcelArgb } from "@/lib/workLogColors";
 import { siteColorExcelArgb } from "@/lib/siteColor";
 import { formatPermitQuantity } from "@/lib/koreanNumber";
+import { safeSheetName } from "@/lib/sheetName";
 import {
   formatAmount,
   teamColor,
@@ -58,7 +59,8 @@ export async function downloadXlsxSheets(filename: string, sheets: XlsxSheet[]) 
 }
 
 function addSheet(wb: ExcelJS.Workbook, { name: sheetName, headers, rows, leadingRows = [] }: XlsxSheet) {
-  const ws = wb.addWorksheet(sheetName, { views: [{ state: "frozen", ySplit: leadingRows.length + 1 }] });
+  // 장 이름에 거래처·카테고리 이름이 들어가는 엑셀이 있어서 엑셀이 안 받는 글자는 다듬음(lib/sheetName.ts)
+  const ws = wb.addWorksheet(safeSheetName(sheetName), { views: [{ state: "frozen", ySplit: leadingRows.length + 1 }] });
 
   leadingRows.forEach((r, i) => {
     const row = ws.addRow(r);
