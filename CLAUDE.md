@@ -24,7 +24,7 @@
   `UncategorizedPurchasesTable`, `TransactionHistoryTable`, `ProjectReceiptsTable`, 통합 보고서의 `ProjectsCombinedTable`·
   `CombinedCategorySection`·`CombinedAgencyTable`, `BankBalanceCheckPopup`(통장 잔액 확인 기록), `YearLockPanel`(잠긴 해),
   `ReceivableAgingTable`(오래된 외상매출금), `HometaxReconcilePanel`(홈택스 대조 결과), `ConstructionMemoList`(공사 메모),
-  `WorkSequenceList`(공사 작업 순서표), `FixedExpensePanel`(고정지출 지정 거래처·카테고리·후보), `RecentTransactionsTable`(대시보드 최근 등록 거래), `SortableSimpleTable`(보고서 분기별·월별 손익·매출처별 집계), `SqlStatusTable`(백업 화면 SQL 실행 상태), `ProjectOverview`(보고서 프로젝트 한눈에 보기의 프로젝트별 표))에
+  `WorkSequenceList`(공사 작업 순서표), `FixedExpensePanel`(고정지출 지정 거래처·카테고리·후보), `RecentTransactionsTable`(대시보드 최근 등록 거래), `SortableSimpleTable`(보고서 분기별·월별 손익·매출처별 집계, 세무사 열람 표들 — 합계 줄은 `footer`), `SqlStatusTable`(백업 화면 SQL 실행 상태), `ProjectOverview`(보고서 프로젝트 한눈에 보기의 프로젝트별 표))에
   이 패턴이 적용돼 있음 — 새 표를 추가할 때 이 목록도 같이 업데이트할 것.
   (예외: `DailyWorkerUsageStatementTable`은 세무사 제출용 사용내역서 문서라
   근로자별 연속일 소계 순서가 고정돼야 해서 임의 정렬을 지원하지 않음 —
@@ -215,7 +215,7 @@
   정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
   해 잠금 불러오기(`yearLock`), 오래된 외상매출금(`receivableAging`), 이번 달 신고·납부 일정(`annualTasks`), 홈택스 세금계산서
   대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`), 메모 저장 확인(`unsavedChanges` — 떠나는 링크 판단·뒤로가기 되돌리기), 메모 한 장 엑셀(`memoExport`), 공사 작업 순서
-  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 고정지출 자동 등록 결제일·이번 달 상태·은행 겹침(`recurringExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내·자동으로 다시 보내기(`actionError`), 연결 끊김에 두 번 저장 막기(`idempotentSave`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`), 공구명세서 이름 [ ] 메모(`toolNameNote`), 같은 날 순서·한 번에 넣는 줄의 등록 시각·넣은 순서 id(`entryOrder`), 매입매출 등록 여러 날짜(`multiDate`), 목록 기본 순서(`listOrder`),
+  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 고정지출 자동 등록 결제일·이번 달 상태·은행 겹침(`recurringExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내·자동으로 다시 보내기(`actionError`), 연결 끊김에 두 번 저장 막기(`idempotentSave`), 매입매출 위 반기 세금계산서(`taxInvoiceSummary`), 거래처별 이전 품목(`clientItemHistory`), 세무사 열람(`taxReview`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`), 공구명세서 이름 [ ] 메모(`toolNameNote`), 같은 날 순서·한 번에 넣는 줄의 등록 시각·넣은 순서 id(`entryOrder`), 매입매출 등록 여러 날짜(`multiDate`), 목록 기본 순서(`listOrder`),
   매입매출장 글자 검색(`ledgerSearch`), SQL 실행 상태(`sqlStatus`), 파일 저장 공간(`storageUsage`), 메모장 구분(`memoCategories`), 거래 일괄
   변경 나눠 바꾸기(`bulkUpdate`)·일괄 변경 칸(`transactionBulkEdit`), 챙길 거래 창(`transactionWatch`)·수정 팝업 주소(`ledgerLinks`), 은행 → 장부 올리기·등록 취소 판단(`bankLedger`)의 검사가
   `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
@@ -509,10 +509,24 @@
   Node 26엔 `SlowBuffer`가 없어 `buffer-equal-constant-time`(제미나이 라이브러리 안쪽 jws → jwa)을 불러오면 오류지만 jwa 2.0.1은
   `crypto.timingSafeEqual`을 써서 그 파일을 안 불러옴 — 라이브러리를 올리거나 바꿀 때 Node 26에서 한 번 실행해 볼 것.
 
-- **세무사(tax_agent) 계정은 매입매출장(매입매출 목록)만**(사용자 요청 10/28): 미들웨어(`lib/supabase/middleware.ts`)가
-  `/transactions` 목록 외 경로·다른 탭·`editTx`를 목록으로 돌려보내고, 화면은 `getCurrentRole()`(`lib/currentRole.ts`)로 탭·
-  "+ 거래 등록"·메모·엑셀 일괄 등록·수정 팝업을 숨기고 표는 `TransactionTable`의 `readOnly`(체크칸·관리 칸 없음). 메뉴도 "매입매출"
-  하나(`AppNav`). 새 화면·탭을 세무사에게 열려면 미들웨어부터 고칠 것.
+- **세무사(tax_agent) 계정은 매입매출장(매입매출 목록)과 세무사 열람만**(사용자 요청 10/28·11/26): 미들웨어(`lib/supabase/middleware.ts`)가
+  `/transactions` 목록과 `/tax-review` 외 경로·다른 탭·`editTx`를 목록으로 돌려보내고, 화면은 `getCurrentRole()`(`lib/currentRole.ts`)로 탭·
+  "+ 거래 등록"·메모·엑셀 일괄 등록·수정 팝업을 숨기고 표는 `TransactionTable`의 `readOnly`(체크칸·관리 칸 없음). 메뉴도 "매입매출"·"세무사
+  열람" 둘(`AppNav`, 휴대폰 하단 탭에 둘 다). 새 화면·탭을 세무사에게 열려면 미들웨어부터 고칠 것.
+- **세무사 열람**(11/26 사용자 요청 "대메뉴에 세무사가 볼 수 있는 창 — 회계사가 필요로 할 만한 내용", DB 변경 없음): 회계 > "세무사 열람"
+  (`/tax-review` — 관리자·직원·조회 전용·세무사, 읽기만). 세무사 계정이 읽을 수 있는 표(거래·거래처·카테고리·결제수단·외상 정산·부가세
+  예정고지액)로만 — 급여·일용직·은행은 세무사 계정에 DB 읽기 권한이 없어 빠짐(넣으려면 SQL로 권한부터 — 개인정보라 사용자와 먼저 상의).
+  계산은 `lib/taxReview.ts`로만(부가세 기준은 `lib/vatBasis.ts` — 대시보드 분기별 부가세와 같은 숫자, 거래일 기준·외상 미정산 포함): 1기·2기 카드
+  (매출세액·공제 매입세액·예상 납부(환급)세액·4월/10월 예정고지액), 분기별 부가세, 세금계산서 발행·수취(한 결제 묶음은 한 건), 세금계산서 없는
+  과세 매입 결제수단별(카드 등 다른 증빙 확인용, 비과세 뺌), 거래처별 세금계산서(매출처·매입처, 1기·2기·연간), 카테고리별 경비(비용 =
+  `purchaseCostOf`)와 매출·경비·차액, 월별 매출·매입, 외상 잔액(기준일 = 그해 12월 31일, 올해면 오늘 — 기준일까지 정산만, 지난해 외상 포함).
+  표는 `SortableSimpleTable`(합계 줄 `footer`), 표마다 엑셀 + "전체 엑셀"(장마다 표 하나, `TaxReviewExcelAll`), 인쇄(접힌 칸도 — `printAlways`),
+  1~5월엔 작년 자료 바로가기 한 줄.
+- **11/26 사용자 요청(매입매출)**: 매입매출 위 "총 매입액·총 매출액" 아래 줄에 그 해 상반기·하반기 세금계산서 발행 매입·매출 건수·합계
+  (`lib/taxInvoiceSummary.ts` — 고른 달·필터와 상관없이 그 해 전체, 거래일 기준·외상 미정산 포함이라 바로 위 총액(정산 전 외상은 뺌)과 다를 수
+  있어 "(외상 미정산 포함)" 표시, 한 결제 묶음은 한 건, 세무사 계정도 보임). 거래 등록 품목칸은 고른 거래처(등록 거래처, 없으면 직접 입력한
+  이름 그대로 — 두 글자부터)의 예전 품목만 골라 쓰기(`lib/actions/clientItemHistory.ts` 최근 3년·500줄 → `lib/clientItemHistory.ts` 같은 품목은
+  한 줄·최근 순·"지난번 날짜·횟수·단가" 글자, 금액은 자동으로 안 넣음 — 거래처 기본 품목(`default_item_name`) 자동 채우기는 그대로).
 
 - **작업일지의 "내용 이어받기"는 `lib/workLogSummary.ts`의 `resolveWorkLogTitles` 하나로만 정할 것.** 내용을 비운 줄은 같은
   현장·같은 프로젝트의 앞 내용 → 없으면 프로젝트 이름 → 프로젝트도 없으면 그 현장의 앞 내용. 작업일지를 날짜·내용별로 세는

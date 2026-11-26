@@ -11,10 +11,18 @@ export function SortableSimpleTable({
   headers,
   rows,
   empty = "데이터가 없습니다.",
+  footer,
+  leftCount = 1,
+  minWidthClass = "min-w-[600px]",
 }: {
   headers: string[];
   rows: SortableCell[][];
   empty?: string;
+  /** 합계 줄 — 정렬과 상관없이 늘 맨 아래(세무사 열람 등) */
+  footer?: SortableCell[];
+  /** 앞에서 몇 칸까지 왼쪽 글자 칸인지(나머지는 오른쪽 숫자 칸) — 기본 첫 칸만 */
+  leftCount?: number;
+  minWidthClass?: string;
 }) {
   const [sortKey, setSortKey] = useState<number | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -43,11 +51,11 @@ export function SortableSimpleTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[600px] text-sm">
+      <table className={`w-full ${minWidthClass} text-sm`}>
         <thead>
           <tr className="border-b border-slate-200 text-left text-slate-500">
             {headers.map((h, i) => (
-              <th key={h} className={`pb-2 pr-4 ${i > 0 ? "text-right" : ""}`}>
+              <th key={h} className={`pb-2 pr-4 ${i >= leftCount ? "text-right" : ""}`}>
                 <button type="button" onClick={() => handleSort(i)} className="inline-flex items-center gap-1 hover:text-slate-800">
                   {h}
                   {sortKey === i && <span className="text-[10px]">{sortDir === "asc" ? "▲" : "▼"}</span>}
@@ -62,7 +70,7 @@ export function SortableSimpleTable({
               {cells.map((cell, j) => (
                 <td
                   key={j}
-                  className={`py-2 pr-4 ${j > 0 ? "whitespace-nowrap text-right tabular-nums text-slate-700" : "text-slate-700"}`}
+                  className={`py-2 pr-4 ${j >= leftCount ? "whitespace-nowrap text-right tabular-nums text-slate-700" : "text-slate-700"}`}
                 >
                   {cell.text}
                 </td>
@@ -77,6 +85,20 @@ export function SortableSimpleTable({
             </tr>
           )}
         </tbody>
+        {footer && rows.length > 0 && (
+          <tfoot>
+            <tr className="border-t-2 border-slate-200 font-semibold">
+              {footer.map((cell, j) => (
+                <td
+                  key={j}
+                  className={`py-2 pr-4 ${j >= leftCount ? "whitespace-nowrap text-right tabular-nums text-slate-900" : "text-slate-900"}`}
+                >
+                  {cell.text}
+                </td>
+              ))}
+            </tr>
+          </tfoot>
+        )}
       </table>
     </div>
   );

@@ -143,10 +143,12 @@ async function updateSessionInner(request: NextRequest) {
 
   // tax_agent(세무사 사무실 계정)는 매입매출장(매입매출 목록)만 볼 수 있음(사용자 요청 10/28 — 예전엔 대시보드·외상
   // 등 매입매출·외상 화면 전체) — 다른 경로(대시보드·거래 등록·수정 화면 포함)와 다른 탭·수정 팝업은 목록으로 강제 이동.
+  // 11/26 사용자 요청으로 "세무사 열람"(/tax-review — 세무사가 필요한 자료를 모은 읽기 전용 화면)도 열어 줌.
   if (user && role === "tax_agent") {
     const { pathname, searchParams } = request.nextUrl;
     const tab = searchParams.get("tab");
-    if (pathname !== "/transactions" || (tab && tab !== "list") || searchParams.has("editTx")) {
+    const ledgerList = pathname === "/transactions" && !(tab && tab !== "list") && !searchParams.has("editTx");
+    if (!ledgerList && pathname !== "/tax-review") {
       const url = request.nextUrl.clone();
       url.pathname = "/transactions";
       if (pathname !== "/transactions") url.search = "";
