@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
-import { createClient } from "@/lib/supabase/server";
+import { requireWriterForApi } from "@/lib/apiAuth";
 import { nowKst } from "@/lib/kstDate";
 import { parseTransactionSheet } from "@/lib/transactionExcel";
 
@@ -22,13 +22,9 @@ function cellToString(v: unknown): string {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
-  }
+  // 관리자·직원만(저장할 수 있는 역할 — 예전엔 로그인만 확인, lib/apiAuth.ts)
+  const denied = await requireWriterForApi();
+  if (denied) return denied;
 
   // 보낸 양식이 깨졌거나 중간에 끊기면 formData()가 실패함 — 500 오류 화면 대신 알아볼 수 있는 문구로.
   let file: FormDataEntryValue | null;

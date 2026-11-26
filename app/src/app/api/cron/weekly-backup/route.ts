@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/service";
+import { isCronAuthorized } from "@/lib/cronAuth";
 import { pruneAutoBackups, runBackup } from "@/lib/backup";
 import { sendEmail } from "@/lib/email";
 import { AUTO_BACKUP_STATUS_PATH, type AutoBackupRun } from "@/lib/autoBackupStatus";
@@ -44,8 +45,7 @@ export async function GET(req: NextRequest) {
   // Vercel Cron은 Vercel 환경변수 CRON_SECRET이 있으면 "Authorization: Bearer <CRON_SECRET>"를 붙여서 부름. 설정이 없거나
   // 다르면 거부 — 예전엔 설정이 없을 때 그냥 실행해서 주소만 알면 누구나 백업을 돌릴 수 있었음(백업 파일이 쌓임).
   // 서버에 CRON_SECRET이 없으면 자동 백업이 늘 여기서 막힘 — 백업 화면 "자동 백업 점검"에 "없음"으로 보임.
-  const secret = process.env.CRON_SECRET;
-  if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!isCronAuthorized(req.headers.get("authorization"), process.env.CRON_SECRET)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

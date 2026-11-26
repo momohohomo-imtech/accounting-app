@@ -12,6 +12,9 @@ import { isViewerBlockedApi, isViewerBlockedPage } from "@/lib/viewerAccess";
 // 돌려보내는 쪽(fail closed)으로만 처리 — 검증 안 된 요청을 통과시키는 일은 없음.
 const AUTH_CHECK_TIMEOUT_MS = 8000;
 
+// 정해진 역할 — 이 밖의 계정(public.users 줄이 없거나 다른 글자)은 로그인을 끊음(아래 updateSessionInner).
+const KNOWN_ROLES = new Set(["admin", "staff", "tax_agent", "viewer"]);
+
 class AuthCheckTimeoutError extends Error {}
 
 function withTimeout<T>(promise: PromiseLike<T>, label: string): Promise<T> {
@@ -33,7 +36,8 @@ function withTimeout<T>(promise: PromiseLike<T>, label: string): Promise<T> {
 function redirectToLoginOnTimeout(request: NextRequest) {
   const url = request.nextUrl.clone();
   url.pathname = "/login";
-  url.searchParams.set("error", "인증 서버 응답이 지연되어 로그인 화면으로 돌아왔습니다. 다시 로그인해주세요.");
+  // 문구는 로그인 화면이 코드로 정함(lib/loginError.ts — 주소 글자를 그대로 보여 주지 않음)
+  url.searchParams.set("error", "timeout");
   return NextResponse.redirect(url);
 }
 
@@ -91,15 +95,24 @@ async function updateSessionInner(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // 로그아웃 등으로 바뀐 세션 쿠키(supabaseResponse에 실림)를 그대로 실어 다른 주소로 보냄
+  const redirectKeepingCookies = (url: URL) => {
+    const res = NextResponse.redirect(url);
+    supabaseResponse.cookies.getAll().forEach((c) => res.cookies.set(c));
+    return res;
+  };
+
   let role: string | null = null;
   if (user) {
     let roleRow: { role: string | null; resuspend_at: string | null } | null = null;
+    let roleReadFailed = false;
     try {
-      const { data } = await withTimeout(
+      const { data, error } = await withTimeout(
         supabase.from("users").select("role, resuspend_at").eq("id", user.id).maybeSingle(),
         "users.select(role)"
       );
       roleRow = data;
+      roleReadFailed = Boolean(error);
     } catch (err) {
       if (err instanceof AuthCheckTimeoutError) return redirectToLoginOnTimeout(request);
       throw err;
@@ -131,6 +144,23 @@ async function updateSessionInner(request: NextRequest) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       return NextResponse.redirect(url);
+    }
+
+    // 역할이 없는 계정(public.users 줄이 없거나 정해진 역할이 아님) — 로그인을 끊고 안내(11/26 보안 점검). 예전엔 이런 계정도 화면은
+    // 다 열렸음(자료는 DB 권한이 막음). 역할 조회가 실패한 경우(일시적인 오류)는 예전처럼 통과 — 자료는 DB 권한(RLS)이 막음.
+    // 로그인 화면에서는 다시 보내지 않음(같은 주소로 계속 돌아가는 일 없게).
+    if (!roleReadFailed && !KNOWN_ROLES.has(role ?? "")) {
+      try {
+        await withTimeout(supabase.auth.signOut(), "auth.signOut");
+      } catch {
+        // 로그아웃이 안 되더라도 아래로 — 다음 요청에서도 같은 확인에 걸림
+      }
+      if (isAuthRoute) return supabaseResponse;
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.search = "";
+      url.searchParams.set("error", "norole");
+      return redirectKeepingCookies(url);
     }
   }
   const homePath = role === "tax_agent" ? "/transactions" : "/dashboard";
