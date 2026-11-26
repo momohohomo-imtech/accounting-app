@@ -13,6 +13,7 @@ import {
   suspendAccount,
   unsuspendAccount,
   type Account,
+  type AccountRole,
   type Role,
 } from "@/lib/actions/accounts";
 import { PROTECTED_OWNER_EMAIL } from "@/lib/protectedAccount";
@@ -20,6 +21,8 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
 const ROLE_LABEL: Record<Role, string> = { admin: "관리자", staff: "직원", tax_agent: "세무사", viewer: "조회 전용" };
+// 계정 목록에 보이는 이름 — "pending"(109 SQL 뒤 새 계정 기본값)은 권한 없음: 로그인해도 바로 끊기고, 여기서 역할을 지정해야 씀.
+const ACCOUNT_ROLE_LABEL: Record<AccountRole, string> = { ...ROLE_LABEL, pending: "권한 없음" };
 
 function formatDateTime(iso: string) {
   const d = new Date(iso);
@@ -31,7 +34,7 @@ function RoleSelect({
   onChange,
   disabled,
 }: {
-  value: Role;
+  value: Role | "";
   onChange: (v: Role) => void;
   disabled?: boolean;
 }) {
@@ -42,6 +45,11 @@ function RoleSelect({
       disabled={disabled}
       className={`${inlineFieldClass} w-28`}
     >
+      {value === "" && (
+        <option value="" disabled>
+          역할 고르기
+        </option>
+      )}
       {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
         <option key={r} value={r}>
           {ROLE_LABEL[r]}
@@ -59,7 +67,9 @@ function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) 
   const globalPending = useGlobalPending();
   const [editingInfo, setEditingInfo] = useState(false);
   const [name, setName] = useState(account.name);
-  const [role, setRole] = useState<Role>(account.role);
+  // 권한 없는 계정(pending)은 고르는 칸이 비어 있게 — 역할을 골라야 저장
+  const initialRole: Role | "" = account.role === "pending" ? "" : account.role;
+  const [role, setRole] = useState<Role | "">(initialRole);
   const [changingPassword, setChangingPassword] = useState(false);
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
@@ -71,6 +81,10 @@ function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) 
   async function handleSaveInfo() {
     if (!name.trim()) {
       setMessage("이름을 입력해주세요.");
+      return;
+    }
+    if (!role) {
+      setMessage("역할을 골라 주세요.");
       return;
     }
     if (!(await confirm(`${account.name}(${account.email}) 계정 정보를 저장하시겠습니까?`))) return;
@@ -164,7 +178,9 @@ function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) 
           ) : (
             <p className="font-medium text-slate-900">
               {account.name} <span className="font-normal text-slate-400">({account.email})</span>{" "}
-              <span className="text-xs font-normal text-slate-500">[{ROLE_LABEL[account.role]}]</span>
+              <span className={`text-xs ${account.role === "pending" ? "font-semibold text-amber-700" : "font-normal text-slate-500"}`}>
+                [{ACCOUNT_ROLE_LABEL[account.role]}]
+              </span>
               {isSelf && <span className="ml-1 text-xs font-normal text-slate-400">(나)</span>}
             </p>
           )}
@@ -175,6 +191,10 @@ function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) 
           {account.authMissing ? (
             <p className="mt-0.5 text-xs font-medium text-slate-500">
               로그인 정보 없음 — 연결이 끊긴 기록(이미 로그인 불가, 데이터만 남아있음)
+            </p>
+          ) : account.role === "pending" && !account.suspended ? (
+            <p className="mt-0.5 text-xs font-medium text-amber-700">
+              역할 지정 전 — 로그인해도 바로 끊김. 이 계정을 쓰려면 &quot;정보 수정&quot;에서 역할을 지정해 주세요(모르는 계정이면 삭제·비활성화).
             </p>
           ) : (
             <p className={`mt-0.5 text-xs font-medium ${account.suspended ? "text-red-600" : "text-emerald-600"}`}>
@@ -198,7 +218,7 @@ function AccountRow({ account, isSelf }: { account: Account; isSelf: boolean }) 
                 onClick={() => {
                   setEditingInfo(false);
                   setName(account.name);
-                  setRole(account.role);
+                  setRole(initialRole);
                 }}
                 disabled={pending}
               >

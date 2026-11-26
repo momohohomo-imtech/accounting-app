@@ -8,13 +8,15 @@ import { TAX_AGENT_SUSPEND_DURATION } from "@/lib/taxAgentSuspend";
 import { PROTECTED_OWNER_EMAIL } from "@/lib/protectedAccount";
 
 export type Role = "admin" | "staff" | "tax_agent" | "viewer";
+// 계정 줄에 있을 수 있는 역할 — "pending"은 109 SQL 뒤 새로 생긴 계정의 기본값(권한 없음, 관리자가 역할을 지정해야 앱을 씀). 고를 수 있는 역할은 Role만.
+export type AccountRole = Role | "pending";
 const ROLES: Role[] = ["admin", "staff", "tax_agent", "viewer"];
 
 export type Account = {
   id: string;
   email: string;
   name: string;
-  role: Role;
+  role: AccountRole;
   suspended: boolean;
   resuspendAt: string | null;
   // public.users엔 있지만 auth.users엔 없는 상태(과거 수기 등록 등으로 어긋난 데이터) —
@@ -40,7 +42,7 @@ export async function getAccounts(): Promise<Account[]> {
             id: r.id,
             email: r.email,
             name: r.name,
-            role: r.role as Role,
+            role: r.role as AccountRole,
             suspended: false,
             resuspendAt: null,
             authMissing: true,
@@ -62,7 +64,7 @@ export async function getAccounts(): Promise<Account[]> {
           }
         }
 
-        return { id: r.id, email: r.email, name: r.name, role: r.role as Role, suspended, resuspendAt, authMissing: false };
+        return { id: r.id, email: r.email, name: r.name, role: r.role as AccountRole, suspended, resuspendAt, authMissing: false };
       })
     );
   } catch {
@@ -70,7 +72,7 @@ export async function getAccounts(): Promise<Account[]> {
       id: r.id,
       email: r.email,
       name: r.name,
-      role: r.role as Role,
+      role: r.role as AccountRole,
       suspended: false,
       resuspendAt: null,
       authMissing: false,
@@ -100,13 +102,13 @@ export async function createAccount(formData: FormData): Promise<{ error?: strin
     });
     if (error) return { error: error.message };
     if (data.user) {
-      // handle_new_user 트리거가 role 기본값(staff)으로 행을 만들어두므로, 다른 역할로
-      // 만들었으면 여기서 덮어씀. 실패하면 꼭 알림 — 세무사·조회 전용으로 만든 계정이 직원 권한(쓰기 가능)으로 남음.
+      // handle_new_user 트리거가 role 기본값으로 행을 만들어두므로(109 SQL 뒤엔 'pending' 권한 없음, 그 전엔 'staff' 직원) 고른 역할로
+      // 여기서 덮어씀. 실패하면 꼭 알림 — 109 전이면 세무사·조회 전용으로 만든 계정이 직원 권한(쓰기 가능)으로 남음.
       const { error: roleError } = await admin.from("users").update({ name, role }).eq("id", data.user.id);
       if (roleError) {
         revalidatePath("/backups");
         return {
-          error: `계정은 만들어졌지만 이름·역할을 저장하지 못했습니다(지금은 직원 권한). 아래 계정 목록에서 역할을 다시 지정해주세요. (${roleError.message})`,
+          error: `계정은 만들어졌지만 이름·역할을 저장하지 못했습니다(지금은 기본 역할 — 109 SQL을 실행했으면 "권한 없음", 아니면 직원). 아래 계정 목록에서 역할을 다시 지정해주세요. (${roleError.message})`,
         };
       }
     }
