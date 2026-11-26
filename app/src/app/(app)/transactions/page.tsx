@@ -439,11 +439,11 @@ async function TransactionListSection({
         <LedgerSearchBox key={searchText} initial={searchText} />
         <TransactionExportButtons transactions={transactions as Transaction[]} />
       </div>
-      {/* 위쪽 정리(11/11 사용자 "화면 정리" — 메모칸이 고르는 칸 줄 끝에 붙고 "챙길 거래" 창만 오른쪽 끝으로 밀려 서로 어긋나고 왼쪽이
-          비었음): 고르는 칸·검색·인쇄·엑셀은 위 줄, 그 아래 줄은 왼쪽 = 필터된 전체 금액, 오른쪽 = 메모칸 + 바로 아래 챙길 거래 창(같은
-          폭). 노트북 폭(xl)보다 좁으면 메모칸 → 창 → 금액 줄 순서로 위아래(전체 폭). */}
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-        <p className="text-sm text-slate-600 xl:pt-2">
+      {/* 위쪽 정리(11/11 사용자 "화면 정리" → 11/26 사용자 "메모·챙길 거래를 왼쪽으로, 폭 크게 — 어차피 아무것도 없는 공간"): 고르는
+          칸·검색·인쇄·엑셀은 위 줄, 그 아래 필터된 전체 금액, 그 아래 메모칸 + 바로 아래 챙길 거래 창(왼쪽부터 아래 표와 같은 전체 폭 —
+          예전엔 오른쪽에 34~40rem 폭이라 왼쪽이 비고 창의 거래 이름이 잘렸음). 노트북 폭(xl)보다 좁으면 메모칸 → 창 → 금액 줄 순서(예전 그대로). */}
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-slate-600">
           필터된 전체 금액{" "}
           <span className={`tabular-nums font-semibold ${filteredNetTotal >= 0 ? "text-brand" : "text-red-600"}`}>
             {filteredNetTotal >= 0 ? "+" : "-"}
@@ -457,7 +457,7 @@ async function TransactionListSection({
           )}
         </p>
         {!readOnly && (
-          <div className="order-first w-full space-y-2 print:hidden xl:order-none xl:w-[34rem] xl:shrink-0 2xl:w-[40rem]">
+          <div className="order-first w-full space-y-2 print:hidden xl:order-none">
             <PageMemo
               bare
               rows={2}
