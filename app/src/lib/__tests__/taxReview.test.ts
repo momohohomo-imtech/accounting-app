@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import {
   VAT_PERIODS,
   categoryExpenseRows,
-  clientInvoiceRows,
   creditAsOf,
   creditBalanceRows,
   incomeSummary,
@@ -12,6 +11,8 @@ import {
   noticeFor,
   nonInvoicePurchaseByMethod,
   vatPeriodRows,
+  vendorPurchaseDetail,
+  vendorPurchaseRows,
   type TaxCategory,
   type TaxReviewTx,
 } from "@/lib/taxReview";
@@ -44,6 +45,8 @@ function tx(p: Partial<TaxReviewTx> & { type: string; trans_date: string; total:
     payment_type: p.payment_type ?? "immediate",
     tax_invoice_issued: p.tax_invoice_issued ?? false,
     payment_group_id: p.payment_group_id ?? null,
+    item_name: p.item_name ?? null,
+    created_at: p.created_at ?? null,
     sales_amount: sales ? p.total : 0,
     sales_vat: 0,
     purchase_amount: sales ? 0 : p.total,
@@ -103,11 +106,50 @@ test("세금계산서 없는 과세 매입 — 결제수단별(비과세 빼고,
   );
 });
 
-test("거래처별 세금계산서: 매출처·매입처 따로, 반기별·연간", () => {
-  const sales = clientInvoiceRows(ROWS, CATS, CLIENTS, "매출");
-  assert.deepEqual(sales.map((r) => [r.name, r.h1.supply, r.h2.supply, r.year.count]), [["가짜 원청", 10000000, 5000000, 2]]);
-  const purchase = clientInvoiceRows(ROWS, CATS, CLIENTS, "매입");
-  assert.deepEqual(purchase.map((r) => [r.name, r.year.supply, r.year.vat, r.year.count]), [["가짜 자재상", 1500000, 150000, 1]]);
+test("매입처별 정리: 매입만, 등록 거래처·직접 입력 이름이 같으면 한 곳, 묶음은 한 건, 세금계산서 수취·그 외, 합계 큰 순", () => {
+  const list = [
+    ...ROWS,
+    tx({ type: "매입", trans_date: "2026-07-01", total: 330000, client_name_raw: " 가짜 자재상 ", category_id: "cat-mat", payment_method_id: "pm-card" }),
+  ];
+  const rows = vendorPurchaseRows(list, CATS, CLIENTS);
+  assert.deepEqual(
+    rows.map((r) => [r.name, r.count, r.total, r.invoiceTotal, r.otherTotal]),
+    [
+      // 거래처 없는 매입: 330,000(차량) + 2,000,000(인건비) + 220,000(자재) + 110,000(카테고리 없음)
+      ["(거래처 없음)", 4, 2660000, 0, 2660000],
+      // 등록 거래처 묶음 두 줄(1,100,000 + 550,000 — 한 건) + 직접 입력한 같은 이름 330,000
+      ["가짜 자재상", 2, 1980000, 1650000, 330000],
+    ]
+  );
+  const vendor = rows.find((r) => r.name === "가짜 자재상")!;
+  assert.equal(vendor.supply, 1500000 + 300000);
+  assert.equal(vendor.vat, 150000 + 30000);
+  const none = rows.find((r) => r.name === "(거래처 없음)")!;
+  assert.equal(none.vat, 30000 + 0 + 20000 + 10000, "비과세는 부가세 없음");
+  // 매입처 합계 = 그해 매입 전부(부가세 표의 연간 매입 공급가액과 같음)
+  const year = vatPeriodRows(list, CATS).find((v) => v.key === "year")!;
+  assert.equal(rows.reduce((s, r) => s + r.supply, 0), year.purchaseSupply);
+});
+
+test("매입처 상세: 그 매입처 매입만, 최신순(같은 날은 나중에 등록한 것이 위), 카테고리 비고·결제수단·외상·세금계산서", () => {
+  const list = [
+    tx({ id: "d1", type: "매입", trans_date: "2026-03-05", total: 1100000, client_id: "c2", category_id: "cat-mat", tax_invoice_issued: true, payment_group_id: "g9", item_name: "가짜 철근", created_at: "2026-03-05T01:00:00Z" }),
+    tx({ id: "d2", type: "매입", trans_date: "2026-03-05", total: 550000, client_id: "c2", category_id: "cat-mat", tax_invoice_issued: true, payment_group_id: "g9", item_name: " 가짜 볼트 ", created_at: "2026-03-05T02:00:00Z" }),
+    tx({ id: "d3", type: "매입", trans_date: "2026-04-01", total: 330000, client_name_raw: "가짜 자재상", category_id: "cat-car", payment_method_id: "pm-card", payment_type: "credit" }),
+    tx({ id: "d4", type: "매출", trans_date: "2026-05-01", total: 999, client_id: "c2" }),
+    tx({ id: "d5", type: "매입", trans_date: "2026-06-01", total: 1000, client_id: "c1" }),
+    tx({ id: "d6", type: "매입", trans_date: "2026-06-02", total: 2000000, category_id: "cat-pay" }),
+  ];
+  const d = vendorPurchaseDetail(list, CATS, CLIENTS, METHODS, "가짜 자재상");
+  assert.deepEqual(d.map((r) => r.id), ["d3", "d2", "d1"]);
+  assert.deepEqual(
+    [d[0].method, d[0].credit, d[0].category, d[0].note, d[0].invoice, d[0].supply, d[0].vat, d[0].total],
+    ["가짜 카드", true, "가짜 차량", "불공제", false, 300000, 30000, 330000]
+  );
+  assert.deepEqual([d[1].item, d[1].invoice, d[1].credit, d[1].method], ["가짜 볼트", true, false, ""]);
+  const none = vendorPurchaseDetail(list, CATS, CLIENTS, METHODS, "(거래처 없음)");
+  assert.deepEqual(none.map((r) => [r.id, r.note, r.vat]), [["d6", "비과세", 0]]);
+  assert.equal(vendorPurchaseDetail(list, CATS, CLIENTS, METHODS, "없는 매입처").length, 0);
 });
 
 test("카테고리별 경비: 비용 = 공급가액(불공제는 총액, 비과세는 총액), 비고, 카테고리 없음 따로", () => {

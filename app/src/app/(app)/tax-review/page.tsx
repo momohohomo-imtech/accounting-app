@@ -9,10 +9,10 @@ import { SortableSimpleTable, type SortableCell } from "@/components/SortableSim
 import { ReportExcelButton } from "@/components/ReportExcelButton";
 import { PrintButton } from "@/components/PrintButton";
 import { TaxReviewExcelAll } from "@/components/TaxReviewExcelAll";
+import { TaxReviewVendorPopup } from "@/components/TaxReviewVendorPopup";
 import type { XlsxSheet } from "@/lib/xlsxExport";
 import {
   categoryExpenseRows,
-  clientInvoiceRows,
   creditAsOf,
   creditBalanceRows,
   incomeSummary,
@@ -21,6 +21,8 @@ import {
   nonInvoicePurchaseByMethod,
   noticeFor,
   vatPeriodRows,
+  vendorPurchaseDetail,
+  vendorPurchaseRows,
   type Amounts,
   type CreditPaymentLite,
   type NamedRef,
@@ -31,9 +33,10 @@ import {
 // 대메뉴 "세무사 열람"(11/26 사용자 요청 "세무사가 볼 수 있는 창 — 회계사가 필요로 할 만한 내용 정리") — 세무사 계정도 열 수 있는 화면
 // (미들웨어가 세무사에겐 매입매출 목록과 이 화면만 열어 줌). 세무사 계정이 읽을 수 있는 표로만 — 계산은 lib/taxReview.ts.
 // 읽기만(저장·수정 없음). 표마다 엑셀, 위에 전체 엑셀(장마다 표 하나)·인쇄(접힌 칸도 다 나옴).
+// 매입처별 정리의 이름을 누르면 ?vendor=로 상세 팝업(열려 있으면 인쇄는 팝업만).
 
 const TX_SELECT =
-  "id, type, trans_date, client_id, client_name_raw, category_id, payment_method_id, payment_type, tax_invoice_issued, payment_group_id, sales_amount, sales_vat, purchase_amount, purchase_vat";
+  "id, type, trans_date, client_id, client_name_raw, category_id, payment_method_id, payment_type, tax_invoice_issued, payment_group_id, item_name, created_at, sales_amount, sales_vat, purchase_amount, purchase_vat";
 
 // 화면 칸(글자·정렬값) + 엑셀 값(x — 금액·건수는 숫자, 글자 칸은 글자 그대로)
 type Cell = SortableCell & { x: string | number };
@@ -44,8 +47,13 @@ const blank = (): Cell => ({ text: "", value: "", x: "" });
 const sumAmounts = (list: Amounts[]): Amounts =>
   list.reduce((a, b) => ({ count: a.count + b.count, supply: a.supply + b.supply, vat: a.vat + b.vat }), { count: 0, supply: 0, vat: 0 });
 
-export default async function TaxReviewPage({ searchParams }: { searchParams: Promise<{ year?: string }> }) {
-  const { year: yearParam } = await searchParams;
+export default async function TaxReviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ year?: string | string[]; vendor?: string | string[] }>;
+}) {
+  const { year: yearParam, vendor: vendorParam } = await searchParams;
+  const vendor = typeof vendorParam === "string" && vendorParam.trim() ? vendorParam : null;
   const { year: currentYear, month: currentMonth } = nowKst();
   const today = nowKstParts().date;
   const year = Number(yearParam) || currentYear;
@@ -110,8 +118,8 @@ export default async function TaxReviewPage({ searchParams }: { searchParams: Pr
   const invoiceQuarters = invoices.filter((v) => !v.total);
   const invoiceYear = invoices.find((v) => v.key === "year")!;
   const methodRows = nonInvoicePurchaseByMethod(rows, categories, methods);
-  const salesClients = clientInvoiceRows(rows, categories, clients, "매출");
-  const purchaseClients = clientInvoiceRows(rows, categories, clients, "매입");
+  const vendorRows = vendorPurchaseRows(rows, categories, clients);
+  const vendorDetail = vendor ? vendorPurchaseDetail(rows, categories, clients, methods, vendor) : [];
   const categoryRows = categoryExpenseRows(rows, categories);
   const income = incomeSummary(rows, categories);
   const months = monthlyRows(rows, categories);
@@ -152,24 +160,38 @@ export default async function TaxReviewPage({ searchParams }: { searchParams: Pr
     cnt(m.year.count),
   ];
   const methodTotal = { h1: sumAmounts(methodRows.map((m) => m.h1)), h2: sumAmounts(methodRows.map((m) => m.h2)), year: sumAmounts(methodRows.map((m) => m.year)) };
-  const clientHeaders = ["거래처", "1기 건수", "1기 공급가액", "1기 세액", "2기 건수", "2기 공급가액", "2기 세액", "연간 공급가액", "연간 세액"];
-  const clientCells = (c: (typeof salesClients)[number]): Cell[] => [
-    txt(c.name),
-    cnt(c.h1.count),
-    won(c.h1.supply),
-    won(c.h1.vat),
-    cnt(c.h2.count),
-    won(c.h2.supply),
-    won(c.h2.vat),
-    won(c.year.supply),
-    won(c.year.vat),
+  const closeHref = `/tax-review?year=${year}`;
+  const vendorHeaders = ["매입처", "건수", "합계(부가세 포함)", "공급가액", "부가세", "세금계산서 수취", "세금계산서 없음"];
+  const vendorCells = (v: (typeof vendorRows)[number]): Cell[] => [
+    { ...txt(v.name), href: `${closeHref}&vendor=${encodeURIComponent(v.name)}` },
+    cnt(v.count),
+    won(v.total),
+    won(v.supply),
+    won(v.vat),
+    won(v.invoiceTotal),
+    won(v.otherTotal),
   ];
-  const clientFooter = (list: typeof salesClients): Cell[] => {
-    const h1 = sumAmounts(list.map((c) => c.h1));
-    const h2 = sumAmounts(list.map((c) => c.h2));
-    const y = sumAmounts(list.map((c) => c.year));
-    return [txt(`합계(${list.length}곳)`), cnt(h1.count), won(h1.supply), won(h1.vat), cnt(h2.count), won(h2.supply), won(h2.vat), won(y.supply), won(y.vat)];
+  const vendorTotal = {
+    count: sumOf(vendorRows, (v) => v.count),
+    total: sumOf(vendorRows, (v) => v.total),
+    supply: sumOf(vendorRows, (v) => v.supply),
+    vat: sumOf(vendorRows, (v) => v.vat),
+    invoiceTotal: sumOf(vendorRows, (v) => v.invoiceTotal),
+    otherTotal: sumOf(vendorRows, (v) => v.otherTotal),
   };
+  // 매입처 상세 팝업 칸(날짜·품목·카테고리(비고)·결제(외상)·세금계산서·금액)
+  const detailHeaders = ["날짜", "품목", "카테고리", "결제", "세금계산서", "공급가액", "부가세", "합계"];
+  const detailCells = (d: (typeof vendorDetail)[number]): Cell[] => [
+    txt(d.date),
+    txt(d.item || "-", d.item),
+    txt(d.note ? `${d.category || "-"} (${d.note})` : d.category || "-", d.category),
+    txt(d.credit ? (d.method ? `외상 · ${d.method}` : "외상") : d.method || "-"),
+    txt(d.invoice ? "수취" : "-"),
+    won(d.supply),
+    won(d.vat),
+    won(d.total),
+  ];
+  const vendorRow = vendor ? vendorRows.find((v) => v.name === vendor) : undefined;
   const categoryHeaders = ["카테고리", "비고", "건수", "합계", "공급가액", "부가세", "비용(소득세 기준)"];
   const categoryCells = (c: (typeof categoryRows)[number]): Cell[] => [
     txt(c.name),
@@ -205,8 +227,7 @@ export default async function TaxReviewPage({ searchParams }: { searchParams: Pr
     { name: "부가세 기간별", headers: vatHeaders, rows: vat.map((v) => plain(vatCells(v))) },
     { name: "세금계산서 기간별", headers: invoiceHeaders, rows: invoices.map((v) => plain(invoiceCells(v))) },
     { name: "세금계산서 없는 매입", headers: methodHeaders, rows: methodRows.map((m) => plain(methodCells(m))) },
-    { name: "매출처별 세금계산서", headers: clientHeaders, rows: salesClients.map((c) => plain(clientCells(c))) },
-    { name: "매입처별 세금계산서", headers: clientHeaders, rows: purchaseClients.map((c) => plain(clientCells(c))) },
+    { name: "매입처별 정리", headers: vendorHeaders, rows: vendorRows.map((v) => plain(vendorCells(v))) },
     { name: "카테고리별 경비", headers: categoryHeaders, rows: categoryRows.map((c) => plain(categoryCells(c))) },
     { name: "월별 매출매입", headers: monthHeaders, rows: months.map((m) => plain(monthCells(m))) },
     { name: "외상 잔액", headers: creditHeaders, rows: credit.map((c) => plain(creditCells(c))), leadingRows: [[`기준일 ${asOf}`]] },
@@ -247,209 +268,240 @@ export default async function TaxReviewPage({ searchParams }: { searchParams: Pr
   const filingSeason = currentMonth <= 5 && year === currentYear;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1">
-          <h1 className="text-2xl font-bold text-slate-900">세무사 열람</h1>
-          <p className="text-sm text-slate-500">
-            {year}년 세무 신고 자료 — 부가세는 세금계산서(거래일) 기준, 외상 미정산 포함. 금액은 장부에 적은 합계를 부가세 포함으로 보고 나눈
-            값입니다(앱의 다른 부가세 계산과 같음).
+    <>
+      {/* 인쇄는 A4 가로 — 칸이 많은 표(분기별 부가세 8칸 등)가 세로 A4 폭(약 718px)을 넘어 오른쪽 칸이 잘렸음. 이 화면에 있을 때만 쓰는
+          이름 없는 @page(공사 작업 순서표 WorkSequenceEditor와 같은 방식 — 이름 붙인 페이지는 빈 장이 생겨서 안 씀). */}
+      <style>{"@media print { @page { size: A4 landscape; margin: 10mm; } }"}</style>
+      <div className={vendor ? "space-y-6 print:hidden" : "space-y-6"}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 space-y-1">
+            <h1 className="text-2xl font-bold text-slate-900">세무사 열람</h1>
+            <p className="text-sm text-slate-500">
+              {year}년 세무 신고 자료 — 부가세는 세금계산서(거래일) 기준, 외상 미정산 포함. 금액은 장부에 적은 합계를 부가세 포함으로 보고 나눈
+              값입니다(앱의 다른 부가세 계산과 같음).
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 print:hidden">
+            <YearFilter basePath="/tax-review" years={years} selectedYear={year} />
+            <TaxReviewExcelAll filename={`세무사열람_${year}.xlsx`} sheets={sheets} />
+            <PrintButton />
+          </div>
+        </div>
+
+        {filingSeason && (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 print:hidden">
+            1~5월은 작년 신고 기간입니다(2기 확정 부가세 1월, 종합소득세 5월).{" "}
+            <Link href={`/tax-review?year=${currentYear - 1}`} className="font-medium underline underline-offset-2">
+              {currentYear - 1}년 자료 보기
+            </Link>
           </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 print:hidden">
-          <YearFilter basePath="/tax-review" years={years} selectedYear={year} />
-          <TaxReviewExcelAll filename={`세무사열람_${year}.xlsx`} sheets={sheets} />
-          <PrintButton />
-        </div>
+        )}
+
+        <CollapsibleSection
+          title="부가가치세 신고 자료"
+          defaultOpen
+          printAlways
+          headerExtra={<div className="flex flex-wrap items-center gap-2 print:hidden">{excel("부가세 기간별")}</div>}
+        >
+          <div className="mt-4 space-y-5">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {halfCard("h1", "1기(1~6월) — 7월 확정신고")}
+              {halfCard("h2", "2기(7~12월) — 다음 해 1월 확정신고")}
+            </div>
+            <div>
+              <h3 className="mb-2 text-sm font-semibold text-slate-700">분기별</h3>
+              <SortableSimpleTable headers={vatHeaders} rows={quarters.map(vatCells)} footer={vatCells({ ...vatBy.year, label: "연간" })} minWidthClass="min-w-[900px]" />
+            </div>
+            <div>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-slate-700">세금계산서 발행·수취</h3>
+                {excel("세금계산서 기간별")}
+              </div>
+              <SortableSimpleTable
+                headers={invoiceHeaders}
+                rows={invoiceQuarters.map(invoiceCells)}
+                footer={invoiceCells({ ...invoiceYear, label: "연간" })}
+                minWidthClass="min-w-[760px]"
+              />
+            </div>
+            <div>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-slate-700">세금계산서 없는 과세 매입 — 결제수단별</h3>
+                {excel("세금계산서 없는 매입")}
+              </div>
+              <p className="mb-2 text-xs text-slate-500">카드 매출전표·현금영수증 등 다른 증빙이 있으면 매입세액 공제 대상 — 증빙 확인용(비과세 카테고리는 뺌).</p>
+              <SortableSimpleTable
+                headers={methodHeaders}
+                rows={methodRows.map(methodCells)}
+                footer={[txt("합계"), won(methodTotal.h1.supply), won(methodTotal.h1.vat), won(methodTotal.h2.supply), won(methodTotal.h2.vat), cnt(methodTotal.year.count)]}
+                empty="세금계산서 없는 과세 매입이 없습니다."
+              />
+            </div>
+            <p className="text-xs leading-relaxed text-slate-500">
+              공제 매입세액은 대시보드 부가세와 같은 계산(비과세·불공제 카테고리를 뺀 매입 전부)입니다. 실제 신고에서는 세금계산서·카드 매출전표·
+              현금영수증 등 증빙이 있는 매입만 공제됩니다. 불공제 카테고리(승용차 등)는 지출카테고리의 체크로 정합니다.
+            </p>
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title={
+            <span>
+              매입처별 정리{" "}
+              <span className="text-sm font-normal text-slate-500">
+                {vendorRows.length}곳 · {formatWon(vendorTotal.total)}
+              </span>
+            </span>
+          }
+          defaultOpen={Boolean(vendor)}
+          printAlways
+          headerExtra={<div className="flex flex-wrap items-center gap-2 print:hidden">{excel("매입처별 정리")}</div>}
+        >
+          <div className="mt-4 space-y-3">
+            <p className="text-xs text-slate-500">
+              그해 매입 전부(세금계산서 여부와 상관없이) — 매입처 이름을 누르면 거래 내역이 열립니다. 금액은 부가세 포함 장부 금액, 한 결제로
+              묶은 줄은 한 건.
+            </p>
+            <SortableSimpleTable
+              headers={vendorHeaders}
+              rows={vendorRows.map(vendorCells)}
+              footer={[
+                txt(`합계(${vendorRows.length}곳)`),
+                cnt(vendorTotal.count),
+                won(vendorTotal.total),
+                won(vendorTotal.supply),
+                won(vendorTotal.vat),
+                won(vendorTotal.invoiceTotal),
+                won(vendorTotal.otherTotal),
+              ]}
+              minWidthClass="min-w-[820px]"
+              empty="매입이 없습니다."
+            />
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title={
+            <span>
+              카테고리별 매입(경비){" "}
+              <span className="text-sm font-normal text-slate-500">비용 {formatWon(income.cost)}</span>
+            </span>
+          }
+          printAlways
+          headerExtra={<div className="flex flex-wrap items-center gap-2 print:hidden">{excel("카테고리별 경비")}</div>}
+        >
+          <div className="mt-4 space-y-3">
+            <dl className="grid grid-cols-1 gap-2 text-sm min-[480px]:grid-cols-3">
+              <div className="rounded-lg bg-slate-50 px-3 py-2">
+                <dt className="text-xs text-slate-500">매출(공급가액)</dt>
+                <dd className="whitespace-nowrap font-semibold tabular-nums text-slate-900">{formatWon(income.sales)}</dd>
+              </div>
+              <div className="rounded-lg bg-slate-50 px-3 py-2">
+                <dt className="text-xs text-slate-500">경비(소득세 기준 비용)</dt>
+                <dd className="whitespace-nowrap font-semibold tabular-nums text-slate-900">{formatWon(income.cost)}</dd>
+              </div>
+              <div className="rounded-lg bg-slate-50 px-3 py-2">
+                <dt className="text-xs text-slate-500">차액(장부상 이익 참고)</dt>
+                <dd className="whitespace-nowrap font-semibold tabular-nums text-slate-900">{formatWon(income.profit)}</dd>
+              </div>
+            </dl>
+            <p className="text-xs text-slate-500">
+              비용 = 돌려받는 부가세를 뺀 금액(불공제·비과세 카테고리는 총액). 매입매출장에 적은 거래만 — 장부에 없는 비용(감가상각 등)은 빠짐.
+            </p>
+            <SortableSimpleTable
+              headers={categoryHeaders}
+              rows={categoryRows.map(categoryCells)}
+              footer={[
+                txt("합계"),
+                blank(),
+                cnt(sumOf(categoryRows, (c) => c.count)),
+                won(sumOf(categoryRows, (c) => c.total)),
+                won(sumOf(categoryRows, (c) => c.supply)),
+                won(sumOf(categoryRows, (c) => c.vat)),
+                won(sumOf(categoryRows, (c) => c.cost)),
+              ]}
+              leftCount={2}
+              minWidthClass="min-w-[760px]"
+              empty="매입이 없습니다."
+            />
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title="월별 매출·매입"
+          printAlways
+          headerExtra={<div className="flex flex-wrap items-center gap-2 print:hidden">{excel("월별 매출매입")}</div>}
+        >
+          <div className="mt-4">
+            <SortableSimpleTable
+              headers={monthHeaders}
+              rows={months.map(monthCells)}
+              footer={[
+                txt("합계"),
+                won(sumOf(months, (m) => m.salesSupply)),
+                won(sumOf(months, (m) => m.salesVat)),
+                won(sumOf(months, (m) => m.purchaseSupply)),
+                won(sumOf(months, (m) => m.purchaseVat)),
+                cnt(sumOf(months, (m) => m.invoiceSalesCount)),
+                cnt(sumOf(months, (m) => m.invoicePurchaseCount)),
+              ]}
+              minWidthClass="min-w-[820px]"
+            />
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title={
+            <span>
+              외상 잔액{" "}
+              <span className="text-sm font-normal text-slate-500">{asOf} 기준</span>
+            </span>
+          }
+          printAlways
+          headerExtra={<div className="flex flex-wrap items-center gap-2 print:hidden">{excel("외상 잔액")}</div>}
+        >
+          <div className="mt-4 space-y-3">
+            <p className="text-sm text-slate-600">
+              외상매출금 <span className="whitespace-nowrap font-semibold tabular-nums text-slate-900">{formatWon(sumOf(receivable, (c) => c.balance))}</span>
+              ({receivable.length}곳) · 외상매입금{" "}
+              <span className="whitespace-nowrap font-semibold tabular-nums text-slate-900">{formatWon(sumOf(payable, (c) => c.balance))}</span>(
+              {payable.length}곳) — 기준일까지의 정산만 반영, 지난해 외상 포함.
+            </p>
+            <SortableSimpleTable headers={creditHeaders} rows={credit.map(creditCells)} leftCount={2} minWidthClass="min-w-[640px]" empty="남은 외상이 없습니다." />
+          </div>
+        </CollapsibleSection>
       </div>
 
-      {filingSeason && (
-        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 print:hidden">
-          1~5월은 작년 신고 기간입니다(2기 확정 부가세 1월, 종합소득세 5월).{" "}
-          <Link href={`/tax-review?year=${currentYear - 1}`} className="font-medium underline underline-offset-2">
-            {currentYear - 1}년 자료 보기
-          </Link>
-        </p>
+      {vendor && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-brand-ink/50 p-4 py-10 print:static print:bg-transparent print:p-0">
+          <div className="w-full max-w-4xl rounded-2xl bg-white p-6 shadow-xl max-md:p-4 print:max-w-none print:rounded-none print:p-0 print:shadow-none">
+            <TaxReviewVendorPopup
+              vendor={vendor}
+              year={year}
+              closeHref={closeHref}
+              headers={detailHeaders}
+              rows={vendorDetail.map(detailCells)}
+              footer={[
+                txt(`합계(${(vendorRow?.count ?? 0).toLocaleString("ko-KR")}건)`),
+                blank(),
+                blank(),
+                blank(),
+                blank(),
+                won(sumOf(vendorDetail, (d) => d.supply)),
+                won(sumOf(vendorDetail, (d) => d.vat)),
+                won(sumOf(vendorDetail, (d) => d.total)),
+              ]}
+              summary={{
+                count: vendorRow?.count ?? 0,
+                lines: vendorDetail.length,
+                total: vendorRow?.total ?? 0,
+                invoiceTotal: vendorRow?.invoiceTotal ?? 0,
+                otherTotal: vendorRow?.otherTotal ?? 0,
+              }}
+            />
+          </div>
+        </div>
       )}
-
-      <CollapsibleSection
-        title="부가가치세 신고 자료"
-        defaultOpen
-        printAlways
-        headerExtra={<div className="flex flex-wrap items-center gap-2 print:hidden">{excel("부가세 기간별")}</div>}
-      >
-        <div className="mt-4 space-y-5">
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {halfCard("h1", "1기(1~6월) — 7월 확정신고")}
-            {halfCard("h2", "2기(7~12월) — 다음 해 1월 확정신고")}
-          </div>
-          <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-700">분기별</h3>
-            <SortableSimpleTable headers={vatHeaders} rows={quarters.map(vatCells)} footer={vatCells({ ...vatBy.year, label: "연간" })} minWidthClass="min-w-[900px]" />
-          </div>
-          <div>
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-slate-700">세금계산서 발행·수취</h3>
-              {excel("세금계산서 기간별")}
-            </div>
-            <SortableSimpleTable
-              headers={invoiceHeaders}
-              rows={invoiceQuarters.map(invoiceCells)}
-              footer={invoiceCells({ ...invoiceYear, label: "연간" })}
-              minWidthClass="min-w-[760px]"
-            />
-          </div>
-          <div>
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-slate-700">세금계산서 없는 과세 매입 — 결제수단별</h3>
-              {excel("세금계산서 없는 매입")}
-            </div>
-            <p className="mb-2 text-xs text-slate-500">카드 매출전표·현금영수증 등 다른 증빙이 있으면 매입세액 공제 대상 — 증빙 확인용(비과세 카테고리는 뺌).</p>
-            <SortableSimpleTable
-              headers={methodHeaders}
-              rows={methodRows.map(methodCells)}
-              footer={[txt("합계"), won(methodTotal.h1.supply), won(methodTotal.h1.vat), won(methodTotal.h2.supply), won(methodTotal.h2.vat), cnt(methodTotal.year.count)]}
-              empty="세금계산서 없는 과세 매입이 없습니다."
-            />
-          </div>
-          <p className="text-xs leading-relaxed text-slate-500">
-            공제 매입세액은 대시보드 부가세와 같은 계산(비과세·불공제 카테고리를 뺀 매입 전부)입니다. 실제 신고에서는 세금계산서·카드 매출전표·
-            현금영수증 등 증빙이 있는 매입만 공제됩니다. 불공제 카테고리(승용차 등)는 지출카테고리의 체크로 정합니다.
-          </p>
-        </div>
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title={
-          <span>
-            거래처별 세금계산서 합계{" "}
-            <span className="text-sm font-normal text-slate-500">
-              매출처 {salesClients.length}곳 · 매입처 {purchaseClients.length}곳
-            </span>
-          </span>
-        }
-        printAlways
-        headerExtra={
-          <div className="flex flex-wrap items-center gap-2 print:hidden">
-            {excel("매출처별 세금계산서")}
-            {excel("매입처별 세금계산서")}
-          </div>
-        }
-      >
-        <div className="mt-4 space-y-5">
-          <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-700">매출처별(세금계산서 발행)</h3>
-            <SortableSimpleTable
-              headers={clientHeaders}
-              rows={salesClients.map(clientCells)}
-              footer={clientFooter(salesClients)}
-              minWidthClass="min-w-[860px]"
-              empty="세금계산서 발행 매출이 없습니다."
-            />
-          </div>
-          <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-700">매입처별(세금계산서 수취)</h3>
-            <SortableSimpleTable
-              headers={clientHeaders}
-              rows={purchaseClients.map(clientCells)}
-              footer={clientFooter(purchaseClients)}
-              minWidthClass="min-w-[860px]"
-              empty="세금계산서 수취 매입이 없습니다."
-            />
-          </div>
-        </div>
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title={
-          <span>
-            카테고리별 매입(경비){" "}
-            <span className="text-sm font-normal text-slate-500">비용 {formatWon(income.cost)}</span>
-          </span>
-        }
-        printAlways
-        headerExtra={<div className="flex flex-wrap items-center gap-2 print:hidden">{excel("카테고리별 경비")}</div>}
-      >
-        <div className="mt-4 space-y-3">
-          <dl className="grid grid-cols-1 gap-2 text-sm min-[480px]:grid-cols-3">
-            <div className="rounded-lg bg-slate-50 px-3 py-2">
-              <dt className="text-xs text-slate-500">매출(공급가액)</dt>
-              <dd className="whitespace-nowrap font-semibold tabular-nums text-slate-900">{formatWon(income.sales)}</dd>
-            </div>
-            <div className="rounded-lg bg-slate-50 px-3 py-2">
-              <dt className="text-xs text-slate-500">경비(소득세 기준 비용)</dt>
-              <dd className="whitespace-nowrap font-semibold tabular-nums text-slate-900">{formatWon(income.cost)}</dd>
-            </div>
-            <div className="rounded-lg bg-slate-50 px-3 py-2">
-              <dt className="text-xs text-slate-500">차액(장부상 이익 참고)</dt>
-              <dd className="whitespace-nowrap font-semibold tabular-nums text-slate-900">{formatWon(income.profit)}</dd>
-            </div>
-          </dl>
-          <p className="text-xs text-slate-500">
-            비용 = 돌려받는 부가세를 뺀 금액(불공제·비과세 카테고리는 총액). 매입매출장에 적은 거래만 — 장부에 없는 비용(감가상각 등)은 빠짐.
-          </p>
-          <SortableSimpleTable
-            headers={categoryHeaders}
-            rows={categoryRows.map(categoryCells)}
-            footer={[
-              txt("합계"),
-              blank(),
-              cnt(sumOf(categoryRows, (c) => c.count)),
-              won(sumOf(categoryRows, (c) => c.total)),
-              won(sumOf(categoryRows, (c) => c.supply)),
-              won(sumOf(categoryRows, (c) => c.vat)),
-              won(sumOf(categoryRows, (c) => c.cost)),
-            ]}
-            leftCount={2}
-            minWidthClass="min-w-[760px]"
-            empty="매입이 없습니다."
-          />
-        </div>
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title="월별 매출·매입"
-        printAlways
-        headerExtra={<div className="flex flex-wrap items-center gap-2 print:hidden">{excel("월별 매출매입")}</div>}
-      >
-        <div className="mt-4">
-          <SortableSimpleTable
-            headers={monthHeaders}
-            rows={months.map(monthCells)}
-            footer={[
-              txt("합계"),
-              won(sumOf(months, (m) => m.salesSupply)),
-              won(sumOf(months, (m) => m.salesVat)),
-              won(sumOf(months, (m) => m.purchaseSupply)),
-              won(sumOf(months, (m) => m.purchaseVat)),
-              cnt(sumOf(months, (m) => m.invoiceSalesCount)),
-              cnt(sumOf(months, (m) => m.invoicePurchaseCount)),
-            ]}
-            minWidthClass="min-w-[820px]"
-          />
-        </div>
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title={
-          <span>
-            외상 잔액{" "}
-            <span className="text-sm font-normal text-slate-500">{asOf} 기준</span>
-          </span>
-        }
-        printAlways
-        headerExtra={<div className="flex flex-wrap items-center gap-2 print:hidden">{excel("외상 잔액")}</div>}
-      >
-        <div className="mt-4 space-y-3">
-          <p className="text-sm text-slate-600">
-            외상매출금 <span className="whitespace-nowrap font-semibold tabular-nums text-slate-900">{formatWon(sumOf(receivable, (c) => c.balance))}</span>
-            ({receivable.length}곳) · 외상매입금{" "}
-            <span className="whitespace-nowrap font-semibold tabular-nums text-slate-900">{formatWon(sumOf(payable, (c) => c.balance))}</span>(
-            {payable.length}곳) — 기준일까지의 정산만 반영, 지난해 외상 포함.
-          </p>
-          <SortableSimpleTable headers={creditHeaders} rows={credit.map(creditCells)} leftCount={2} minWidthClass="min-w-[640px]" empty="남은 외상이 없습니다." />
-        </div>
-      </CollapsibleSection>
-    </div>
+    </>
   );
 }

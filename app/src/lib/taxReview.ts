@@ -5,6 +5,7 @@
 // 한 결제로 묶은 줄은 건수만 한 건(매입장처럼). 검사: taxReview.test.ts
 
 import { transactionTotal } from "@/lib/credit";
+import { newestFirst } from "@/lib/entryOrder";
 import { isVatExemptCategory, purchaseCostOf, supplyOf, vatOf } from "@/lib/vatBasis";
 
 export type TaxReviewTx = {
@@ -18,6 +19,9 @@ export type TaxReviewTx = {
   payment_type: string | null;
   tax_invoice_issued: boolean | null;
   payment_group_id?: string | null;
+  /** 매입처 상세 팝업용(품목·같은 날 순서) */
+  item_name?: string | null;
+  created_at?: string | null;
   sales_amount: number;
   sales_vat: number;
   purchase_amount: number;
@@ -64,6 +68,14 @@ function counter() {
     seen.add(key);
     return 1;
   };
+}
+
+export const NO_VENDOR = "(거래처 없음)";
+
+/** 거래처 이름 — 등록 거래처 이름, 없으면 직접 입력한 이름(앞뒤 빈칸 뺌). 이름이 같으면 한 곳으로 셈. */
+function vendorNamer(clients: NamedRef[]) {
+  const clientName = new Map(clients.map((c) => [c.id, c.name]));
+  return (t: TaxReviewTx) => (t.client_id && clientName.get(t.client_id)) || t.client_name_raw?.trim() || NO_VENDOR;
 }
 
 // ── ① 기간별 부가세 요약 ─────────────────────────────────────────────
@@ -172,33 +184,92 @@ export function nonInvoicePurchaseByMethod(rows: TaxReviewTx[], categories: TaxC
   return [...byName.values()].sort((a, b) => b.year.supply - a.year.supply);
 }
 
-// ── ④ 거래처별 세금계산서 합계(매출처별·매입처별) ─────────────────────
+// ── ④ 매입처별 정리 + 매입처 상세(팝업) ─────────────────────────────
+// 11/26 사용자 요청 "매입처별 정리항 — 이름을 누르면 팝업으로 상세 내역". 예전 "거래처별 세금계산서 합계"(매출처·매입처)는
+// 세무사가 홈택스에서 보므로 뺌(같은 날 사용자 요청). 세금계산서 여부와 상관없이 그해 매입 전부를 매입처별로 — 합계 = 장부 금액
+// (부가세 포함), 공급가액·부가세는 위 부가세 계산과 같은 기준, 세금계산서 받은 매입과 그 밖(카드·현금 등)을 나눔.
 
-export type ClientInvoiceRow = { name: string; h1: Amounts; h2: Amounts; year: Amounts };
+export type VendorPurchaseRow = {
+  name: string;
+  /** 한 결제로 묶은 줄은 한 건 */
+  count: number;
+  total: number;
+  supply: number;
+  vat: number;
+  /** 세금계산서 받은 매입 합계(부가세 포함) */
+  invoiceTotal: number;
+  /** 세금계산서 없는 매입 합계(카드·현금영수증·송금 등) */
+  otherTotal: number;
+};
 
-export function clientInvoiceRows(rows: TaxReviewTx[], categories: TaxCategory[], clients: NamedRef[], side: "매출" | "매입"): ClientInvoiceRow[] {
+export function vendorPurchaseRows(rows: TaxReviewTx[], categories: TaxCategory[], clients: NamedRef[]): VendorPurchaseRow[] {
   const catOf = categoryLookup(categories);
-  const clientName = new Map(clients.map((c) => [c.id, c.name]));
-  const byName = new Map<string, ClientInvoiceRow>();
+  const nameOf = vendorNamer(clients);
+  const byName = new Map<string, VendorPurchaseRow>();
   const count = counter();
   for (const t of rows) {
-    if (!t.tax_invoice_issued || (t.type === "매출") !== (side === "매출")) continue;
-    const name = (t.client_id && clientName.get(t.client_id)) || t.client_name_raw?.trim() || "(거래처 없음)";
-    const r = byName.get(name) ?? { name, h1: zero(), h2: zero(), year: zero() };
+    if (t.type === "매출") continue;
+    const name = nameOf(t);
+    const r = byName.get(name) ?? { name, count: 0, total: 0, supply: 0, vat: 0, invoiceTotal: 0, otherTotal: 0 };
     byName.set(name, r);
     const row = basisRow(t, catOf(t));
-    const supply = supplyOf(row);
-    const vat = vatOf(row);
-    const c = count(name, t);
-    const half = monthOf(t.trans_date) <= 6 ? r.h1 : r.h2;
-    half.supply += supply;
-    half.vat += vat;
-    half.count += c;
-    r.year.supply += supply;
-    r.year.vat += vat;
-    r.year.count += c;
+    const total = transactionTotal(t);
+    r.count += count(name, t);
+    r.total += total;
+    r.supply += supplyOf(row);
+    r.vat += vatOf(row);
+    if (t.tax_invoice_issued) r.invoiceTotal += total;
+    else r.otherTotal += total;
   }
-  return [...byName.values()].sort((a, b) => b.year.supply - a.year.supply);
+  return [...byName.values()].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, "ko"));
+}
+
+export type VendorDetailRow = {
+  id: string;
+  date: string;
+  item: string;
+  category: string;
+  /** 카테고리 비고 — 비과세(부가세 없음)·불공제(매입세액 공제 안 됨) */
+  note: "" | "비과세" | "불공제";
+  method: string;
+  credit: boolean;
+  invoice: boolean;
+  supply: number;
+  vat: number;
+  total: number;
+};
+
+/** 매입처 한 곳의 그해 매입 — 줄마다(한 결제 묶음도 줄마다), 매입매출장처럼 최신순·같은 날은 나중에 등록한 것이 위. */
+export function vendorPurchaseDetail(
+  rows: TaxReviewTx[],
+  categories: TaxCategory[],
+  clients: NamedRef[],
+  methods: NamedRef[],
+  vendor: string
+): VendorDetailRow[] {
+  const catOf = categoryLookup(categories);
+  const nameOf = vendorNamer(clients);
+  const methodName = new Map(methods.map((m) => [m.id, m.name]));
+  return rows
+    .filter((t) => t.type !== "매출" && nameOf(t) === vendor)
+    .sort(newestFirst)
+    .map((t) => {
+      const cat = catOf(t);
+      const row = basisRow(t, cat);
+      return {
+        id: t.id,
+        date: t.trans_date,
+        item: t.item_name?.trim() || "",
+        category: cat?.name ?? "",
+        note: isVatExemptCategory(cat) ? "비과세" : cat?.vat_non_deductible ? "불공제" : "",
+        method: (t.payment_method_id && methodName.get(t.payment_method_id)) || "",
+        credit: t.payment_type === "credit",
+        invoice: Boolean(t.tax_invoice_issued),
+        supply: supplyOf(row),
+        vat: vatOf(row),
+        total: transactionTotal(t),
+      };
+    });
 }
 
 // ── ⑤ 카테고리별 매입(경비) — 종합소득세 장부 참고 ─────────────────────
@@ -304,7 +375,7 @@ export function creditBalanceRows(
   asOf: string,
   clients: NamedRef[]
 ): CreditBalanceRow[] {
-  const clientName = new Map(clients.map((c) => [c.id, c.name]));
+  const nameOf = vendorNamer(clients);
   const latest = new Map<string, CreditPaymentLite>();
   for (const p of payments) {
     if (p.paid_date > asOf) continue;
@@ -319,7 +390,7 @@ export function creditBalanceRows(
     const remaining = latest.get(t.id)?.remaining_amount ?? transactionTotal(t);
     if (remaining === 0) continue;
     const side = t.type === "매출" ? "외상매출금" : "외상매입금";
-    const name = (t.client_id && clientName.get(t.client_id)) || t.client_name_raw?.trim() || "(거래처 없음)";
+    const name = nameOf(t);
     const key = `${side}|${name}`;
     const r = byKey.get(key) ?? { name, side, balance: 0, open: 0, oldest: t.trans_date };
     byKey.set(key, r);

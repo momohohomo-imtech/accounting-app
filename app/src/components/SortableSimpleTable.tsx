@@ -1,11 +1,30 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 
 // 보고서 메뉴의 분기별·월별 매입·매출·손익, 매출처별 집계 표 — 예전엔 정렬이 안 되는 SimpleTable이었음(목록형 표는 헤더
 // 클릭 정렬 규칙). 칸마다 보이는 글자(text)와 정렬값(value)을 따로 받음: 금액은 "1,234원" 글자가 아니라 숫자로, 월·분기
 // 이름은 순서 번호로 정렬해야 "10월"이 "2월"보다 앞에 오지 않음. 첫 칸은 왼쪽, 나머지 칸은 오른쪽 숫자 칸.
-export type SortableCell = { text: string; value: string | number };
+// href가 있는 칸은 링크(주소로 여는 팝업 — push, 화면 위치 그대로: 세무사 열람 매입처 이름).
+export type SortableCell = { text: string; value: string | number; href?: string };
+
+function CellText({ cell }: { cell: SortableCell }) {
+  if (!cell.href) return <>{cell.text}</>;
+  return (
+    <Link
+      href={cell.href}
+      scroll={false}
+      className="text-slate-700 underline decoration-slate-300 underline-offset-2 hover:text-slate-900 print:no-underline"
+    >
+      {cell.text}
+    </Link>
+  );
+}
+
+// 휴대폰 고정 칸(stickyCol) — 넘치면 말줄임, 누르면 그 칸만 전체 글자(tap-full), 인쇄는 그대로 다 보이게.
+const STICKY_CELL =
+  "sticky-col max-md:max-w-[10rem] max-md:truncate tap-full print:max-w-none print:whitespace-normal print:overflow-visible";
 
 export function SortableSimpleTable({
   headers,
@@ -14,6 +33,7 @@ export function SortableSimpleTable({
   footer,
   leftCount = 1,
   minWidthClass = "min-w-[600px]",
+  stickyCol,
 }: {
   headers: string[];
   rows: SortableCell[][];
@@ -23,6 +43,8 @@ export function SortableSimpleTable({
   /** 앞에서 몇 칸까지 왼쪽 글자 칸인지(나머지는 오른쪽 숫자 칸) — 기본 첫 칸만 */
   leftCount?: number;
   minWidthClass?: string;
+  /** 휴대폰에서 왼쪽에 고정할 칸 번호 — 첫 칸이 날짜처럼 줄을 알아보기 어려울 때(없으면 첫 칸 고정, globals.css) */
+  stickyCol?: number;
 }) {
   const [sortKey, setSortKey] = useState<number | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -51,11 +73,11 @@ export function SortableSimpleTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className={`w-full ${minWidthClass} text-sm`}>
+      <table className={`${stickyCol === undefined ? "" : "sticky-col-table "}w-full ${minWidthClass} text-sm`}>
         <thead>
           <tr className="border-b border-slate-200 text-left text-slate-500">
             {headers.map((h, i) => (
-              <th key={h} className={`pb-2 pr-4 ${i >= leftCount ? "text-right" : ""}`}>
+              <th key={h} className={`pb-2 pr-4 ${i >= leftCount ? "text-right" : ""} ${i === stickyCol ? "sticky-col" : ""}`}>
                 <button type="button" onClick={() => handleSort(i)} className="inline-flex items-center gap-1 hover:text-slate-800">
                   {h}
                   {sortKey === i && <span className="text-[10px]">{sortDir === "asc" ? "▲" : "▼"}</span>}
@@ -70,9 +92,12 @@ export function SortableSimpleTable({
               {cells.map((cell, j) => (
                 <td
                   key={j}
-                  className={`py-2 pr-4 ${j >= leftCount ? "whitespace-nowrap text-right tabular-nums text-slate-700" : "text-slate-700"}`}
+                  className={`py-2 pr-4 ${j >= leftCount ? "whitespace-nowrap text-right tabular-nums text-slate-700" : "text-slate-700"} ${
+                    j === stickyCol ? STICKY_CELL : ""
+                  }`}
+                  {...(j === stickyCol ? { title: cell.text, tabIndex: 0 } : {})}
                 >
-                  {cell.text}
+                  <CellText cell={cell} />
                 </td>
               ))}
             </tr>
@@ -91,7 +116,9 @@ export function SortableSimpleTable({
               {footer.map((cell, j) => (
                 <td
                   key={j}
-                  className={`py-2 pr-4 ${j >= leftCount ? "whitespace-nowrap text-right tabular-nums text-slate-900" : "text-slate-900"}`}
+                  className={`py-2 pr-4 ${j >= leftCount ? "whitespace-nowrap text-right tabular-nums text-slate-900" : "text-slate-900"} ${
+                    j === stickyCol ? "sticky-col" : ""
+                  }`}
                 >
                   {cell.text}
                 </td>
