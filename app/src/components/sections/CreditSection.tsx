@@ -169,7 +169,7 @@ export async function CreditSection() {
         <div className="flex items-center gap-3">
           <PrintButton />
           <Card padding="none" className="px-5 py-3">
-            <p className="text-xs text-slate-500">전체 외상 잔액</p>
+            <p className="text-xs text-slate-500">전체 미정산 잔액</p>
             <p className="text-xl font-bold text-slate-900">{formatWon(totalOutstanding)}</p>
           </Card>
         </div>

@@ -253,7 +253,7 @@ export default async function TaxReviewPage({
     { name: "매입처별 정리", headers: partnerHeaders("매입"), rows: purchasePartners.map((v) => plain(partnerCells("매입")(v))) },
     { name: "카테고리별 경비", headers: categoryHeaders, rows: categoryRows.map((c) => plain(categoryCells(c))) },
     { name: "월별 매출매입", headers: monthHeaders, rows: months.map((m) => plain(monthCells(m))) },
-    { name: "외상 잔액", headers: creditHeaders, rows: credit.map((c) => plain(creditCells(c))), leadingRows: [[`기준일 ${asOf}`]] },
+    { name: "미정산 잔액", headers: creditHeaders, rows: credit.map((c) => plain(creditCells(c))), leadingRows: [[`기준일 ${asOf}`]] },
   ];
   const sheet = (name: string) => sheets.find((s) => s.name === name)!;
   const excel = (name: string) => {
@@ -477,12 +477,12 @@ export default async function TaxReviewPage({
         <CollapsibleSection
           title={
             <span>
-              외상 잔액{" "}
+              미정산 잔액{" "}
               <span className="text-sm font-normal text-slate-500">{asOf} 기준</span>
             </span>
           }
           printAlways
-          headerExtra={<div className="flex flex-wrap items-center gap-2 print:hidden">{excel("외상 잔액")}</div>}
+          headerExtra={<div className="flex flex-wrap items-center gap-2 print:hidden">{excel("미정산 잔액")}</div>}
         >
           <div className="mt-4 space-y-3">
             <p className="text-sm text-slate-600">
