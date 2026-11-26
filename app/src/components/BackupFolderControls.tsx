@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore, type MouseEvent } from "react";
 import { Button } from "@/components/ui/Button";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 import {
   ensureFolderPermission,
@@ -94,35 +95,37 @@ export function BackupFolderControls() {
     }
   }
 
+  // 백업 화면 칸은 모두 접힌 채로 시작(11/26 사용자 "백업에 박스들 전부 숨김") — 제목 줄에 지금 폴더
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-slate-700">
-          백업 저장 폴더:{" "}
+    <CollapsibleSection
+      title={
+        <span>
+          백업 저장 폴더{" "}
           {folder ? (
-            <span className="font-semibold text-slate-900">{folder.name}</span>
+            <span className="text-sm font-semibold text-slate-700">{folder.name}</span>
           ) : (
-            <span className="text-slate-400">지정 안 함</span>
+            <span className="text-sm font-normal text-slate-400">지정 안 함</span>
           )}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant={folder ? "secondary" : "primary"} size="sm" onClick={pick}>
-            {folder ? "폴더 바꾸기" : "저장 폴더 지정"}
+        </span>
+      }
+    >
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant={folder ? "secondary" : "primary"} size="sm" onClick={pick}>
+          {folder ? "폴더 바꾸기" : "저장 폴더 지정"}
+        </Button>
+        {folder && (
+          <Button type="button" variant="secondary" size="sm" onClick={forget}>
+            지정 해제
           </Button>
-          {folder && (
-            <Button type="button" variant="secondary" size="sm" onClick={forget}>
-              지정 해제
-            </Button>
-          )}
-        </div>
+        )}
       </div>
-      <p className="mt-1 text-xs text-slate-500">
+      <p className="mt-2 text-xs text-slate-500">
         {folder
           ? "\"지금 백업\"과 표의 \"다운로드\"가 이 폴더에 바로 저장돼요. 저장할 때 브라우저가 폴더 사용을 물으면 \"방문할 때마다 허용\"을 고르면 다음부터 묻지 않아요. 다른 폴더로 바꾸려면 \"폴더 바꾸기\" — 폴더 고르는 창 위쪽 주소칸에 경로(예: E:\\문서\\…\\back up)를 붙여넣고 Enter를 누르면 그 폴더로 바로 가요."
           : "처음 한 번 백업을 넣을 폴더(예: E:\\문서\\…\\back up)를 고르면, 그다음부터 \"지금 백업\"과 표의 \"다운로드\"가 그 폴더에 바로 저장돼요. 폴더 고르는 창 위쪽 주소칸에 경로를 붙여넣고 Enter를 누르면 그 폴더로 바로 가요. 이 PC의 이 브라우저에만 기억돼요."}
       </p>
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
-    </div>
+    </CollapsibleSection>
   );
 }
 
