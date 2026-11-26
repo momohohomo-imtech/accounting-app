@@ -14,6 +14,7 @@ import {
   type AutoBackupRunView,
 } from "@/lib/autoBackupStatus";
 import { cx } from "@/lib/cx";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { checkSqlStatus } from "@/lib/sqlStatus";
 import { SqlStatusTable } from "@/components/SqlStatusTable";
 import { storageUsage, formatMb, FREE_STORAGE_LIMIT_MB } from "@/lib/storageUsage";
@@ -127,10 +128,17 @@ export default async function BackupsPage() {
         </p>
       )}
 
+      {/* 칸은 모두 접힌 채로 시작(11/26 사용자 "백업에 박스들 전부 숨김") — 제목 줄에 상태 요약, 문제는 빨간 글씨 */}
       {canCheckAuto && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="font-semibold text-slate-900">자동 백업 점검</h2>
-          <dl className="mt-2 divide-y divide-slate-100">
+        <CollapsibleSection
+          title={
+            <span>
+              자동 백업 점검 <span className={cx("text-sm font-normal", TONE_CLASS[lastRun.tone])}>{lastRun.title}</span>
+              {(!config.cronSecret || !config.serviceKey) && <span className="text-sm font-normal text-red-700"> · 설정 확인 필요</span>}
+            </span>
+          }
+        >
+          <dl className="divide-y divide-slate-100">
             <CheckRow label="마지막 자동 실행">
               <span className={cx("font-medium", TONE_CLASS[lastRun.tone])}>{lastRun.title}</span>
               {lastRun.detail && <span className="mt-0.5 block text-xs text-slate-500">{lastRun.detail}</span>}
@@ -179,13 +187,21 @@ export default async function BackupsPage() {
             </CheckRow>
           </dl>
           <p className="mt-2 text-[11px] text-slate-400">설정값 자체는 보이지 않고, 지금 실행 중인 배포에 들어 있는지만 확인합니다.</p>
-        </div>
+        </CollapsibleSection>
       )}
 
       {canCheckAuto && usage && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="font-semibold text-slate-900">파일 저장 공간</h2>
-          <dl className="mt-2 divide-y divide-slate-100">
+        <CollapsibleSection
+          title={
+            <span>
+              파일 저장 공간{" "}
+              <span className={cx("text-sm font-normal", usage.warn ? "text-red-700" : "text-slate-500")}>
+                약 {formatMb(usage.totalMb)} · {usage.pct.toLocaleString("ko-KR")}%
+              </span>
+            </span>
+          }
+        >
+          <dl className="divide-y divide-slate-100">
             <CheckRow label="합계">
               <span className={cx("font-medium", usage.warn ? "text-red-700" : "text-slate-900")}>
                 약 {formatMb(usage.totalMb)}
@@ -219,13 +235,25 @@ export default async function BackupsPage() {
             앱이 올린 파일(첨부·백업)의 크기를 더한 값입니다. 거래 등 DB 자료(무료 요금제 500MB)는 따로이며, 정확한 사용량은 Supabase →
             Project Settings → Usage에서 볼 수 있습니다.
           </p>
-        </div>
+        </CollapsibleSection>
       )}
 
       {canCheckAuto && sqlRows.length > 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="font-semibold text-slate-900">SQL 실행 상태</h2>
-          <p className={cx("mt-1 text-sm", neededSql.length > 0 ? "font-medium text-red-700" : "text-emerald-700")}>
+        <CollapsibleSection
+          title={
+            <span>
+              SQL 실행 상태{" "}
+              {neededSql.length > 0 ? (
+                <span className="text-sm font-medium text-red-700">실행 필요 {neededSql.length}개</span>
+              ) : unknownSql.length > 0 ? (
+                <span className="text-sm font-normal text-amber-700">확인 못 함 {unknownSql.length}개</span>
+              ) : (
+                <span className="text-sm font-normal text-emerald-700">모두 실행됨</span>
+              )}
+            </span>
+          }
+        >
+          <p className={cx("text-sm", neededSql.length > 0 ? "font-medium text-red-700" : "text-emerald-700")}>
             {neededSql.length > 0
               ? `실행이 필요한 SQL ${neededSql.length}개: ${neededSql.join(", ")} — 실행 전엔 그 기능이 숨겨져 있습니다.`
               : unknownSql.length > 0
@@ -243,10 +271,20 @@ export default async function BackupsPage() {
             없어 여기서 확인할 수 없습니다.
           </p>
           <SqlStatusTable rows={sqlRows} />
-        </div>
+        </CollapsibleSection>
       )}
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <CollapsibleSection
+        title={
+          <span>
+            백업 목록{" "}
+            <span className="text-sm font-normal text-slate-500">
+              {(backups ?? []).length.toLocaleString("ko-KR")}개
+              {backups?.[0]?.created_at && ` · 마지막 ${formatKstDateTime(backups[0].created_at as string)}`}
+            </span>
+          </span>
+        }
+      >
         <p className="mb-3 text-xs text-slate-500">
           {hasRowCounts
             ? "백업은 표마다 모든 줄을 끝까지 담습니다(거래 = 백업에 담긴 거래 수). 거래 칸이 \"-\"인 예전 방식 백업은 표마다 1,000줄까지만 담겨, 1,000줄 이상인 표가 있으면 복원이 막힙니다."
@@ -260,7 +298,7 @@ export default async function BackupsPage() {
         <div className="overflow-x-auto">
           <BackupsTable backups={withLinks} />
         </div>
-      </div>
+      </CollapsibleSection>
 
       {isAdmin && user && (
         <AccountPanel

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { Button } from "@/components/ui/Button";
 import { fieldClass, labelClass, inlineFieldClass } from "@/components/ui/field";
 import {
@@ -412,17 +412,33 @@ export function AccountPanel({
   adminApiConfigured: boolean;
 }) {
   const [showAdd, setShowAdd] = useState(false);
+  // 백업 화면 칸은 모두 접힌 채로 시작(11/26 사용자 "백업에 박스들 전부 숨김") — "+ 계정 추가"는 칸을 펼치며 입력칸을 염
+  const [open, setOpen] = useState(false);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>계정 관리</CardTitle>
-        {!showAdd && (
-          <Button type="button" size="sm" onClick={() => setShowAdd(true)}>
+    <CollapsibleSection
+      title={
+        <span>
+          계정 관리 <span className="text-sm font-normal text-slate-500">{accounts.length.toLocaleString("ko-KR")}개</span>
+        </span>
+      }
+      open={open}
+      onOpenChange={setOpen}
+      headerExtra={
+        !showAdd && (
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => {
+              setShowAdd(true);
+              setOpen(true);
+            }}
+          >
             + 계정 추가
           </Button>
-        )}
-      </CardHeader>
+        )
+      }
+    >
       <p className="mb-3 text-xs text-slate-400">
         본 계정(admin)에서만 보이는 영역입니다. 계정을 추가하거나, 이름/역할을 바꾸거나, 비밀번호를 재설정할 수
         있어요. 필요할 때 로그인을 막는 &ldquo;비활성화&rdquo;도 가능합니다 — 이미 거래·메모 등 기록을 남긴 계정은
@@ -442,6 +458,6 @@ export function AccountPanel({
         ))}
         {accounts.length === 0 && <p className="text-sm text-slate-400">등록된 계정이 없습니다.</p>}
       </div>
-    </Card>
+    </CollapsibleSection>
   );
 }
