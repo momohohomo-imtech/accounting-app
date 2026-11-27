@@ -10,7 +10,7 @@ import type { Transaction } from "@/lib/types";
 
 export function TransactionExportButtons({ transactions }: { transactions: Transaction[] }) {
   async function handleExport() {
-    // 한 결제로 묶인 거래(092)는 화면처럼 한 줄로 — 거래처·프로젝트·품목은 이름을 모두 적고 금액은 합계, 날짜가 여럿이면
+    // 한 결제로 묶인 거래(092)는 화면처럼 한 줄로 — 거래처·프로젝트·품목·결제방식은 이름을 모두 적고 금액은 합계, 날짜가 여럿이면
     // (외상 정산 묶음) 처음~마지막.
     const rows = groupLedgerRows(transactions).map((item) => {
       const lines = sortGroupLines(item.lines);
@@ -23,7 +23,8 @@ export function TransactionExportButtons({ transactions }: { transactions: Trans
         names((l) => l.clients?.name ?? l.client_name_raw ?? "-"),
         names((l) => l.projects?.name ?? "일반경비"),
         names((l) => l.item_name ?? "-"),
-        t.payment_methods?.name ?? "-",
+        // 결제방식도 줄마다 고를 수 있어서(11/27) 다르면 모두
+        names((l) => l.payment_methods?.name ?? "-"),
         lines.some((l) => l.tax_invoice_issued) ? "발행" : "-",
         lines.reduce((s, l) => s + transactionTotal(l), 0),
       ];

@@ -88,12 +88,14 @@ function sortValue(t: Transaction, key: SortKey): string | number {
 }
 
 // 한 결제로 묶인 거래(092)의 매입장 한 줄 — 금액은 합계, 이름은 "A 외 1곳"처럼(같은 이름은 한 번만), 날짜는 마지막 계산서
-// 날짜(외상 정산 묶음은 날짜가 여럿 — 정렬용, 화면엔 범위로), 나머지는 첫 줄(한 결제라 구분·결제방식이 같음).
+// 날짜(외상 정산 묶음은 날짜가 여럿 — 정렬용, 화면엔 범위로), 나머지는 첫 줄(한 결제라 구분이 같음). 카테고리·결제방식은 줄마다
+// 고를 수 있어서(11/27) 다르면 "A 외 1개"(색은 첫 값).
 function groupHead(lines: Transaction[]): Transaction {
   const first = lines[0];
   const total = (key: "sales_amount" | "sales_vat" | "purchase_amount" | "purchase_vat") =>
     lines.reduce((s, l) => s + Number(l[key]), 0);
   const firstCategory = lines.find((l) => l.expense_categories)?.expense_categories;
+  const firstMethod = lines.find((l) => l.payment_methods)?.payment_methods;
   return {
     ...first,
     trans_date: dateSpan(lines).last,
@@ -117,6 +119,10 @@ function groupHead(lines: Transaction[]): Transaction {
     expense_categories: firstCategory && {
       ...firstCategory,
       name: summaryLabel(lines.map((l) => l.expense_categories?.name ?? "-"), "개"),
+    },
+    payment_methods: firstMethod && {
+      ...firstMethod,
+      name: summaryLabel(lines.map((l) => l.payment_methods?.name ?? "-"), "개"),
     },
   };
 }

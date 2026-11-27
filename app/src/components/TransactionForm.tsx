@@ -20,25 +20,35 @@ import { MAX_MULTI_DATES, multiDateLabel, multiDateRows } from "@/lib/multiDate"
 import { NEW_ID_FIELD, createNewIdKeeper } from "@/lib/idempotentSave";
 import { loadClientItemHistory } from "@/lib/actions/clientItemHistory";
 import { suggestionLabel, type ClientItemSuggestion } from "@/lib/clientItemHistory";
+import {
+  EMPTY_LINE_COMMONS,
+  distinctPaymentMethodCount,
+  fillEmptyCategory,
+  groupTaxFlags,
+  lineTaxFlags,
+  resolveLineCommons,
+  splitLineCommons,
+  type LineCommons,
+} from "@/lib/transactionLines";
 
 type Option = { id: string; name: string };
 type ClientOption = Option & { default_item_name?: string | null; default_category_id?: string | null };
 // id: 묶음 전체 수정 때 원래 거래(줄) — 없으면 저장할 때 새 거래로 추가.
-type LineItem = { item_name: string; quantity: string; unit_price: string; subtotal: string; project_id: string; id?: string };
+// project_id·category_id·payment_method_id: 품목이 2줄 이상이면 줄마다 고르고 위쪽 공통 칸은 숨김(1줄이면 위쪽 칸 — 카테고리·결제수단은
+// 11/27 사용자 요청 "프로젝트처럼"). 줄 수가 바뀔 때 공통 칸 ↔ 줄 값 옮기기는 lib/transactionLines.ts의 splitLineCommons.
+type LineItem = {
+  item_name: string;
+  quantity: string;
+  unit_price: string;
+  subtotal: string;
+  project_id: string;
+  category_id: string;
+  payment_method_id: string;
+  id?: string;
+};
 
 function emptyLineItem(): LineItem {
-  return { item_name: "", quantity: "", unit_price: "", subtotal: "", project_id: "" };
-}
-
-// 품목이 2줄 이상이면 프로젝트는 줄마다 정하고 위쪽 공통 칸은 숨김 — 줄을 추가한 뒤 위쪽 칸을 바꾸면 "(공통)" 줄까지 같이
-// 바뀌어 원래 프로젝트에서 거래가 빠졌음(사용자 문의). 2줄 이상이 되면 공통값을 줄마다 옮겨 적고(그때부터 줄의 빈 값은
-// 일반경비), 1줄로 돌아오면 그 줄 값을 다시 공통 칸으로.
-function splitLineProjects(lines: LineItem[], common: string): { lines: LineItem[]; common: string } {
-  if (lines.length > 1) return { lines: lines.map((li) => ({ ...li, project_id: li.project_id || common })), common: "" };
-  if (lines.length === 1 && lines[0].project_id) {
-    return { lines: [{ ...lines[0], project_id: "" }], common: lines[0].project_id };
-  }
-  return { lines, common };
+  return { item_name: "", quantity: "", unit_price: "", subtotal: "", ...EMPTY_LINE_COMMONS };
 }
 
 function lineItemFromInitial(t: Transaction): LineItem {
@@ -52,8 +62,8 @@ function lineItemFromInitial(t: Transaction): LineItem {
     unit_price: t.unit_price?.toString() ?? "",
     // 0원 줄도 "0"으로 — 빈칸이면 묶음 전체 수정에서 빈 줄로 보고 저장할 때 그 줄을 지웠음.
     subtotal: amount != null ? String(amount) : "",
-    // 비워두면 위쪽 공통 "프로젝트" 선택값을 그대로 씀 — 계산서 1건이 여러 프로젝트에 걸칠 때만 줄별로 덮어씀.
-    project_id: "",
+    // 비워두면 위쪽 공통 "프로젝트"·카테고리·결제수단 선택값을 그대로 씀 — 줄을 더하면 그때 줄마다 옮겨 적음.
+    ...EMPTY_LINE_COMMONS,
   };
 }
 
@@ -93,6 +103,10 @@ export function TransactionForm({
   asPopup?: boolean;
 }) {
   const isGroupEdit = Boolean(initial && initialGroup && initialGroup.length > 1);
+  const exemptCategory = (categoryId: string | null | undefined) =>
+    isVatExemptCategory(expenseCategories.find((c) => c.id === categoryId));
+  // 묶음 전체 수정의 위쪽 VAT·세금계산서 체크 = 비과세가 아닌 줄의 값(누른 줄이 비과세 줄이어도 다른 줄의 부가세가 빠지지 않게)
+  const groupFlags = isGroupEdit ? groupTaxFlags(initialGroup!, (t) => exemptCategory(t.category_id)) : null;
   const router = useRouter();
   const confirm = useConfirm();
   const pending = useGlobalPending();
@@ -115,12 +129,12 @@ export function TransactionForm({
     type: initial?.type ?? "매입",
     client_id: initial?.client_id ?? "",
     client_name_raw: initial?.client_name_raw ?? "",
-    // 묶음 수정은 줄마다 자기 프로젝트를 들고 있어서 공통 프로젝트는 비워 둠.
+    // 묶음 수정은 줄마다 자기 프로젝트·카테고리·결제수단을 들고 있어서 공통 칸은 비워 둠.
     project_id: isGroupEdit ? "" : initial?.project_id ?? "",
-    category_id: initial?.category_id ?? "",
-    payment_method_id: initial?.payment_method_id ?? "",
-    tax_invoice_issued: initial?.tax_invoice_issued ?? false,
-    vat_included: initial?.vat_included ?? false,
+    category_id: isGroupEdit ? "" : initial?.category_id ?? "",
+    payment_method_id: isGroupEdit ? "" : initial?.payment_method_id ?? "",
+    tax_invoice_issued: groupFlags ? groupFlags.tax_invoice_issued : initial?.tax_invoice_issued ?? false,
+    vat_included: groupFlags ? groupFlags.vat_included : initial?.vat_included ?? false,
     needs_classification: initial?.needs_classification ?? false,
     payment_type: initial?.payment_type ?? "immediate",
     note1: initial?.note1 ?? "",
@@ -128,7 +142,13 @@ export function TransactionForm({
   });
   const [lineItems, setLineItems] = useState<LineItem[]>(
     isGroupEdit
-      ? initialGroup!.map((t) => ({ ...lineItemFromInitial(t), project_id: t.project_id ?? "", id: t.id }))
+      ? initialGroup!.map((t) => ({
+          ...lineItemFromInitial(t),
+          project_id: t.project_id ?? "",
+          category_id: t.category_id ?? "",
+          payment_method_id: t.payment_method_id ?? "",
+          id: t.id,
+        }))
       : initial
         ? [lineItemFromInitial(initial)]
         : [emptyLineItem()]
@@ -147,14 +167,31 @@ export function TransactionForm({
   const [projectPopupIndex, setProjectPopupIndex] = useState<number | null>(null);
   useEscapeKey(projectPopupIndex !== null, () => setProjectPopupIndex(null));
   const inputClass = "rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none";
-  const vatExempt = isVatExemptCategory(expenseCategories.find((c) => c.id === values.category_id));
-  const vatAppliesNow = !vatExempt && values.vat_included;
+  // 품목이 2줄 이상이면 프로젝트·카테고리·결제수단은 줄마다(위쪽 칸은 숨김), 1줄이면 위쪽 칸 — lib/transactionLines.ts
+  const perLine = lineItems.length > 1;
+  const commons: LineCommons = {
+    project_id: values.project_id,
+    category_id: values.category_id,
+    payment_method_id: values.payment_method_id,
+  };
+  // 줄마다 저장할 값 — 프로젝트·카테고리·결제수단(2줄 이상이면 줄 값)과 VAT·세금계산서(비과세 카테고리 줄은 위쪽 체크와 상관없이 끔)
+  function lineValues(li: LineItem) {
+    const own = resolveLineCommons(li, commons, perLine);
+    return { ...values, ...own, ...lineTaxFlags(exemptCategory(own.category_id), values) };
+  }
+  const lineExempt = (li: LineItem) => exemptCategory(resolveLineCommons(li, commons, perLine).category_id);
+  // 모든 줄이 비과세면 VAT·세금계산서 체크를 막음(1줄일 때는 그 카테고리 — 예전 그대로), 일부만 비과세면 그 줄만 빼고 저장
+  const allExempt = lineItems.every(lineExempt);
+  const someExempt = !allExempt && lineItems.some(lineExempt);
+  const vatAppliesNow = lineItems.some((li) => lineValues(li).vat_included);
   // 실제 저장 시 각 줄마다 VAT를 반올림해서 더하는 computeAmounts와 동일한 방식으로 미리보기 합계를 계산.
   const grandTotal = lineItems.reduce((s, li) => {
     const base = Number(li.subtotal) || 0;
-    const vat = vatAppliesNow ? addedVat(base) : 0;
+    const vat = lineValues(li).vat_included ? addedVat(base) : 0;
     return s + base + vat;
   }, 0);
+  // 한 결제로 묶는데 줄마다 결제수단이 다르면 알림(따로 결제한 것일 수 있음 — 묶기는 그대로 둠)
+  const mixedPaymentMethods = perLine && distinctPaymentMethodCount(lineItems) > 1;
   // 마이너스 줄(단수 조정·할인 — 11/14 사용자 요청 "실제 금액을 적고 마이너스로 빼려고")이 있으면 합계 옆에 표시
   const negativeLineCount = lineItems.filter((li) => (Number(li.subtotal) || 0) < 0).length;
 
@@ -222,25 +259,26 @@ export function TransactionForm({
     );
   }
 
-  // 줄 수가 바뀌는 곳(추가·삭제·OCR·엑셀)은 모두 이걸로 — 줄마다 프로젝트/공통 프로젝트를 splitLineProjects 규칙대로.
-  // common: 지금 공통 프로젝트(OCR·엑셀처럼 기다렸다가 바꾸는 곳은 latest에서 읽은 값).
-  function applyLines(next: LineItem[], common = values.project_id) {
-    const r = splitLineProjects(next, common);
+  // 줄 수가 바뀌는 곳(추가·삭제·OCR·엑셀)은 모두 이걸로 — 줄마다/공통 프로젝트·카테고리·결제수단을 splitLineCommons 규칙대로.
+  // common: 지금 공통 칸(OCR·엑셀처럼 기다렸다가 바꾸는 곳은 latest에서 읽은 값).
+  function applyLines(next: LineItem[], common: LineCommons = commons) {
+    const r = splitLineCommons(next, common);
     setLineItems(r.lines);
-    if (r.common !== common) set("project_id", r.common);
+    setValues((prev) => ({ ...prev, ...r.common }));
   }
 
   // OCR·엑셀 인식을 기다리는 몇 초 사이에 품목 줄·프로젝트를 고쳐도 인식 결과가 그 내용을 덮어쓰지 않게, 기다린 뒤에는
   // 화면을 연 때의 값이 아니라 지금 값을 읽는다.
-  const latest = useRef({ lineItems, projectId: values.project_id });
+  const latest = useRef({ lineItems, commons });
   useEffect(() => {
-    latest.current = { lineItems, projectId: values.project_id };
+    latest.current = { lineItems, commons };
   });
 
   function addLineItem() {
-    // 새 줄은 바로 윗줄 프로젝트로 시작 — 묶음 수정에서 새 줄이 일반경비로 들어가던 것.
+    // 새 줄은 바로 윗줄 프로젝트·카테고리·결제수단으로 시작 — 묶음 수정에서 새 줄이 일반경비로 들어가던 것.
     const last = lineItems[lineItems.length - 1];
-    applyLines([...lineItems, { ...emptyLineItem(), project_id: last ? last.project_id || values.project_id : "" }]);
+    const from = last ? resolveLineCommons(last, commons, perLine) : EMPTY_LINE_COMMONS;
+    applyLines([...lineItems, { ...emptyLineItem(), ...from }]);
   }
 
   function removeLineItem(i: number) {
@@ -283,7 +321,9 @@ export function TransactionForm({
       );
     }
     if (client?.default_category_id) {
-      handleCategorySelect(client.default_category_id);
+      // 줄마다 고르는 중이면 카테고리가 빈 줄에만(이미 고른 줄은 그대로)
+      if (perLine) setLineItems((prev) => fillEmptyCategory(prev, client.default_category_id as string));
+      else handleCategorySelect(client.default_category_id);
     }
   }
 
@@ -319,25 +359,27 @@ export function TransactionForm({
       setOcrExtracted(valid[0]);
       const updated = [...latest.current.lineItems];
       valid.forEach((ex, idx) => {
+        // 영수증마다 읽은 카테고리를 그 줄에(1줄이면 applyLines가 위쪽 카테고리 칸으로 옮김, 못 읽으면 지금 값 그대로)
+        const matched = expenseCategories.find((c) => c.name === ex.category);
         const patch = {
           item_name: (ex.item_name as string) ?? "",
           quantity: ex.quantity != null ? String(ex.quantity) : "",
           unit_price: ex.unit_price != null ? String(ex.unit_price) : "",
           subtotal: ex.amount != null ? String(ex.amount) : "",
+          ...(matched ? { category_id: matched.id } : {}),
         };
         if (idx < updated.length) updated[idx] = { ...updated[idx], ...patch };
         else updated.push({ ...emptyLineItem(), ...patch });
       });
-      applyLines(updated, latest.current.projectId);
+      applyLines(updated, latest.current.commons);
       const ex = valid[0];
-      const matchedCategory = expenseCategories.find((c) => c.name === ex.category);
-      const ocrExempt = isVatExemptCategory(matchedCategory);
+      // 1줄이고 비과세 카테고리면 VAT·세금계산서 체크를 끔(예전 그대로) — 여러 줄이면 비과세 줄만 저장할 때 끔
+      const ocrExempt = updated.length === 1 && isVatExemptCategory(expenseCategories.find((c) => c.name === ex.category));
       setValues((prev) => ({
         ...prev,
         trans_date: (ex.trans_date as string) ?? prev.trans_date,
         // AI가 영수증에서 추정한 VAT 여부는 신뢰하지 않고, 항상 사용자가 직접 체크하게 둠.
         vat_included: ocrExempt ? false : prev.vat_included,
-        category_id: matchedCategory?.id ?? prev.category_id,
         tax_invoice_issued: ocrExempt ? false : prev.tax_invoice_issued,
         client_name_raw: (ex.client_name as string) ?? prev.client_name_raw,
       }));
@@ -380,6 +422,9 @@ export function TransactionForm({
         return;
       }
 
+      // 엑셀 줄마다 카테고리·결제수단(11/27 — 줄마다 고를 수 있게 되면서). 빈 칸이면 지금 위쪽 칸 값(applyLines), 1줄이면 위쪽 칸으로.
+      const categoryNamed = (name?: string) => (name ? expenseCategories.find((c) => c.name === name) : undefined);
+      const methodNamed = (name?: string) => (name ? paymentMethods.find((pm) => pm.name === name) : undefined);
       applyLines(
         rows.map((r) => ({
           item_name: r.item_name ?? "",
@@ -387,27 +432,22 @@ export function TransactionForm({
           unit_price: r.unit_price != null ? String(r.unit_price) : "",
           subtotal: r.amount != null ? String(r.amount) : "",
           project_id: (r.project_name && projects.find((p) => p.name === r.project_name)?.id) || "",
+          category_id: categoryNamed(r.category_name)?.id ?? "",
+          payment_method_id: methodNamed(r.payment_method_name)?.id ?? "",
         })),
-        latest.current.projectId
+        latest.current.commons
       );
 
       const first = rows[0];
       const matchedClient = first.client_name ? clients.find((c) => c.name === first.client_name) : undefined;
-      const matchedCategory = first.category_name
-        ? expenseCategories.find((c) => c.name === first.category_name)
-        : undefined;
-      const matchedPaymentMethod = first.payment_method_name
-        ? paymentMethods.find((pm) => pm.name === first.payment_method_name)
-        : undefined;
-      const catExempt = isVatExemptCategory(matchedCategory);
+      // 1줄이고 비과세 카테고리면 세금계산서를 끔(예전 그대로) — 여러 줄이면 비과세 줄만 저장할 때 끔
+      const catExempt = rows.length === 1 && isVatExemptCategory(categoryNamed(first.category_name));
       setValues((prev) => ({
         ...prev,
         trans_date: first.trans_date ?? prev.trans_date,
         type: first.type === "매출" || first.type === "매입" ? first.type : prev.type,
         client_id: matchedClient?.id ?? "",
         client_name_raw: matchedClient ? "" : (first.client_name ?? prev.client_name_raw),
-        category_id: matchedCategory?.id ?? prev.category_id,
-        payment_method_id: matchedPaymentMethod?.id ?? prev.payment_method_id,
         payment_type: first.payment_type === "credit" ? "credit" : "immediate",
         tax_invoice_issued: catExempt ? false : Boolean(first.tax_invoice_issued),
         note1: first.note1 ?? prev.note1,
@@ -466,47 +506,42 @@ export function TransactionForm({
     if (!(await confirm(confirmMessage))) return;
     setSubmitError(null);
 
-    // 종류구분이 비과세면 체크박스 state가(예전 데이터 등으로) true로 남아있어도 무조건 무시 —
+    // 줄마다 lineValues — 비과세 카테고리 줄은 체크박스 state가(예전 데이터 등으로) true로 남아있어도 무조건 무시(lineTaxFlags) —
     // 화면에서 비활성화만 하고 state는 안 건드렸던 게 "체크 안 보이는데 10%가 붙는" 원인이었음.
-    const effectiveValues = {
-      ...values,
-      vat_included: vatExempt ? false : values.vat_included,
-      tax_invoice_issued: vatExempt ? false : values.tax_invoice_issued,
-    };
-
     function buildRow(li: LineItem): BulkTransactionInput {
+      const v = lineValues(li);
       return {
-        trans_date: effectiveValues.trans_date,
-        type: effectiveValues.type,
-        client_id: effectiveValues.client_id || null,
-        client_name_raw: effectiveValues.client_name_raw || null,
-        project_id: li.project_id || effectiveValues.project_id || null,
+        trans_date: v.trans_date,
+        type: v.type,
+        client_id: v.client_id || null,
+        client_name_raw: v.client_name_raw || null,
+        project_id: v.project_id || null,
         item_name: li.item_name || null,
-        category_id: effectiveValues.category_id || null,
+        category_id: v.category_id || null,
         quantity: li.quantity ? Number(li.quantity) : null,
         unit_price: li.unit_price ? Number(li.unit_price) : null,
-        payment_method_id: effectiveValues.payment_method_id || null,
-        payment_type: effectiveValues.payment_type,
-        tax_invoice_issued: effectiveValues.tax_invoice_issued,
-        vat_included: effectiveValues.vat_included,
-        needs_classification: effectiveValues.needs_classification,
+        payment_method_id: v.payment_method_id || null,
+        payment_type: v.payment_type,
+        tax_invoice_issued: v.tax_invoice_issued,
+        vat_included: v.vat_included,
+        needs_classification: v.needs_classification,
         amount: Number(li.subtotal) || 0,
-        note1: effectiveValues.note1 || null,
-        note2: effectiveValues.note2 || null,
+        note1: v.note1 || null,
+        note2: v.note2 || null,
       };
     }
 
     async function saveSingle(li: LineItem, id?: string) {
       const fd = new FormData();
       if (id) fd.append("id", id);
-      Object.entries(effectiveValues).forEach(([k, v]) => {
+      // 줄이 2개인데 한 줄만 금액이 있을 때도 그 줄의 카테고리·결제수단으로(lineValues)
+      Object.entries(lineValues(li)).forEach(([k, v]) => {
         if (k === "vat_included" || k === "tax_invoice_issued" || k === "needs_classification") {
           if (v) fd.append(k, "on");
         } else {
           fd.append(k, String(v));
         }
       });
-      fd.set("project_id", li.project_id || effectiveValues.project_id);
       fd.append("item_name", li.item_name);
       fd.append("quantity", li.quantity);
       fd.append("unit_price", li.unit_price);
@@ -687,12 +722,10 @@ export function TransactionForm({
           </datalist>
         </Field>
         <div className="flex flex-col gap-1">
-          {lineItems.length > 1 ? (
+          {perLine ? (
             <>
               <span className="text-xs font-medium text-slate-500">프로젝트</span>
-              <p className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-500">
-                품목이 여러 줄이라 아래 품목 줄마다 선택해요.
-              </p>
+              <PerLineNote />
             </>
           ) : (
             <ProjectPicker
@@ -727,14 +760,18 @@ export function TransactionForm({
           </label>
         </div>
         <Field label="카테고리">
-          <select value={values.category_id} onChange={(e) => handleCategorySelect(e.target.value)} className={inputClass}>
-            <option value="">선택 안함</option>
-            {expenseCategories.map((c) => (
-              <option key={c.id} value={c.id} style={{ color: resolveCategoryColor(c) }}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          {perLine ? (
+            <PerLineNote />
+          ) : (
+            <select value={values.category_id} onChange={(e) => handleCategorySelect(e.target.value)} className={inputClass}>
+              <option value="">선택 안함</option>
+              {expenseCategories.map((c) => (
+                <option key={c.id} value={c.id} style={{ color: resolveCategoryColor(c) }}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
         <Field label="결제 시점">
           <select
@@ -747,43 +784,50 @@ export function TransactionForm({
           </select>
         </Field>
         <Field label="결제수단">
-          <select
-            value={values.payment_method_id}
-            onChange={(e) => set("payment_method_id", e.target.value)}
-            className={`${inputClass} bg-red-600 text-white`}
-            disabled={values.payment_type === "credit"}
-          >
-            <option value="">{values.payment_type === "credit" ? "정산 시 지정" : "선택 안함"}</option>
-            {paymentMethods.map((pm) => (
-              <option key={pm.id} value={pm.id} style={paymentMethodColorStyle(pm)}>
-                {pm.name}
-              </option>
-            ))}
-          </select>
+          {perLine ? (
+            <PerLineNote />
+          ) : (
+            <select
+              value={values.payment_method_id}
+              onChange={(e) => set("payment_method_id", e.target.value)}
+              className={`${inputClass} bg-red-600 text-white`}
+              disabled={values.payment_type === "credit"}
+            >
+              <option value="">{values.payment_type === "credit" ? "정산 시 지정" : "선택 안함"}</option>
+              {paymentMethods.map((pm) => (
+                <option key={pm.id} value={pm.id} style={paymentMethodColorStyle(pm)}>
+                  {pm.name}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
         <label className="flex items-start gap-2 pt-5 text-sm text-slate-700">
           <input
             type="checkbox"
-            checked={vatExempt ? false : values.vat_included}
-            disabled={vatExempt}
+            checked={allExempt ? false : values.vat_included}
+            disabled={allExempt}
             onChange={(e) => set("vat_included", e.target.checked)}
             className="mt-0.5 h-4 w-4 disabled:cursor-not-allowed disabled:opacity-50"
           />
           <span>
             10% VAT 추가
-            <span className="block text-xs text-slate-400">(총 합계에 10% 합산 / 체크 해제 시 합산 안함)</span>
+            <span className="block text-xs text-slate-400">
+              {someExempt ? "(비과세 카테고리 줄은 빼고 10% 합산)" : "(총 합계에 10% 합산 / 체크 해제 시 합산 안함)"}
+            </span>
           </span>
         </label>
         <label className="flex items-center gap-2 pt-5 text-sm text-slate-700">
           <input
             type="checkbox"
-            checked={vatExempt ? false : values.tax_invoice_issued}
-            disabled={vatExempt}
+            checked={allExempt ? false : values.tax_invoice_issued}
+            disabled={allExempt}
             onChange={(e) => set("tax_invoice_issued", e.target.checked)}
             className="h-4 w-4 disabled:cursor-not-allowed disabled:opacity-50"
           />
           세금계산서 발행
-          {vatExempt && <span className="text-xs text-slate-400">(비과세 카테고리라 선택 불가)</span>}
+          {allExempt && <span className="text-xs text-slate-400">(비과세 카테고리라 선택 불가)</span>}
+          {someExempt && <span className="text-xs text-slate-400">(비과세 줄은 빼고)</span>}
         </label>
         <Field label="메모1">
           <input value={values.note1} onChange={(e) => set("note1", e.target.value)} className={inputClass} />
@@ -823,7 +867,7 @@ export function TransactionForm({
             <p className="mb-2 text-xs text-slate-400">
               줄을 추가하면 저장 시 첫 줄은 이 거래를 수정하고, 나머지 줄은 새 거래로 분리돼요 (계산서 1건이 여러
               프로젝트에 걸칠 때).
-              {partOfGroup && " 이 거래는 한 결제로 묶여 있지만 줄마다 날짜·카테고리 등이 달라 이 줄만 수정해요."}
+              {partOfGroup && " 이 거래는 한 결제로 묶여 있지만 줄마다 날짜·거래처 등이 달라 이 줄만 수정해요."}
             </p>
           )
         )}
@@ -833,6 +877,8 @@ export function TransactionForm({
             const resolvedProjectId = li.project_id || values.project_id;
             const resolvedProject = projects.find((p) => p.id === resolvedProjectId);
             const isOverride = Boolean(li.project_id);
+            // 비과세 카테고리 줄인데 위쪽 VAT·세금계산서가 켜져 있으면 이 줄은 빼고 저장한다고 알림
+            const exemptNote = perLine && lineExempt(li) && (values.vat_included || values.tax_invoice_issued);
             return (
               <div key={i} className="rounded-xl border border-slate-200 p-3">
                 <div className="mb-2 flex items-center gap-2">
@@ -855,8 +901,8 @@ export function TransactionForm({
                     </button>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <div className="flex flex-col gap-1">
+                <div className={`grid grid-cols-2 gap-2 ${perLine ? "sm:grid-cols-3" : "sm:grid-cols-4"}`}>
+                  <div className="flex min-w-0 flex-col gap-1">
                     <span className="text-xs font-medium text-slate-500">프로젝트</span>
                     <button
                       type="button"
@@ -867,6 +913,44 @@ export function TransactionForm({
                       {!isOverride && lineItems.length === 1 && <span className="text-slate-400"> (공통)</span>}
                     </button>
                   </div>
+                  {perLine && (
+                    <>
+                      <div className="flex min-w-0 flex-col gap-1">
+                        <span className="text-xs font-medium text-slate-500">카테고리</span>
+                        <select
+                          value={li.category_id}
+                          onChange={(e) => updateLineItem(i, { category_id: e.target.value })}
+                          aria-label={`${i + 1}번째 줄 카테고리`}
+                          className={`${inputClass} w-full min-w-0`}
+                        >
+                          <option value="">선택 안함</option>
+                          {expenseCategories.map((c) => (
+                            <option key={c.id} value={c.id} style={{ color: resolveCategoryColor(c) }}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                        {exemptNote && <span className="text-[11px] leading-4 text-slate-400">비과세 — 이 줄은 VAT·계산서 없이</span>}
+                      </div>
+                      <div className="flex min-w-0 flex-col gap-1">
+                        <span className="text-xs font-medium text-slate-500">결제수단</span>
+                        <select
+                          value={li.payment_method_id}
+                          onChange={(e) => updateLineItem(i, { payment_method_id: e.target.value })}
+                          disabled={values.payment_type === "credit"}
+                          aria-label={`${i + 1}번째 줄 결제수단`}
+                          className={`${inputClass} w-full min-w-0 disabled:cursor-not-allowed disabled:opacity-60`}
+                        >
+                          <option value="">{values.payment_type === "credit" ? "정산 시 지정" : "선택 안함"}</option>
+                          {paymentMethods.map((pm) => (
+                            <option key={pm.id} value={pm.id} style={paymentMethodColorStyle(pm)}>
+                              {pm.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
+                  )}
                   <div className="flex flex-col gap-1">
                     <span className="text-xs font-medium text-slate-500">수량</span>
                     <input
@@ -933,6 +1017,9 @@ export function TransactionForm({
               <span>
                 한 결제로 묶기
                 <span className="block text-xs text-slate-400">매입장에 한 줄로 표시 · 프로젝트별 금액은 줄마다 따로 저장</span>
+                {groupPayment && mixedPaymentMethods && (
+                  <span className="block text-xs text-amber-700">결제수단이 줄마다 달라요 — 따로 결제했으면 체크를 끄세요.</span>
+                )}
               </span>
             </label>
           ) : groupingReady ? (
@@ -1010,6 +1097,15 @@ export function TransactionForm({
         </button>
       </div>
     </form>
+  );
+}
+
+// 품목이 2줄 이상일 때 위쪽 프로젝트·카테고리·결제수단 칸 자리 — 줄마다 고름
+function PerLineNote() {
+  return (
+    <p className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-500">
+      품목이 여러 줄이라 아래 품목 줄마다 선택해요.
+    </p>
   );
 }
 

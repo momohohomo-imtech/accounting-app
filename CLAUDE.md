@@ -215,7 +215,7 @@
   정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
   해 잠금 불러오기(`yearLock`), 오래된 외상매출금(`receivableAging`), 이번 달 신고·납부 일정(`annualTasks`), 홈택스 세금계산서
   대조(`hometaxReconcile`), 프로젝트 번호 순서(`projectCode`), 프로젝트 목록 상태 체크 저장(`projectStatusFilter`), 팝업 ESC 순서(`escapeStack`), 팝업 닫기 기록(`popupNavigation`), 메모 저장 확인(`unsavedChanges` — 떠나는 링크 판단·뒤로가기 되돌리기), 메모 한 장 엑셀(`memoExport`), 공사 작업 순서
-  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 고정지출 자동 등록 결제일·이번 달 상태·은행 겹침(`recurringExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내·자동으로 다시 보내기(`actionError`), 연결 끊김에 두 번 저장 막기(`idempotentSave`), 엑셀 장 이름 다듬기(`sheetName` — 거래처 이름에 "/" 등이 있으면 엑셀 받기가 아무 말 없이 안 됐음, `xlsxExport`가 모든 장에), 매입매출 위 반기 세금계산서(`taxInvoiceSummary`), 거래처별 이전 품목(`clientItemHistory`), 세무사 열람(`taxReview`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`), 공구명세서 이름 [ ] 메모(`toolNameNote`), 같은 날 순서·한 번에 넣는 줄의 등록 시각·넣은 순서 id(`entryOrder`), 매입매출 등록 여러 날짜(`multiDate`), 목록 기본 순서(`listOrder`),
+  일정·예상(`workSequence`)·모아 보기(`workSequenceOverview`)·연도·현장 필터(`workSequenceFilter`), 고정지출 달 평균(`fixedExpense`), 고정지출 자동 등록 결제일·이번 달 상태·은행 겹침(`recurringExpense`), 자동 백업 실행 기록(`autoBackupStatus`), 저장 호출 실패 안내·자동으로 다시 보내기(`actionError`), 연결 끊김에 두 번 저장 막기(`idempotentSave`), 엑셀 장 이름 다듬기(`sheetName` — 거래처 이름에 "/" 등이 있으면 엑셀 받기가 아무 말 없이 안 됐음, `xlsxExport`가 모든 장에), 매입매출 위 반기 세금계산서(`taxInvoiceSummary`), 거래처별 이전 품목(`clientItemHistory`), 세무사 열람(`taxReview`), 사업 첫해(`businessYear`), 중간 업체 수수료(`intermediaryFee`), 공구명세서 이름 [ ] 메모(`toolNameNote`), 같은 날 순서·한 번에 넣는 줄의 등록 시각·넣은 순서 id(`entryOrder`), 매입매출 등록 여러 날짜(`multiDate`), 등록 품목 줄마다 프로젝트·카테고리·결제수단(`transactionLines`), 목록 기본 순서(`listOrder`),
   매입매출장 글자 검색(`ledgerSearch`), SQL 실행 상태(`sqlStatus`), 파일 저장 공간(`storageUsage`), 메모장 구분(`memoCategories`), 거래 일괄
   변경 나눠 바꾸기(`bulkUpdate`)·일괄 변경 칸(`transactionBulkEdit`), 챙길 거래 창(`transactionWatch`)·수정 팝업 주소(`ledgerLinks`), 은행 → 장부 올리기·등록 취소 판단(`bankLedger`), 크론 비밀값 비교(`cronAuth`), 로그인 안내 문구(`loginError`)의 검사가
   `app/src/lib/__tests__/`에 있음. 별도 라이브러리 없이
@@ -425,6 +425,17 @@
   `MAX_MULTI_DATES` 62일까지). 고른 날짜마다 아래 줄 전부를 그대로 한 건씩 — `bulkImportTransactions` 한 번에(하나라도 실패하면 전부 안 들어감,
   줄마다 다른 등록 시각 `entryTimestamps`), "한 결제로 묶기"는 날짜마다(`groupPerDate` — 날짜가 다르면 다른 결제). 확인창에 날짜·건수·합계(× 날짜
   수), 합계 옆 "× N일 = 모두". 날짜 고르기·줄 만들기·글자는 `lib/multiDate.ts`.
+- **매입매출 등록 품목 여러 줄 — 카테고리·결제수단도 줄마다**(11/27 사용자 요청 "한 번에 여러 항목 추가 시 카테고리·결제수단 각기 선택 —
+  프로젝트처럼", DB 변경 없음 — 거래는 원래 줄마다 저장): 품목이 1줄이면 위쪽 공통 칸(예전 그대로), 2줄 이상이면 위쪽 프로젝트·카테고리·결제수단
+  칸은 "줄마다 선택" 안내로 바뀌고 품목 줄마다 고름. 줄을 더하면 위쪽 값·윗줄 값을 옮겨 적고 1줄로 돌아오면 그 줄 값을 위쪽으로
+  (`lib/transactionLines.ts`의 `splitLineCommons`), 저장할 줄 값은 `resolveLineCommons`(2줄 이상이면 숨은 위쪽 값은 안 씀 — 2줄 중 한 줄만 금액이
+  있어도 그 줄 값). VAT 추가·세금계산서는 위쪽 공통 체크 그대로, 비과세 카테고리 줄만 둘 다 끄고 저장(`lineTaxFlags` — 모든 줄이 비과세면 체크를
+  막고, 일부면 "비과세 줄은 빼고" 안내·그 줄에 한 줄 안내, 합계도 줄마다). 외상이면 줄 결제수단도 막힘(위쪽과 같게). 영수증 여러 장은 장마다 읽은
+  카테고리, 엑셀은 줄마다 카테고리·결제수단(빈 칸은 위쪽 값). 거래처 기본 카테고리는 줄마다 고르는 중이면 빈 줄에만. 한 결제로 묶는데 결제수단이
+  줄마다 다르면 알림만(묶기는 그대로). 묶음 전체 수정은 카테고리·결제수단이 달라도 열림(`lib/paymentGroup.ts`의 `sameCommonFields` — VAT·세금계산서는
+  비과세 줄은 꺼져 있어야 하고 나머지 줄끼리 같아야, 비과세 판단은 줄에 붙은 `expense_categories` — 안 붙이면 예전처럼 모든 줄이 같아야), 열 때 위쪽
+  체크는 비과세 아닌 줄 값(`groupTaxFlags` — 비과세 줄을 눌러 열어도 다른 줄의 부가세가 안 빠짐). 매입장 묶음 줄·엑셀은 결제방식도 카테고리처럼
+  "A 외 1개"·모두.
 - **은행 "등록"(매입/매출장으로 올리기)**: 출금 → 매입, 입금 → 매출, "분류 대기 중"으로 한 줄(`lib/bankLedger.ts`의 `ledgerRowFromBank`).
   결제방식은 송금이 기본(11/12 사용자 요청 — 결제수단 목록에서 이름 "송금"으로 찾고, 없으면 예전처럼 빈칸, 이미 올린 줄은 안 바꿈).
   등록 취소·은행 거래 삭제 때 장부 줄은 등록 당시 그대로일 때만 같이 지움(`isLedgerRowUntouched` — 결제방식은 송금 또는 빈칸(예전에 올린

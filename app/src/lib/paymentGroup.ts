@@ -1,5 +1,7 @@
 import type { createClient } from "@/lib/supabase/server";
 import type { Transaction } from "@/lib/types";
+import { isVatExemptCategory } from "@/lib/vatBasis";
+import { one } from "@/lib/relations";
 
 // 한 결제로 묶기(092 SQL) — 카드 결제 한 번(영수증·계산서 1건)을 프로젝트별로 나눠 저장한 거래들은 같은
 // payment_group_id를 갖는다. 저장·계산(프로젝트 손익·보고서·부가세)은 거래(줄)마다 그대로 하고, 매입장 화면·엑셀에서만
@@ -59,26 +61,41 @@ export function summaryLabel(names: string[], unit: string) {
   return `${distinct[0]} 외\u00a0${distinct.length - 1}${unit}`;
 }
 
-// 등록 화면에서 모든 줄이 같이 쓰는 칸(프로젝트·품목·수량·단가·금액만 줄마다 다름).
+// 등록 화면에서 모든 줄이 같이 쓰는 칸 — 프로젝트·카테고리·결제수단·품목·수량·단가·금액은 줄마다 다름(카테고리·결제수단은 11/27부터
+// 줄마다 — lib/transactionLines.ts).
 const GROUP_COMMON_FIELDS = [
   "trans_date",
   "type",
   "client_id",
   "client_name_raw",
-  "category_id",
-  "payment_method_id",
   "payment_type",
-  "tax_invoice_issued",
-  "vat_included",
   "needs_classification",
   "note1",
   "note2",
 ] as const;
+// VAT 추가·세금계산서는 위쪽 공통 체크지만 비과세 카테고리 줄은 늘 끄고 저장(lib/transactionLines.ts의 lineTaxFlags) — 비과세 줄은 꺼져
+// 있어야 하고, 나머지 줄끼리 같으면 됨.
+const GROUP_TAX_FIELDS = ["vat_included", "tax_invoice_issued"] as const;
 
-// 묶음 전체 수정은 공통 칸이 모든 줄에서 같을 때만 — 다르면 한꺼번에 저장할 때 한 값으로 덮어써서 원래 값이
-// 바뀌므로 그 줄만 수정한다.
-export function sameCommonFields(lines: Pick<Transaction, (typeof GROUP_COMMON_FIELDS)[number]>[]) {
-  return lines.every((l) => GROUP_COMMON_FIELDS.every((f) => (l[f] ?? null) === (lines[0][f] ?? null)));
+type GroupCheckLine = Pick<Transaction, (typeof GROUP_COMMON_FIELDS)[number] | (typeof GROUP_TAX_FIELDS)[number]> & {
+  expense_categories?: { name: string; vat_exempt?: boolean | null } | { name: string; vat_exempt?: boolean | null }[] | null;
+};
+
+function sameValues(lines: GroupCheckLine[], fields: readonly (keyof GroupCheckLine)[]) {
+  return lines.every((l) => fields.every((f) => (l[f] ?? null) === (lines[0][f] ?? null)));
+}
+
+// 묶음 전체 수정은 공통 칸이 모든 줄에서 같을 때만 — 다르면 한꺼번에 저장할 때 한 값으로 덮어써서 원래 값이 바뀌므로 그 줄만 수정한다.
+// 비과세 여부는 줄에 붙은 카테고리(expense_categories)로 봄 — 카테고리를 안 붙여 부르면 비과세 줄도 VAT·세금계산서가 같아야 함(전처럼).
+export function sameCommonFields(lines: GroupCheckLine[]) {
+  if (!sameValues(lines, GROUP_COMMON_FIELDS)) return false;
+  const exempt = (l: GroupCheckLine) => isVatExemptCategory(one(l.expense_categories));
+  // 비과세 줄에 VAT·세금계산서가 켜져 있으면(예전 자료) 한꺼번에 저장할 때 꺼지며 금액이 바뀌므로 그 줄만 수정
+  if (lines.some((l) => exempt(l) && GROUP_TAX_FIELDS.some((f) => l[f]))) return false;
+  return sameValues(
+    lines.filter((l) => !exempt(l)),
+    GROUP_TAX_FIELDS
+  );
 }
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -100,7 +117,7 @@ export async function loadPaymentGroupForEdit(supabase: Supabase, tx: Transactio
   if (!tx.payment_group_id) return { group: undefined, partOfGroup: false };
   const { data } = await supabase
     .from("transactions")
-    .select("*, projects(name)")
+    .select("*, projects(name), expense_categories(*)")
     .eq("payment_group_id", tx.payment_group_id);
   const lines = sortGroupLines((data ?? []) as Transaction[]);
   if (lines.length < 2) return { group: undefined, partOfGroup: false };
