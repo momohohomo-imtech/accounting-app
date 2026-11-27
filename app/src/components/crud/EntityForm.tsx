@@ -33,6 +33,7 @@ export function EntityForm({
                 }}
                 className="h-4 w-4 rounded border-slate-300 accent-slate-900"
               />
+              {f.presenceMarker && <input type="hidden" name={`${f.name}__shown`} value="1" />}
               {f.label}
             </label>
           );

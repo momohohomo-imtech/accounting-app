@@ -5,7 +5,9 @@ import { one } from "@/lib/relations";
 import { isLedgerVisible } from "@/lib/credit";
 import type { CreditPayment } from "@/lib/types";
 import { CreatePanel } from "@/components/crud/CreatePanel";
-import { EntityTable } from "@/components/crud/EntityTable";
+import { ProjectListTable } from "@/components/ProjectListTable";
+import { getCurrentRole } from "@/lib/currentRole";
+import { poIssuedReady } from "@/lib/projectPo";
 import { createProjectRecord, updateProjectRecord, deleteProjectRecord } from "@/lib/actions/projects";
 import type { FieldConfig, RowBgColor } from "@/components/crud/types";
 import { PageTabs } from "@/components/PageTabs";
@@ -144,6 +146,9 @@ async function ProjectListSection({
   backToCombined: boolean;
 }) {
   const supabase = await createClient();
+  // 발주서 발급 칸(110 SQL — 실행 전엔 칸·체크·일괄 변경의 발주서를 숨김)과 체크해서 일괄 변경(관리자·직원만) — 다른 조회와 같이 시작
+  const poReadyPromise = poIssuedReady(supabase);
+  const rolePromise = getCurrentRole();
   const today = nowKst();
   const currentYear = today.year;
   const selectedYear = year ? Number(year) : currentYear;
@@ -284,6 +289,8 @@ async function ProjectListSection({
     agencyByProject.set(a.project_id, (agencyByProject.get(a.project_id) ?? 0) + a.amount);
   }
 
+  const [poReady, role] = await Promise.all([poReadyPromise, rolePromise]);
+  const canBulkEdit = role === "admin" || role === "staff";
   const fields: FieldConfig[] = [
     { name: "project_code", label: "프로젝트번호", readOnly: true, width: "7%" },
     {
@@ -347,6 +354,21 @@ async function ProjectListSection({
     { name: "start_date", label: "시작일", type: "date", hideInTable: true },
     { name: "end_date", label: "완료일", type: "date", width: "7%", toggleable: true, defaultVisible: false },
     { name: "order_date", label: "발주서일자", type: "date", hideInTable: true },
+    // 발주서 발급(11/27 사용자 요청, 110 SQL) — 수정·추가 화면 체크칸 + 목록 "발주서" 칸(O). 체크를 끄면 값이 안 와서 표지를 같이 보냄.
+    ...(poReady
+      ? [
+          {
+            name: "po_issued",
+            label: "발주서 발급",
+            tableLabel: "발주서",
+            type: "checkbox",
+            width: "5%",
+            toggleable: true,
+            defaultVisible: true,
+            presenceMarker: true,
+          } satisfies FieldConfig,
+        ]
+      : []),
     {
       name: "quote_amount",
       label: "발주액",
@@ -604,7 +626,7 @@ async function ProjectListSection({
                 통합 보고서
               </LinkButton>
             )}
-            <ProjectListExportButtons year={selectedYear} rows={exportRows} />
+            <ProjectListExportButtons year={selectedYear} rows={exportRows} withPoIssued={poReady} />
           </div>
         </div>
 
@@ -613,7 +635,9 @@ async function ProjectListSection({
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm print:border-0 print:p-0 print:shadow-none">
-          <EntityTable
+          <ProjectListTable
+            canEdit={canBulkEdit}
+            poReady={poReady}
             fields={fields}
             rows={coloredRows}
             groupByField="parent_project_id"

@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { nowKst } from "@/lib/kstDate";
 import { PROJECT_LINKS, deleteBlockReason, deleteErrorMessage } from "@/lib/deleteGuard";
+import { updateInChunks } from "@/lib/bulkUpdate";
+import { poIssuedReady } from "@/lib/projectPo";
+import { projectBulkFieldCount, projectBulkPatchFromForm } from "@/lib/projectBulkEdit";
 
 function parse(formData: FormData) {
   const estimated = formData.get("contract_amount_estimated") === "on";
@@ -26,6 +29,9 @@ function parse(formData: FormData) {
     memo: String(formData.get("memo") ?? "") || null,
     // 확인 필요/우선순위 등 사용자가 직접 지정하는 강조색 — 지정되면 자동 상태색 대신 이 색을 씀.
     highlight_color: String(formData.get("highlight_color") ?? "") || null,
+    // 발주서 발급(110 SQL) — 폼에 그 체크칸이 있었을 때만(표지 "po_issued__shown") 저장. 체크를 끄면 칸 값이 안 와서, 표지가 없으면
+    // 110 실행 전 화면(칸 없음)인지 끈 것인지 알 수 없음 — 표지가 없으면 지금 값 그대로 둠.
+    ...(formData.has("po_issued__shown") ? { po_issued: formData.get("po_issued") === "on" } : {}),
   };
 }
 
@@ -169,6 +175,37 @@ export async function deleteProjectRecord(formData: FormData) {
     if (error) return { error: deleteErrorMessage(error) };
     revalidatePath("/projects");
     revalidatePath("/reports");
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// 프로젝트 일괄 변경(11/27 사용자 요청 — 프로젝트 목록·보고서 "발주서 발급 현황"에서 체크한 프로젝트) — 발주서 발급·상태·진행률 중 고른 칸만
+// 한 번에(lib/projectBulkEdit.ts). 100개씩 나눠 바꾸고 바뀐 줄 수를 셈(권한 없으면 0 — 조회 전용은 DB가 막음). 발주서는 110 SQL 뒤에만.
+export async function bulkUpdateProjectFields(formData: FormData): Promise<{ error?: string; changed?: number }> {
+  try {
+    const ids = Array.from(new Set(formData.getAll("ids").map(String).filter(Boolean)));
+    if (ids.length === 0) return { error: "바꿀 프로젝트를 체크해 주세요." };
+    const { patch, error: invalid } = projectBulkPatchFromForm((k) => {
+      const v = formData.get(k);
+      return v === null ? null : String(v);
+    });
+    if (invalid) return { error: invalid };
+    if (projectBulkFieldCount(patch) === 0) return { error: "바꿀 칸을 하나 이상 고르세요." };
+    const supabase = await createClient();
+    if (patch.po_issued !== undefined && !(await poIssuedReady(supabase))) {
+      return { error: "발주서 발급 칸은 Supabase에서 110 SQL을 실행한 뒤에 쓸 수 있습니다." };
+    }
+    const result = await updateInChunks(
+      ids,
+      (chunk) => supabase.from("projects").update(patch).in("id", chunk).select("id"),
+      undefined,
+      "프로젝트"
+    );
+    revalidatePath("/projects");
+    revalidatePath("/reports");
+    revalidatePath("/dashboard");
+    return result.error ? { error: result.error, changed: result.changed } : { changed: result.changed };
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) };
   }

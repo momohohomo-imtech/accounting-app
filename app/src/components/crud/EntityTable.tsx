@@ -8,6 +8,7 @@ import { Table, THead, Tr, Td } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
 import { formatNumber, formatWon } from "@/lib/format";
 import { useEscapeKey } from "@/lib/useEscapeKey";
+import { useRowSelection } from "@/lib/useRowSelection";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useGlobalPending } from "@/components/GlobalPendingProvider";
 
@@ -157,6 +158,7 @@ export function EntityTable({
   groupByField,
   groupSummaries,
   groupActions,
+  selectable,
 }: {
   fields: FieldConfig[];
   rows: Row[];
@@ -179,6 +181,11 @@ export function EntityTable({
   groupSummaries?: Record<string, Row>;
   /** 요약 행의 관리 칸(요약 행은 실제 항목이 아니라 수정·삭제 없음) — 어미 id → 버튼. */
   groupActions?: Record<string, ReactNode>;
+  /**
+   * 줄마다 체크칸(첫 칸, 인쇄 안 됨) — 체크한 줄이 있으면 표 위에 renderBar(체크한 id, 체크 풀기)를 띄움(프로젝트 일괄 변경, 11/27).
+   * 바꾸는 건 지금 보이는 줄 중 체크한 것만 — 접힌 묶음 안 줄은 펼쳐야 고를 수 있고, 묶음 요약 줄은 체크칸 없음(lib/useRowSelection.ts).
+   */
+  selectable?: { renderBar: (ids: string[], clear: () => void) => ReactNode; noun?: string };
 }) {
   const confirm = useConfirm();
   const pending = useGlobalPending();
@@ -242,8 +249,10 @@ export function EntityTable({
   const hasExtraActions = Boolean(extraActions && Object.keys(extraActions).length > 0);
   // 관리 칸은 버튼이 한 줄에 들어가는 고정 폭(비율로 주면 휴대폰에서 버튼이 세로로 쌓임).
   const actionsWidth = hasExtraActions ? 180 : 120;
+  // 체크칸(selectable) 고정 폭 — 칸 폭 나누기·휴대폰 최소 폭에서 관리 칸처럼 뺌
+  const selectWidth = selectable ? 32 : 0;
   // 휴대폰에서는 칸 수에 맞춰 표를 넓히고 가로로 넘김(700px에 다 우겨넣으면 칸마다 글자가 잘림).
-  const mobileMinWidth = visibleFields.length * 105 + actionsWidth;
+  const mobileMinWidth = visibleFields.length * 105 + actionsWidth + selectWidth;
   const sortField = fields.find((f) => f.name === sortKey);
 
   // 폭이 지정된(hasWidths) 표에 한해 헤더 오른쪽 끝을 드래그해서 열 너비를 직접
@@ -313,11 +322,12 @@ export function EntityTable({
     // 폭 지정이 없는 칸이 섞여 있으면 그 칸 몫으로 105px씩 남겨 둠(휴대폰 최소 폭과 같은 값).
     const reserved =
       actionsWidth +
+      selectWidth +
       visibleFields.reduce((s, f) => s + (colWidths[f.name] ?? (pctOf(f) > 0 ? 0 : 105)), 0);
     const free = tableWidth - reserved;
     if (!tableWidth || pctSum <= 0 || free <= 0) return {};
     return Object.fromEntries(pctFields.map((f) => [f.name, Math.floor((free * pctOf(f)) / pctSum)]));
-  }, [tableWidth, visibleFields, colWidths, actionsWidth]);
+  }, [tableWidth, visibleFields, colWidths, actionsWidth, selectWidth]);
 
   // 지정 폭(%, 드래그한 px)은 PC·인쇄에서만 — 휴대폰에서 %로 고정하면 칸이 좁아져 금액이
   // "5,000,…"처럼 잘림. 휴대폰은 내용 폭대로 늘어나고 표 전체를 옆으로 넘김.
@@ -407,6 +417,16 @@ export function EntityTable({
     return list;
   }, [rows, sortField, sortDir, groupByField, groupSummaries]);
   const sortedRows = useMemo(() => blocks.flatMap((b) => [b.anchor, ...b.children]), [blocks]);
+  // 체크할 수 있는 줄 = 지금 보이는 실제 줄(접힌 묶음의 어미·하위는 펼쳤을 때만, 요약 줄은 제외)
+  const visibleRowIds = useMemo(
+    () =>
+      selectable
+        ? blocks.flatMap((b) => (!b.summary || expandedGroups.has(b.anchor.id) ? [b.anchor, ...b.children].map((r) => r.id) : []))
+        : [],
+    [blocks, expandedGroups, selectable]
+  );
+  const selection = useRowSelection(visibleRowIds);
+  const selectNoun = selectable?.noun ?? "항목";
 
   const editingRow = editPopup ? sortedRows.find((r) => r.id === editingId) : undefined;
   useEscapeKey(Boolean(editingRow), () => setEditingId(null));
@@ -417,7 +437,7 @@ export function EntityTable({
     return (
       editingId === row.id && !editPopup ? (
         <Tr key={row.id} className="bg-slate-50">
-          <td colSpan={visibleFields.length + 1} className="py-3 pr-4">
+          <td colSpan={visibleFields.length + 1 + (selectable ? 1 : 0)} className="py-3 pr-4">
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
@@ -461,6 +481,19 @@ export function EntityTable({
         </Tr>
       ) : (
         <Tr key={row.id} className={rowBgClass(row, fields)}>
+          {selectable && (
+            <Td className="w-8 pr-2 print:hidden" style={{ width: `${selectWidth}px` }}>
+              {!summaryOf && (
+                <input
+                  type="checkbox"
+                  aria-label={`${String(row.name ?? row.id)} 선택`}
+                  checked={selection.selected.has(row.id)}
+                  onChange={() => selection.toggle(row.id)}
+                  className="h-4 w-4 accent-slate-900"
+                />
+              )}
+            </Td>
+          )}
           {visibleFields.map((f) => (
             <Td
               key={f.name}
@@ -608,6 +641,9 @@ export function EntityTable({
         ))}
       </div>
     )}
+    {selectable && selection.chosen.length > 0 && (
+      <div className="mb-3 print:hidden">{selectable.renderBar(selection.chosen, selection.clear)}</div>
+    )}
     <Table
       ref={tableRef}
       className={cx(
@@ -617,6 +653,17 @@ export function EntityTable({
       style={{ "--entity-min-w": `${mobileMinWidth}px` } as CSSProperties}
     >
       <THead>
+        {selectable && (
+          <th className="w-8 pb-2 pr-2 print:hidden" style={{ width: `${selectWidth}px` }}>
+            <input
+              type="checkbox"
+              aria-label={`보이는 ${selectNoun} 전체 선택`}
+              checked={selection.allOn}
+              onChange={selection.toggleAll}
+              className="h-4 w-4 accent-slate-900"
+            />
+          </th>
+        )}
         {visibleFields.map((f) => (
           <th
             key={f.name}

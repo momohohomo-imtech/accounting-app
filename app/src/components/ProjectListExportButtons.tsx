@@ -3,6 +3,7 @@
 import { downloadXlsx } from "@/lib/xlsxExport";
 import { formatDate } from "@/lib/format";
 import { projectStatusLabel } from "@/lib/projectStatus";
+import { poIssuedLabel } from "@/lib/projectPo";
 import { Button } from "@/components/ui/Button";
 import { PrintButton } from "@/components/PrintButton";
 
@@ -24,9 +25,11 @@ type ExportRow = {
   progress_pct: number | null;
   year: number;
   memo: string | null;
+  po_issued?: boolean | null;
 };
 
-export function ProjectListExportButtons({ year, rows }: { year: number; rows: ExportRow[] }) {
+// withPoIssued: 110 SQL 뒤 — "발주서" 칸(발급/미발급)을 발주서일자 다음에
+export function ProjectListExportButtons({ year, rows, withPoIssued = false }: { year: number; rows: ExportRow[]; withPoIssued?: boolean }) {
   async function handleExport() {
     const data = rows.map((p) => [
       p.project_code ?? "-",
@@ -37,6 +40,7 @@ export function ProjectListExportButtons({ year, rows }: { year: number; rows: E
       formatDate(p.start_date),
       formatDate(p.end_date),
       formatDate(p.order_date),
+      ...(withPoIssued ? [poIssuedLabel(p.po_issued)] : []),
       p.quote_amount ?? 0,
       p.contractAmountExpected,
       p.receivable ?? "",
@@ -57,6 +61,7 @@ export function ProjectListExportButtons({ year, rows }: { year: number; rows: E
         "시작일",
         "완료일",
         "발주서일자",
+        ...(withPoIssued ? ["발주서"] : []),
         "발주액",
         "수주예상액",
         "미수 금액",
