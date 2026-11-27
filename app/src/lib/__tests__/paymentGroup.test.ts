@@ -80,7 +80,42 @@ test("묶음 전체 수정 가능 여부: 공통 칸이 모두 같을 때만(nul
     note2: null,
   };
   assert.equal(sameCommonFields([base, { ...base }]), true);
-  assert.equal(sameCommonFields([base, { ...base, category_id: "k2" }]), false);
+  // 카테고리·결제수단은 11/27부터 줄마다 고름 — 달라도 묶음 전체 수정(줄마다 자기 값으로 저장)
+  assert.equal(sameCommonFields([base, { ...base, category_id: "k2" }]), true);
+  assert.equal(sameCommonFields([base, { ...base, payment_method_id: "p2" }]), true);
   assert.equal(sameCommonFields([base, { ...base, note2: "정산일: 2026-10-05" }]), false);
+  assert.equal(sameCommonFields([base, { ...base, client_id: "c2" }]), false);
+  assert.equal(sameCommonFields([base, { ...base, tax_invoice_issued: false }]), false);
   assert.equal(sameCommonFields([base, { ...base, note1: undefined as unknown as null }]), true);
+});
+
+test("묶음 전체 수정: 비과세 카테고리 줄은 VAT·세금계산서가 꺼져 있으면 다른 줄과 달라도 됨(켜져 있으면 그 줄만 수정)", () => {
+  const taxed = {
+    trans_date: "2026-10-01",
+    type: "매입" as const,
+    client_id: "c1",
+    client_name_raw: null,
+    payment_type: "immediate" as const,
+    tax_invoice_issued: true,
+    vat_included: true,
+    needs_classification: false,
+    note1: null,
+    note2: null,
+    expense_categories: { name: "가짜 자재", vat_exempt: false },
+  };
+  const exemptOff = { ...taxed, tax_invoice_issued: false, vat_included: false, expense_categories: { name: "가짜 인건비", vat_exempt: true } };
+  assert.equal(sameCommonFields([taxed, exemptOff]), true);
+  assert.equal(sameCommonFields([exemptOff, taxed, { ...taxed }]), true);
+  // 비과세인데 켜져 있는 예전 자료 — 한꺼번에 저장하면 꺼지며 금액이 바뀌므로 묶음 전체 수정 안 함
+  assert.equal(sameCommonFields([taxed, { ...exemptOff, vat_included: true }]), false);
+  // 비과세 아닌 줄끼리는 같아야 함
+  assert.equal(sameCommonFields([taxed, { ...taxed, vat_included: false }, exemptOff]), false);
+  // 카테고리를 안 붙이면 예전처럼 모든 줄이 같아야 함
+  const { expense_categories: _a, ...plainTaxed } = taxed;
+  const { expense_categories: _b, ...plainExempt } = exemptOff;
+  void _a;
+  void _b;
+  assert.equal(sameCommonFields([plainTaxed, plainExempt]), false);
+  // 모두 비과세(꺼짐)면 됨
+  assert.equal(sameCommonFields([exemptOff, { ...exemptOff }]), true);
 });
