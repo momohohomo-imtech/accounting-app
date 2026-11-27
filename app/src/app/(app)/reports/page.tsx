@@ -27,6 +27,9 @@ import { CategoryAggregateTable } from "@/components/CategoryAggregateTable";
 import { CategoryDetailReport } from "@/components/CategoryDetailReport";
 import { ProjectProfitTable } from "@/components/ProjectProfitTable";
 import { ProjectOverview } from "@/components/ProjectOverview";
+import { ProjectPoReport } from "@/components/ProjectPoReport";
+import { ReportPoFilter } from "@/components/ReportPoFilter";
+import { filterPoRows, parsePoFilter, poIssuedLabel, poReportRows, poSummary } from "@/lib/projectPo";
 import { projectOverviewRows, projectOverviewTotals } from "@/lib/projectOverview";
 import { SiteProfitTable } from "@/components/SiteProfitTable";
 import { SiteProfitReport } from "@/components/SiteProfitReport";
@@ -137,6 +140,8 @@ export default async function ReportsPage({
     wlSite?: string;
     unassignedMonth?: string;
     printSection?: string;
+    // 발주서 발급 현황 거르기(all·issued·not)
+    po?: string;
   }>;
 }) {
   const {
@@ -153,7 +158,9 @@ export default async function ReportsPage({
     wlSite,
     unassignedMonth,
     printSection,
+    po,
   } = await searchParams;
+  const poFilter = parsePoFilter(po);
   const includeVendorAgency = vendorAgency === "1";
   const categoryNames = category ? (Array.isArray(category) ? category : [category]) : [];
   const categorySet = new Set(categoryNames);
@@ -168,6 +175,8 @@ export default async function ReportsPage({
   // 아래 큰 조회가 먼저 실패하면 이 조회는 기다려지지 않음 — 처리 안 된 거부로 남지 않게(기다리는 곳에서는 그대로 오류)
   fixedExpensePromise.catch(() => {});
   const rolePromise = getCurrentRole();
+  // 발주서 발급(110 SQL) — 그 해 프로젝트의 발급 여부. 칸이 없으면(실행 전) 오류 → "발주서 발급 현황" 칸을 숨김.
+  const poIssuedPromise = Promise.resolve(supabase.from("projects").select("id, po_issued").eq("year", selectedYear));
   const [
     rawTx,
     { data: projects },
@@ -561,6 +570,18 @@ export default async function ReportsPage({
   const overviewTotals = projectOverviewTotals(overviewRows);
   const overviewSiteLabel = site ? projectSiteOptions.find((o) => o.value === site)?.label ?? null : null;
 
+  // 발주서 발급 현황(11/27 사용자 요청) — 그 해 프로젝트(현장 필터를 따름)마다 발급 여부, 거르기는 주소 ?po=(인쇄·엑셀도 거른 그대로).
+  // 요약은 거르기 전 전체. 110 SQL 실행 전이면 칸을 숨김. lib/projectPo.ts
+  const { data: poIssuedData, error: poIssuedError } = await poIssuedPromise;
+  const poReady = !poIssuedError;
+  const poIssuedById = new Map((poIssuedData ?? []).map((r) => [r.id as string, Boolean(r.po_issued)]));
+  const poAllRows = poReportRows(
+    byProject.map((p) => ({ ...p, siteName: (one(p.sites) as { name: string } | null)?.name ?? null })),
+    poIssuedById
+  );
+  const poRowsShown = filterPoRows(poAllRows, poFilter);
+  const poSummaryAll = poSummary(poAllRows);
+
   // 상단 박스의 "예상 순이익율" — 대시보드 "프로젝트 기준 예상 이익"과 같은 계산(lib/projectProfit.ts의
   // projectBasedProfit: 연도 전체, site 필터와 무관, 세금계산서 기준이라 외상 미정산 포함, 검토중 발주액 제외,
   // 발행 세금계산서가 더 많거나 발주액이 없으면 실제 매출, 프로젝트 없는 매출 포함) ÷ 발주액 합계(검토중 제외).
@@ -918,6 +939,7 @@ export default async function ReportsPage({
     if (wlMonths) p.set("wlMonths", wlMonths);
     if (wlSite) p.set("wlSite", wlSite);
     if (unassignedMonth) p.set("unassignedMonth", unassignedMonth);
+    if (poFilter !== "all") p.set("po", poFilter);
     if (extra?.printSection) p.set("printSection", extra.printSection);
     return `/reports?${p.toString()}`;
   }
@@ -1277,8 +1299,9 @@ export default async function ReportsPage({
       <CollapsibleSection
         title={groupTitle("프로젝트")}
         bare
-        className={groupPrintClass(["projectOverview", "projects", "revenue", "projectSummary"])}
-        defaultOpen={groupDefaultOpen(["projectOverview", "projects", "revenue", "projectSummary"])}
+        className={groupPrintClass(["projectOverview", "projects", "poStatus", "revenue", "projectSummary"])}
+        // 발주서 거르기(?po=)가 있으면 구역도 펼침 — 거른 주소로 새로 열었을 때(새로고침·되돌아오기) 거른 표가 바로 보이게
+        defaultOpen={groupDefaultOpen(["projectOverview", "projects", "poStatus", "revenue", "projectSummary"]) || poFilter !== "all"}
       >
        <div className="space-y-6 mt-3">
 
@@ -1367,6 +1390,47 @@ export default async function ReportsPage({
 
           <ProjectProfitTable rows={byProject} year={selectedYear} site={site} />
       </CollapsibleSection>
+
+        {poReady && (
+          <CollapsibleSection
+            className={hiddenClass("poStatus")}
+            title="발주서 발급 현황 — 프로젝트마다 발주서 발급·미발급"
+            defaultOpen={printSection === "poStatus" || poFilter !== "all"}
+            headerExtra={sectionControls(
+              "poStatus",
+              {
+                filename: `발주서_발급_현황_${selectedYear}${poFilter === "issued" ? "_발급" : poFilter === "not" ? "_미발급" : ""}.xlsx`,
+                headers: ["프로젝트번호", "프로젝트", "현장", "상태", "발주서일자", "발주액", "진행률(%)", "발주서"],
+                rows: poRowsShown.map((r) => [
+                  r.code ?? "",
+                  r.child ? `${r.name} (귀속)` : r.name,
+                  r.siteName,
+                  projectStatusLabel(r.status),
+                  r.orderDate ?? "",
+                  r.quote,
+                  r.progress,
+                  poIssuedLabel(r.issued),
+                ]),
+              },
+              <>
+                <ReportPoFilter year={selectedYear} site={site} value={poFilter} />
+                {projectSiteOptions.length > 0 && (
+                  <ReportProjectSiteFilter year={selectedYear} siteOptions={projectSiteOptions} selectedSite={site} />
+                )}
+              </>
+            )}
+          >
+            <ProjectPoReport
+              rows={poRowsShown}
+              summary={poSummaryAll}
+              filter={poFilter}
+              year={selectedYear}
+              site={site}
+              siteLabel={overviewSiteLabel}
+              canEdit={canBulkEdit}
+            />
+          </CollapsibleSection>
+        )}
 
       <CollapsibleSection
         title="매출 검증 — 수주액 vs 실제 매출 원장"
@@ -1596,7 +1660,10 @@ export default async function ReportsPage({
       {project && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-brand-ink/50 p-4 py-10 print:static print:bg-transparent print:p-0">
           <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:shadow-none">
-            <ProjectProfitReport projectId={project} closeHref={`/reports?year=${selectedYear}${site ? `&site=${site}` : ""}`} />
+            <ProjectProfitReport
+              projectId={project}
+              closeHref={`/reports?year=${selectedYear}${site ? `&site=${site}` : ""}${poFilter !== "all" ? `&po=${poFilter}` : ""}`}
+            />
           </div>
         </div>
       )}

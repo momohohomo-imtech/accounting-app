@@ -48,6 +48,11 @@ export type FieldConfig = {
   redValue?: string;
   /** For type "checkbox": checking this field unchecks the named sibling checkbox field in the form (mutual exclusivity). */
   exclusiveWith?: string;
+  /**
+   * For type "checkbox": also send a hidden "<name>__shown" marker so the server can tell "unchecked" from "this checkbox wasn't on the
+   * form" (a checkbox sends nothing when unchecked) — for a column that exists only after a SQL file is run (projects.po_issued, 110).
+   */
+  presenceMarker?: boolean;
   /** Render the whole row with a light background color keyed by this field's raw value (table view only). A value not present in the map gets no special background. */
   rowBackgroundByValue?: Record<string, RowBgColor>;
   /** Like `rowBackgroundByValue` but with a more saturated shade, and checked first (wins over any `rowBackgroundByValue` match on the same row). Meant for a user-chosen override. */

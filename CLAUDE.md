@@ -24,7 +24,7 @@
   `UncategorizedPurchasesTable`, `TransactionHistoryTable`, `ProjectReceiptsTable`, 통합 보고서의 `ProjectsCombinedTable`·
   `CombinedCategorySection`·`CombinedAgencyTable`, `BankBalanceCheckPopup`(통장 잔액 확인 기록), `YearLockPanel`(잠긴 해),
   `ReceivableAgingTable`(오래된 외상매출금), `HometaxReconcilePanel`(홈택스 대조 결과), `ConstructionMemoList`(공사 메모),
-  `WorkSequenceList`(공사 작업 순서표), `FixedExpensePanel`(고정지출 지정 거래처·카테고리·후보), `RecentTransactionsTable`(대시보드 최근 등록 거래), `SortableSimpleTable`(보고서 분기별·월별 손익·매출처별 집계, 세무사 열람 표들·거래처 상세 팝업 — 합계 줄은 `footer`, 팝업 여는 이름 링크는 칸의 `href`, 휴대폰 고정 칸은 `stickyCol`), `SqlStatusTable`(백업 화면 SQL 실행 상태), `ProjectOverview`(보고서 프로젝트 한눈에 보기의 프로젝트별 표))에
+  `WorkSequenceList`(공사 작업 순서표), `FixedExpensePanel`(고정지출 지정 거래처·카테고리·후보), `RecentTransactionsTable`(대시보드 최근 등록 거래), `SortableSimpleTable`(보고서 분기별·월별 손익·매출처별 집계, 세무사 열람 표들·거래처 상세 팝업 — 합계 줄은 `footer`, 팝업 여는 이름 링크는 칸의 `href`, 휴대폰 고정 칸은 `stickyCol`), `SqlStatusTable`(백업 화면 SQL 실행 상태), `ProjectOverview`(보고서 프로젝트 한눈에 보기의 프로젝트별 표), `ProjectPoReport`(보고서 발주서 발급 현황))에
   이 패턴이 적용돼 있음 — 새 표를 추가할 때 이 목록도 같이 업데이트할 것.
   (예외: `DailyWorkerUsageStatementTable`은 세무사 제출용 사용내역서 문서라
   근로자별 연속일 소계 순서가 고정돼야 해서 임의 정렬을 지원하지 않음 —
@@ -209,7 +209,7 @@
 - **금액 계산을 바꾸면 `npm test`(app 폴더)로 자동 검사를 돌릴 것.** 부가세 분리·마이너스 금액 반올림(`vatBasis`),
   외상 잔액(`credit`), 종합소득세(`tax`), 견적 금액·한글 금액(`quoteCalc`·`numberToKorean`),
   예상 미수액·프로젝트 받은 돈(`expectedReceivable`), 이익 예상(`projectProfit` — 대시보드·보고서 공통, 남은 달 고정지출 포함), 프로젝트 목록 하단 합계·통합
-  보고서(`projectListTotals`), 엑셀 거래 읽기(`transactionExcel`), 작업일지 집계(`workLogSummary`), 출장일지 합계·보고서 작업일수 나눔·출장 투입 인원·근무일당 이익금·출장 횟수(`tripLog`), 보고서 출장 현황(`tripOverview`), 프로젝트 보고서 근무 달력(`workCalendar`), 보고서 프로젝트 한눈에 보기(`projectOverview`), 매입장 한 결제 묶기(`paymentGroup`), 장부 점검(`ledgerCheck`), 거래 수정 이력 표시·일괄 변경 접기(`transactionHistory`), 백업
+  보고서(`projectListTotals`), 엑셀 거래 읽기(`transactionExcel`), 작업일지 집계(`workLogSummary`), 출장일지 합계·보고서 작업일수 나눔·출장 투입 인원·근무일당 이익금·출장 횟수(`tripLog`), 보고서 출장 현황(`tripOverview`), 프로젝트 보고서 근무 달력(`workCalendar`), 보고서 프로젝트 한눈에 보기(`projectOverview`), 발주서 발급 현황(`projectPo`), 프로젝트 일괄 변경(`projectBulkEdit`), 매입장 한 결제 묶기(`paymentGroup`), 장부 점검(`ledgerCheck`), 거래 수정 이력 표시·일괄 변경 접기(`transactionHistory`), 백업
   끝까지 담기(`backup`), 복원 막기·표 목록·나눠 올리기(`restore`), 백업 상태(`backupStatus`), 삭제 막기(`deleteGuard`), 급여 중복
   확인(`payrollDuplicates`), 긴 ID 목록 나눠 조회·자동완성 기간(`supabaseFetchAll`), 파일 올리기 규칙(`fileUpload`), 백업 자동
   정리(`backupRetention`), 제미나이 호출·오류 안내(`gemini`), 대표자 보험료 요율(`ownerSocialInsurance`), 통장 잔액 맞추기(`bankReconcile`),
@@ -362,6 +362,18 @@
   저절로 바꾸지 않음). 체크칸은 관리자·직원만, 대행구매 줄(따로 저장되는 표)은 체크칸 없음, 바꾸는 건 보이는(필터·검색된) 줄 중 체크한
   것만(`lib/useRowSelection.ts`), 체크칸·일괄 변경 칸은 인쇄에 안 나옴. 거래 내역 표를 새로 만들면 이 칸을 붙이고, 체크칸을 첫 칸에 두면 표에
   `sticky-col-table` + 알아보기 쉬운 칸에 `sticky-col`. 선택 목록·확인 문구 계산은 `lib/transactionBulkEdit.ts`.
+- **프로젝트 발주서 발급·프로젝트 일괄 변경**(11/27 사용자 요청 "프로젝트마다 발주서 발급 유무 체크 란 + 보고서에서 발급 유무 보는 항 + 체크해서
+  일괄 수정 — 상태·진행율도", "발주서 부분 인쇄 가능", 110 SQL `projects.po_issued` — 새 칸만, 기존 프로젝트는 미발급으로 시작): 발주서 = 원청이 우리에게
+  준 발주서(프로젝트 "발주서일자" 칸과 같은 뜻 — 앱의 발주서 작성 `purchase_orders`(우리가 업체에 내는 것)와는 달라서 손으로 체크). 프로젝트 추가·수정
+  "발주서 발급" 체크(체크를 끄면 폼에 값이 안 와서 `presenceMarker`가 `po_issued__shown` 표지를 같이 보냄 — 표지가 없으면 그 칸을 안 바꿈, 110 전 화면이
+  칸을 지우지 않게), 목록 "발주서" 칸(O)·목록 엑셀. 프로젝트 목록과 보고서 "발주서 발급 현황"은 체크해서 발주서·상태·진행률을 한 번에
+  (`ProjectBulkEditBar` → `bulkUpdateProjectFields` → `updateInChunks`, 기본 "그대로", 확인창에 바꿀 칸 한 줄씩, "타 프로젝트 귀속"은 귀속할 프로젝트를
+  같이 골라야 해서 뺌 — 수정 화면에서, 발주액·이름·날짜는 안 바꿈). 체크칸은 관리자·직원만, 목록은 `EntityTable`의 `selectable`(보이는 줄만 — 접힌 묶음은
+  펼쳐야, 요약 줄은 체크칸 없음, 서버 화면은 함수를 못 넘겨서 `ProjectListTable`을 거침). 보고서 칸(`ProjectPoReport` — "프로젝트" 구역, 프로젝트별 손익
+  다음)은 그 해 프로젝트(현장 필터를 따름, 귀속 하위도 자기 줄 "(귀속)")마다 발급/미발급, 요약(발급·미발급 건수·발주액, 미발급 중 검토중), 거르기
+  `?po=issued|not`(인쇄·엑셀·프로젝트 보고서 닫기 주소도 그대로, 거른 주소로 열면 구역·칸이 펼쳐짐), 인쇄 `printSection=poStatus`(A4 세로 한 폭 —
+  `print:min-w-0`, 체크칸·일괄 변경 칸은 인쇄 안 됨). 줄·요약·거르기는 `lib/projectPo.ts`, 일괄 변경 값 검사·확인 문구는 `lib/projectBulkEdit.ts`. 110 실행
+  전엔 체크·칸·보고서 칸·일괄 변경의 발주서를 숨기고 저장하지 않음(`poIssuedReady` — 상태·진행률 일괄 변경은 됨).
 - **매입매출 "챙길 거래" 창**(11/11 사용자 요청 "매입장 메모 옆이나 아래 작은 창 — 체크하면 바로 올라가 보이고 필요 없으면 쉽게 지우게,
   창 크기는 내용에 맞게", 사용자 결정 "모든 기기 공용" + "줄마다 짧은 메모", 105 SQL `transaction_watch` — 거래 하나당 한 줄·메모 100자,
   거래를 지우면 같이 지워짐): 매입매출장 줄마다 📌(묶음 줄은 묶음 전체 — 하나라도 올라가 있으면 켜짐, 누르면 모두 빠짐 `watchToggle`)와

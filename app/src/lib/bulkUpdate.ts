@@ -12,12 +12,12 @@ export function chunkIds(ids: string[], size = BULK_UPDATE_CHUNK): string[][] {
   return chunks;
 }
 
-/** 바꾼 결과 안내 — 다 바뀌었으면 null */
-export function bulkUpdateMessage(requested: number, changed: number, error?: string | null): string | null {
+/** 바꾼 결과 안내 — 다 바뀌었으면 null. noun: 무엇을 바꾸는지("거래" 기본, 프로젝트 일괄 변경은 "프로젝트") */
+export function bulkUpdateMessage(requested: number, changed: number, error?: string | null, noun = "거래"): string | null {
   if (error) return changed > 0 ? `${requested}건 중 ${changed}건만 바뀌었습니다 — ${error}` : error;
   if (changed >= requested) return null;
-  if (changed === 0) return "바뀐 거래가 없습니다 — 바꿀 권한이 없거나 그새 지워진 거래입니다(화면을 새로 고쳐 확인해 주세요).";
-  return `${requested}건 중 ${changed}건만 바뀌었습니다 — 나머지는 바꿀 권한이 없거나 그새 지워진 거래입니다(화면을 새로 고쳐 확인해 주세요).`;
+  if (changed === 0) return `바뀐 ${noun}가 없습니다 — 바꿀 권한이 없거나 그새 지워진 ${noun}입니다(화면을 새로 고쳐 확인해 주세요).`;
+  return `${requested}건 중 ${changed}건만 바뀌었습니다 — 나머지는 바꿀 권한이 없거나 그새 지워진 ${noun}입니다(화면을 새로 고쳐 확인해 주세요).`;
 }
 
 type ChunkResult = { data: { id: string }[] | null; error: { message: string } | null };
@@ -29,11 +29,12 @@ type ChunkResult = { data: { id: string }[] | null; error: { message: string } |
 export async function updateInChunks(
   ids: string[],
   runChunk: (chunk: string[]) => PromiseLike<ChunkResult>,
-  size = BULK_UPDATE_CHUNK
+  size = BULK_UPDATE_CHUNK,
+  noun = "거래"
 ): Promise<{ error?: string; changed: number }> {
   const chunks = chunkIds(ids, size);
   const requested = chunks.reduce((s, c) => s + c.length, 0);
-  if (requested === 0) return { error: "선택된 거래가 없습니다.", changed: 0 };
+  if (requested === 0) return { error: `선택된 ${noun}가 없습니다.`, changed: 0 };
   let changed = 0;
   for (const chunk of chunks) {
     let result: ChunkResult;
@@ -43,10 +44,10 @@ export async function updateInChunks(
       result = { data: null, error: { message: err instanceof Error ? err.message : "저장 중 오류가 났습니다." } };
     }
     if (result.error) {
-      return { error: bulkUpdateMessage(requested, changed, result.error.message) ?? undefined, changed };
+      return { error: bulkUpdateMessage(requested, changed, result.error.message, noun) ?? undefined, changed };
     }
     changed += result.data?.length ?? 0;
   }
-  const message = bulkUpdateMessage(requested, changed);
+  const message = bulkUpdateMessage(requested, changed, null, noun);
   return message ? { error: message, changed } : { changed };
 }
