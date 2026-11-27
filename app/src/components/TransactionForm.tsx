@@ -22,11 +22,17 @@ import { loadClientItemHistory } from "@/lib/actions/clientItemHistory";
 import { suggestionLabel, type ClientItemSuggestion } from "@/lib/clientItemHistory";
 import {
   EMPTY_LINE_COMMONS,
+  clientHistoryKey,
+  clientHistoryQuery,
+  clientPairFromText,
+  distinctClientCount,
   distinctPaymentMethodCount,
-  fillEmptyCategory,
+  fillClientDefaults,
   groupTaxFlags,
+  lineClientText,
   lineTaxFlags,
   resolveLineCommons,
+  settleClientPair,
   splitLineCommons,
   type LineCommons,
 } from "@/lib/transactionLines";
@@ -34,16 +40,14 @@ import {
 type Option = { id: string; name: string };
 type ClientOption = Option & { default_item_name?: string | null; default_category_id?: string | null };
 // id: 묶음 전체 수정 때 원래 거래(줄) — 없으면 저장할 때 새 거래로 추가.
-// project_id·category_id·payment_method_id: 품목이 2줄 이상이면 줄마다 고르고 위쪽 공통 칸은 숨김(1줄이면 위쪽 칸 — 카테고리·결제수단은
-// 11/27 사용자 요청 "프로젝트처럼"). 줄 수가 바뀔 때 공통 칸 ↔ 줄 값 옮기기는 lib/transactionLines.ts의 splitLineCommons.
-type LineItem = {
+// 거래처(client_id·client_name_raw)·project_id·category_id·payment_method_id: 품목이 2줄 이상이면 줄마다 고르고 위쪽 공통 칸은 숨김(1줄이면
+// 위쪽 칸 — 11/27 사용자 요청 "카테고리·결제수단 각기 — 프로젝트처럼", "거래처 이름도"). 줄 수가 바뀔 때 공통 칸 ↔ 줄 값 옮기기는
+// lib/transactionLines.ts의 splitLineCommons.
+type LineItem = LineCommons & {
   item_name: string;
   quantity: string;
   unit_price: string;
   subtotal: string;
-  project_id: string;
-  category_id: string;
-  payment_method_id: string;
   id?: string;
 };
 
@@ -62,7 +66,7 @@ function lineItemFromInitial(t: Transaction): LineItem {
     unit_price: t.unit_price?.toString() ?? "",
     // 0원 줄도 "0"으로 — 빈칸이면 묶음 전체 수정에서 빈 줄로 보고 저장할 때 그 줄을 지웠음.
     subtotal: amount != null ? String(amount) : "",
-    // 비워두면 위쪽 공통 "프로젝트"·카테고리·결제수단 선택값을 그대로 씀 — 줄을 더하면 그때 줄마다 옮겨 적음.
+    // 비워두면 위쪽 공통 거래처·"프로젝트"·카테고리·결제수단 선택값을 그대로 씀 — 줄을 더하면 그때 줄마다 옮겨 적음.
     ...EMPTY_LINE_COMMONS,
   };
 }
@@ -113,10 +117,11 @@ export function TransactionForm({
   // 새로 넣는 줄의 id를 화면에서 정함 — 같은 내용이면 다시 눌러도·연결이 끊겨 자동으로 다시 보내도 같은 id라 두 번 들어가지 않음
   // (11/23 사용자 "저장을 두 번 누르거나 인터넷 연결이 끊겼다는 안내", lib/idempotentSave.ts). 저장이 끝나면 비움.
   const [newIdKeeper] = useState(() => createNewIdKeeper());
-  // 고른 거래처에서 예전에 쓴 품목(11/26 사용자 요청 — 그 거래처 건만) — 품목 칸을 누르면 골라 쓰기, 금액은 자동으로 안 넣음
+  // 고른 거래처에서 예전에 쓴 품목(11/26 사용자 요청 — 그 거래처 건만) — 품목 칸을 누르면 골라 쓰기, 금액은 자동으로 안 넣음. 줄마다
+  // 거래처가 다를 수 있어서(11/27) 거래처 열쇠(등록 거래처 id·직접 입력 이름)마다 한 번씩 불러 둠(lib/transactionLines.ts의 clientHistoryKey).
   const itemHistoryListId = useId();
-  const [itemHistory, setItemHistory] = useState<ClientItemSuggestion[]>([]);
-  const itemHistoryRequest = useRef(0);
+  const [historyByKey, setHistoryByKey] = useState<Record<string, ClientItemSuggestion[]>>({});
+  const requestedHistoryKeys = useRef(new Set<string>());
   // 저장(거래 등록·수정 저장) 실패·확인 안내 — 저장 단추 바로 위에(휴대폰에선 폼이 길어 맨 위 안내가 화면 밖이라, 저장이 안 된 줄 모르고
   // 다시 누르는 일이 있었음). 맨 위 error는 영수증·엑셀 인식 안내.
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -127,9 +132,9 @@ export function TransactionForm({
   const [values, setValues] = useState({
     trans_date: initial?.trans_date ?? todayString(),
     type: initial?.type ?? "매입",
-    client_id: initial?.client_id ?? "",
-    client_name_raw: initial?.client_name_raw ?? "",
-    // 묶음 수정은 줄마다 자기 프로젝트·카테고리·결제수단을 들고 있어서 공통 칸은 비워 둠.
+    // 묶음 수정은 줄마다 자기 거래처·프로젝트·카테고리·결제수단을 들고 있어서 공통 칸은 비워 둠.
+    client_id: isGroupEdit ? "" : initial?.client_id ?? "",
+    client_name_raw: isGroupEdit ? "" : initial?.client_name_raw ?? "",
     project_id: isGroupEdit ? "" : initial?.project_id ?? "",
     category_id: isGroupEdit ? "" : initial?.category_id ?? "",
     payment_method_id: isGroupEdit ? "" : initial?.payment_method_id ?? "",
@@ -147,6 +152,8 @@ export function TransactionForm({
           project_id: t.project_id ?? "",
           category_id: t.category_id ?? "",
           payment_method_id: t.payment_method_id ?? "",
+          client_id: t.client_id ?? "",
+          client_name_raw: t.client_name_raw ?? "",
           id: t.id,
         }))
       : initial
@@ -167,14 +174,16 @@ export function TransactionForm({
   const [projectPopupIndex, setProjectPopupIndex] = useState<number | null>(null);
   useEscapeKey(projectPopupIndex !== null, () => setProjectPopupIndex(null));
   const inputClass = "rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none";
-  // 품목이 2줄 이상이면 프로젝트·카테고리·결제수단은 줄마다(위쪽 칸은 숨김), 1줄이면 위쪽 칸 — lib/transactionLines.ts
+  // 품목이 2줄 이상이면 거래처·프로젝트·카테고리·결제수단은 줄마다(위쪽 칸은 숨김), 1줄이면 위쪽 칸 — lib/transactionLines.ts
   const perLine = lineItems.length > 1;
   const commons: LineCommons = {
     project_id: values.project_id,
     category_id: values.category_id,
     payment_method_id: values.payment_method_id,
+    client_id: values.client_id,
+    client_name_raw: values.client_name_raw,
   };
-  // 줄마다 저장할 값 — 프로젝트·카테고리·결제수단(2줄 이상이면 줄 값)과 VAT·세금계산서(비과세 카테고리 줄은 위쪽 체크와 상관없이 끔)
+  // 줄마다 저장할 값 — 거래처·프로젝트·카테고리·결제수단(2줄 이상이면 줄 값)과 VAT·세금계산서(비과세 카테고리 줄은 위쪽 체크와 상관없이 끔)
   function lineValues(li: LineItem) {
     const own = resolveLineCommons(li, commons, perLine);
     return { ...values, ...own, ...lineTaxFlags(exemptCategory(own.category_id), values) };
@@ -190,8 +199,19 @@ export function TransactionForm({
     const vat = lineValues(li).vat_included ? addedVat(base) : 0;
     return s + base + vat;
   }, 0);
-  // 한 결제로 묶는데 줄마다 결제수단이 다르면 알림(따로 결제한 것일 수 있음 — 묶기는 그대로 둠)
+  // 한 결제로 묶는데 줄마다 거래처·결제수단이 다르면 알림(따로 결제한 것일 수 있음 — 묶기는 그대로 둠)
+  const mixedClients = perLine && distinctClientCount(lineItems) > 1;
   const mixedPaymentMethods = perLine && distinctPaymentMethodCount(lineItems) > 1;
+  const mixedLabel =
+    mixedClients && mixedPaymentMethods ? "거래처·결제수단이" : mixedClients ? "거래처가" : mixedPaymentMethods ? "결제수단이" : null;
+  // 줄마다 거래처 열쇠(예전 품목 골라 쓰기) — 1줄이면 위쪽 거래처
+  const lineHistoryKeys = lineItems.map((li) => clientHistoryKey(resolveLineCommons(li, commons, perLine)));
+  const historyKeys = Array.from(new Set(lineHistoryKeys.filter((k): k is string => Boolean(k)))).sort();
+  const historyKeysSig = historyKeys.join("\n");
+  const historyListId = (key: string | null) =>
+    key && historyByKey[key]?.length ? `${itemHistoryListId}-${historyKeys.indexOf(key)}` : undefined;
+  const singleHistoryCount = !perLine && lineHistoryKeys[0] ? (historyByKey[lineHistoryKeys[0]]?.length ?? 0) : 0;
+  const anyLineHistory = perLine && lineHistoryKeys.some((k) => Boolean(k && historyByKey[k]?.length));
   // 마이너스 줄(단수 조정·할인 — 11/14 사용자 요청 "실제 금액을 적고 마이너스로 빼려고")이 있으면 합계 옆에 표시
   const negativeLineCount = lineItems.filter((li) => (Number(li.subtotal) || 0) < 0).length;
 
@@ -285,33 +305,31 @@ export function TransactionForm({
     applyLines(lineItems.filter((_, idx) => idx !== i));
   }
 
-  const historyClientId = values.client_id;
-  const historyClientName = values.client_name_raw.trim();
+  // 거래처마다 한 번씩 예전 품목을 불러 둠 — 등록 거래처는 바로, 직접 입력 이름은 치는 동안 0.4초 쉬면(치는 중 글자마다 부르지 않게).
+  // 거래처별로 따로 담아서 늦게 온 결과가 다른 거래처 목록을 덮지 않음.
   useEffect(() => {
-    const request = ++itemHistoryRequest.current;
-    const useName = !historyClientId && historyClientName.length >= 2;
-    if (!historyClientId && !useName) {
-      const clear = setTimeout(() => {
-        if (request === itemHistoryRequest.current) setItemHistory([]);
-      }, 0);
-      return () => clearTimeout(clear);
-    }
-    const timer = setTimeout(
-      async () => {
-        try {
-          const result = await loadClientItemHistory(historyClientId ? { clientId: historyClientId } : { clientName: historyClientName });
-          // 그사이 거래처를 또 바꿨으면 늦게 온 결과는 버림
-          if (request === itemHistoryRequest.current) setItemHistory(result.items);
-        } catch {
-          // 고르기 목록은 거들 뿐 — 못 불러오면 그냥 빈 목록(직접 쓰면 됨)
-          if (request === itemHistoryRequest.current) setItemHistory([]);
-        }
-      },
-      historyClientId ? 0 : 400
-    );
-    return () => clearTimeout(timer);
-  }, [historyClientId, historyClientName]);
+    const keys = historyKeysSig ? historyKeysSig.split("\n") : [];
+    const timers = keys
+      .filter((key) => !requestedHistoryKeys.current.has(key))
+      .map((key) =>
+        setTimeout(
+          async () => {
+            requestedHistoryKeys.current.add(key);
+            try {
+              const result = await loadClientItemHistory(clientHistoryQuery(key));
+              setHistoryByKey((prev) => ({ ...prev, [key]: result.items }));
+            } catch {
+              // 고르기 목록은 거들 뿐 — 못 불러오면 그냥 빈 목록(직접 쓰면 됨), 다음에 다시 시도
+              requestedHistoryKeys.current.delete(key);
+            }
+          },
+          key.startsWith("id:") ? 0 : 400
+        )
+      );
+    return () => timers.forEach(clearTimeout);
+  }, [historyKeysSig]);
 
+  // 위쪽 등록 거래처(1줄일 때) — 거래처 기본 품목은 첫 줄에, 기본 카테고리는 위쪽 카테고리 칸에(예전 그대로)
   function handleClientSelect(clientId: string) {
     const client = clients.find((c) => c.id === clientId);
     set("client_id", clientId);
@@ -321,10 +339,34 @@ export function TransactionForm({
       );
     }
     if (client?.default_category_id) {
-      // 줄마다 고르는 중이면 카테고리가 빈 줄에만(이미 고른 줄은 그대로)
-      if (perLine) setLineItems((prev) => fillEmptyCategory(prev, client.default_category_id as string));
-      else handleCategorySelect(client.default_category_id);
+      handleCategorySelect(client.default_category_id);
     }
+  }
+
+  // 줄 거래처 칸(2줄 이상) — 등록 거래처 이름과 똑같으면 등록 거래처, 아니면 직접 입력 이름(lib/transactionLines.ts). 등록 거래처가 되면
+  // 그 거래처 기본 품목·카테고리를 그 줄 빈칸에만.
+  function handleLineClient(i: number, text: string) {
+    const pair = clientPairFromText(text, clients);
+    setLineItems((prev) =>
+      prev.map((li, idx) => {
+        if (idx !== i) return li;
+        const next = { ...li, ...pair };
+        return pair.client_id ? fillClientDefaults(next, clients.find((c) => c.id === pair.client_id)) : next;
+      })
+    );
+  }
+
+  // 칸에서 벗어날 때 — 앞뒤 빈칸 정리, 등록 거래처 이름과 같으면 등록 거래처로
+  function settleLineClient(i: number) {
+    setLineItems((prev) =>
+      prev.map((li, idx) => {
+        if (idx !== i) return li;
+        const pair = settleClientPair(li, clients);
+        if (pair.client_id === li.client_id && pair.client_name_raw === li.client_name_raw) return li;
+        const next = { ...li, ...pair };
+        return pair.client_id && !li.client_id ? fillClientDefaults(next, clients.find((c) => c.id === pair.client_id)) : next;
+      })
+    );
   }
 
   // 큰 사진은 줄여서 보내고(서버 한도 4.5MB), 실패하면 그 이유(크기·인식 오류)를 돌려줌 — lib/postFileToApi.ts.
@@ -371,6 +413,14 @@ export function TransactionForm({
         if (idx < updated.length) updated[idx] = { ...updated[idx], ...patch };
         else updated.push({ ...emptyLineItem(), ...patch });
       });
+      // 여러 줄이면 영수증마다 읽은 거래처 이름을 그 줄에(직접 입력 이름 — 1줄이면 아래에서 위쪽 자유 입력 칸에, 예전 그대로)
+      const manyLines = updated.length > 1;
+      if (manyLines) {
+        valid.forEach((ex, idx) => {
+          const name = typeof ex.client_name === "string" ? ex.client_name : "";
+          if (name) updated[idx] = { ...updated[idx], client_id: "", client_name_raw: name };
+        });
+      }
       applyLines(updated, latest.current.commons);
       const ex = valid[0];
       // 1줄이고 비과세 카테고리면 VAT·세금계산서 체크를 끔(예전 그대로) — 여러 줄이면 비과세 줄만 저장할 때 끔
@@ -381,7 +431,7 @@ export function TransactionForm({
         // AI가 영수증에서 추정한 VAT 여부는 신뢰하지 않고, 항상 사용자가 직접 체크하게 둠.
         vat_included: ocrExempt ? false : prev.vat_included,
         tax_invoice_issued: ocrExempt ? false : prev.tax_invoice_issued,
-        client_name_raw: (ex.client_name as string) ?? prev.client_name_raw,
+        ...(manyLines ? {} : { client_name_raw: (ex.client_name as string) ?? prev.client_name_raw }),
       }));
     } catch {
       setError("OCR 인식 중 오류가 발생했습니다.");
@@ -425,6 +475,11 @@ export function TransactionForm({
       // 엑셀 줄마다 카테고리·결제수단(11/27 — 줄마다 고를 수 있게 되면서). 빈 칸이면 지금 위쪽 칸 값(applyLines), 1줄이면 위쪽 칸으로.
       const categoryNamed = (name?: string) => (name ? expenseCategories.find((c) => c.name === name) : undefined);
       const methodNamed = (name?: string) => (name ? paymentMethods.find((pm) => pm.name === name) : undefined);
+      // 거래처: 등록 거래처 이름과 같으면 등록 거래처, 아니면 직접 입력 이름(예전엔 첫 줄 거래처만 위쪽 칸에)
+      const clientNamed = (name?: string) => {
+        const matched = name ? clients.find((c) => c.name === name) : undefined;
+        return matched ? { client_id: matched.id, client_name_raw: "" } : { client_id: "", client_name_raw: name ?? "" };
+      };
       applyLines(
         rows.map((r) => ({
           item_name: r.item_name ?? "",
@@ -434,20 +489,18 @@ export function TransactionForm({
           project_id: (r.project_name && projects.find((p) => p.name === r.project_name)?.id) || "",
           category_id: categoryNamed(r.category_name)?.id ?? "",
           payment_method_id: methodNamed(r.payment_method_name)?.id ?? "",
+          ...clientNamed(r.client_name),
         })),
         latest.current.commons
       );
 
       const first = rows[0];
-      const matchedClient = first.client_name ? clients.find((c) => c.name === first.client_name) : undefined;
       // 1줄이고 비과세 카테고리면 세금계산서를 끔(예전 그대로) — 여러 줄이면 비과세 줄만 저장할 때 끔
       const catExempt = rows.length === 1 && isVatExemptCategory(categoryNamed(first.category_name));
       setValues((prev) => ({
         ...prev,
         trans_date: first.trans_date ?? prev.trans_date,
         type: first.type === "매출" || first.type === "매입" ? first.type : prev.type,
-        client_id: matchedClient?.id ?? "",
-        client_name_raw: matchedClient ? "" : (first.client_name ?? prev.client_name_raw),
         payment_type: first.payment_type === "credit" ? "credit" : "immediate",
         tax_invoice_issued: catExempt ? false : Boolean(first.tax_invoice_issued),
         note1: first.note1 ?? prev.note1,
@@ -697,30 +750,38 @@ export function TransactionForm({
             <option value="매출">매출</option>
           </select>
         </Field>
-        <Field label="거래처 (등록됨)">
-          <select value={values.client_id} onChange={(e) => handleClientSelect(e.target.value)} className={inputClass}>
-            <option value="">선택 안함</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="거래처 (자유 입력)">
-          <input
-            list="client-name-suggestions"
-            value={values.client_name_raw}
-            onChange={(e) => set("client_name_raw", e.target.value)}
-            placeholder="예: 온라인, 화성"
-            className={inputClass}
-          />
-          <datalist id="client-name-suggestions">
-            {clientNameSuggestions.map((name) => (
-              <option key={name} value={name} />
-            ))}
-          </datalist>
-        </Field>
+        {perLine ? (
+          <Field label="거래처">
+            <PerLineNote />
+          </Field>
+        ) : (
+          <>
+            <Field label="거래처 (등록됨)">
+              <select value={values.client_id} onChange={(e) => handleClientSelect(e.target.value)} className={inputClass}>
+                <option value="">선택 안함</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="거래처 (자유 입력)">
+              <input
+                list="client-name-suggestions"
+                value={values.client_name_raw}
+                onChange={(e) => set("client_name_raw", e.target.value)}
+                placeholder="예: 온라인, 화성"
+                className={inputClass}
+              />
+            </Field>
+          </>
+        )}
+        <datalist id="client-name-suggestions">
+          {clientNameSuggestions.map((name) => (
+            <option key={name} value={name} />
+          ))}
+        </datalist>
         <div className="flex flex-col gap-1">
           {perLine ? (
             <>
@@ -848,16 +909,23 @@ export function TransactionForm({
             + 물품 종류 추가
           </button>
         </div>
-        {itemHistory.length > 0 && (
+        {singleHistoryCount > 0 && (
           <p className="mb-2 text-xs text-slate-500">
-            이 거래처에서 쓴 품목 {itemHistory.length}개 — 품목칸을 누르면 골라 쓸 수 있어요(금액은 직접 입력).
+            이 거래처에서 쓴 품목 {singleHistoryCount}개 — 품목칸을 누르면 골라 쓸 수 있어요(금액은 직접 입력).
           </p>
         )}
-        <datalist id={itemHistoryListId}>
-          {itemHistory.map((h) => (
-            <option key={h.name} value={h.name} label={suggestionLabel(h)} />
-          ))}
-        </datalist>
+        {anyLineHistory && (
+          <p className="mb-2 text-xs text-slate-500">품목칸을 누르면 그 줄 거래처에서 쓴 품목을 골라 쓸 수 있어요(금액은 직접 입력).</p>
+        )}
+        {historyKeys.map((key, idx) =>
+          historyByKey[key]?.length ? (
+            <datalist key={key} id={`${itemHistoryListId}-${idx}`}>
+              {historyByKey[key].map((h) => (
+                <option key={h.name} value={h.name} label={suggestionLabel(h)} />
+              ))}
+            </datalist>
+          ) : null
+        )}
         {isGroupEdit ? (
           <p className="mb-2 text-xs text-slate-400">
             한 결제로 묶인 {initialGroup!.length}줄을 함께 수정해요. 줄을 지우거나 소계를 비우면 저장할 때 그 거래가 삭제돼요.
@@ -867,7 +935,7 @@ export function TransactionForm({
             <p className="mb-2 text-xs text-slate-400">
               줄을 추가하면 저장 시 첫 줄은 이 거래를 수정하고, 나머지 줄은 새 거래로 분리돼요 (계산서 1건이 여러
               프로젝트에 걸칠 때).
-              {partOfGroup && " 이 거래는 한 결제로 묶여 있지만 줄마다 날짜·거래처 등이 달라 이 줄만 수정해요."}
+              {partOfGroup && " 이 거래는 한 결제로 묶여 있지만 줄마다 날짜·결제 시점·메모 등이 달라 이 줄만 수정해요."}
             </p>
           )
         )}
@@ -887,7 +955,7 @@ export function TransactionForm({
                     value={li.item_name}
                     onChange={(e) => updateLineItem(i, { item_name: e.target.value })}
                     placeholder="품목명"
-                    list={itemHistory.length > 0 ? itemHistoryListId : undefined}
+                    list={historyListId(lineHistoryKeys[i])}
                     autoComplete="off"
                     className={`${inputClass} min-w-0 flex-1`}
                   />
@@ -901,7 +969,22 @@ export function TransactionForm({
                     </button>
                   )}
                 </div>
-                <div className={`grid grid-cols-2 gap-2 ${perLine ? "sm:grid-cols-3" : "sm:grid-cols-4"}`}>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {perLine && (
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <span className="text-xs font-medium text-slate-500">거래처</span>
+                      <input
+                        list="client-name-suggestions"
+                        value={lineClientText(li, clients)}
+                        onChange={(e) => handleLineClient(i, e.target.value)}
+                        onBlur={() => settleLineClient(i)}
+                        placeholder="등록·직접 입력"
+                        autoComplete="off"
+                        aria-label={`${i + 1}번째 줄 거래처`}
+                        className={`${inputClass} w-full min-w-0`}
+                      />
+                    </div>
+                  )}
                   <div className="flex min-w-0 flex-col gap-1">
                     <span className="text-xs font-medium text-slate-500">프로젝트</span>
                     <button
@@ -1017,8 +1100,8 @@ export function TransactionForm({
               <span>
                 한 결제로 묶기
                 <span className="block text-xs text-slate-400">매입장에 한 줄로 표시 · 프로젝트별 금액은 줄마다 따로 저장</span>
-                {groupPayment && mixedPaymentMethods && (
-                  <span className="block text-xs text-amber-700">결제수단이 줄마다 달라요 — 따로 결제했으면 체크를 끄세요.</span>
+                {groupPayment && mixedLabel && (
+                  <span className="block text-xs text-amber-700">{mixedLabel} 줄마다 달라요 — 따로 결제했으면 체크를 끄세요.</span>
                 )}
               </span>
             </label>

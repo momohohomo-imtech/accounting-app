@@ -80,11 +80,15 @@ test("묶음 전체 수정 가능 여부: 공통 칸이 모두 같을 때만(nul
     note2: null,
   };
   assert.equal(sameCommonFields([base, { ...base }]), true);
-  // 카테고리·결제수단은 11/27부터 줄마다 고름 — 달라도 묶음 전체 수정(줄마다 자기 값으로 저장)
+  // 거래처·카테고리·결제수단은 11/27부터 줄마다 고름 — 달라도 묶음 전체 수정(줄마다 자기 값으로 저장)
   assert.equal(sameCommonFields([base, { ...base, category_id: "k2" }]), true);
   assert.equal(sameCommonFields([base, { ...base, payment_method_id: "p2" }]), true);
+  assert.equal(sameCommonFields([base, { ...base, client_id: "c2" }]), true);
+  const rawClientLine = { ...base, client_id: null, client_name_raw: "가짜 직접 업체" };
+  assert.equal(sameCommonFields([base, rawClientLine]), true);
   assert.equal(sameCommonFields([base, { ...base, note2: "정산일: 2026-10-05" }]), false);
-  assert.equal(sameCommonFields([base, { ...base, client_id: "c2" }]), false);
+  assert.equal(sameCommonFields([base, { ...base, trans_date: "2026-10-02" }]), false);
+  assert.equal(sameCommonFields([base, { ...base, payment_type: "credit" as const }]), false);
   assert.equal(sameCommonFields([base, { ...base, tax_invoice_issued: false }]), false);
   assert.equal(sameCommonFields([base, { ...base, note1: undefined as unknown as null }]), true);
 });

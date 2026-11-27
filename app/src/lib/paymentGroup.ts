@@ -61,18 +61,9 @@ export function summaryLabel(names: string[], unit: string) {
   return `${distinct[0]} 외\u00a0${distinct.length - 1}${unit}`;
 }
 
-// 등록 화면에서 모든 줄이 같이 쓰는 칸 — 프로젝트·카테고리·결제수단·품목·수량·단가·금액은 줄마다 다름(카테고리·결제수단은 11/27부터
-// 줄마다 — lib/transactionLines.ts).
-const GROUP_COMMON_FIELDS = [
-  "trans_date",
-  "type",
-  "client_id",
-  "client_name_raw",
-  "payment_type",
-  "needs_classification",
-  "note1",
-  "note2",
-] as const;
+// 등록 화면에서 모든 줄이 같이 쓰는 칸 — 거래처·프로젝트·카테고리·결제수단·품목·수량·단가·금액은 줄마다 다름(거래처·카테고리·결제수단은
+// 11/27부터 줄마다 — lib/transactionLines.ts).
+const GROUP_COMMON_FIELDS = ["trans_date", "type", "payment_type", "needs_classification", "note1", "note2"] as const;
 // VAT 추가·세금계산서는 위쪽 공통 체크지만 비과세 카테고리 줄은 늘 끄고 저장(lib/transactionLines.ts의 lineTaxFlags) — 비과세 줄은 꺼져
 // 있어야 하고, 나머지 줄끼리 같으면 됨.
 const GROUP_TAX_FIELDS = ["vat_included", "tax_invoice_issued"] as const;
